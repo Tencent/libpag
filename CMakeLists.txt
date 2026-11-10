@@ -331,6 +331,7 @@ if (PAG_BUILD_PAGX)
         list(APPEND PAG_FILES src/pagx/svg/SVGExporter.cpp src/pagx/svg/SVGFeatureProbe.cpp)
         list(APPEND PAG_FILES src/pagx/svg/SVGAnimationPlan.cpp src/pagx/svg/SVGAnimationPlan.h)
         list(APPEND PAG_FILES src/pagx/svg/SVGAnimationWriter.cpp src/pagx/svg/SVGAnimationWriter.h)
+        list(APPEND PAG_FILES src/pagx/svg/SVGCoverageLedger.cpp src/pagx/svg/SVGCoverageLedger.h)
     endif ()
 
     if (PAG_BUILD_HTML)

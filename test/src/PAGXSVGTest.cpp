@@ -25,6 +25,7 @@
 #include "pagx/PAGXDocument.h"
 #include "pagx/PAGXExporter.h"
 #include "pagx/PAGXImporter.h"
+#include "pagx/PAGXNodeChannel.h"
 #include "pagx/PAGXOptimizer.h"
 #include "pagx/SVGExporter.h"
 #include "pagx/SVGImporter.h"
@@ -65,8 +66,10 @@
 #include "pagx/nodes/TextBox.h"
 #include "pagx/nodes/TextPath.h"
 #include "pagx/nodes/TrimPath.h"
+#include "pagx/svg/SVGCoverageLedger.h"
 #include "pagx/svg/SVGPathParser.h"
 #include "pagx/svg/SVGTransformParser.h"
+#include "pagx/utils/StringParser.h"
 #include "renderer/FontEmbedder.h"
 #include "renderer/LayerBuilder.h"
 #include "tgfx/core/Data.h"
@@ -5020,6 +5023,96 @@ PAGX_TEST(PAGXSVGTest, SVGExport_AnimBlendFilterColor) {
   auto svg = pagx::SVGExporter::ToSVG(*doc);
   EXPECT_NE(svg.find("attributeName=\"flood-color\""), std::string::npos);
   EXPECT_NE(svg.find("values=\"#FF0000;#0000FF\""), std::string::npos);
+}
+
+//==============================================================================
+// S0: coverage ledger gate
+//==============================================================================
+
+// Every animatable channel the PAGX reflection table knows about must have a ledger row, and every
+// ledger row must still be a real animatable channel. Adding one without the other fails here.
+PAGX_TEST(PAGXSVGTest, SVGCoverageLedgerIsComplete) {
+  static const pagx::NodeType AllNodeTypes[] = {
+      pagx::NodeType::Document,
+      pagx::NodeType::PathData,
+      pagx::NodeType::Image,
+      pagx::NodeType::Composition,
+      pagx::NodeType::SolidColor,
+      pagx::NodeType::LinearGradient,
+      pagx::NodeType::RadialGradient,
+      pagx::NodeType::ConicGradient,
+      pagx::NodeType::DiamondGradient,
+      pagx::NodeType::ImagePattern,
+      pagx::NodeType::ColorStop,
+      pagx::NodeType::Font,
+      pagx::NodeType::Glyph,
+      pagx::NodeType::Animation,
+      pagx::NodeType::AnimationObject,
+      pagx::NodeType::Channel,
+      pagx::NodeType::StateMachine,
+      pagx::NodeType::StateRegion,
+      pagx::NodeType::State,
+      pagx::NodeType::StateTransition,
+      pagx::NodeType::TransitionCondition,
+      pagx::NodeType::StateMachineInput,
+      pagx::NodeType::Layer,
+      pagx::NodeType::DropShadowStyle,
+      pagx::NodeType::InnerShadowStyle,
+      pagx::NodeType::BackgroundBlurStyle,
+      pagx::NodeType::NoiseStyle,
+      pagx::NodeType::GlassStyle,
+      pagx::NodeType::BlurFilter,
+      pagx::NodeType::DropShadowFilter,
+      pagx::NodeType::InnerShadowFilter,
+      pagx::NodeType::BlendFilter,
+      pagx::NodeType::ColorMatrixFilter,
+      pagx::NodeType::NoiseFilter,
+      pagx::NodeType::Rectangle,
+      pagx::NodeType::Ellipse,
+      pagx::NodeType::Polystar,
+      pagx::NodeType::Path,
+      pagx::NodeType::Text,
+      pagx::NodeType::Fill,
+      pagx::NodeType::Stroke,
+      pagx::NodeType::TrimPath,
+      pagx::NodeType::RoundCorner,
+      pagx::NodeType::MergePath,
+      pagx::NodeType::TextModifier,
+      pagx::NodeType::TextPath,
+      pagx::NodeType::TextBox,
+      pagx::NodeType::Group,
+      pagx::NodeType::Repeater,
+      pagx::NodeType::RangeSelector,
+      pagx::NodeType::GlyphRun,
+      pagx::NodeType::ViewModel,
+      pagx::NodeType::ViewModelProperty,
+      pagx::NodeType::DataBind,
+  };
+
+  size_t animatableChannels = 0;
+  std::string firstMissing;
+  for (auto type : AllNodeTypes) {
+    for (const auto& name : pagx::ListChannels(type)) {
+      if (!pagx::IsAnimatableChannel(type, name)) {
+        continue;
+      }
+      ++animatableChannels;
+      if (firstMissing.empty() && pagx::FindSVGChannelEntry(type, name) == nullptr) {
+        firstMissing = std::string(pagx::NodeTypeName(type)) + "." + name;
+      }
+    }
+  }
+  EXPECT_TRUE(firstMissing.empty()) << "unclassified animatable channel: " << firstMissing;
+  EXPECT_EQ(animatableChannels, 175u);
+  EXPECT_EQ(pagx::SVGChannelLedger().size(), 175u);
+  EXPECT_EQ(pagx::SVGClassifiedNodeTypeCount(), 30u);
+
+  // The reverse direction: a stale ledger row would claim a channel the model no longer has.
+  for (const auto& entry : pagx::SVGChannelLedger()) {
+    EXPECT_TRUE(pagx::IsAnimatableChannel(entry.type, entry.channel))
+        << "stale ledger row: " << pagx::NodeTypeName(entry.type) << "." << entry.channel;
+    EXPECT_NE(entry.note, nullptr);
+  }
 }
 
 }  // namespace pag
