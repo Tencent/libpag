@@ -33,6 +33,10 @@
 #include "tgfx/core/Clock.h"
 #include "utils/TestUtils.h"
 
+#ifdef __OHOS__
+#include "platform/ohos/NativePlatform.h"
+#endif
+
 #ifdef TGFX_USE_OPENGL
 #include "tgfx/gpu/opengl/GLDevice.h"
 #endif
@@ -127,6 +131,7 @@ static void CheckNoOpenDiskCacheFiles() {
 /**
  * Isolates the singleton's bookkeeping in an exclusively created temporary directory. Restores
  * the original state without scanning or modifying its files, including on fatal assertion returns.
+ * Also preserves the platform default cache directory on HarmonyOS.
  */
 class ScopedDiskCacheDirectory {
  public:
@@ -150,6 +155,9 @@ class ScopedDiskCacheDirectory {
     }
 #endif
     directory = path;
+#ifdef __OHOS__
+    originalDefaultCacheDir = Platform::Current()->getCacheDir();
+#endif
     auto diskCache = DiskCache::GetInstance();
     DiskIOWorker::GetInstance()->waitAll();
     std::lock_guard<std::mutex> lock(diskCache->locker);
@@ -184,12 +192,18 @@ class ScopedDiskCacheDirectory {
       diskCache->maxDiskSize = originalMaxDiskSize;
       diskCache->totalDiskSize = originalTotalDiskSize;
     }
+#ifdef __OHOS__
+    NativePlatform::SetDefaultCacheDir(originalDefaultCacheDir);
+#endif
     std::error_code error = {};
     std::filesystem::remove_all(directory, error);
     EXPECT_FALSE(error);
   }
 
  private:
+#ifdef __OHOS__
+  std::string originalDefaultCacheDir;
+#endif
   std::string originalCacheDir;
   std::string originalConfigPath;
   std::string originalCacheFolder;
@@ -754,6 +768,69 @@ PAG_TEST(PAGDiskCacheTest, RepeatedCacheDirectorySetup) {
   }
   EXPECT_FALSE(std::filesystem::exists(cacheFilePath));
 }
+
+#ifdef __OHOS__
+/**
+ * Registering the HarmonyOS default directory must preserve an existing custom directory, and
+ * native empty-string resets must restore the default paths before the first cache write.
+ */
+PAG_TEST(PAGDiskCacheTest, DefaultCacheDirectoryReset) {
+  ASSERT_NO_FATAL_FAILURE(CheckNoOpenDiskCacheFiles());
+  auto diskCache = DiskCache::GetInstance();
+  ScopedDiskCacheDirectory cleanup;
+  ASSERT_FALSE(cleanup.directory.empty());
+  auto defaultDir = Directory::JoinPath(cleanup.directory, "default");
+  auto customDir = Directory::JoinPath(cleanup.directory, "custom");
+  NativePlatform::SetDefaultCacheDir(defaultDir);
+  PAGDiskCache::SetCacheDir(customDir);
+  {
+    std::lock_guard<std::mutex> lock(diskCache->locker);
+    ASSERT_EQ(diskCache->customCacheDir, customDir);
+    ASSERT_EQ(diskCache->configPath, Directory::JoinPath(customDir, "cache.cfg"));
+    ASSERT_EQ(diskCache->cacheFolder, Directory::JoinPath(customDir, "files"));
+  }
+  NativePlatform::SetDefaultCacheDir(defaultDir);
+  EXPECT_EQ(Platform::Current()->getCacheDir(), defaultDir);
+  {
+    std::lock_guard<std::mutex> lock(diskCache->locker);
+    ASSERT_EQ(diskCache->customCacheDir, customDir);
+    ASSERT_EQ(diskCache->getCacheDir(), customDir);
+    ASSERT_EQ(diskCache->configPath, Directory::JoinPath(customDir, "cache.cfg"));
+    ASSERT_EQ(diskCache->cacheFolder, Directory::JoinPath(customDir, "files"));
+  }
+  PAGDiskCache::SetCacheDir("");
+  {
+    std::lock_guard<std::mutex> lock(diskCache->locker);
+    ASSERT_TRUE(diskCache->customCacheDir.empty());
+    ASSERT_EQ(diskCache->getCacheDir(), defaultDir);
+    ASSERT_EQ(diskCache->configPath, Directory::JoinPath(defaultDir, "cache.cfg"));
+    ASSERT_EQ(diskCache->cacheFolder, Directory::JoinPath(defaultDir, "files"));
+  }
+  ASSERT_FALSE(std::filesystem::exists(defaultDir));
+  ASSERT_FALSE(std::filesystem::exists(customDir));
+  const std::string cacheKey = "DefaultCacheDirectoryReset";
+  auto data = tgfx::Data::MakeWithCopy(cacheKey.data(), cacheKey.size());
+  ASSERT_TRUE(data != nullptr);
+  PAGDiskCache::SetMaxDiskSize(data->size());
+  ASSERT_TRUE(DiskCache::WriteFile(cacheKey, data));
+  DiskIOWorker::GetInstance()->waitAll();
+  uint32_t cacheFileID = 0;
+  {
+    std::lock_guard<std::mutex> lock(diskCache->locker);
+    ASSERT_EQ(diskCache->cachedFileIDs.count(cacheKey), 1u);
+    cacheFileID = diskCache->cachedFileIDs.at(cacheKey);
+  }
+  auto fileName = std::to_string(cacheFileID) + ".bin";
+  EXPECT_TRUE(std::filesystem::exists(Directory::JoinPath(defaultDir, "cache.cfg")));
+  EXPECT_TRUE(std::filesystem::exists(
+      Directory::JoinPath(Directory::JoinPath(defaultDir, "files"), fileName)));
+  EXPECT_FALSE(std::filesystem::exists(customDir));
+  auto cacheData = DiskCache::ReadFile(cacheKey);
+  ASSERT_TRUE(cacheData != nullptr);
+  ASSERT_EQ(cacheData->size(), data->size());
+  EXPECT_EQ(memcmp(cacheData->bytes(), data->bytes(), data->size()), 0);
+}
+#endif
 
 PAG_TEST(PAGDiskCacheTest, CacheDirectorySwitchReloadsConfiguration) {
   ASSERT_NO_FATAL_FAILURE(CheckNoOpenDiskCacheFiles());

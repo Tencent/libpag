@@ -33,7 +33,7 @@ export class PAGDiskCache {
    */
   static SetCacheDir(dir: string): void {
     PAGInit.Init();
-    JPAGDiskCache.SetCacheDir(dir.length === 0 ? PAGInit.GetDefaultCacheDir() : dir);
+    JPAGDiskCache.SetCacheDir(dir);
   }
 
   /**

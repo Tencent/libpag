@@ -23,6 +23,16 @@
 namespace pag {
 class NativePlatform : public Platform {
  public:
+  /**
+   * Registers the default cache directory during initialization without changing a custom directory.
+   */
+  static void SetDefaultCacheDir(const std::string& dir);
+
+  /**
+   * Returns the default cache directory registered during initialization.
+   */
+  std::string getCacheDir() const override;
+
   std::vector<const VideoDecoderFactory*> getVideoDecoderFactories() const override;
 
   bool registerFallbackFonts() const override;

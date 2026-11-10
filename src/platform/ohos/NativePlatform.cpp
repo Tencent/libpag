@@ -17,10 +17,14 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "NativePlatform.h"
+#include <mutex>
 #include "platform/ohos/NativeDisplayLink.h"
 #include "platform/ohos/OHOSSoftwareDecoderWrapper.h"
 
 namespace pag {
+static std::mutex DefaultCacheDirLocker = {};
+static std::string DefaultCacheDir = {};
+
 class HardwareDecoderFactory : public VideoDecoderFactory {
  public:
   bool isHardwareBacked() const override {
@@ -52,6 +56,16 @@ static OHOSSoftwareDecoderFactory softwareDecoderFactory = {};
 const Platform* Platform::Current() {
   static const NativePlatform platform = {};
   return &platform;
+}
+
+void NativePlatform::SetDefaultCacheDir(const std::string& dir) {
+  std::lock_guard<std::mutex> autoLock(DefaultCacheDirLocker);
+  DefaultCacheDir = dir;
+}
+
+std::string NativePlatform::getCacheDir() const {
+  std::lock_guard<std::mutex> autoLock(DefaultCacheDirLocker);
+  return DefaultCacheDir;
 }
 
 std::vector<const VideoDecoderFactory*> NativePlatform::getVideoDecoderFactories() const {
