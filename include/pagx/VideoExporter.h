@@ -36,7 +36,7 @@ class PAGAnimation;
 class PAGScene;
 class PAGSurface;
 class PAGXDocument;
-class VideoExportState;
+struct VideoExportState;
 
 /**
  * Export options for VideoExporter.
