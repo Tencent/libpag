@@ -5437,4 +5437,41 @@ PAGX_TEST(PAGXSVGTest, SVGExport_FilterChainAdvancesAfterDropShadow) {
   EXPECT_NE(svg.find("in=\"shadow0Over\""), std::string::npos);
 }
 
+// ST4 remainder: a stroke-only contour mask cannot become a clip region, because <clipPath> uses
+// the filled area. The degradation has to be visible instead of silently clipping to the interior.
+PAGX_TEST(PAGXSVGTest, SVGExport_StrokeOnlyContourMaskWarns) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto* mask = doc->makeNode<pagx::Layer>("strokeMask");
+  auto* maskRect = doc->makeNode<pagx::Rectangle>();
+  maskRect->position = {100, 100};
+  maskRect->size = {80, 80};
+  auto* stroke = doc->makeNode<pagx::Stroke>();
+  auto* color = doc->makeNode<pagx::SolidColor>();
+  stroke->color = color;
+  stroke->width = 6.0f;
+  mask->contents = {maskRect, stroke};
+
+  auto* owner = doc->makeNode<pagx::Layer>("owner");
+  owner->mask = mask;
+  owner->maskType = pagx::MaskType::Contour;
+  auto* rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {100, 100};
+  rect->size = {100, 100};
+  auto* fill = doc->makeNode<pagx::Fill>();
+  auto* solid = doc->makeNode<pagx::SolidColor>();
+  fill->color = solid;
+  owner->contents = {rect, fill};
+  owner->children.push_back(mask);
+  doc->layers.push_back(owner);
+
+  std::vector<std::string> warnings;
+  auto svg = pagx::SVGExporter::ToSVG(*doc, {}, &warnings);
+  EXPECT_NE(svg.find("<clipPath"), std::string::npos);
+  bool warned = false;
+  for (const auto& warning : warnings) {
+    warned = warned || warning.find("stroke-only") != std::string::npos;
+  }
+  EXPECT_TRUE(warned) << (warnings.empty() ? "no warnings" : warnings[0]);
+}
+
 }  // namespace pag

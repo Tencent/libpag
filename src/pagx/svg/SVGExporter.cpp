@@ -1970,7 +1970,7 @@ std::string SVGWriter::writeMaskOrClipDef(const Layer* maskLayer, const Layer* o
   }
   _defs->closeElementStart();
   SVGWriter nestedWriter(&paintDefs, _context, _indentSpaces, _convertTextToPath, _layoutContext,
-                         _doc);
+                         _doc, _bakeUnsupported, _rasterScale, _warnings);
   nestedWriter._maskContentTransform = maskRelativeMatrix(maskLayer, owner);
   nestedWriter._clipPathContent = isClipPath;
   (nestedWriter.*writer)(*_defs, maskLayer);
@@ -2019,6 +2019,15 @@ void SVGWriter::writeMaskContent(SVGBuilder& out, const Layer* layer) {
 }
 
 void SVGWriter::writeClipPathContent(SVGBuilder& out, const Layer* layer) {
+  // A contour clip is the filled area of the mask geometry. When the mask only paints a stroke, the
+  // ring itself is not representable as a clip region, so the visible result would silently be the
+  // interior of the stroke path. Report it instead of hiding the divergence.
+  auto painters = CollectFillStroke(layer->contents);
+  if (painters.fill == nullptr && painters.stroke != nullptr) {
+    addWarning("contour mask '" + layer->id +
+               "' is stroke-only; SVG <clipPath> uses the fill area, so the stroke ring is not "
+               "represented.");
+  }
   // _maskContentTransform already includes the mask layer's own matrix, so the root layer is
   // emitted with it directly and children keep accumulating their own transforms.
   writeLayerContents(out, layer, _maskContentTransform, 1.0f, LayerPlacement::Background,
