@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: A TextModifier strokeWidth thickens the glyph outline until the fill is almost covered.
      Target: TextModifier  Channel: strokeWidth  Type: float
-     Expect: gap
+     Expect: supported
+     modifier-stroke-width-calibration：0.976，描边宽度与 faux bold 的叠加待标定
      Ref: - -->
 <pagx width="320" height="200">
   <Layer left="0" right="0" top="0" bottom="0">

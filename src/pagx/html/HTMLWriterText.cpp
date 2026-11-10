@@ -1279,6 +1279,13 @@ void HTMLWriter::writeTextModifier(HTMLBuilder& out, const std::vector<GeoInfo>&
         // text's layout coordinate system; the SVG viewport is positioned at renderPos so
         // glyph coordinates are relative to that origin.
         const RangeSelector* animatedSelector = nullptr;
+        // A modifier channel animates the pose of every glyph the modifier reaches, so the glyphs
+        // need ids and rules just like an animated selector does.
+        const TextModifier* animatedModifier = nullptr;
+        if (modifier != nullptr && !modifier->id.empty() &&
+            _ctx->animation.animatedModifiers.count(modifier) > 0) {
+          animatedModifier = modifier;
+        }
         if (RangeSelectorGlyphsAnimatable(modifier)) {
           auto* selector = static_cast<const RangeSelector*>(modifier->selectors[0]);
           if (_ctx->animation.animatedRangeSelectors.count(selector) > 0 && !selector->id.empty()) {
@@ -1397,14 +1404,26 @@ void HTMLWriter::writeTextModifier(HTMLBuilder& out, const std::vector<GeoInfo>&
                           CssFloatToString(-modAnchorY) + ") ";
 
           out.openTag("text");
-          if (animatedSelector != nullptr) {
+          if (animatedSelector != nullptr || animatedModifier != nullptr) {
             // The keyframes rebuild this glyph's modifier pose per frame; the static transform
             // below stays as the pre-animation fallback.
-            std::string glyphId = animatedSelector->id + "_g" + std::to_string(charIdx);
+            const std::string& hostId =
+                animatedSelector != nullptr ? animatedSelector->id : animatedModifier->id;
+            std::string glyphId = hostId + "_g" + std::to_string(charIdx);
             out.addAttr("id", glyphId);
-            _ctx->animation.rangeSelectorGlyphs.push_back({animatedSelector, modifier, charIdx,
-                                                           factors.size(), glyphX, glyphY, pivotX,
-                                                           renderFont, glyphId});
+            HTMLWriterContext::AnimationState::RangeSelectorGlyph record = {};
+            record.selector = animatedSelector;
+            record.modifier = modifier;
+            record.glyphIndex = charIdx;
+            record.totalGlyphs = factors.size();
+            record.glyphX = glyphX;
+            record.glyphY = glyphY;
+            record.pivotX = pivotX;
+            record.fontSize = renderFont;
+            record.factor = f;
+            record.fromModifier = animatedModifier != nullptr;
+            record.id = glyphId;
+            _ctx->animation.rangeSelectorGlyphs.push_back(record);
           }
           if (!fontFamily.empty()) {
             out.addAttr("font-family", fontFamily);

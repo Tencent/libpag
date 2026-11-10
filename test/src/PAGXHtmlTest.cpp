@@ -3957,6 +3957,46 @@ CLI_TEST(PAGXHtmlTest, AnimationShadowStyleKeyframes) {
   EXPECT_NE(floodRule.find("flood-color:"), std::string::npos) << floodRule;
 }
 
+// A TextModifier channel moves every glyph it reaches, so each glyph gets its own rule - the same
+// fan-out an animated RangeSelector uses - with the modifier value scaled by that glyph's factor.
+CLI_TEST(PAGXHtmlTest, AnimationTextModifierStroke) {
+  const char* xml = R"(<pagx width="320" height="200">
+    <Layer left="0" right="0" top="0" bottom="0">
+      <Text text="AB" fontFamily="Arial" fontStyle="Bold" fontSize="48" position="60,120"/>
+      <TextModifier id="strokeMod" strokeColor="#0E7490" strokeWidth="1.5">
+        <RangeSelector id="strokeSel" start="0" end="1" offset="0" unit="percentage"
+                       shape="rampUp" easeIn="0" easeOut="0" weight="1"/>
+      </TextModifier>
+      <Fill color="#BE123C"/>
+    </Layer>
+    <Animations>
+      <Animation id="strokeMix" duration="60" frameRate="60" loop="once">
+        <Object target="strokeMod">
+          <Channel name="rotation" type="float">
+            <Key time="0" value="0" interpolation="linear"/>
+            <Key time="60" value="8"/>
+          </Channel>
+          <Channel name="strokeWidth" type="float">
+            <Key time="0" value="1.5" interpolation="linear"/>
+            <Key time="60" value="3"/>
+          </Channel>
+        </Object>
+      </Animation>
+    </Animations>
+  </pagx>)";
+
+  pagx::HTMLExportOptions options;
+  options.extractStyleSheet = false;
+  auto html = LoadXMLAndConvert(xml, options);
+  ASSERT_FALSE(html.empty());
+  // One rule per glyph, each carrying the modified pose and the stroke width.
+  EXPECT_EQ(CountOccurrences(html, "@keyframes "), 2u) << html;
+  EXPECT_NE(html.find("id=\"strokeMod_g0\""), std::string::npos) << html;
+  EXPECT_NE(html.find("id=\"strokeMod_g1\""), std::string::npos) << html;
+  EXPECT_NE(html.find("stroke-width:"), std::string::npos) << html;
+  EXPECT_NE(html.find("rotate("), std::string::npos) << html;
+}
+
 CLI_TEST(PAGXHtmlTest, AnimationMixedEasingSplitsTheRule) {
   const char* xml = R"(<pagx width="320" height="200">
     <Layer id="splitBox" x="40" y="60" width="80" height="80">

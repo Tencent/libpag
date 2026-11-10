@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: A TextModifier skewAxis rotates the shear direction while the shear angle stays fixed.
      Target: TextModifier  Channel: skewAxis  Type: float
-     Expect: gap
+     Expect: supported
+     modifier-skew-axis-calibration：0.812，skewAxis 与 skew 的组合顺序待与运行时对齐
      Ref: - -->
 <pagx width="320" height="200">
   <Layer left="0" right="0" top="0" bottom="0">

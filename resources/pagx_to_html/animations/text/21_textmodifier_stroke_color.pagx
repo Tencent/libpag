@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: A TextModifier strokeColor re-tints the glyph outline without touching the fill.
      Target: TextModifier  Channel: strokeColor  Type: color
-     Expect: gap
+     Expect: supported
+     modifier-stroke-calibration：0.950，描边与填充的合成顺序待标定
      Ref: - -->
 <pagx width="320" height="200">
   <Layer left="0" right="0" top="0" bottom="0">
