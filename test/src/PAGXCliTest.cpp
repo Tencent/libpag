@@ -16,8 +16,21 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#ifdef _WIN32
+#include <windows.h>
+#else
+#include <fcntl.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <unistd.h>
+#endif
 #include <algorithm>
+#include <cerrno>
+#include <cmath>
+#include <cstdint>
+#include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -26,6 +39,7 @@
 #include <unordered_set>
 #include <vector>
 #include "base/PAGTest.h"
+#include "cli/CliUtils.h"
 #include "cli/CommandBounds.h"
 #include "cli/CommandEmbed.h"
 #include "cli/CommandExport.h"
@@ -415,9 +429,14 @@ CLI_TEST(PAGXCliTest, Render_BackdropStyles) {
   EXPECT_GT(glassBlue.alpha, 0.99f);
 }
 
-static tgfx::Bitmap RenderAnimatedTimelinesAt(const std::string& timeSeconds) {
+static tgfx::Bitmap RenderAnimatedTimelinesAt(const std::string& timeSeconds,
+                                              bool opaqueBackground = false) {
   auto inputPath = TestResourcePath("render_animated_timelines.pagx");
-  std::vector<std::string> args = {"render", "--time", timeSeconds, inputPath};
+  std::vector<std::string> args = {"render", "--time", timeSeconds};
+  if (opaqueBackground) {
+    args.insert(args.end(), {"--background", "#FFFFFF"});
+  }
+  args.emplace_back(inputPath);
   std::vector<char*> argv = {};
   for (auto& arg : args) {
     argv.push_back(arg.data());
@@ -449,6 +468,53 @@ CLI_TEST(PAGXCliTest, Render_TimeDrivesCompositionTimelines) {
   EXPECT_LT(switched.getColor(150, 50).green, 0.1f);
   EXPECT_GT(switched.getColor(250, 50).green, 0.9f);
   EXPECT_LT(switched.getColor(250, 50).red, 0.1f);
+}
+
+static void ExpectSamePixels(const tgfx::Bitmap& expected, const tgfx::Bitmap& actual) {
+  ASSERT_FALSE(expected.isEmpty());
+  ASSERT_FALSE(actual.isEmpty());
+  ASSERT_EQ(actual.width(), expected.width());
+  ASSERT_EQ(actual.height(), expected.height());
+  tgfx::Pixmap expectedPixels(expected);
+  tgfx::Pixmap actualPixels(actual);
+  auto packedRowBytes = static_cast<size_t>(expected.width()) * 4;
+  ASSERT_GE(expectedPixels.rowBytes(), packedRowBytes);
+  ASSERT_GE(actualPixels.rowBytes(), packedRowBytes);
+  auto* expectedData = static_cast<const uint8_t*>(expectedPixels.pixels());
+  auto* actualData = static_cast<const uint8_t*>(actualPixels.pixels());
+  for (int row = 0; row < expected.height(); ++row) {
+    EXPECT_EQ(std::memcmp(actualData + static_cast<size_t>(row) * actualPixels.rowBytes(),
+                          expectedData + static_cast<size_t>(row) * expectedPixels.rowBytes(),
+                          packedRowBytes),
+              0)
+        << "row " << row;
+  }
+}
+
+CLI_TEST(PAGXCliTest, Render_FrameSequenceMatchesSingleFrameTimes) {
+  auto inputPath = TestResourcePath("render_animated_timelines.pagx");
+  auto framesDir = TempDir() + "/animated_frame_sequence";
+  std::filesystem::remove_all(framesDir);
+  auto ret =
+      CallRun(pagx::cli::RunRender, {"render", "--frames-dir", framesDir, "--fps", "20",
+                                     "--duration", "0.35", "--background", "#FFFFFF", inputPath});
+  ASSERT_EQ(ret, 0);
+
+  const char* timeSeconds[] = {"0", "0.05", "0.1", "0.15", "0.2", "0.25", "0.3"};
+  for (int frame = 0; frame < 7; ++frame) {
+    char fileName[32] = {};
+    std::snprintf(fileName, sizeof(fileName), "f_%04d.png", frame);
+    auto codec = tgfx::ImageCodec::MakeFrom(framesDir + "/" + fileName);
+    ASSERT_NE(codec, nullptr) << "frame " << frame;
+    tgfx::Bitmap actual(codec->width(), codec->height(), false, false);
+    ASSERT_FALSE(actual.isEmpty());
+    {
+      tgfx::Pixmap actualPixels(actual);
+      ASSERT_TRUE(codec->readPixels(actualPixels.info(), actualPixels.writablePixels()));
+    }
+    auto expected = RenderAnimatedTimelinesAt(timeSeconds[frame], true);
+    ExpectSamePixels(expected, actual);
+  }
 }
 
 CLI_PIXEL_TEST(PAGXCliTest, Render_WebpFormat) {
@@ -3960,6 +4026,189 @@ CLI_TEST(PAGXCliTest, Embed_Usage_NoInputErrors_HelpPrints) {
 // Video encoder tests
 //==============================================================================
 
+struct ProcessCapture {
+  int exitCode = -1;
+  std::string output = {};
+  std::string errorOutput = {};
+};
+
+static std::string ReadBinaryFile(const std::string& path) {
+  std::ifstream in(path, std::ios::binary);
+  return {std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()};
+}
+
+static ProcessCapture RunCapturedProcess(const std::vector<std::string>& arguments) {
+  ProcessCapture result = {};
+  if (arguments.empty()) {
+    result.errorOutput = "empty process arguments";
+    return result;
+  }
+  static int captureID = 0;
+  auto basePath = TempDir() + "/process_capture_" + std::to_string(captureID++);
+  auto stdoutPath = basePath + ".stdout";
+  auto stderrPath = basePath + ".stderr";
+#ifdef _WIN32
+  auto wideStdout = pagx::cli::UTF8ToWide(stdoutPath);
+  auto wideStderr = pagx::cli::UTF8ToWide(stderrPath);
+  SECURITY_ATTRIBUTES security = {};
+  security.nLength = sizeof(security);
+  security.bInheritHandle = TRUE;
+  auto stdoutHandle =
+      CreateFileW(wideStdout.c_str(), GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, &security,
+                  CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+  auto stderrHandle =
+      CreateFileW(wideStderr.c_str(), GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, &security,
+                  CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+  if (stdoutHandle == INVALID_HANDLE_VALUE || stderrHandle == INVALID_HANDLE_VALUE) {
+    if (stdoutHandle != INVALID_HANDLE_VALUE) {
+      CloseHandle(stdoutHandle);
+    }
+    if (stderrHandle != INVALID_HANDLE_VALUE) {
+      CloseHandle(stderrHandle);
+    }
+    result.errorOutput = "failed to create process capture files";
+    return result;
+  }
+  std::wstring commandLine = {};
+  for (const auto& argument : arguments) {
+    if (!commandLine.empty()) {
+      commandLine += L' ';
+    }
+    commandLine += pagx::cli::QuoteWindowsArg(pagx::cli::UTF8ToWide(argument));
+  }
+  STARTUPINFOW startup = {};
+  startup.cb = sizeof(startup);
+  startup.dwFlags = STARTF_USESTDHANDLES;
+  startup.hStdInput = GetStdHandle(STD_INPUT_HANDLE);
+  startup.hStdOutput = stdoutHandle;
+  startup.hStdError = stderrHandle;
+  PROCESS_INFORMATION info = {};
+  auto created = CreateProcessW(nullptr, commandLine.data(), nullptr, nullptr, TRUE, 0, nullptr,
+                                nullptr, &startup, &info);
+  auto createError = created ? ERROR_SUCCESS : GetLastError();
+  CloseHandle(stdoutHandle);
+  CloseHandle(stderrHandle);
+  if (!created) {
+    result.errorOutput =
+        "failed to start process (Windows error " + std::to_string(createError) + ")";
+    return result;
+  }
+  WaitForSingleObject(info.hProcess, INFINITE);
+  DWORD exitCode = 0;
+  GetExitCodeProcess(info.hProcess, &exitCode);
+  result.exitCode = static_cast<int>(exitCode);
+  CloseHandle(info.hProcess);
+  CloseHandle(info.hThread);
+#else
+  auto stdoutFD = open(stdoutPath.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0600);
+  auto stderrFD = open(stderrPath.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0600);
+  if (stdoutFD < 0 || stderrFD < 0) {
+    if (stdoutFD >= 0) {
+      close(stdoutFD);
+    }
+    if (stderrFD >= 0) {
+      close(stderrFD);
+    }
+    result.errorOutput = "failed to create process capture files";
+    return result;
+  }
+  std::vector<char*> argv = {};
+  argv.reserve(arguments.size() + 1);
+  for (const auto& argument : arguments) {
+    argv.emplace_back(const_cast<char*>(argument.c_str()));
+  }
+  argv.emplace_back(nullptr);
+  auto processID = fork();
+  if (processID == 0) {
+    if (dup2(stdoutFD, STDOUT_FILENO) >= 0 && dup2(stderrFD, STDERR_FILENO) >= 0) {
+      close(stdoutFD);
+      close(stderrFD);
+      execvp(argv[0], argv.data());
+    }
+    _exit(127);
+  }
+  close(stdoutFD);
+  close(stderrFD);
+  if (processID < 0) {
+    result.errorOutput = "failed to fork process: " + std::string(std::strerror(errno));
+    return result;
+  }
+  int status = 0;
+  pid_t waitResult = -1;
+  do {
+    waitResult = waitpid(processID, &status, 0);
+  } while (waitResult < 0 && errno == EINTR);
+  if (waitResult < 0) {
+    result.errorOutput = "failed to wait for process: " + std::string(std::strerror(errno));
+    return result;
+  }
+  if (WIFEXITED(status)) {
+    result.exitCode = WEXITSTATUS(status);
+  } else if (WIFSIGNALED(status)) {
+    result.exitCode = -WTERMSIG(status);
+  }
+#endif
+  result.output = ReadBinaryFile(stdoutPath);
+  result.errorOutput = ReadBinaryFile(stderrPath);
+  return result;
+}
+
+static bool IsExecutableFile(const std::string& path) {
+  std::error_code ec;
+  if (!std::filesystem::is_regular_file(path, ec) || ec) {
+    return false;
+  }
+#ifdef _WIN32
+  return true;
+#else
+  return access(path.c_str(), X_OK) == 0;
+#endif
+}
+
+static std::string FindSiblingExecutable(const std::string& executable,
+                                         const std::string& siblingName) {
+  std::filesystem::path path(executable);
+#ifdef _WIN32
+  path.replace_filename(siblingName + ".exe");
+#else
+  path.replace_filename(siblingName);
+#endif
+  return IsExecutableFile(path.string()) ? path.string() : "";
+}
+
+#ifndef _WIN32
+struct WorkingDirectoryAndPathRestore {
+  WorkingDirectoryAndPathRestore() {
+    directory = std::filesystem::current_path().string();
+    const char* value = std::getenv("PATH");
+    path = value != nullptr ? value : "";
+    hadPath = value != nullptr;
+  }
+
+  ~WorkingDirectoryAndPathRestore() {
+    std::error_code ec;
+    std::filesystem::current_path(directory, ec);
+    if (hadPath) {
+      setenv("PATH", path.c_str(), 1);
+    } else {
+      unsetenv("PATH");
+    }
+  }
+
+  std::string directory = {};
+  std::string path = {};
+  bool hadPath = false;
+};
+#endif
+
+static void WriteExecutable(const std::string& path, const std::string& contents) {
+  {
+    std::ofstream out(path);
+    out << contents;
+  }
+  std::filesystem::permissions(path, std::filesystem::perms::owner_all);
+}
+
 static pagx::cli::VideoEncodeOptions DefaultVideoOptions() {
   pagx::cli::VideoEncodeOptions options = {};
   options.width = 320;
@@ -4092,13 +4341,27 @@ CLI_TEST(PAGXCliTest, VideoCommandLine_HonorsEncoderOverrideAndExtraArgs) {
   EXPECT_TRUE(HasArgumentSequence(arguments, {"-b:v", "6M", "-movflags", "+faststart"}));
 }
 
-CLI_TEST(PAGXCliTest, VideoSplitArguments_HonorsDoubleQuotes) {
-  auto arguments = pagx::cli::SplitArguments("-b:v  6M \"-x264-params keyint=30\"");
-  ASSERT_EQ(arguments.size(), 3u);
+CLI_TEST(PAGXCliTest, VideoSplitArguments_HonorsQuotesAndEmptyArguments) {
+  std::vector<std::string> arguments = {};
+  std::string errorMsg = {};
+  ASSERT_TRUE(pagx::cli::SplitArguments("-b:v  6M \"-x264-params keyint=30\" '-vf scale=1:1' \"\"",
+                                        &arguments, &errorMsg));
+  ASSERT_EQ(arguments.size(), 5u);
   EXPECT_EQ(arguments[0], "-b:v");
   EXPECT_EQ(arguments[1], "6M");
   EXPECT_EQ(arguments[2], "-x264-params keyint=30");
-  EXPECT_TRUE(pagx::cli::SplitArguments("   ").empty());
+  EXPECT_EQ(arguments[3], "-vf scale=1:1");
+  EXPECT_EQ(arguments[4], "");
+  ASSERT_TRUE(pagx::cli::SplitArguments("   ", &arguments, &errorMsg));
+  EXPECT_TRUE(arguments.empty());
+}
+
+CLI_TEST(PAGXCliTest, VideoSplitArguments_RejectsUnclosedQuotes) {
+  std::vector<std::string> arguments = {};
+  std::string errorMsg = {};
+  EXPECT_FALSE(pagx::cli::SplitArguments("-b:v \"6M", &arguments, &errorMsg));
+  EXPECT_TRUE(arguments.empty());
+  EXPECT_NE(errorMsg.find("unclosed quote"), std::string::npos);
 }
 
 CLI_TEST(PAGXCliTest, VideoFormatCommandLine_QuotesOnlyWhenNeeded) {
@@ -4114,6 +4377,10 @@ CLI_TEST(PAGXCliTest, VideoFindFFmpeg_RequiresAnExecutable) {
   EXPECT_TRUE(location.path.empty());
   EXPECT_TRUE(location.source.empty());
   EXPECT_NE(location.error.find("--ffmpeg"), std::string::npos);
+
+  location = pagx::cli::FindFFmpeg(TempDir());
+  EXPECT_TRUE(location.path.empty());
+  EXPECT_NE(location.error.find("not an executable file"), std::string::npos);
 
   auto fake = TempDir() + "/fake-ffmpeg";
   {
@@ -4139,6 +4406,69 @@ static void FillVideoFrame(std::vector<uint8_t>* frame, size_t stride, int width
       pixels[column * 4 + 3] = 255;
     }
   }
+}
+
+static double ComputeFramePSNR(const tgfx::Bitmap& expected, const char* decoded,
+                               size_t decodedSize);
+
+static tgfx::Bitmap MakeVideoFrameBitmap(int width, int height, int index) {
+  std::vector<uint8_t> pixels = {};
+  auto rowBytes = static_cast<size_t>(width) * 4;
+  FillVideoFrame(&pixels, rowBytes, width, height, index);
+  tgfx::Bitmap bitmap(width, height, false, false);
+  tgfx::Pixmap pixmap(bitmap);
+  auto* destination = static_cast<uint8_t*>(pixmap.writablePixels());
+  for (int row = 0; row < height; ++row) {
+    std::memcpy(destination + static_cast<size_t>(row) * pixmap.rowBytes(),
+                pixels.data() + static_cast<size_t>(row) * rowBytes, rowBytes);
+  }
+  return bitmap;
+}
+
+CLI_TEST(PAGXCliTest, VideoEncoder_ExecutesTheValidatedRelativePath) {
+#ifdef _WIN32
+  GTEST_SKIP() << "POSIX relative-path execution semantics";
+#else
+  auto root = TempDir() + "/relative_ffmpeg";
+  std::filesystem::remove_all(root);
+  auto currentDirectory = root + "/current";
+  auto pathDirectory = root + "/path";
+  std::filesystem::create_directories(currentDirectory);
+  std::filesystem::create_directories(pathDirectory);
+  WriteExecutable(currentDirectory + "/ffmpeg",
+                  "#!/bin/sh\n/bin/cat >/dev/null\nfor output in \"$@\"; do :; done\n"
+                  ": > \"$output\"\nexit 0\n");
+  WriteExecutable(pathDirectory + "/ffmpeg", "#!/bin/sh\nexit 99\n");
+
+  auto* format = pagx::cli::FindVideoFormat("mp4");
+  pagx::cli::VideoEncodeOptions options = {};
+  options.width = 64;
+  options.height = 48;
+  options.frameRate = 10;
+  options.outputFile = root + "/relative.mp4";
+  bool started = false;
+  bool wrote = false;
+  bool finished = false;
+  std::string errorMsg = {};
+  {
+    WorkingDirectoryAndPathRestore restore;
+    setenv("PATH", pathDirectory.c_str(), 1);
+    std::filesystem::current_path(currentDirectory);
+    auto location = pagx::cli::FindFFmpeg("ffmpeg");
+    auto encoder = pagx::cli::VideoEncoder::Start(location.path, *format, options, &errorMsg);
+    started = encoder != nullptr;
+    if (started) {
+      std::vector<uint8_t> frame = {};
+      FillVideoFrame(&frame, 64 * 4, 64, 48, 0);
+      wrote = encoder->writeFrame(frame.data(), 64 * 4, &errorMsg);
+      finished = encoder->finish(&errorMsg);
+    }
+  }
+  EXPECT_TRUE(started) << errorMsg;
+  EXPECT_TRUE(wrote) << errorMsg;
+  EXPECT_TRUE(finished) << errorMsg;
+  EXPECT_TRUE(std::filesystem::exists(options.outputFile));
+#endif
 }
 
 CLI_TEST(PAGXCliTest, VideoEncoder_EncodesPaddedFramesWhenFFmpegIsAvailable) {
@@ -4179,9 +4509,52 @@ CLI_TEST(PAGXCliTest, VideoEncoder_EncodesPaddedFramesWhenFFmpegIsAvailable) {
   std::vector<char> header(8, 0);
   in.read(header.data(), 8);
   EXPECT_EQ(std::string(header.data() + 4, 4), "ftyp");
+
+  auto decoded = RunCapturedProcess(
+      {location.path, "-hide_banner", "-loglevel", "error", "-i", options.outputFile, "-vf",
+       "scale=in_color_matrix=bt709:in_range=tv:out_range=pc,format=rgba", "-vsync", "0", "-f",
+       "rawvideo", "pipe:1"});
+  ASSERT_EQ(decoded.exitCode, 0) << decoded.errorOutput;
+  const size_t frameBytes = static_cast<size_t>(width) * height * 4;
+  ASSERT_EQ(decoded.output.size(), frameBytes * frameCount);
+  for (int index = 0; index < frameCount; ++index) {
+    auto expected = MakeVideoFrameBitmap(width, height, index);
+    auto psnr = ComputeFramePSNR(expected, decoded.output.data() + index * frameBytes, frameBytes);
+    EXPECT_GT(psnr, 30.0) << "frame " << index;
+  }
 }
 
-CLI_TEST(PAGXCliTest, VideoEncoder_ReportsEncoderFailureWhenFFmpegIsAvailable) {
+CLI_TEST(PAGXCliTest, VideoEncoder_UsesDistinctTemporaryFilesForTheSameOutput) {
+  auto location = pagx::cli::FindFFmpeg("");
+  if (location.path.empty()) {
+    GTEST_SKIP() << "ffmpeg is not available";
+  }
+  auto* format = pagx::cli::FindVideoFormat("mp4");
+  ASSERT_NE(format, nullptr);
+  pagx::cli::VideoEncodeOptions options = {};
+  options.width = 64;
+  options.height = 48;
+  options.frameRate = 10;
+  options.outputFile = TempDir() + "/encoder_shared_output.mp4";
+  std::filesystem::remove(options.outputFile);
+
+  std::string errorMsg;
+  auto first = pagx::cli::VideoEncoder::Start(location.path, *format, options, &errorMsg);
+  ASSERT_NE(first, nullptr) << errorMsg;
+  errorMsg.clear();
+  auto second = pagx::cli::VideoEncoder::Start(location.path, *format, options, &errorMsg);
+  ASSERT_NE(second, nullptr) << errorMsg;
+
+  std::vector<uint8_t> frame = {};
+  FillVideoFrame(&frame, 64 * 4, 64, 48, 0);
+  ASSERT_TRUE(first->writeFrame(frame.data(), frame.size() / 48, &errorMsg)) << errorMsg;
+  ASSERT_TRUE(second->writeFrame(frame.data(), frame.size() / 48, &errorMsg)) << errorMsg;
+  ASSERT_TRUE(first->finish(&errorMsg)) << errorMsg;
+  ASSERT_TRUE(second->finish(&errorMsg)) << errorMsg;
+  EXPECT_TRUE(std::filesystem::exists(options.outputFile));
+}
+
+CLI_TEST(PAGXCliTest, VideoEncoder_FailurePreservesAnUnrelatedFixedPartFile) {
   auto location = pagx::cli::FindFFmpeg("");
   if (location.path.empty()) {
     GTEST_SKIP() << "ffmpeg is not available";
@@ -4198,7 +4571,10 @@ CLI_TEST(PAGXCliTest, VideoEncoder_ReportsEncoderFailureWhenFFmpegIsAvailable) {
   options.encoder = "libunknownencoder";
   options.outputFile = TempDir() + "/encoder_failure.mp4";
   std::filesystem::remove(options.outputFile);
-  std::filesystem::remove(options.outputFile + ".part");
+  {
+    std::ofstream out(options.outputFile + ".part");
+    out << "unrelated data";
+  }
 
   std::string errorMsg;
   auto encoder = pagx::cli::VideoEncoder::Start(location.path, *format, options, &errorMsg);
@@ -4211,10 +4587,106 @@ CLI_TEST(PAGXCliTest, VideoEncoder_ReportsEncoderFailureWhenFFmpegIsAvailable) {
   auto finished = encoder->finish(&finishError);
   EXPECT_TRUE(!wrote || !finished);
   EXPECT_FALSE(std::filesystem::exists(options.outputFile));
-  EXPECT_FALSE(std::filesystem::exists(options.outputFile + ".part"));
+  EXPECT_EQ(ReadFile(options.outputFile + ".part"), "unrelated data");
+}
+
+CLI_TEST(PAGXCliTest, VideoEncoder_ReportsExecFailureAndPreservesFixedPartFile) {
+  auto* format = pagx::cli::FindVideoFormat("mp4");
+  ASSERT_NE(format, nullptr);
+  pagx::cli::VideoEncodeOptions options = {};
+  options.width = 64;
+  options.height = 48;
+  options.frameRate = 10;
+  options.outputFile = TempDir() + "/encoder_exec_failure.mp4";
+  std::filesystem::remove(options.outputFile);
+  {
+    std::ofstream out(options.outputFile + ".part");
+    out << "unrelated data";
+  }
+  auto missingExecutable = TempDir() + "/missing-ffmpeg";
+  std::filesystem::remove(missingExecutable);
+  std::string errorMsg = {};
+  auto encoder = pagx::cli::VideoEncoder::Start(missingExecutable, *format, options, &errorMsg);
+  if (encoder != nullptr) {
+    std::vector<uint8_t> frame = {};
+    FillVideoFrame(&frame, 64 * 4, 64, 48, 0);
+    auto wrote = encoder->writeFrame(frame.data(), 64 * 4, &errorMsg);
+    if (wrote) {
+      EXPECT_FALSE(encoder->finish(&errorMsg));
+    }
+    EXPECT_NE(errorMsg.find("127"), std::string::npos) << errorMsg;
+  } else {
+    EXPECT_FALSE(errorMsg.empty());
+  }
+  EXPECT_FALSE(std::filesystem::exists(options.outputFile));
+  EXPECT_EQ(ReadFile(options.outputFile + ".part"), "unrelated data");
+}
+
+CLI_TEST(PAGXCliTest, Export_Mp4DryRunAcceptsStaticDocument) {
+  if (pagx::cli::FindFFmpeg("").path.empty()) {
+    GTEST_SKIP() << "ffmpeg is not available";
+  }
+  auto inputPath = TempDir() + "/static_input.pagx";
+  auto outputPath = TempDir() + "/static_output.mp4";
+  {
+    std::ofstream out(inputPath);
+    out << "<pagx width=\"64\" height=\"48\">\n"
+           "  <Layer>\n"
+           "    <Rectangle position=\"32,24\" size=\"64,48\"/>\n"
+           "    <Fill color=\"#FF0000\"/>\n"
+           "  </Layer>\n"
+           "</pagx>\n";
+  }
+  std::string output;
+  int ret = 0;
+  {
+    StreamCapture capturedOut(std::cout);
+    ret = CallRun(pagx::cli::RunExport,
+                  {"export", "--input", inputPath, "--output", outputPath, "--dry-run"});
+    output = capturedOut.str();
+  }
+  EXPECT_EQ(ret, 0);
+  EXPECT_NE(output.find(" -framerate 60 "), std::string::npos);
+  EXPECT_FALSE(std::filesystem::exists(outputPath));
+}
+
+CLI_TEST(PAGXCliTest, Export_Mp4DryRunDownscalesToTheGPUTextureLimit) {
+  if (pagx::cli::FindFFmpeg("").path.empty()) {
+    GTEST_SKIP() << "ffmpeg is not available";
+  }
+  auto inputPath = TempDir() + "/oversized_input.pagx";
+  auto outputPath = TempDir() + "/oversized_output.mp4";
+  {
+    std::ofstream out(inputPath);
+    out << "<pagx width=\"100000\" height=\"100\">\n"
+           "  <Layer>\n"
+           "    <Rectangle position=\"50000,50\" size=\"100000,100\"/>\n"
+           "    <Fill color=\"#FF0000\"/>\n"
+           "  </Layer>\n"
+           "</pagx>\n";
+  }
+  std::string output;
+  std::string errors;
+  int ret = 0;
+  {
+    StreamCapture capturedOut(std::cout);
+    StreamCapture capturedErr(std::cerr);
+    ret = CallRun(pagx::cli::RunExport,
+                  {"export", "--input", inputPath, "--output", outputPath, "--dry-run"});
+    output = capturedOut.str();
+    errors = capturedErr.str();
+  }
+  ASSERT_EQ(ret, 0) << errors;
+  EXPECT_NE(errors.find("maxTextureDimension2D"), std::string::npos);
+  EXPECT_NE(errors.find("downscaling"), std::string::npos);
+  EXPECT_EQ(output.find("-video_size 100000x100"), std::string::npos);
+  EXPECT_NE(output.find("-video_size "), std::string::npos);
 }
 
 CLI_TEST(PAGXCliTest, Export_Mp4DryRunPrintsTheCommandLineAndWritesNothing) {
+  if (pagx::cli::FindFFmpeg("").path.empty()) {
+    GTEST_SKIP() << "ffmpeg is not available";
+  }
   auto inputPath = TestResourcePath("render_animated_timelines.pagx");
   auto outputPath = TempDir() + "/export_dry_run.mp4";
   std::filesystem::remove(outputPath);
@@ -4237,6 +4709,9 @@ CLI_TEST(PAGXCliTest, Export_Mp4DryRunPrintsTheCommandLineAndWritesNothing) {
 }
 
 CLI_TEST(PAGXCliTest, Export_Mp4RoundsAnOddSizeUpToEven) {
+  if (pagx::cli::FindFFmpeg("").path.empty()) {
+    GTEST_SKIP() << "ffmpeg is not available";
+  }
   auto inputPath = TestResourcePath("render_animated_timelines.pagx");
   auto outputPath = TempDir() + "/export_odd_size.mp4";
   std::string output;
@@ -4267,6 +4742,21 @@ CLI_TEST(PAGXCliTest, Export_VideoOptionsAreRejectedForVectorFormats) {
   }
   EXPECT_EQ(ret, 1);
   EXPECT_NE(errors.find("--fps is only supported for video formats"), std::string::npos);
+}
+
+CLI_TEST(PAGXCliTest, Export_Mp4RejectsUnclosedEncoderArguments) {
+  auto inputPath = TestResourcePath("render_animated_timelines.pagx");
+  std::string errors;
+  int ret = 0;
+  {
+    StreamCapture capturedErr(std::cerr);
+    ret = CallRun(pagx::cli::RunExport,
+                  {"export", "--input", inputPath, "--output", TempDir() + "/invalid_args.mp4",
+                   "--encoder-args", "\"-b:v"});
+    errors = capturedErr.str();
+  }
+  EXPECT_EQ(ret, 1);
+  EXPECT_NE(errors.find("unclosed quote"), std::string::npos);
 }
 
 CLI_TEST(PAGXCliTest, Export_Mp4RejectsATransparentBackground) {
@@ -4306,6 +4796,106 @@ CLI_TEST(PAGXCliTest, Export_Mp4EncodesTheAnimationWhenFFmpegIsAvailable) {
   EXPECT_FALSE(std::filesystem::exists(outputPath + ".part"));
   ASSERT_TRUE(std::filesystem::exists(outputPath));
   EXPECT_GT(std::filesystem::file_size(outputPath), 1000u);
+}
+
+static std::string ProbeValue(const std::string& output, const std::string& key) {
+  std::istringstream lines(output);
+  std::string line = {};
+  auto prefix = key + "=";
+  while (std::getline(lines, line)) {
+    if (!line.empty() && line.back() == '\r') {
+      line.pop_back();
+    }
+    if (line.rfind(prefix, 0) == 0) {
+      return line.substr(prefix.size());
+    }
+  }
+  return {};
+}
+
+static double ComputeFramePSNR(const tgfx::Bitmap& expected, const char* decoded,
+                               size_t decodedSize) {
+  auto frameBytes = static_cast<size_t>(expected.width()) * expected.height() * 4;
+  if (decodedSize != frameBytes) {
+    return 0.0;
+  }
+  tgfx::Pixmap expectedPixels(expected);
+  auto* expectedData = static_cast<const uint8_t*>(expectedPixels.pixels());
+  auto* decodedData = reinterpret_cast<const uint8_t*>(decoded);
+  double squaredError = 0.0;
+  for (int row = 0; row < expected.height(); ++row) {
+    auto* expectedRow = expectedData + static_cast<size_t>(row) * expectedPixels.rowBytes();
+    auto* decodedRow = decodedData + static_cast<size_t>(row) * expected.width() * 4;
+    for (int column = 0; column < expected.width() * 4; column += 4) {
+      for (int channel = 0; channel < 3; ++channel) {
+        auto difference = static_cast<double>(expectedRow[column + channel]) -
+                          static_cast<double>(decodedRow[column + channel]);
+        squaredError += difference * difference;
+      }
+    }
+  }
+  auto meanSquaredError =
+      squaredError / (static_cast<double>(expected.width()) * expected.height() * 3);
+  if (meanSquaredError == 0.0) {
+    return 99.0;
+  }
+  return 10.0 * std::log10(255.0 * 255.0 / meanSquaredError);
+}
+
+CLI_TEST(PAGXCliTest, Export_Mp4MetadataAndDecodedFramesMatch) {
+  auto location = pagx::cli::FindFFmpeg("");
+  if (location.path.empty()) {
+    GTEST_SKIP() << "ffmpeg is not available";
+  }
+  auto ffprobe = FindSiblingExecutable(location.path, "ffprobe");
+  if (ffprobe.empty()) {
+    GTEST_SKIP() << "ffprobe is not available next to ffmpeg";
+  }
+  auto inputPath = TestResourcePath("render_animated_timelines.pagx");
+  auto outputPath = TempDir() + "/export_media_inspection.mp4";
+  std::filesystem::remove(outputPath);
+  auto ret = CallRun(pagx::cli::RunExport, {"export", "--input", inputPath, "--output", outputPath,
+                                            "--fps", "20", "--crf", "30"});
+  ASSERT_EQ(ret, 0);
+
+  auto metadata = RunCapturedProcess(
+      {ffprobe, "-v", "error", "-select_streams", "v:0", "-show_entries",
+       "stream=codec_name,width,height,pix_fmt,r_frame_rate,nb_frames:format=duration", "-of",
+       "default=noprint_wrappers=1", outputPath});
+  ASSERT_EQ(metadata.exitCode, 0) << metadata.errorOutput;
+  EXPECT_EQ(ProbeValue(metadata.output, "codec_name"), "h264");
+  EXPECT_EQ(ProbeValue(metadata.output, "width"), "300");
+  EXPECT_EQ(ProbeValue(metadata.output, "height"), "100");
+  EXPECT_EQ(ProbeValue(metadata.output, "pix_fmt"), "yuv420p");
+  EXPECT_EQ(ProbeValue(metadata.output, "r_frame_rate"), "20/1");
+  EXPECT_EQ(ProbeValue(metadata.output, "nb_frames"), "7");
+  auto durationString = ProbeValue(metadata.output, "duration");
+  char* durationEnd = nullptr;
+  auto duration = std::strtof(durationString.c_str(), &durationEnd);
+  EXPECT_NE(durationEnd, durationString.c_str());
+  EXPECT_EQ(*durationEnd, '\0');
+  EXPECT_NEAR(duration, 0.35f, 0.001f);
+
+  auto audio =
+      RunCapturedProcess({ffprobe, "-v", "error", "-select_streams", "a:0", "-show_entries",
+                          "stream=index", "-of", "default=noprint_wrappers=1", outputPath});
+  ASSERT_EQ(audio.exitCode, 0) << audio.errorOutput;
+  EXPECT_TRUE(audio.output.empty()) << audio.output;
+
+  auto decoded =
+      RunCapturedProcess({location.path, "-hide_banner", "-loglevel", "error", "-i", outputPath,
+                          "-vf", "scale=in_color_matrix=bt709:in_range=tv:out_range=pc,format=rgba",
+                          "-vsync", "0", "-f", "rawvideo", "pipe:1"});
+  ASSERT_EQ(decoded.exitCode, 0) << decoded.errorOutput;
+  const char* timeSeconds[] = {"0", "0.05", "0.1", "0.15", "0.2", "0.25", "0.3"};
+  const size_t frameBytes = 300 * 100 * 4;
+  ASSERT_EQ(decoded.output.size(), frameBytes * 7);
+  for (int frame = 0; frame < 7; ++frame) {
+    auto expected = RenderAnimatedTimelinesAt(timeSeconds[frame], true);
+    ASSERT_FALSE(expected.isEmpty());
+    auto psnr = ComputeFramePSNR(expected, decoded.output.data() + frame * frameBytes, frameBytes);
+    EXPECT_GT(psnr, 30.0) << "frame " << frame;
+  }
 }
 
 }  // namespace pag

@@ -102,6 +102,8 @@ list(APPEND TEST_SOURCES ${WEB_TEST_SOURCES})
 # pagx::cli entry points; main.cpp is replaced by WebTestRunner.cpp).
 file(GLOB CLI_SOURCES CONFIGURE_DEPENDS ${ROOT}/src/cli/*.cpp)
 list(FILTER CLI_SOURCES EXCLUDE REGEX "main\\.cpp$")
+list(FILTER CLI_SOURCES EXCLUDE REGEX "CommandExport\\.cpp$")
+list(FILTER CLI_SOURCES EXCLUDE REGEX "VideoEncoder\\.cpp$")
 list(APPEND TEST_SOURCES ${CLI_SOURCES})
 
 # The vendor's prebuilt gtest static library is compiled with -fno-rtti and therefore lacks

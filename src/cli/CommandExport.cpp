@@ -36,6 +36,9 @@
 #include "pagx/SVGExporter.h"
 #include "pagx/VideoExporter.h"
 #include "pagx/types/Color.h"
+#include "rendering/gpu/Devices.h"
+#include "tgfx/gpu/Context.h"
+#include "tgfx/gpu/GPU.h"
 
 namespace pagx::cli {
 
@@ -49,7 +52,7 @@ struct ExportOptions {
   bool pptBakeUnsupported = true;
   bool pptIgnoreGlyphRuns = false;
   // Sampling options shared with the render command. Zero frame rate means "use the document
-  // animation frame rate"; a non-positive duration means "the longest animation".
+  // animation frame rate"; a non-positive duration means "the longest full playback period".
   int frameRate = 0;
   float duration = -1.0f;
   float scale = 1.0f;
@@ -120,18 +123,24 @@ static void PrintUsage() {
       << "                              given, --text-to-path wins.\n"
       << "\n"
       << "MP4 options (requires an external ffmpeg executable: --ffmpeg, $FFMPEG_BIN, or PATH):\n"
-      << "  --fps <n>                   Sampling frame rate (default: the document animation "
-         "frame\n"
-      << "                              rate, falling back to 60); valid range: 1-120\n"
-      << "  --duration <seconds>        Sequence length (default: the longest animation)\n"
-      << "  --scale <float>             Output scale applied to the document size (default: 1.0)\n"
+      << "  --fps <n>                   Sampling frame rate (default: the integer document "
+         "animation\n"
+      << "                              frame rate, falling back to 60); valid range: 1-120;\n"
+      << "                              mixed/non-integer document rates require an explicit "
+         "value\n"
+      << "  --duration <seconds>        Sequence length (default: the longest full playback "
+         "period;\n"
+      << "                              static documents produce one frame)\n"
+      << "  --scale <float>             Output scale applied to the document size (default: 1.0;\n"
+      << "                              automatically downscaled to the GPU texture limit)\n"
       << "  --background <color>        Opaque background color as #RRGGBB (default: #FFFFFF);\n"
       << "                              mp4 cannot carry alpha\n"
       << "  --crf <0-51>                Constant rate factor (default: 20, lower is better)\n"
       << "  --no-crf                    Do not pass -crf, for encoders without CRF support\n"
       << "  --preset <name>             Encoder preset (default: medium)\n"
       << "  --no-preset                 Do not pass -preset, for encoders without preset support\n"
-      << "  --encoder <name>            Encoder (default: libx264; h264_videotoolbox on macOS)\n"
+      << "  --encoder <name>            Encoder (default: libx264; macOS can explicitly select "
+         "h264_videotoolbox)\n"
       << "  --encoder-args \"<args>\"      Extra ffmpeg arguments appended after the generated "
          "ones\n"
       << "  --ffmpeg <path>             ffmpeg executable (default: $FFMPEG_BIN, then PATH)\n"
@@ -245,7 +254,12 @@ static int ParseOptions(int argc, char* argv[], ExportOptions* options) {
       options->encoder = argv[++i];
       options->firstVideoOnlyOption = "--encoder";
     } else if (arg == "--encoder-args" && i + 1 < argc) {
-      auto extraArgs = SplitArguments(argv[++i]);
+      std::vector<std::string> extraArgs = {};
+      std::string parseError = {};
+      if (!SplitArguments(argv[++i], &extraArgs, &parseError)) {
+        std::cerr << "pagx export: error: invalid --encoder-args: " << parseError << "\n";
+        return 1;
+      }
       options->encoderArgs.insert(options->encoderArgs.end(), extraArgs.begin(), extraArgs.end());
       options->firstVideoOnlyOption = "--encoder-args";
     } else if (arg == "--ffmpeg" && i + 1 < argc) {
@@ -297,7 +311,7 @@ static int ParseOptions(int argc, char* argv[], ExportOptions* options) {
               << " is only supported for video formats (mp4)\n";
     return 1;
   }
-  if (videoFormat != nullptr && options->bgAlpha < 1.0f) {
+  if (videoFormat != nullptr && videoFormat->requiresOpaque && options->bgAlpha < 1.0f) {
     std::cerr << "pagx export: error: " << videoFormat->name
               << " output cannot carry alpha, --background must be opaque\n";
     return 1;
@@ -308,6 +322,46 @@ static int ParseOptions(int argc, char* argv[], ExportOptions* options) {
   }
 
   return 0;
+}
+
+static void LimitOutputToTextureSize(const PAGXDocument& document, VideoExportOptions* options) {
+  if (!std::isfinite(document.width) || !std::isfinite(document.height) || document.width <= 0 ||
+      document.height <= 0) {
+    return;
+  }
+  auto requestedWidth = std::ceil(static_cast<double>(document.width) * options->scale);
+  auto requestedHeight = std::ceil(static_cast<double>(document.height) * options->scale);
+  auto device = pag::Devices::MakeDefault();
+  if (device == nullptr) {
+    return;
+  }
+  auto* context = device->lockContext();
+  if (context == nullptr || context->gpu() == nullptr || context->gpu()->limits() == nullptr) {
+    if (context != nullptr) {
+      device->unlock();
+    }
+    return;
+  }
+  auto maxTextureSize = context->gpu()->limits()->maxTextureDimension2D;
+  device->unlock();
+  // Keep the final even-size adjustment within the device limit as well.
+  auto maxOutputSize =
+      options->alignToEvenSize ? maxTextureSize - maxTextureSize % 2 : maxTextureSize;
+  if (maxOutputSize <= 0 || (requestedWidth <= maxOutputSize && requestedHeight <= maxOutputSize)) {
+    return;
+  }
+  auto limitedScale = std::min(static_cast<double>(maxOutputSize) / document.width,
+                               static_cast<double>(maxOutputSize) / document.height);
+  std::cerr << "pagx export: output size " << requestedWidth << "x" << requestedHeight
+            << " exceeds maxTextureDimension2D (" << maxTextureSize << "), downscaling\n";
+  auto adjustedScale = static_cast<float>(limitedScale);
+  // Match ardot's ceil + clamp boundary behavior without letting float rounding exceed the limit.
+  while (adjustedScale > 0.0f &&
+         (std::ceil(static_cast<double>(document.width) * adjustedScale) > maxOutputSize ||
+          std::ceil(static_cast<double>(document.height) * adjustedScale) > maxOutputSize)) {
+    adjustedScale = std::nextafter(adjustedScale, 0.0f);
+  }
+  options->scale = adjustedScale;
 }
 
 // Encodes the document's animations into a video file through an external ffmpeg executable. The
@@ -344,11 +398,12 @@ static int ExportToMP4(const ExportOptions& options, const VideoFormatSpec& form
   videoOptions.frameRate = options.frameRate;
   videoOptions.duration = options.duration;
   videoOptions.scale = options.scale;
-  videoOptions.hasBackground = true;
+  videoOptions.hasBackground = format.requiresOpaque;
   videoOptions.background =
       Color{options.bgRed, options.bgGreen, options.bgBlue, options.bgAlpha, ColorSpace::SRGB};
   // 4:2:0 chroma subsampling cannot represent an odd width or height.
   videoOptions.alignToEvenSize = true;
+  LimitOutputToTextureSize(*document, &videoOptions);
 
   std::string errorMsg = {};
   auto exporter = VideoExporter::Make(document, videoOptions, &errorMsg);
@@ -360,9 +415,9 @@ static int ExportToMP4(const ExportOptions& options, const VideoFormatSpec& form
   auto width = exporter->width();
   auto height = exporter->height();
   auto requestedWidth =
-      static_cast<int>(std::ceil(static_cast<double>(document->width) * options.scale));
+      static_cast<int>(std::ceil(static_cast<double>(document->width) * videoOptions.scale));
   auto requestedHeight =
-      static_cast<int>(std::ceil(static_cast<double>(document->height) * options.scale));
+      static_cast<int>(std::ceil(static_cast<double>(document->height) * videoOptions.scale));
   if (requestedWidth != width || requestedHeight != height) {
     std::cerr << "pagx export: " << requestedWidth << "x" << requestedHeight << " rounded up to "
               << width << "x" << height << " for the " << format.pixelFormat << " pixel format\n";

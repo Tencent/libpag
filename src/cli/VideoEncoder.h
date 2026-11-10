@@ -27,8 +27,8 @@
 namespace pagx::cli {
 
 /**
- * Describes one output container. Only mp4 ships today; a new single-pass format appends one row
- * to the table in VideoEncoder.cpp.
+ * Describes one output container. Only mp4 ships today; additional formats also need their alpha
+ * and muxer behavior wired into the command and export paths.
  */
 struct VideoFormatSpec {
   /** The --format value, e.g. "mp4". */
@@ -40,7 +40,7 @@ struct VideoFormatSpec {
   std::string defaultEncoder = {};
   /** Pixel format used by both -pix_fmt and the scale filter. */
   std::string pixelFormat = {};
-  /** Whether the container can carry alpha. H.264 cannot, so the frames must arrive opaque. */
+  /** Whether frames must be opaque. H.264 cannot carry alpha, so the mp4 entry sets this true. */
   bool requiresOpaque = true;
 };
 
@@ -62,9 +62,11 @@ struct VideoEncodeOptions {
   std::string preset = "medium";
   /** Encoder name; empty means the format's default encoder. */
   std::string encoder = {};
-  /** Extra arguments placed after the generated ones so that they can override them. */
+  /** Extra arguments placed after the generated codec/color options and before the fixed muxer
+   *  and output arguments. */
   std::vector<std::string> extraArgs = {};
-  /** Final output path. ffmpeg writes "<outputFile>.part", which is renamed on success. */
+  /** Final output path. The encoder writes a unique sibling temporary file and publishes it on
+   *  success. Command previews use "<outputFile>.part" as the temporary-path placeholder. */
   std::string outputFile = {};
 };
 
@@ -79,8 +81,10 @@ bool BuildFFmpegCommandLine(const std::string& ffmpegPath, const VideoFormatSpec
 /** Joins argv into a single shell-like line, for --dry-run output and error messages. */
 std::string FormatCommandLine(const std::vector<std::string>& arguments);
 
-/** Splits a raw argument string on whitespace; a double-quoted run keeps its spaces. */
-std::vector<std::string> SplitArguments(const std::string& text);
+/** Splits arguments on whitespace with single or double quotes. Reports unclosed quotes and
+ *  preserves explicitly quoted empty arguments. */
+bool SplitArguments(const std::string& text, std::vector<std::string>* arguments,
+                    std::string* errorMsg = nullptr);
 
 /** Result of looking for the ffmpeg executable. */
 struct FFmpegLocation {
@@ -95,11 +99,13 @@ struct FFmpegLocation {
 FFmpegLocation FindFFmpeg(const std::string& explicitPath);
 
 /**
- * Streams premultiplied RGBA frames to one ffmpeg child process through its stdin, then renames the
- * written "<output>.part" onto the output path once ffmpeg exits cleanly.
+ * Streams premultiplied RGBA frames to one ffmpeg child process through its stdin, then atomically
+ * publishes a unique sibling temporary file onto the output path once ffmpeg exits cleanly.
  *
  * ffmpeg keeps the inherited stderr, so its own diagnostics reach the terminal unchanged. This
- * class only reports why a step failed and what the child exit code was.
+ * class only reports why a step failed and what the child exit code was. It is a CLI-internal,
+ * non-thread-safe component: concurrent Start() calls on different threads are not supported, and
+ * process waits have no cancellation or timeout.
  */
 class VideoEncoder {
  public:
@@ -123,21 +129,22 @@ class VideoEncoder {
    */
   bool writeFrame(const uint8_t* pixels, size_t rowBytes, std::string* errorMsg = nullptr);
 
-  /** Closes the pipe, waits for ffmpeg, then moves the .part file onto the output path. */
+  /** Closes the pipe, waits for ffmpeg, then publishes the temporary file onto the output path. */
   bool finish(std::string* errorMsg = nullptr);
 
-  /** Kills ffmpeg and deletes the .part file; a no-op once the encoder has stopped. */
+  /** Requests ffmpeg termination, reaps it without a timeout, and deletes the owned temporary
+   *  file. A no-op once the encoder has stopped. */
   void abort();
 
  private:
   struct ChildProcess;
 
-  explicit VideoEncoder(const VideoEncodeOptions& options);
+  VideoEncoder(const VideoEncodeOptions& options, std::string partFile);
 
   bool spawnChild(const std::vector<std::string>& arguments, std::string* errorMsg);
   bool writeAll(const uint8_t* data, size_t size, std::string* errorMsg);
   void closeStdin();
-  int reapChild();
+  bool reapChild(int* exitCode);
   void killChild();
   void removePartFile();
 

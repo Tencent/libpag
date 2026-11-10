@@ -40,27 +40,31 @@ class PAGXDocument;
 /**
  * Export options for VideoExporter.
  *
- * ABI stability: this struct is part of the public API. New optional fields must be appended at
- * the end with sensible defaults so that callers compiled against an older header continue to
- * link and behave correctly. Reordering, removing, or changing the type of an existing field is
- * a breaking change.
+ * This struct is part of the public API but does not promise binary ABI stability. Callers and
+ * the library must use compatible headers. Changes to the field layout require recompilation.
  */
 struct VideoExportOptions {
   /**
    * Sampling frame rate in frames per second. Zero means "use the document animation frame rate",
-   * falling back to 60 when the document does not declare one. Valid range: (0, 120].
+   * falling back to 60 when the document does not declare one. A non-integer document frame rate is
+   * rejected in this mode instead of being silently rounded. All declared top-level animation
+   * frame rates must also match in this mode. Otherwise the value must be in [1, 120]; Make()
+   * rejects anything outside that range and negative values.
    */
   int frameRate = 0;
 
   /**
-   * Sequence length in seconds. Values <= 0 mean "use the longest top-level animation's duration".
-   * The frame count is derived as `llround(duration * frameRate)`.
+   * Sequence length in seconds. Values <= 0 mean "use the longest top-level animation's playback
+   * period", including both passes of a PingPong animation. A document without animations produces
+   * one static frame by default; a positive duration repeats that frame. Must be finite. The frame
+   * count is derived as `llround(duration * frameRate)`.
    */
   float duration = -1.0f;
 
   /**
    * Output scale factor applied to the document size. The exporter renders at
-   * `ceil(documentSize * scale)` pixels. Must be greater than zero; invalid values fall back to 1.
+   * `ceil(documentSize * scale)` pixels. Must be finite and greater than zero; Make() rejects
+   * invalid values instead of hiding host parameter errors.
    */
   float scale = 1.0f;
 
@@ -89,9 +93,11 @@ struct VideoExportOptions {
 };
 
 /**
- * VideoExporter produces an RGBA frame sequence from a document's animations. The scene and the
- * offscreen surface are created once and reused for every frame, so the per-frame cost is limited
- * to timeline evaluation, drawing and the pixel readback.
+ * VideoExporter produces an RGBA frame sequence from a document's animations or static scene. The
+ * scene and the offscreen surface are created once and reused for every frame, so the per-frame
+ * cost is limited to timeline evaluation, drawing and the pixel readback. Documents with no
+ * animation or state-machine definitions draw and read back only the first frame; later frames
+ * reuse the same RGBA buffer.
  *
  * The exporter only renders. Encoding and muxing are the host's responsibility: an external ffmpeg
  * process on native platforms, WebCodecs on the web. No video codec ships inside pagx.
@@ -118,14 +124,16 @@ class VideoExporter {
 
   /**
    * Creates an exporter bound to the given document. The document's top-level animations are
-   * sampled; a document without any top-level animation cannot be exported.
+   * sampled; their ids must be non-empty and unique. A document without animations produces one
+   * static frame by default, or repeats its static scene when duration is positive.
    *
    * @param document the source document, which is retained for the lifetime of the returned
    *                 exporter. Must be non-null.
    * @param options sampling frame rate, duration, scale and background.
    * @param errorMsg optional pointer that receives a human-readable description on failure.
-   * @return a new exporter, or nullptr when the document is null, has no top-level animation, has
-   *         no duration and none was supplied, or the offscreen surface cannot be created.
+   * @return a new exporter, or nullptr when the document or options are invalid, an animation has
+   *         no duration and none was supplied, the computed frame range or dimensions overflow, or
+   *         the offscreen surface cannot be created.
    */
   static std::shared_ptr<VideoExporter> Make(std::shared_ptr<PAGXDocument> document,
                                              const Options& options = {},
@@ -194,6 +202,7 @@ class VideoExporter {
   int64_t frameCount_ = 0;
   int64_t currentFrame_ = 0;
   int64_t previousTimeUs_ = 0;
+  bool reuseStaticFrame_ = false;
 };
 
 }  // namespace pagx

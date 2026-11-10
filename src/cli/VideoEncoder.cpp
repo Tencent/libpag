@@ -20,6 +20,7 @@
 #ifdef _WIN32
 #include <windows.h>
 #else
+#include <fcntl.h>
 #include <signal.h>
 #include <sys/types.h>
 #include <sys/wait.h>
@@ -31,6 +32,8 @@
 #include <cstdlib>
 #include <cstring>
 #include <filesystem>
+#include <limits>
+#include <random>
 #include <system_error>
 #include <utility>
 #include "cli/CliUtils.h"
@@ -60,9 +63,12 @@ bool NeedsEvenDimensions(const std::string& pixelFormat) {
 }
 
 bool IsExecutableFile(const std::string& path) {
-#ifdef _WIN32
   std::error_code ec;
-  return std::filesystem::is_regular_file(path, ec) && !ec;
+  if (!std::filesystem::is_regular_file(path, ec) || ec) {
+    return false;
+  }
+#ifdef _WIN32
+  return true;
 #else
   return access(path.c_str(), X_OK) == 0;
 #endif
@@ -104,6 +110,58 @@ std::string ExitCodeMessage(const std::string& action, int exitCode) {
     return action + " (terminated by signal " + std::to_string(-exitCode) + ")";
   }
   return action + " (exit code " + std::to_string(exitCode) + ")";
+}
+
+bool CreatePartFile(const std::string& outputFile, std::string* partFile, std::string* errorMsg) {
+  std::random_device random = {};
+  for (int attempt = 0; attempt < 100; ++attempt) {
+    auto randomValue = (static_cast<uint64_t>(random()) << 32) ^ static_cast<uint64_t>(random());
+    auto candidate = outputFile + kPartSuffix + "." + std::to_string(randomValue);
+#ifdef _WIN32
+    auto widePath = UTF8ToWide(candidate);
+    if (widePath.empty()) {
+      SetError(errorMsg, "failed to encode the temporary output path as UTF-16");
+      return false;
+    }
+    auto file = CreateFileW(widePath.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_NEW,
+                            FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (file != INVALID_HANDLE_VALUE) {
+      CloseHandle(file);
+      *partFile = std::move(candidate);
+      return true;
+    }
+    auto error = GetLastError();
+    if (error == ERROR_FILE_EXISTS || error == ERROR_ALREADY_EXISTS) {
+      continue;
+    }
+    SetError(errorMsg, "failed to create a temporary output file (Windows error " +
+                           std::to_string(error) + ")");
+    return false;
+#else
+    auto fd = open(candidate.c_str(), O_WRONLY | O_CREAT | O_EXCL, 0600);
+    if (fd >= 0) {
+      if (close(fd) != 0) {
+        auto error = errno;
+        std::error_code ec = {};
+        std::filesystem::remove(candidate, ec);
+        SetError(errorMsg,
+                 "failed to close the temporary output file: " + std::string(std::strerror(error)));
+        return false;
+      }
+      *partFile = std::move(candidate);
+      return true;
+    }
+    auto error = errno;
+    if (error == EEXIST) {
+      continue;
+    }
+    SetError(errorMsg,
+             "failed to create a temporary output file: " + std::string(std::strerror(error)));
+    return false;
+#endif
+  }
+  SetError(errorMsg, "failed to allocate a unique temporary output file");
+  return false;
 }
 
 }  // namespace
@@ -205,28 +263,51 @@ std::string FormatCommandLine(const std::vector<std::string>& arguments) {
   return line;
 }
 
-std::vector<std::string> SplitArguments(const std::string& text) {
-  std::vector<std::string> arguments = {};
+bool SplitArguments(const std::string& text, std::vector<std::string>* arguments,
+                    std::string* errorMsg) {
+  if (arguments == nullptr) {
+    SetError(errorMsg, "the argument list is null");
+    return false;
+  }
+  arguments->clear();
   std::string current = {};
-  bool inQuotes = false;
+  char quote = 0;
+  bool hasToken = false;
   for (char ch : text) {
-    if (ch == '"') {
-      inQuotes = !inQuotes;
+    if (quote != 0) {
+      if (ch == quote) {
+        quote = 0;
+      } else {
+        current += ch;
+      }
+      hasToken = true;
       continue;
     }
-    if (!inQuotes && std::isspace(static_cast<unsigned char>(ch)) != 0) {
-      if (!current.empty()) {
-        arguments.emplace_back(std::move(current));
+    if (ch == '"' || ch == '\'') {
+      quote = ch;
+      hasToken = true;
+      continue;
+    }
+    if (std::isspace(static_cast<unsigned char>(ch)) != 0) {
+      if (hasToken) {
+        arguments->emplace_back(std::move(current));
         current.clear();
+        hasToken = false;
       }
       continue;
     }
     current += ch;
+    hasToken = true;
   }
-  if (!current.empty()) {
-    arguments.emplace_back(std::move(current));
+  if (quote != 0) {
+    arguments->clear();
+    SetError(errorMsg, "unclosed quote in encoder arguments");
+    return false;
   }
-  return arguments;
+  if (hasToken) {
+    arguments->emplace_back(std::move(current));
+  }
+  return true;
 }
 
 FFmpegLocation FindFFmpeg(const std::string& explicitPath) {
@@ -297,12 +378,13 @@ struct VideoEncoder::ChildProcess {
   int stdinPipe = -1;
 #endif
   bool reaped = false;
+  bool exitStatusValid = false;
   int exitCode = 0;
 };
 
-VideoEncoder::VideoEncoder(const VideoEncodeOptions& options)
+VideoEncoder::VideoEncoder(const VideoEncodeOptions& options, std::string partFile)
     : width(options.width), height(options.height), outputFile(options.outputFile),
-      partFile(options.outputFile + kPartSuffix) {
+      partFile(std::move(partFile)) {
 }
 
 VideoEncoder::~VideoEncoder() {
@@ -317,7 +399,12 @@ std::unique_ptr<VideoEncoder> VideoEncoder::Start(const std::string& ffmpegPath,
   if (!BuildFFmpegCommandLine(ffmpegPath, format, options, &arguments, errorMsg)) {
     return nullptr;
   }
-  std::unique_ptr<VideoEncoder> encoder(new VideoEncoder(options));
+  std::string partFile = {};
+  if (!CreatePartFile(options.outputFile, &partFile, errorMsg)) {
+    return nullptr;
+  }
+  arguments.back() = partFile;
+  std::unique_ptr<VideoEncoder> encoder(new VideoEncoder(options, std::move(partFile)));
   if (!encoder->spawnChild(arguments, errorMsg)) {
     return nullptr;
   }
@@ -327,6 +414,11 @@ std::unique_ptr<VideoEncoder> VideoEncoder::Start(const std::string& ffmpegPath,
 bool VideoEncoder::spawnChild(const std::vector<std::string>& arguments, std::string* errorMsg) {
   auto process = std::make_unique<ChildProcess>();
 #ifdef _WIN32
+  auto applicationName = UTF8ToWide(arguments.front());
+  if (applicationName.empty()) {
+    SetError(errorMsg, "failed to encode the ffmpeg path as UTF-16");
+    return false;
+  }
   std::wstring commandLine = {};
   for (const auto& argument : arguments) {
     auto wide = UTF8ToWide(argument);
@@ -363,8 +455,8 @@ bool VideoEncoder::spawnChild(const std::vector<std::string>& arguments, std::st
   startup.hStdOutput = GetStdHandle(STD_OUTPUT_HANDLE);
   startup.hStdError = GetStdHandle(STD_ERROR_HANDLE);
   PROCESS_INFORMATION info = {};
-  if (!CreateProcessW(nullptr, commandLine.data(), nullptr, nullptr, TRUE, 0, nullptr, nullptr,
-                      &startup, &info)) {
+  if (!CreateProcessW(applicationName.c_str(), commandLine.data(), nullptr, nullptr, TRUE, 0,
+                      nullptr, nullptr, &startup, &info)) {
     SetError(errorMsg,
              "failed to spawn ffmpeg (Windows error " + std::to_string(GetLastError()) + ")");
     CloseHandle(readPipe);
@@ -384,6 +476,16 @@ bool VideoEncoder::spawnChild(const std::vector<std::string>& arguments, std::st
              "failed to create the ffmpeg input pipe: " + std::string(std::strerror(errno)));
     return false;
   }
+  // A later encoder must not inherit an earlier encoder's stdin writer, or the earlier ffmpeg will
+  // never observe EOF while both processes are alive.
+  if (fcntl(fds[0], F_SETFD, FD_CLOEXEC) != 0 || fcntl(fds[1], F_SETFD, FD_CLOEXEC) != 0) {
+    auto error = errno;
+    close(fds[0]);
+    close(fds[1]);
+    SetError(errorMsg,
+             "failed to configure the ffmpeg input pipe: " + std::string(std::strerror(error)));
+    return false;
+  }
   std::vector<char*> argv = {};
   argv.reserve(arguments.size() + 1);
   for (const auto& argument : arguments) {
@@ -401,10 +503,12 @@ bool VideoEncoder::spawnChild(const std::vector<std::string>& arguments, std::st
     return false;
   }
   if (processId == 0) {
-    if (dup2(fds[0], STDIN_FILENO) >= 0) {
-      close(fds[0]);
+    if (dup2(fds[0], STDIN_FILENO) >= 0 && fcntl(STDIN_FILENO, F_SETFD, 0) >= 0) {
+      if (fds[0] != STDIN_FILENO) {
+        close(fds[0]);
+      }
       close(fds[1]);
-      execvp(argv[0], argv.data());
+      execv(argv[0], argv.data());
     }
     _exit(127);
   }
@@ -425,16 +529,27 @@ bool VideoEncoder::writeFrame(const uint8_t* pixels, size_t rowBytes, std::strin
     SetError(errorMsg, "the frame buffer is null");
     return false;
   }
-  auto packedRowBytes = static_cast<size_t>(width) * 4;
+  auto widthSize = static_cast<size_t>(width);
+  auto heightSize = static_cast<size_t>(height);
+  if (widthSize > std::numeric_limits<size_t>::max() / 4) {
+    SetError(errorMsg, "the frame row size overflows size_t");
+    return false;
+  }
+  auto packedRowBytes = widthSize * 4;
   if (rowBytes < packedRowBytes) {
     SetError(errorMsg, "the row stride " + std::to_string(rowBytes) +
                            " is smaller than width * 4 (" + std::to_string(packedRowBytes) + ")");
     return false;
   }
+  if (rowBytes > std::numeric_limits<size_t>::max() / heightSize ||
+      packedRowBytes > std::numeric_limits<size_t>::max() / heightSize) {
+    SetError(errorMsg, "the frame byte size overflows size_t");
+    return false;
+  }
   const uint8_t* data = pixels;
-  size_t size = rowBytes * static_cast<size_t>(height);
+  size_t size = rowBytes * heightSize;
   if (rowBytes != packedRowBytes) {
-    packedBuffer.resize(packedRowBytes * static_cast<size_t>(height));
+    packedBuffer.resize(packedRowBytes * heightSize);
     for (int row = 0; row < height; ++row) {
       std::memcpy(packedBuffer.data() + static_cast<size_t>(row) * packedRowBytes,
                   pixels + static_cast<size_t>(row) * rowBytes, packedRowBytes);
@@ -461,11 +576,19 @@ bool VideoEncoder::writeAll(const uint8_t* data, size_t size, std::string* error
     }
     auto error = GetLastError();
     closeStdin();
-    auto exitCode = reapChild();
+    int exitCode = 0;
+    auto hasExitStatus = reapChild(&exitCode);
+    if (!hasExitStatus) {
+      killChild();
+    }
     stopped = true;
     removePartFile();
     if (error == ERROR_BROKEN_PIPE || error == ERROR_NO_DATA) {
-      SetError(errorMsg, FrameWriteFailure(framesWritten, exitCode));
+      auto message = FrameWriteFailure(framesWritten, exitCode);
+      if (!hasExitStatus) {
+        message += " (exit status unavailable)";
+      }
+      SetError(errorMsg, message);
     } else {
       SetError(errorMsg,
                "failed to write a frame to ffmpeg (Windows error " + std::to_string(error) + ")");
@@ -486,11 +609,19 @@ bool VideoEncoder::writeAll(const uint8_t* data, size_t size, std::string* error
     }
     auto error = errno;
     closeStdin();
-    auto exitCode = reapChild();
+    int exitCode = 0;
+    auto hasExitStatus = reapChild(&exitCode);
+    if (!hasExitStatus) {
+      killChild();
+    }
     stopped = true;
     removePartFile();
     if (error == EPIPE) {
-      SetError(errorMsg, FrameWriteFailure(framesWritten, exitCode));
+      auto message = FrameWriteFailure(framesWritten, exitCode);
+      if (!hasExitStatus) {
+        message += " (exit status unavailable)";
+      }
+      SetError(errorMsg, message);
     } else {
       SetError(errorMsg, "failed to write a frame to ffmpeg: " + std::string(std::strerror(error)));
     }
@@ -517,31 +648,41 @@ void VideoEncoder::closeStdin() {
 #endif
 }
 
-int VideoEncoder::reapChild() {
-  if (child == nullptr) {
-    return 0;
+bool VideoEncoder::reapChild(int* exitCode) {
+  if (child == nullptr || exitCode == nullptr) {
+    return false;
   }
+  *exitCode = child->exitCode;
   if (child->reaped) {
-    return child->exitCode;
+    return child->exitStatusValid;
   }
 #ifdef _WIN32
-  WaitForSingleObject(child->process, INFINITE);
+  if (WaitForSingleObject(child->process, INFINITE) != WAIT_OBJECT_0) {
+    return false;
+  }
   DWORD code = 0;
-  GetExitCodeProcess(child->process, &code);
-  child->exitCode = static_cast<int>(code);
+  auto hasExitStatus = GetExitCodeProcess(child->process, &code) != 0;
   CloseHandle(child->process);
   child->process = nullptr;
   if (child->thread != nullptr) {
     CloseHandle(child->thread);
     child->thread = nullptr;
   }
+  child->reaped = true;
+  if (!hasExitStatus) {
+    return false;
+  }
+  child->exitCode = static_cast<int>(code);
 #else
   int status = 0;
-  while (waitpid(child->processId, &status, 0) < 0) {
-    if (errno != EINTR) {
-      break;
-    }
+  pid_t result = -1;
+  do {
+    result = waitpid(child->processId, &status, 0);
+  } while (result < 0 && errno == EINTR);
+  if (result < 0) {
+    return false;
   }
+  child->reaped = true;
   if (WIFEXITED(status)) {
     child->exitCode = WEXITSTATUS(status);
   } else if (WIFSIGNALED(status)) {
@@ -550,8 +691,9 @@ int VideoEncoder::reapChild() {
     child->exitCode = 1;
   }
 #endif
-  child->reaped = true;
-  return child->exitCode;
+  child->exitStatusValid = true;
+  *exitCode = child->exitCode;
+  return true;
 }
 
 void VideoEncoder::killChild() {
@@ -565,7 +707,8 @@ void VideoEncoder::killChild() {
 #else
   ::kill(child->processId, SIGKILL);
 #endif
-  reapChild();
+  int exitCode = 0;
+  reapChild(&exitCode);
 }
 
 void VideoEncoder::removePartFile() {
@@ -579,7 +722,12 @@ bool VideoEncoder::finish(std::string* errorMsg) {
     return false;
   }
   closeStdin();
-  auto exitCode = reapChild();
+  int exitCode = 0;
+  if (!reapChild(&exitCode)) {
+    abort();
+    SetError(errorMsg, "failed to obtain the ffmpeg exit status");
+    return false;
+  }
   stopped = true;
   if (exitCode != 0) {
     removePartFile();
@@ -588,15 +736,30 @@ bool VideoEncoder::finish(std::string* errorMsg) {
                            exitCode));
     return false;
   }
-  std::error_code removeError = {};
-  std::filesystem::remove(outputFile, removeError);
+#ifdef _WIN32
+  auto source = UTF8ToWide(partFile);
+  auto destination = UTF8ToWide(outputFile);
+  if (source.empty() || destination.empty()) {
+    SetError(errorMsg, "failed to encode the output paths as UTF-16; temporary file kept at '" +
+                           partFile + "'");
+    return false;
+  }
+  if (!MoveFileExW(source.c_str(), destination.c_str(),
+                   MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)) {
+    SetError(errorMsg, "failed to publish '" + outputFile + "' (Windows error " +
+                           std::to_string(GetLastError()) + "); temporary file kept at '" +
+                           partFile + "'");
+    return false;
+  }
+#else
   std::error_code renameError = {};
   std::filesystem::rename(partFile, outputFile, renameError);
   if (renameError) {
-    removePartFile();
-    SetError(errorMsg, "failed to move '" + partFile + "' to '" + outputFile + "'");
+    SetError(errorMsg,
+             "failed to move '" + partFile + "' to '" + outputFile + "'; temporary file kept");
     return false;
   }
+#endif
   return true;
 }
 

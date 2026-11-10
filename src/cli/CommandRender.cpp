@@ -79,9 +79,11 @@ struct RenderOptions {
   // When set, the document's animations are sampled into an image sequence written to this
   // directory. The scene and surface are built once and reused for every frame.
   std::string framesDir = {};
-  // Sampling frame rate for --frames-dir. Zero means "use the document's animation frame rate".
+  // Sampling frame rate for --frames-dir. Zero uses one consistent integer document rate; mixed or
+  // non-integer document rates must be overridden explicitly.
   int frameRate = 0;
-  // Sequence length in seconds for --frames-dir. Negative means "use the longest animation".
+  // Sequence length in seconds for --frames-dir. Negative means the longest full playback period,
+  // or one frame for a static document.
   float duration = -1.0f;
   // Whether --output was given explicitly, so --frames-dir can reject the combination.
   bool hasOutput = false;
@@ -101,11 +103,11 @@ static void PrintRenderUsage() {
       << "  --frames-dir <dir>        Render the animations as an image sequence into <dir>, "
          "reusing\n"
       << "                            one scene for every frame\n"
-      << "  --fps <n>                 Sampling frame rate for --frames-dir (default: the "
-         "document's\n"
-      << "                            animation frame rate)\n"
+      << "  --fps <n>                 Sampling frame rate for --frames-dir (default: the integer\n"
+      << "                            document's animation frame rate; mixed/non-integer document\n"
+      << "                            rates require an explicit --fps)\n"
       << "  --duration <seconds>      Sequence length for --frames-dir (default: the longest\n"
-      << "                            animation's duration)\n"
+      << "                            full playback period; static documents produce one frame)\n"
       << "  --crop <x,y,w,h>          Crop region in document coordinates\n"
       << "  --id <id>                 Render only the Layer with the specified id\n"
       << "  --xpath <expr>            Render only the Layer matched by XPath expression\n"
