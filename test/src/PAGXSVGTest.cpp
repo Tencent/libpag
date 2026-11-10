@@ -5658,4 +5658,37 @@ PAGX_TEST(PAGXSVGTest, SVGExport_FontPathRejectsGlyphRotation) {
   EXPECT_NE(svg.find("<path"), std::string::npos);
 }
 
+// ST10: the accumulated group alpha has to reach the glyph <g>, which carries the fill / stroke
+// the child <path>s inherit.
+PAGX_TEST(PAGXSVGTest, SVGExport_GlyphOutlinesCarryGroupAlpha) {
+  auto doc = pagx::PAGXDocument::Make(200, 100);
+  auto* font = doc->makeNode<pagx::Font>("alphaFont");
+  font->unitsPerEm = 1000;
+  auto* glyph = doc->makeNode<pagx::Glyph>();
+  glyph->path = doc->makeNode<pagx::PathData>();
+  *glyph->path = pagx::PathDataFromSVGString("M 0,0 L 700,0 L 700,-800 L 0,-800 Z");
+  glyph->advance = 700;
+  font->glyphs.push_back(glyph);
+
+  auto* layer = doc->makeNode<pagx::Layer>("layer");
+  auto* group = doc->makeNode<pagx::Group>("group");
+  group->alpha = 0.5f;
+  auto* text = doc->makeNode<pagx::Text>("run");
+  text->fontSize = 50;
+  auto* run = doc->makeNode<pagx::GlyphRun>();
+  run->font = font;
+  run->fontSize = 50;
+  run->glyphs = {1};
+  text->glyphRuns.push_back(run);
+  group->elements = {text, MakeSolidFillSVG(doc.get(), 0, 0, 0)};
+  layer->contents = {group};
+  doc->layers.push_back(layer);
+
+  pagx::SVGExportOptions options = {};
+  options.embedFontsAsWoff2 = false;
+  auto svg = pagx::SVGExporter::ToSVG(*doc, options);
+  EXPECT_NE(svg.find("<path"), std::string::npos);
+  EXPECT_NE(svg.find("fill-opacity=\"0.5\""), std::string::npos);
+}
+
 }  // namespace pag
