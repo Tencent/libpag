@@ -155,8 +155,8 @@ class HTMLParserContext {
   // bound to this layer. All `<img>`, inline `<svg>`, and container conversion paths funnel
   // their final outer Layer through this helper to ensure animation capture is exhaustive.
   void assignElementId(Layer* layer, const std::shared_ptr<DOMNode>& element,
-                       float parentPerspectivePx = 0.0f, float parentPerspectiveOriginX = NAN,
-                       float parentPerspectiveOriginY = NAN);
+                       float parentPerspectivePx = 0.0f, float localPerspectiveOriginX = NAN,
+                       float localPerspectiveOriginY = NAN);
 
   // Rebuilds a PAGX mask layer from the element's CSS `mask-image` (alpha / luminance) or
   // `clip-path` (contour) — the latter from a `url(#id)` <clipPath> reference or a CSS basic
@@ -317,8 +317,8 @@ class HTMLParserContext {
     // CSS `perspective` declared on the parent, folded into every keyframe pose, plus its
     // `perspective-origin` in the element's local coordinates.
     float parentPerspectivePx = 0.0f;
-    float parentPerspectiveOriginX = NAN;
-    float parentPerspectiveOriginY = NAN;
+    float localPerspectiveOriginX = NAN;
+    float localPerspectiveOriginY = NAN;
   };
   std::vector<PendingAnimation> _pendingAnimations = {};
 

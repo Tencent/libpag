@@ -114,7 +114,7 @@ struct PosePlacement {
 };
 
 PosePlacement PlacePose(const Matrix3D& pose, float parentPerspectivePx,
-                        float parentPerspectiveOriginX, float parentPerspectiveOriginY);
+                        float localPerspectiveOriginX, float localPerspectiveOriginY);
 
 /**
  * Returns true when the pose only acts on the z = 0 plane: no depth translation, no z-dependent

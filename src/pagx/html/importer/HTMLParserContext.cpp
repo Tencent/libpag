@@ -45,14 +45,25 @@ using namespace pagx::html;
 
 namespace {
 
-// Folds a CSS `perspective` declared on the parent into `box`: stores the camera distance and
-// re-expresses the parent's `perspective-origin` in this element's local coordinates. Only an
-// absolutely positioned child knows its offset from the parent's box; a flow / flex child is placed
-// by layout, so its local origin is unknown here and the parent coordinates are used as-is.
-// True when one of the element's own `@keyframes` animates `transform`: such a child only gets its
-// 3D pose from the animation, so the static pose cannot be used to decide whether the camera matters.
-bool AnimatesTransform(const std::unordered_map<std::string, html::CssKeyframesRule>& rules,
-                       const HTMLStyleCascade::PropertyMap& style) {
+// True when a `transform` value leaves the z = 0 plane. A pure translation, 2D rotation, scale or
+// skew stays on the plane, and the parent camera is the identity for it, so those values must not
+// trigger the "approximate vanishing point" diagnostic.
+bool TransformMovesOffPlane(const std::string& value) {
+  const std::string lower = ToLower(value);
+  return lower.find("matrix3d") != std::string::npos ||
+         lower.find("rotate3d") != std::string::npos ||
+         lower.find("rotatex") != std::string::npos || lower.find("rotatey") != std::string::npos ||
+         lower.find("translatez") != std::string::npos ||
+         lower.find("translate3d") != std::string::npos ||
+         lower.find("perspective(") != std::string::npos;
+}
+
+// True when one of the element's own `@keyframes` animates `transform` off the layer plane: such a
+// child only reaches 3D through the animation, so the static pose cannot decide whether the parent
+// camera matters. Declarations are parsed rather than scanned by hand so `TRANSFORM : rotateY()`
+// counts too.
+bool Animates3DTransform(const std::unordered_map<std::string, html::CssKeyframesRule>& rules,
+                         const HTMLStyleCascade::PropertyMap& style) {
   std::vector<std::string> names = {};
   for (const char* property : {"animation-name", "animation"}) {
     const std::string value = LookupProperty(style, property);
@@ -61,7 +72,7 @@ bool AnimatesTransform(const std::unordered_map<std::string, html::CssKeyframesR
       if (i == value.size() || value[i] == ',' ||
           std::isspace(static_cast<unsigned char>(value[i]))) {
         if (i > start) {
-          names.push_back(Trim(value.substr(start, i - start)));
+          names.push_back(ToLower(Trim(value.substr(start, i - start))));
         }
         start = i + 1;
       }
@@ -73,27 +84,21 @@ bool AnimatesTransform(const std::unordered_map<std::string, html::CssKeyframesR
       continue;
     }
     for (const auto& stop : rule->second.stops) {
-      // Only a `transform` declaration counts; `transform-origin` alone does not move the pose.
-      size_t at = 0;
-      while ((at = stop.declarations.find("transform", at)) != std::string::npos) {
-        constexpr size_t kTransformLength = 9;  // strlen("transform")
-        const size_t after = at + kTransformLength;
-        const size_t before = stop.declarations.rfind(';', at);
-        const bool startsDeclaration =
-            before == std::string::npos
-                ? Trim(stop.declarations.substr(0, at)).empty()
-                : Trim(stop.declarations.substr(before + 1, at - before - 1)).empty();
-        if (startsDeclaration && after < stop.declarations.size() &&
-            Trim(stop.declarations.substr(after, 1)) == ":") {
+      for (const auto& declaration : ParseStyleDeclarations(stop.declarations)) {
+        if (ToLower(declaration.first) == "transform" &&
+            TransformMovesOffPlane(declaration.second)) {
           return true;
         }
-        at = after;
       }
     }
   }
   return false;
 }
 
+// Folds a CSS `perspective` declared on the parent into `box`: stores the camera distance and
+// re-expresses the parent's `perspective-origin` in this element's local coordinates. Only an
+// absolutely positioned child knows its offset from the parent's box; a flow / flex child is placed
+// by layout, so its local origin is unknown here and the parent coordinates are used as-is.
 void ApplyParentPerspective(HTMLBoxAttributes& box, float distancePx, float originX, float originY,
                             float parentBorderWidthPx, bool animatesTransform,
                             const std::string& elementName, HTMLDiagnosticSink& diagnostics,
@@ -468,7 +473,7 @@ std::shared_ptr<PAGXDocument> HTMLParserContext::parseDOM(const std::shared_ptr<
     const auto& style = _styleCascade->getResolvedStyle(entry.element);
     _animationBuilder->buildForElement(
         style, entry.layer, _styleCascade->getTransformReferenceSize(entry.element),
-        entry.parentPerspectivePx, entry.parentPerspectiveOriginX, entry.parentPerspectiveOriginY);
+        entry.parentPerspectivePx, entry.localPerspectiveOriginX, entry.localPerspectiveOriginY);
   }
   // Inline-SVG shape animations (`fill` / `stroke` / `stroke-dashoffset` on `<path>` etc.). Their
   // painter nodes are synthesised by the SVG importer during resolve, so the emitted objects target
@@ -686,16 +691,16 @@ bool HTMLParserContext::resolveCanvasSize(const std::shared_ptr<DOMNode>& body, 
 //==================================================================================================
 
 void HTMLParserContext::assignElementId(Layer* layer, const std::shared_ptr<DOMNode>& element,
-                                        float parentPerspectivePx, float parentPerspectiveOriginX,
-                                        float parentPerspectiveOriginY) {
+                                        float parentPerspectivePx, float localPerspectiveOriginX,
+                                        float localPerspectiveOriginY) {
   _idAllocator->assign(layer, element);
   // Record elements that declare an animation so PAGX animations can be emitted once the whole
   // tree is built. Cheap lookup: the resolved style is cached by the cascade.
   if (layer != nullptr && element != nullptr) {
     const auto& style = _styleCascade->getResolvedStyle(element);
     if (style.count("animation") > 0 || style.count("animation-name") > 0) {
-      _pendingAnimations.push_back({element, layer, parentPerspectivePx, parentPerspectiveOriginX,
-                                    parentPerspectiveOriginY});
+      _pendingAnimations.push_back(
+          {element, layer, parentPerspectivePx, localPerspectiveOriginX, localPerspectiveOriginY});
     }
   }
 }
@@ -798,11 +803,12 @@ Layer* HTMLParserContext::convertElement(const std::shared_ptr<DOMNode>& element
   // The branches below each build their own box (text host / svg / img / regular element) and all
   // need the parent camera folded in the same way, so the call lives here instead of four times.
   const auto attachParentCamera = [&](HTMLBoxAttributes& box) {
-    ApplyParentPerspective(
-        box, inherited.parentPerspectivePx, inherited.parentPerspectiveOriginX,
-        inherited.parentPerspectiveOriginY, inherited.parentBorderWidthPx,
-        AnimatesTransform(_styleCascade->keyframes(), _styleCascade->getResolvedStyle(element)),
-        element->name, *_diagnostics, _flowChildPerspectiveWarned);
+    ApplyParentPerspective(box, inherited.parentPerspectivePx, inherited.parentPerspectiveOriginX,
+                           inherited.parentPerspectiveOriginY, inherited.parentBorderWidthPx,
+                           inherited.parentPerspectivePx > 0.0f &&
+                               Animates3DTransform(_styleCascade->keyframes(),
+                                                   _styleCascade->getResolvedStyle(element)),
+                           element->name, *_diagnostics, _flowChildPerspectiveWarned);
   };
   if (isPagxTextHost && IsContainerTag(tag)) {
     // Per-glyph / TextModifier / TextPath container host: convert the whole container into a

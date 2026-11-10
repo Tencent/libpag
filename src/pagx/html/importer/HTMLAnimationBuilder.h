@@ -69,8 +69,8 @@ class HTMLAnimationBuilder {
    */
   bool buildForElement(const std::unordered_map<std::string, std::string>& resolvedStyle,
                        Layer* layer, const HTMLTransformReference& reference,
-                       float parentPerspectivePx = 0.0f, float parentPerspectiveOriginX = NAN,
-                       float parentPerspectiveOriginY = NAN);
+                       float parentPerspectivePx = 0.0f, float localPerspectiveOriginX = NAN,
+                       float localPerspectiveOriginY = NAN);
 
   /**
    * Builds and registers animations for a single inline-SVG shape (`<path>`, `<rect>`, …) that

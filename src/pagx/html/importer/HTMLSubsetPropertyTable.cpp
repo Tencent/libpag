@@ -440,9 +440,9 @@ const PropertyEntry SubsetPropertyEntries[] = {
     {"-webkit-text-stroke", PropAction::Keep, nullptr, nullptr},
     {"-webkit-text-stroke-width", PropAction::Keep, nullptr, nullptr},
     {"-webkit-text-stroke-color", PropAction::Keep, nullptr, nullptr},
-    // `transform` and `transform-origin` are forwarded. The handler composes the whole function list
-    // in CSS order and maps the pivot onto `Layer.anchor`; an unsupported function or unit is reported
-    // by the resolver, not dropped here.
+    // `transform` and `transform-origin` are forwarded. The handler only validates the value: it
+    // tokenises the function list, and drops the whole declaration when a function is malformed or
+    // outside the supported set. Composition and the pivot mapping happen later, in the resolver.
     {"transform", PropAction::Transform, &TransformTransform, nullptr},
     {"transform-origin", PropAction::Transform, &TransformTransformOrigin, nullptr},
     // `transform-style: preserve-3d` maps onto `Layer.preserve3D`; the flat default is a no-op.

@@ -123,7 +123,7 @@ class HTMLTextFragmentBuilder {
    *  semantics from the data-pagx-* attributes instead of the PUA glyph spans. */
   Layer* convertPAGXTextHost(const std::shared_ptr<DOMNode>& element,
                              const HTMLInheritedStyle& inherited, float parentPerspectivePx,
-                             float parentPerspectiveOriginX, float parentPerspectiveOriginY);
+                             float localPerspectiveOriginX, float localPerspectiveOriginY);
 
   /** Builds a `Text` element from a fragment. Exposed so the synthetic anonymous-text-leaf
    *  path in `HTMLParserContext` can reuse it. */
