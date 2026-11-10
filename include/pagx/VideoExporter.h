@@ -38,7 +38,7 @@ class PAGScene;
 class PAGSurface;
 class PAGTimeline;
 class PAGXDocument;
-class VideoExportState;
+struct VideoExportState;
 
 /** A rational sampling rate in frames per second. Zero numerator with denominator 1 means auto. */
 struct VideoFrameRate {
