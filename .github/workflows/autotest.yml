@@ -114,6 +114,7 @@ jobs:
       - name: Check Out Repo
         uses: actions/checkout@v4
         with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
           lfs: true
 
@@ -150,7 +151,49 @@ jobs:
         run: npm ci --prefix test
         shell: bash
 
+      - name: Build PR Metal Tests
+        if: ${{ github.event_name == 'pull_request' }}
+        env:
+          EXPECTED_COMMIT: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_COMMIT"
+          mkdir -p result third_party/tgfx/out/cache
+          git rev-parse HEAD | tee result/tested-commit.txt
+          ./install_tools.sh
+          cmake -S . -B build-pr-metal \
+            -DPAG_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Debug \
+            -DPAG_USE_METAL=ON -DPAG_USE_OPENGL=OFF -DPAG_USE_SWIFTSHADER=OFF \
+            -DPAG_SKIP_BASELINE_CHECK=ON -DPAG_SKIP_GENERATE_BASELINE_IMAGES=ON \
+            -DCMAKE_CXX_FLAGS="-fprofile-arcs -ftest-coverage -g -O0"
+          cmake --build build-pr-metal \
+            --target UpdateBaseline_Metal PAGFullTest_Metal --parallel 12
+        shell: bash
+
+      - name: Generate PR-local Metal Reference Hashes
+        if: ${{ github.event_name == 'pull_request' }}
+        run: |
+          set -euo pipefail
+          echo "References are generated from this PR; this is not a historical image comparison."
+          rm -f test/baseline/.cache/metal/md5.json
+          ./build-pr-metal/UpdateBaseline_Metal \
+            --gtest_output="json:$GITHUB_WORKSPACE/result/UpdateBaseline_Metal.json"
+          test -s test/baseline/.cache/metal/md5.json
+          test -s test/baseline/.cache/metal/HEAD
+          cmp -s test/baseline/version.json test/baseline/.cache/metal/version.json
+        shell: bash
+
+      - name: Run PR Metal Full Tests
+        if: ${{ github.event_name == 'pull_request' }}
+        working-directory: build-pr-metal
+        run: |
+          set -euo pipefail
+          ./PAGFullTest_Metal \
+            --gtest_output="json:$GITHUB_WORKSPACE/result/PAGFullTest_Metal.json"
+        shell: bash
+
       - name: Run macOS Metal Autotest
+        if: ${{ github.event_name != 'pull_request' }}
         run: |
           mkdir -p third_party/tgfx/out/cache
           chmod +x autotest.sh
@@ -171,5 +214,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: mac_metal_result
-          path: result
+          path: |
+            result
+            test/out
           include-hidden-files: true

@@ -159,12 +159,14 @@ bool HardwareDecoder::resetVideoToolBox() {
   // was no longer recognized). The Metal compatibility key is added because tgfx renders through
   // Metal (CVMetalTextureCache) on macOS.
   CFDictionaryRef ioSurfaceParam =
-      CFDictionaryCreate(kCFAllocatorDefault, NULL, NULL, 0, NULL, NULL);
+      CFDictionaryCreate(kCFAllocatorDefault, NULL, NULL, 0, &kCFTypeDictionaryKeyCallBacks,
+                         &kCFTypeDictionaryValueCallBacks);
 
   const void* values[] = {pixelFormatTypeValue, kCFBooleanTrue, kCFBooleanTrue, ioSurfaceParam};
-  inAttrs = CFDictionaryCreate(kCFAllocatorDefault, keys, values, 4, NULL, NULL);
+  inAttrs = CFDictionaryCreate(kCFAllocatorDefault, keys, values, 4, &kCFTypeDictionaryKeyCallBacks,
+                               &kCFTypeDictionaryValueCallBacks);
   const void* combineDics[] = {inAttrs};
-  CFArrayRef combines = CFArrayCreate(NULL, combineDics, 1, NULL);
+  CFArrayRef combines = CFArrayCreate(NULL, combineDics, 1, &kCFTypeArrayCallBacks);
   CFDictionaryRef outAttrs = NULL;
   CVReturn resolvedResult =
       CVPixelBufferCreateResolvedAttributesDictionary(NULL, combines, &outAttrs);

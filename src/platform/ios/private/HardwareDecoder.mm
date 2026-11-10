@@ -242,7 +242,8 @@ bool HardwareDecoder::resetVideoToolBox() {
 
   CFNumberRef pixelFormatTypeValue = CFNumberCreate(NULL, kCFNumberSInt32Type, &pixelFormatType);
   CFDictionaryRef ioSurfaceParam =
-      CFDictionaryCreate(kCFAllocatorDefault, NULL, NULL, 0, NULL, NULL);
+      CFDictionaryCreate(kCFAllocatorDefault, NULL, NULL, 0, &kCFTypeDictionaryKeyCallBacks,
+                         &kCFTypeDictionaryValueCallBacks);
 
   // The compatibility keys expect a CFBoolean, not a CFNumber: passing a CFNumber makes
   // CVPixelBufferCreateResolvedAttributesDictionary reject the whole attribute set on newer
@@ -250,7 +251,8 @@ bool HardwareDecoder::resetVideoToolBox() {
   // constant and must not be released.
   const void* values[] = {pixelFormatTypeValue, kCFBooleanTrue, ioSurfaceParam};
 
-  attrs = CFDictionaryCreate(NULL, keys, values, 3, NULL, NULL);
+  attrs = CFDictionaryCreate(NULL, keys, values, 3, &kCFTypeDictionaryKeyCallBacks,
+                             &kCFTypeDictionaryValueCallBacks);
 
   VTDecompressionOutputCallbackRecord callBackRecord;
   callBackRecord.decompressionOutputCallback = DidDecompress;
