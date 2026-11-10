@@ -21,8 +21,8 @@
 #include "pagx/VideoExporter.h"
 
 namespace tgfx {
-class Bitmap;
 class Device;
+class Pixmap;
 class SurfaceReadback;
 }  // namespace tgfx
 
@@ -48,11 +48,11 @@ class VideoExportFrameImpl {
   static std::shared_ptr<VideoExportFrameImpl> MakeGPU(std::shared_ptr<VideoExportState> state,
                                                        int64_t index,
                                                        std::shared_ptr<PAGSurface> surface,
-                                                       std::shared_ptr<tgfx::Bitmap> staticCache,
+                                                       std::shared_ptr<tgfx::Pixmap> staticCache,
                                                        std::string* errorMsg);
   static std::shared_ptr<VideoExportFrameImpl> MakeCPU(std::shared_ptr<VideoExportState> state,
                                                        int64_t index,
-                                                       std::shared_ptr<tgfx::Bitmap> pixels);
+                                                       std::shared_ptr<tgfx::Pixmap> pixels);
 
   VideoExportFrameImpl(std::shared_ptr<VideoExportState> state, int64_t index);
 
@@ -76,8 +76,8 @@ class VideoExportFrameImpl {
   std::shared_ptr<PAGSurface> surface = nullptr;
   std::shared_ptr<tgfx::Device> device = nullptr;
   std::shared_ptr<tgfx::SurfaceReadback> readback = nullptr;
-  std::shared_ptr<tgfx::Bitmap> cpuPixels = nullptr;
-  std::shared_ptr<tgfx::Bitmap> staticCache = nullptr;
+  std::shared_ptr<tgfx::Pixmap> cpuPixels = nullptr;
+  std::shared_ptr<tgfx::Pixmap> staticCache = nullptr;
   bool flipY = false;
   bool failed = false;
   std::string errorMessage = {};

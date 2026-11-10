@@ -497,7 +497,7 @@ VideoExportStartResult VideoExporter::startNextFrame() {
   auto frameIndex = state->currentFrame;
   std::shared_ptr<VideoExportFrameImpl> impl = nullptr;
   if (reuseStaticFrame && frameIndex > 0) {
-    impl = VideoExportFrameImpl::MakeCPU(state, frameIndex, bitmap);
+    impl = VideoExportFrameImpl::MakeCPU(state, frameIndex, pixmap);
   } else {
     std::string renderError = {};
     if (!drawNextFrame(&renderError)) {
@@ -506,7 +506,7 @@ VideoExportStartResult VideoExporter::startNextFrame() {
       return {VideoExportStartStatus::Failed, nullptr, renderError};
     }
     impl = VideoExportFrameImpl::MakeGPU(state, frameIndex, surface,
-                                         reuseStaticFrame ? bitmap : nullptr, &renderError);
+                                         reuseStaticFrame ? pixmap : nullptr, &renderError);
     if (impl == nullptr) {
       state->failed = true;
       state->error = renderError;
