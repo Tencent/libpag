@@ -5377,4 +5377,17 @@ PAGX_TEST(PAGXSVGTest, SVGExport_BlendFilterNonFeBlendModeWarns) {
   EXPECT_TRUE(warned) << (warnings.empty() ? "no warnings" : warnings[0]);
 }
 
+// ST17: antiAlias=false has no per-shape SVG switch, but crispEdges removes the coverage smoothing
+// the renderer turns off in that mode.
+PAGX_TEST(PAGXSVGTest, SVGExport_AntiAliasFalseUsesCrispEdges) {
+  auto doc = MakeRectDocument();
+  doc->layers[0]->antiAlias = false;
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("shape-rendering=\"crispEdges\""), std::string::npos);
+
+  auto smooth = MakeRectDocument();
+  auto smoothSvg = pagx::SVGExporter::ToSVG(*smooth);
+  EXPECT_EQ(smoothSvg.find("shape-rendering"), std::string::npos);
+}
+
 }  // namespace pag

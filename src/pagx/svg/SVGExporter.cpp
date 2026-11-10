@@ -3581,7 +3581,8 @@ void SVGWriter::writeLayer(SVGBuilder& out, const Layer* layer) {
   bool needsGroup = !BuildLayerMatrix(layer).isIdentity() || layer->alpha < 1.0f ||
                     !layer->id.empty() || !layer->filters.empty() || !layer->styles.empty() ||
                     layer->mask != nullptr || !layer->customData.empty() ||
-                    layer->blendMode != BlendMode::Normal || layer->hasScrollRect || animated;
+                    layer->blendMode != BlendMode::Normal || layer->hasScrollRect || animated ||
+                    !layer->antiAlias;
 
   // Only an animated alpha forces the group form; a transform-only animation must keep the static
   // per-child distribution so overlapping children keep compositing exactly as before. A layer that
@@ -3759,6 +3760,12 @@ void SVGWriter::writeLayerOuterAttributes(SVGBuilder& out, const Layer* layer) {
       _animWriter.plan()->HasVisibilityAnimation(layer)) {
     // Only reachable when writeLayer kept the layer because it drives a visibility animation.
     out.addAttribute("visibility", "hidden");
+  }
+
+  if (!layer->antiAlias) {
+    // SVG has no per-shape anti-aliasing switch, but crispEdges turns off the coverage smoothing
+    // that antiAlias=false disables in the renderer.
+    out.addAttribute("shape-rendering", "crispEdges");
   }
 
   if (layer->blendMode != BlendMode::Normal) {
