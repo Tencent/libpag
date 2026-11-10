@@ -16,11 +16,13 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include <chrono>
 #include <cstdint>
 #include <cstring>
 #include <limits>
 #include <memory>
 #include <string>
+#include <thread>
 #include <vector>
 #include "base/PAGTest.h"
 #include "pagx/PAGXDocument.h"
@@ -137,8 +139,9 @@ void SetDocumentFrameRate(const std::shared_ptr<pagx::PAGXDocument>& document, f
 void ConsumeAsyncFrame(const std::shared_ptr<pagx::VideoExportFrame>& frame, int width, int height,
                        std::vector<uint8_t>* pixels) {
   ASSERT_TRUE(frame != nullptr);
-  for (int attempt = 0; attempt < 1000 && frame->status() == pagx::VideoExportFrameStatus::Pending;
+  for (int attempt = 0; attempt < 5000 && frame->status() == pagx::VideoExportFrameStatus::Pending;
        ++attempt) {
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
   }
   ASSERT_EQ(frame->status(), pagx::VideoExportFrameStatus::Ready) << frame->error();
   auto rowBytes = static_cast<size_t>(width) * 4 + 16;
