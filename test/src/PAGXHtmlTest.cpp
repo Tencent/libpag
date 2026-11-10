@@ -5475,15 +5475,19 @@ CLI_TEST(PAGXHtmlTest, AnimationGeometryCorpus) {
   struct GeometryCase {
     const char* file;
     const char* target;
-    const char* first;
-    const char* last;
+    std::vector<const char*> first;
+    std::vector<const char*> last;
   };
   const GeometryCase cases[] = {
-      {"01_rectangle_size_width", "growRect", "left: 120px; width: 80px",
-       "left: 40px; width: 240px"},
-      {"02_rectangle_roundness", "roundRect", "border-radius: 0px", "border-radius: 60px"},
-      {"03_ellipse_size_width", "growEllipse", "left: 120px; width: 80px",
-       "left: 40px; width: 240px"},
+      {"01_rectangle_size_width",
+       "growRect",
+       {"left: 120px", "width: 80px"},
+       {"left: 40px", "width: 240px"}},
+      {"02_rectangle_roundness", "roundRect", {"border-radius: 0px"}, {"border-radius: 60px"}},
+      {"03_ellipse_size_width",
+       "growEllipse",
+       {"left: 120px", "width: 80px"},
+       {"left: 40px", "width: 240px"}},
   };
   pagx::HTMLExportOptions options;
   options.extractStyleSheet = false;
@@ -5498,10 +5502,16 @@ CLI_TEST(PAGXHtmlTest, AnimationGeometryCorpus) {
     ASSERT_FALSE(tag.empty()) << geometry.file;
     EXPECT_EQ(tag.rfind("<div", 0), 0u) << geometry.file;
     EXPECT_NE(tag.find("animation:"), std::string::npos) << geometry.file;
-    EXPECT_NE(KeyframeStopOf(html, marker, "0%").find(geometry.first), std::string::npos)
-        << geometry.file;
-    EXPECT_NE(KeyframeStopOf(html, marker, "100%").find(geometry.last), std::string::npos)
-        << geometry.file;
+    // The frame emits left/top/width/height together, so assert each property on its own instead of
+    // a contiguous snippet whose order is incidental.
+    auto firstStop = KeyframeStopOf(html, marker, "0%");
+    auto lastStop = KeyframeStopOf(html, marker, "100%");
+    for (const char* expected : geometry.first) {
+      EXPECT_NE(firstStop.find(expected), std::string::npos) << geometry.file << ' ' << expected;
+    }
+    for (const char* expected : geometry.last) {
+      EXPECT_NE(lastStop.find(expected), std::string::npos) << geometry.file << ' ' << expected;
+    }
 
     options.exportAnimations = false;
     auto withoutAnimation = LoadAndConvert(ProjectPath::Absolute(path), options);
@@ -5538,8 +5548,10 @@ CLI_TEST(PAGXHtmlTest, AnimationGeometryWidthSvgDoesNotClip) {
   EXPECT_NE(tag.find("animation:"), std::string::npos);
   EXPECT_NE(EnclosingSvgTag(html, "id=\"outlinedRect\"").find("overflow:visible"),
             std::string::npos);
-  EXPECT_NE(KeyframeStopOf(html, "id=\"outlinedRect\"", "100%").find("x: 40px; width: 240px"),
-            std::string::npos);
+  // The frame emits x/y/width/height together, so check each property rather than one snippet.
+  auto widthStop = KeyframeStopOf(html, "id=\"outlinedRect\"", "100%");
+  EXPECT_NE(widthStop.find("x: 40px"), std::string::npos) << widthStop;
+  EXPECT_NE(widthStop.find("width: 240px"), std::string::npos) << widthStop;
 }
 
 CLI_TEST(PAGXHtmlTest, AnimationTrimPathEndCorpus) {
@@ -5612,19 +5624,29 @@ CLI_TEST(PAGXHtmlTest, AnimationSharedDivKeepsGeometryAndFill) {
 // keyframes, so an object animating only such channels must not emit a @keyframes rule or attach
 // an animation that would play empty stops.
 CLI_TEST(PAGXHtmlTest, AnimationOnlyUnsupportedChannelsEmitsNoKeyframes) {
-  const char* cases[] = {
-      "layer/07_blend_mode.pagx",
-  };
   pagx::HTMLExportOptions opts;
   opts.extractStyleSheet = false;
-  for (const char* name : cases) {
-    auto html = LoadAndConvert(
-        ProjectPath::Absolute(std::string("resources/pagx_to_html/animations/") + name), opts);
-    ASSERT_FALSE(html.empty()) << name;
-    EXPECT_EQ(html.find("@keyframes"), std::string::npos) << name;
-    EXPECT_EQ(html.find("animation:"), std::string::npos) << name;
-    EXPECT_EQ(html.find("{ ; }"), std::string::npos) << name;
-  }
+  // `scale.z` is the one Layer channel with no mapping (see the exemption in anim_coverage.py).
+  const char* depthXml = R"(<pagx width="320" height="200">
+    <Layer id="deepBox" x="60" y="40" width="90" height="90">
+      <Rectangle position="45,45" size="90,90"/>
+      <Fill color="#2563EB"/>
+    </Layer>
+    <Animations>
+      <Animation id="depth" duration="60" frameRate="60" loop="once">
+        <Object target="deepBox">
+          <Channel name="scale.z" type="float">
+            <Key time="0" value="1" interpolation="linear"/>
+            <Key time="60" value="3"/>
+          </Channel>
+        </Object>
+      </Animation>
+    </Animations>
+  </pagx>)";
+  auto depthHtml = LoadXMLAndConvert(depthXml, opts);
+  ASSERT_FALSE(depthHtml.empty());
+  EXPECT_EQ(std::string(depthHtml).find("@keyframes"), std::string::npos) << depthHtml;
+  EXPECT_EQ(std::string(depthHtml).find("animation:"), std::string::npos) << depthHtml;
   // NoiseStyle has no static export at all (the writer never references it), so its channels have no
   // CSS mapping and stay unexported. Built inline so the test does not depend on a corpus case.
   const char* noiseXml = R"(<pagx width="320" height="200">
@@ -5693,11 +5715,13 @@ static void ExpectUnsupportedChannelIgnored(const std::string& animatedXml,
 }
 
 CLI_TEST(PAGXHtmlTest, AnimationUnsupportedChannelKeepsLayerAlphaLinear) {
-  const char* blendChannel = R"(
-        <Channel name="blendMode" type="int">
-          <Key time="0" value="0" interpolation="hold"/>
-          <Key time="30" value="1" interpolation="hold"/>
-          <Key time="60" value="1" interpolation="hold"/>
+  // `scale.z` still has no mapping: it scales the z=0 plane before the rotation, so it cannot change
+  // a rendered pixel.
+  const char* depthChannel = R"(
+        <Channel name="scale.z" type="float">
+          <Key time="0" value="1" interpolation="linear"/>
+          <Key time="30" value="2" interpolation="linear"/>
+          <Key time="60" value="2"/>
         </Channel>)";
   std::string xml = std::string(R"(<pagx width="320" height="200">
     <Layer id="mixLayer" x="40" y="40" width="80" height="80">
@@ -5711,21 +5735,21 @@ CLI_TEST(PAGXHtmlTest, AnimationUnsupportedChannelKeepsLayerAlphaLinear) {
             <Key time="0" value="0.2" interpolation="linear"/>
             <Key time="60" value="1" interpolation="linear"/>
           </Channel>)") +
-                    blendChannel + R"(
+                    depthChannel + R"(
         </Object>
       </Animation>
     </Animations>
   </pagx>)";
-  ExpectUnsupportedChannelIgnored(xml, blendChannel, "id=\"mixLayer\"");
+  ExpectUnsupportedChannelIgnored(xml, depthChannel, "id=\"mixLayer\"");
 }
 
 CLI_TEST(PAGXHtmlTest, AnimationUnsupportedChannelKeepsLayerXBezier) {
-  const char* blendChannel = R"(
-        <Channel name="blendMode" type="int">
-          <Key time="0" value="0" interpolation="hold"/>
-          <Key time="20" value="1" interpolation="hold"/>
-          <Key time="40" value="0" interpolation="hold"/>
-          <Key time="60" value="0"/>
+  const char* depthChannel = R"(
+        <Channel name="scale.z" type="float">
+          <Key time="0" value="1" interpolation="linear"/>
+          <Key time="20" value="2" interpolation="linear"/>
+          <Key time="40" value="1" interpolation="linear"/>
+          <Key time="60" value="1"/>
         </Channel>)";
   std::string xml = std::string(R"(<pagx width="320" height="200">
     <Layer id="mixSlide" x="40" y="60" width="80" height="80">
@@ -5739,12 +5763,12 @@ CLI_TEST(PAGXHtmlTest, AnimationUnsupportedChannelKeepsLayerXBezier) {
             <Key time="0" value="40" interpolation="bezier" bezierOut="0.42,0" bezierIn="0.58,1"/>
             <Key time="60" value="200"/>
           </Channel>)") +
-                    blendChannel + R"(
+                    depthChannel + R"(
         </Object>
       </Animation>
     </Animations>
   </pagx>)";
-  ExpectUnsupportedChannelIgnored(xml, blendChannel, "id=\"mixSlide\"");
+  ExpectUnsupportedChannelIgnored(xml, depthChannel, "id=\"mixSlide\"");
 }
 
 CLI_TEST(PAGXHtmlTest, AnimationUnsupportedChannelKeepsStrokeWidthLinear) {
