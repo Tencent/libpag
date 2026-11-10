@@ -25,10 +25,14 @@
 #include <thread>
 #include <vector>
 #include "base/PAGTest.h"
+#include "pagx/PAGSurface.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/PAGXImporter.h"
 #include "pagx/VideoExporter.h"
 #include "pagx/nodes/Animation.h"
+#include "pagx/tgfx.h"
+#include "rendering/gpu/Devices.h"
+#include "tgfx/core/Surface.h"
 
 namespace pag {
 namespace {
@@ -136,6 +140,20 @@ void SetDocumentFrameRate(const std::shared_ptr<pagx::PAGXDocument>& document, f
   animation->frameRate = frameRate;
 }
 
+std::shared_ptr<pagx::PAGSurface> MakeHostSurface(int width, int height) {
+  auto device = Devices::MakeDefault();
+  if (device == nullptr) {
+    return nullptr;
+  }
+  auto* context = device->lockContext();
+  if (context == nullptr) {
+    return nullptr;
+  }
+  auto surface = tgfx::Surface::Make(context, width, height);
+  device->unlock();
+  return pagx::MakeFrom(device, surface);
+}
+
 void ConsumeAsyncFrame(const std::shared_ptr<pagx::VideoExportFrame>& frame, int width, int height,
                        std::vector<uint8_t>* pixels) {
   ASSERT_TRUE(frame != nullptr);
@@ -193,6 +211,34 @@ PAGX_TEST(PAGXVideoExporterTest, MakeExportsStaticDocumentAsSingleFrameByDefault
   EXPECT_NE(exporter->pixels(), nullptr);
   EXPECT_EQ(exporter->currentFrame(), 1);
   EXPECT_FALSE(exporter->nextFrame());
+}
+
+PAGX_TEST(PAGXVideoExporterTest, MakeWithSurfaceRejectsInvalidInput) {
+  auto document = MakeStaticDocument();
+  std::string errorMsg = {};
+  EXPECT_EQ(pagx::VideoExporter::MakeWithSurface(document, nullptr, {}, &errorMsg), nullptr);
+  EXPECT_NE(errorMsg.find("surface is null"), std::string::npos);
+
+  auto surface = MakeHostSurface(100, 100);
+  ASSERT_TRUE(surface != nullptr);
+  errorMsg.clear();
+  EXPECT_EQ(pagx::VideoExporter::MakeWithSurface(document, surface, {}, &errorMsg), nullptr);
+  EXPECT_NE(errorMsg.find("dimensions"), std::string::npos);
+  EXPECT_NE(errorMsg.find("200x200"), std::string::npos);
+}
+
+PAGX_TEST(PAGXVideoExporterTest, MakeWithSurfaceKeepsTheHostSurfaceAlive) {
+#ifdef TGFX_USE_WEBGPU
+  GTEST_SKIP() << "VideoExporter synchronous readback is not used in this WebGPU test lane";
+#endif
+  auto surface = MakeHostSurface(200, 200);
+  ASSERT_TRUE(surface != nullptr);
+  auto exporter =
+      pagx::VideoExporter::MakeWithSurface(MakeStaticDocument(), std::move(surface), {}, nullptr);
+  ASSERT_TRUE(exporter != nullptr);
+  ASSERT_TRUE(exporter->nextFrame());
+  EXPECT_EQ(exporter->currentFrame(), 1);
+  EXPECT_NE(exporter->pixels(), nullptr);
 }
 
 PAGX_TEST(PAGXVideoExporterTest, MakeRepeatsStaticDocumentForExplicitDuration) {
@@ -268,6 +314,22 @@ PAGX_TEST(PAGXVideoExporterTest, AsyncFrameCommitsOnlyAfterConsumption) {
   auto cancelled = exporter->startNextFrame();
   EXPECT_EQ(cancelled.status, pagx::VideoExportStartStatus::Failed);
   EXPECT_EQ(cancelled.error, "cancelled");
+}
+
+PAGX_TEST(PAGXVideoExporterTest, MakeWithSurfaceSupportsAsyncReadback) {
+#ifdef TGFX_USE_WEBGPU
+  GTEST_SKIP() << "Native test does not pump the WebGPU event loop";
+#endif
+  auto exporter =
+      pagx::VideoExporter::MakeWithSurface(MakeAnimatedDocument("once"), MakeHostSurface(200, 200));
+  ASSERT_TRUE(exporter != nullptr);
+  auto started = exporter->startNextFrame();
+  ASSERT_EQ(started.status, pagx::VideoExportStartStatus::FrameStarted) << started.error;
+  ASSERT_TRUE(started.frame != nullptr);
+  EXPECT_EQ(started.frame->index(), 0);
+  std::vector<uint8_t> pixels = {};
+  ConsumeAsyncFrame(started.frame, exporter->width(), exporter->height(), &pixels);
+  EXPECT_EQ(exporter->currentFrame(), 1);
 }
 
 PAGX_TEST(PAGXVideoExporterTest, AsyncStaticFramesReuseCPUPixels) {

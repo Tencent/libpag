@@ -200,6 +200,18 @@ class VideoExporter {
                                              const Options& options = {},
                                              std::string* errorMsg = nullptr);
 
+  /**
+   * Creates an exporter that renders into a host-provided surface. The surface dimensions must
+   * exactly match the output dimensions derived from document and options. The host must ensure
+   * that the surface is suitable for offscreen rendering, remains exclusively used by the exporter,
+   * and shares a compatible device with the document's GPU resources. Readback capability is
+   * validated when a frame is started, not by a speculative readback during construction.
+   */
+  static std::shared_ptr<VideoExporter> MakeWithSurface(std::shared_ptr<PAGXDocument> document,
+                                                        std::shared_ptr<PAGSurface> surface,
+                                                        const Options& options = {},
+                                                        std::string* errorMsg = nullptr);
+
   ~VideoExporter();
 
   /**
@@ -267,6 +279,10 @@ class VideoExporter {
 
  private:
   VideoExporter();
+
+  static std::shared_ptr<VideoExporter> MakeInternal(std::shared_ptr<PAGXDocument> document,
+                                                     std::shared_ptr<PAGSurface> surface,
+                                                     const Options& options, std::string* errorMsg);
 
   bool drawNextFrame(std::string* errorMsg);
 

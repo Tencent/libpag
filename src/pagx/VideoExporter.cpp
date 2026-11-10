@@ -29,6 +29,7 @@
 #include "pagx/PAGXDocument.h"
 #include "pagx/VideoExportFrame.h"
 #include "pagx/nodes/Animation.h"
+#include "pagx/runtime/Drawable.h"
 #include "tgfx/core/Bitmap.h"
 #include "tgfx/core/Pixmap.h"
 
@@ -115,6 +116,23 @@ VideoExporter::~VideoExporter() = default;
 
 std::shared_ptr<VideoExporter> VideoExporter::Make(std::shared_ptr<PAGXDocument> document,
                                                    const Options& options, std::string* errorMsg) {
+  return MakeInternal(std::move(document), nullptr, options, errorMsg);
+}
+
+std::shared_ptr<VideoExporter> VideoExporter::MakeWithSurface(
+    std::shared_ptr<PAGXDocument> document, std::shared_ptr<PAGSurface> surface,
+    const Options& options, std::string* errorMsg) {
+  if (surface == nullptr) {
+    SetError(errorMsg, "the export surface is null");
+    return nullptr;
+  }
+  return MakeInternal(std::move(document), std::move(surface), options, errorMsg);
+}
+
+std::shared_ptr<VideoExporter> VideoExporter::MakeInternal(std::shared_ptr<PAGXDocument> document,
+                                                           std::shared_ptr<PAGSurface> surface,
+                                                           const Options& options,
+                                                           std::string* errorMsg) {
   if (document == nullptr) {
     SetError(errorMsg, "the document is null");
     return nullptr;
@@ -230,11 +248,36 @@ std::shared_ptr<VideoExporter> VideoExporter::Make(std::shared_ptr<PAGXDocument>
     return nullptr;
   }
 
-  auto surface = PAGSurface::MakeOffscreen(width, height);
   if (surface == nullptr) {
-    SetError(errorMsg, "failed to create an offscreen surface of " + std::to_string(width) + "x" +
-                           std::to_string(height));
-    return nullptr;
+    surface = PAGSurface::MakeOffscreen(width, height);
+    if (surface == nullptr) {
+      SetError(errorMsg, "failed to create an offscreen surface of " + std::to_string(width) + "x" +
+                             std::to_string(height));
+      return nullptr;
+    }
+  } else {
+    if (surface->width() != width || surface->height() != height) {
+      SetError(errorMsg, "the export surface dimensions do not match the expected output of " +
+                             std::to_string(width) + "x" + std::to_string(height));
+      return nullptr;
+    }
+    auto device = surface->drawable->getDevice();
+    if (device == nullptr) {
+      SetError(errorMsg, "the export surface has no GPU device");
+      return nullptr;
+    }
+    auto* context = device->lockContext();
+    if (context == nullptr) {
+      SetError(errorMsg, "failed to lock the export surface device");
+      return nullptr;
+    }
+    auto tgfxSurface = surface->drawable->getSurface(context);
+    auto validContext = tgfxSurface != nullptr && tgfxSurface->getContext() == context;
+    device->unlock();
+    if (!validContext) {
+      SetError(errorMsg, "the export surface has no valid GPU context");
+      return nullptr;
+    }
   }
   auto bitmap = std::make_shared<tgfx::Bitmap>(width, height, false, false);
   if (bitmap->isEmpty()) {

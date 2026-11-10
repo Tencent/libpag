@@ -108,6 +108,7 @@ class PAGSurface {
   std::shared_ptr<Drawable> drawable = nullptr;
 
   friend class PAGScene;
+  friend class VideoExporter;
   friend class VideoExportFrameImpl;
 };
 
