@@ -31,13 +31,17 @@
 #include "pagx/nodes/BlurFilter.h"
 #include "pagx/nodes/Channel.h"
 #include "pagx/nodes/Composition.h"
+#include "pagx/nodes/ConicGradient.h"
+#include "pagx/nodes/DiamondGradient.h"
 #include "pagx/nodes/DropShadowFilter.h"
 #include "pagx/nodes/Ellipse.h"
 #include "pagx/nodes/Fill.h"
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/InnerShadowFilter.h"
 #include "pagx/nodes/Layer.h"
+#include "pagx/nodes/LinearGradient.h"
 #include "pagx/nodes/Path.h"
+#include "pagx/nodes/RadialGradient.h"
 #include "pagx/nodes/RangeSelector.h"
 #include "pagx/nodes/Rectangle.h"
 #include "pagx/nodes/RoundCorner.h"
@@ -710,6 +714,18 @@ enum class TargetChannelRole {
   GeometryPosY,
   // TrimPath offset shifts the visible run along the path (degrees, 360 = one full lap).
   TrimOffset,
+  // Gradient geometry: the attributes are not CSS properties, so the frame transforms the gradient
+  // element instead (Chromium maps CSS `transform` onto gradientTransform).
+  GradientStartX,
+  GradientStartY,
+  GradientEndX,
+  GradientEndY,
+  GradientCenterX,
+  GradientCenterY,
+  GradientRadius,
+  GradientStartAngle,
+  // Colour of a gradient's <stop>: `stop-color` is a CSS property on that element.
+  StopColor,
   // Layer skew.x / skew.y are the CSS skew angles already, unlike the Group single-axis skew.
   LayerSkewX,
   LayerSkewY,
@@ -774,6 +790,14 @@ constexpr ChannelBindingRule kChannelBindingTable[] = {
     {NodeType::TrimPath, "end", TargetChannelRole::TrimEnd},
     {NodeType::TrimPath, "start", TargetChannelRole::TrimStart},
     {NodeType::TrimPath, "offset", TargetChannelRole::TrimOffset},
+    {NodeType::LinearGradient, "startPoint.x", TargetChannelRole::GradientStartX},
+    {NodeType::LinearGradient, "startPoint.y", TargetChannelRole::GradientStartY},
+    {NodeType::LinearGradient, "endPoint.x", TargetChannelRole::GradientEndX},
+    {NodeType::LinearGradient, "endPoint.y", TargetChannelRole::GradientEndY},
+    {NodeType::RadialGradient, "center.x", TargetChannelRole::GradientCenterX},
+    {NodeType::RadialGradient, "center.y", TargetChannelRole::GradientCenterY},
+    {NodeType::RadialGradient, "radius", TargetChannelRole::GradientRadius},
+    {NodeType::ColorStop, "color", TargetChannelRole::StopColor},
     {NodeType::Repeater, "rotation", TargetChannelRole::RepeaterRotation},
     {NodeType::Repeater, "copies", TargetChannelRole::RepeaterCopies},
     {NodeType::Repeater, "startAlpha", TargetChannelRole::RepeaterStartAlpha},
@@ -886,6 +910,18 @@ struct BundleChannelSet {
   const Channel* geometryPosXCh = nullptr;
   const Channel* geometryPosYCh = nullptr;
   const Channel* trimOffsetCh = nullptr;
+  // Gradient geometry: `gradientTarget` is the colour source the element paints with.
+  const ColorSource* gradientTarget = nullptr;
+  const Channel* gradStartXCh = nullptr;
+  const Channel* gradStartYCh = nullptr;
+  const Channel* gradEndXCh = nullptr;
+  const Channel* gradEndYCh = nullptr;
+  const Channel* gradCenterXCh = nullptr;
+  const Channel* gradCenterYCh = nullptr;
+  const Channel* gradRadiusCh = nullptr;
+  const Channel* gradStartAngleCh = nullptr;
+  const Channel* stopColorCh = nullptr;
+  Color stopBaseColor = {};
   // Polystar: every channel rewrites the outline, so one struct keeps them together.
   bool hasPolystarGeometry = false;
   const Channel* starPointCountCh = nullptr;
@@ -1092,6 +1128,44 @@ bool BindChannelToBundleSet(
     case TargetChannelRole::RepeaterRotation:
       out.repeaterRotationCh = ch;
       out.repeaterTarget = static_cast<const Repeater*>(objTarget);
+      return true;
+    case TargetChannelRole::StopColor:
+      out.stopColorCh = ch;
+      if (objTarget != nullptr && objTarget->nodeType() == NodeType::ColorStop) {
+        out.stopBaseColor = static_cast<const ColorStop*>(objTarget)->color;
+      }
+      return true;
+    case TargetChannelRole::GradientStartX:
+      out.gradStartXCh = ch;
+      out.gradientTarget = static_cast<const ColorSource*>(objTarget);
+      return true;
+    case TargetChannelRole::GradientStartY:
+      out.gradStartYCh = ch;
+      out.gradientTarget = static_cast<const ColorSource*>(objTarget);
+      return true;
+    case TargetChannelRole::GradientEndX:
+      out.gradEndXCh = ch;
+      out.gradientTarget = static_cast<const ColorSource*>(objTarget);
+      return true;
+    case TargetChannelRole::GradientEndY:
+      out.gradEndYCh = ch;
+      out.gradientTarget = static_cast<const ColorSource*>(objTarget);
+      return true;
+    case TargetChannelRole::GradientCenterX:
+      out.gradCenterXCh = ch;
+      out.gradientTarget = static_cast<const ColorSource*>(objTarget);
+      return true;
+    case TargetChannelRole::GradientCenterY:
+      out.gradCenterYCh = ch;
+      out.gradientTarget = static_cast<const ColorSource*>(objTarget);
+      return true;
+    case TargetChannelRole::GradientRadius:
+      out.gradRadiusCh = ch;
+      out.gradientTarget = static_cast<const ColorSource*>(objTarget);
+      return true;
+    case TargetChannelRole::GradientStartAngle:
+      out.gradStartAngleCh = ch;
+      out.gradientTarget = static_cast<const ColorSource*>(objTarget);
       return true;
     case TargetChannelRole::TrimOffset: {
       auto* trim = static_cast<const TrimPath*>(objTarget);
@@ -1845,6 +1919,81 @@ void EmitTextCssAtFrame(const DomTargetBundle& bundle, const BundleChannelSet& c
   }
 }
 
+// A gradient's geometry lives in attributes (x1/y1/x2/y2, cx/cy/r), which CSS cannot animate, but
+// Chromium maps a CSS `transform` on the gradient element onto gradientTransform. So the frame solves
+// for the affine move that takes the authored gradient geometry to this frame's geometry: a linear
+// gradient maps its two endpoints (translate + rotate + scale), a radial/diamond one maps its centre
+// and radius.
+void EmitGradientCssAtFrame(const BundleChannelSet& chSet, const std::string& tagName, Frame t,
+                            std::string& decls) {
+  if (chSet.stopColorCh != nullptr && tagName == "stop") {
+    Color color = EvalColorChannel(chSet.stopColorCh, t, chSet.stopBaseColor);
+    AppendCssDecl(decls, "stop-color", ColorToSVGHex(color));
+    AppendCssDecl(decls, "stop-opacity", CssFloatToString(color.alpha));
+    return;
+  }
+  if (chSet.gradientTarget == nullptr) {
+    return;
+  }
+  auto type = chSet.gradientTarget->nodeType();
+  if (type == NodeType::LinearGradient && tagName == "lineargradient") {
+    auto* g = static_cast<const LinearGradient*>(chSet.gradientTarget);
+    // The def keeps objectBoundingBox units for a single-shape fill, so both the attributes and the
+    // transform are in normalised fractions. (A shared fill converts the def to userSpaceOnUse
+    // pixels, where these units would not line up; that path leaves the gradient static.)
+    float x1 = EvalFloatChannel(chSet.gradStartXCh, t, g->startPoint.x);
+    float y1 = EvalFloatChannel(chSet.gradStartYCh, t, g->startPoint.y);
+    float x2 = EvalFloatChannel(chSet.gradEndXCh, t, g->endPoint.x);
+    float y2 = EvalFloatChannel(chSet.gradEndYCh, t, g->endPoint.y);
+    double dx = g->endPoint.x - g->startPoint.x;
+    double dy = g->endPoint.y - g->startPoint.y;
+    double ndx = x2 - x1;
+    double ndy = y2 - y1;
+    double len = std::hypot(dx, dy);
+    double nextLen = std::hypot(ndx, ndy);
+    std::string transform =
+        "translate(" + CssFloatToString(x1) + "px, " + CssFloatToString(y1) + "px)";
+    if (len > 1e-6 && nextLen > 1e-6) {
+      double degrees = (std::atan2(ndy, ndx) - std::atan2(dy, dx)) * 180.0 / 3.14159265358979323846;
+      transform += " rotate(" + CssFloatToString(static_cast<float>(degrees)) + "deg) scale(" +
+                   CssFloatToString(static_cast<float>(nextLen / len)) + ")";
+    }
+    transform += " translate(" + CssFloatToString(-g->startPoint.x) + "px, " +
+                 CssFloatToString(-g->startPoint.y) + "px)";
+    AppendCssDecl(decls, "transform", transform);
+    return;
+  }
+  if ((type == NodeType::RadialGradient || type == NodeType::DiamondGradient) &&
+      (tagName == "radialgradient")) {
+    Point center = {};
+    float radius = 0.0f;
+    bool fitsToGeometry = false;
+    if (type == NodeType::RadialGradient) {
+      auto* g = static_cast<const RadialGradient*>(chSet.gradientTarget);
+      center = g->center;
+      radius = g->radius;
+      fitsToGeometry = g->fitsToGeometry;
+    } else {
+      auto* g = static_cast<const DiamondGradient*>(chSet.gradientTarget);
+      center = g->center;
+      radius = g->radius;
+      fitsToGeometry = g->fitsToGeometry;
+    }
+    (void)fitsToGeometry;
+    float cx = EvalFloatChannel(chSet.gradCenterXCh, t, center.x);
+    float cy = EvalFloatChannel(chSet.gradCenterYCh, t, center.y);
+    float nextRadius = EvalFloatChannel(chSet.gradRadiusCh, t, radius);
+    std::string transform =
+        "translate(" + CssFloatToString(cx) + "px, " + CssFloatToString(cy) + "px)";
+    if (radius > 1e-6f && nextRadius > 1e-6f) {
+      transform += " scale(" + CssFloatToString(nextRadius / radius) + ")";
+    }
+    transform +=
+        " translate(" + CssFloatToString(-center.x) + "px, " + CssFloatToString(-center.y) + "px)";
+    AppendCssDecl(decls, "transform", transform);
+  }
+}
+
 // `flood-color` is a CSS property on <feFlood>, so a filter colour can ride on that element even
 // though the pipeline's geometry attributes (dx, dy, stdDeviation) are not animatable.
 void EmitFloodColorCssAtFrame(const BundleChannelSet& chSet, const std::string& tagName, Frame t,
@@ -2109,6 +2258,7 @@ std::string EvaluateKeyframeCssDecls(const DomTargetBundle& bundle, const Bundle
   EmitTextCssAtFrame(bundle, chSet, t, decls);
   EmitFilterCssAtFrame(bundle, chSet, t, decls);
   EmitFloodColorCssAtFrame(chSet, tagName, t, decls);
+  EmitGradientCssAtFrame(chSet, tagName, t, decls);
 
   if (chSet.animatedMaskPath != nullptr) {
     std::string dStr = RebuildAnimatedPathSVGString(chSet.animatedMaskPath, chSet.maskPtX,
@@ -2215,6 +2365,29 @@ std::vector<DomTargetBundle> GroupObjectsIntoDomBundles(
     std::string domId;
     const Node* primaryHost = targetNode;
     auto nType = targetNode->nodeType();
+    if (nType == NodeType::ColorStop) {
+      auto idIt = ctx.animation.elementIds.find(targetNode);
+      if (idIt != ctx.animation.elementIds.end()) {
+        DomTargetBundle stopBundle;
+        stopBundle.domId = idIt->second;
+        stopBundle.primaryHost = targetNode;
+        stopBundle.objects.push_back(obj);
+        bundles.push_back(std::move(stopBundle));
+        continue;
+      }
+    }
+    if (nType == NodeType::LinearGradient || nType == NodeType::RadialGradient ||
+        nType == NodeType::ConicGradient || nType == NodeType::DiamondGradient) {
+      auto idIt = ctx.animation.elementIds.find(targetNode);
+      if (idIt != ctx.animation.elementIds.end()) {
+        DomTargetBundle gradientBundle;
+        gradientBundle.domId = idIt->second;
+        gradientBundle.primaryHost = targetNode;
+        gradientBundle.objects.push_back(obj);
+        bundles.push_back(std::move(gradientBundle));
+        continue;
+      }
+    }
     if (nType == NodeType::InnerShadowFilter || nType == NodeType::BlendFilter) {
       auto idIt = ctx.animation.elementIds.find(targetNode);
       if (idIt != ctx.animation.elementIds.end()) {
@@ -3121,6 +3294,33 @@ void HTMLAnimationSession::ResolveAnimationTargets(
               slot = std::max(slot, emitted);
             }
           }
+        }
+      } else if (nType == NodeType::ColorStop) {
+        for (auto* channel : obj->channels) {
+          if (channel != nullptr &&
+              LookupChannelRole(nType, channel->name) == TargetChannelRole::StopColor) {
+            std::string id = _ctx.nextId("stopAnim");
+            _ctx.animation.colorStopIds[targetNode] = id;
+            _ctx.animation.elementIds[targetNode] = id;
+          }
+        }
+      } else if (nType == NodeType::LinearGradient || nType == NodeType::RadialGradient ||
+                 nType == NodeType::ConicGradient || nType == NodeType::DiamondGradient) {
+        bool hasGradientChannel = false;
+        for (auto* channel : obj->channels) {
+          auto role = channel != nullptr ? LookupChannelRole(nType, channel->name)
+                                         : TargetChannelRole::Unknown;
+          if (role != TargetChannelRole::Unknown) {
+            hasGradientChannel = true;
+            break;
+          }
+        }
+        if (hasGradientChannel) {
+          // The gradient element is written while the body is emitted, so the id has to exist by
+          // then; the def emitter picks it up from this map.
+          std::string id = _ctx.nextId("gradAnim");
+          _ctx.animation.gradientIds[targetNode] = id;
+          _ctx.animation.elementIds[targetNode] = id;
         }
       } else if (nType == NodeType::Rectangle || nType == NodeType::Ellipse ||
                  nType == NodeType::Polystar) {

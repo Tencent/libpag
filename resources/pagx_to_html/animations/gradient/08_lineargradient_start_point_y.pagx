@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: LinearGradient startPoint.y tilts the ramp, so the colour bands rotate around the card.
      Target: LinearGradient  Channel: startPoint.y  Type: float
-     Expect: gap
+     Expect: supported
      Ref: - -->
 <pagx width="320" height="200">
   <Layer left="0" right="0" top="0" bottom="0">

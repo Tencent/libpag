@@ -81,14 +81,14 @@ python3 tools/anim_coverage.py --check
 | Text | `x` | ✔ | `text/10` |
 | Text | `y` | ✔ | `text/11` |
 | TextPath | `alpha` `anchor.x` `anchor.y` `position.x` `position.y` `rotation` `scale.x` `scale.y` `skew` `skewAxis` | ✘ | — |
-| Rectangle | `position.x` | ✘ | `geometry/07` |
-| Rectangle | `position.y` | ✘ | `geometry/08` |
+| Rectangle | `position.x` | ✔ | `geometry/07` |
+| Rectangle | `position.y` | ✔ | `geometry/08` |
 | Rectangle | `roundness` | ✔ | `geometry/02` |
-| Rectangle | `size.height` | ✘ | `geometry/09` |
+| Rectangle | `size.height` | ✔ | `geometry/09` |
 | Rectangle | `size.width` | ✔ | `combo/07`、`geometry/01·05` |
-| Ellipse | `position.x` | ✘ | `geometry/10` |
-| Ellipse | `position.y` | ✘ | `geometry/11` |
-| Ellipse | `size.height` | ✘ | `geometry/12` |
+| Ellipse | `position.x` | ✔ | `geometry/10` |
+| Ellipse | `position.y` | ✔ | `geometry/11` |
+| Ellipse | `size.height` | ✔ | `geometry/12` |
 | Ellipse | `size.width` | ✔ | `geometry/03` |
 | Polystar | `innerRadius` | ✔ | `geometry/13` |
 | Polystar | `innerRoundness` | ✔ | `geometry/15` |
@@ -106,7 +106,7 @@ python3 tools/anim_coverage.py --check
 | Stroke | `miterLimit` | ✔ | `stroke/05` |
 | Stroke | `width` | ✔ | `stroke/03·06` |
 | TrimPath | `end` | ✔ | `geometry/04`、`stroke/06` |
-| TrimPath | `offset` | ✘ | `geometry/20` |
+| TrimPath | `offset` | ✔ | `geometry/20` |
 | TrimPath | `start` | ✔ | `modifier/02` |
 | RoundCorner | `radius` | ✔ | `modifier/01` |
 | Repeater | `anchor.x` | ✘ | `modifier/08` |
@@ -140,22 +140,17 @@ python3 tools/anim_coverage.py --check
 | RangeSelector | `start` | ✔ | `modifier/05` |
 | RangeSelector | `weight` | ✘ | `modifier/19` |
 | SolidColor | `color` | ✔ | `sharing/01`、`solid_color/01`、`timing/04·06` |
-| LinearGradient | `endPoint.x` | ✘ | `gradient/01` |
-| LinearGradient | `endPoint.y` | ✘ | `gradient/09` |
-| LinearGradient | `startPoint.x` | ✘ | `gradient/07` |
-| LinearGradient | `startPoint.y` | ✘ | `gradient/08` |
-| RadialGradient | `center.x` | ✘ | `gradient/10` |
-| RadialGradient | `center.y` | ✘ | `gradient/11` |
-| RadialGradient | `radius` | ✘ | `gradient/02` |
-| ConicGradient | `center.x` | ✘ | `gradient/12` |
-| ConicGradient | `center.y` | ✘ | `gradient/13` |
-| ConicGradient | `endAngle` | ✘ | `gradient/14` |
-| ConicGradient | `startAngle` | ✘ | `gradient/03` |
-| DiamondGradient | `center.x` | ✘ | `gradient/15` |
-| DiamondGradient | `center.y` | ✘ | `gradient/16` |
-| DiamondGradient | `radius` | ✘ | `gradient/04` |
-| ColorStop | `color` | ✘ | `gradient/06` |
-| ColorStop | `offset` | ✘ | `gradient/05` |
+| LinearGradient | `endPoint.x` | ✔ | `gradient/01` |
+| LinearGradient | `endPoint.y` | ✔ | `gradient/09` |
+| LinearGradient | `startPoint.x` | ✔ | `gradient/07` |
+| LinearGradient | `startPoint.y` | ✔ | `gradient/08` |
+| RadialGradient | `center.x` | ✔ | `gradient/10` |
+| RadialGradient | `center.y` | ✔ | `gradient/11` |
+| RadialGradient | `radius` | ✔ | `gradient/02` |
+| ConicGradient | `center.x` `center.y` `endAngle` `startAngle` | ✘ | — |
+| DiamondGradient | `center.x` `center.y` `radius` | ✘ | — |
+| ColorStop | `color` | ✔ | `gradient/06` |
+| ColorStop | `offset` | ✘ | — |
 | DropShadowStyle | `blurX` | ✘ | `style/06` |
 | DropShadowStyle | `blurY` | ✘ | `style/07` |
 | DropShadowStyle | `color` | ✘ | `style/08` |
@@ -236,6 +231,14 @@ python3 tools/anim_coverage.py --check
 
 **未实现但已固化**：表 1 中"导出 ✘ 且有用例"的行，共 110 条 `Expect: gap` 用例，逐通道覆盖 Layer
 3D/支点、几何位置与尺寸、渐变色源、修改器、文本与文本修改器、图层样式、滤镜参数。
+
+**渐变的坐标靠变换表达**：`<linearGradient>` / `<radialGradient>` 的 `x1/y1/x2/y2`、`cx/cy/r` 都是 XML
+属性，关键帧对它们无效（实测 0 像素变化）；但 Chromium 会把渐变元素上的 CSS `transform` 映射成
+`gradientTransform`，所以每帧解一个仿射变换即可：线性渐变把两个端点映射过去（平移 + 旋转 + 缩放），径向渐变
+把中心与半径映射过去。色标颜色走 `stop-color`（CSS 属性）。
+
+**锥形 / 菱形渐变整节点豁免**：两者静态导出会光栅化成 PNG（画面上是 `<image>` / `<img>`），没有 CSS 渐变
+可动画，需逐帧重绘位图（JS 侧）。`ColorStop.offset` 同理——`offset` 是属性，不是 CSS 属性。
 
 **几何类通道（`Polystar` 全部 8 个）**：通道按"它到底改变了什么"分流，避免为一件事写复杂表达——
 

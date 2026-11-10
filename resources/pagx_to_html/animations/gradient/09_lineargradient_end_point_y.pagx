@@ -2,7 +2,7 @@
 <!-- Tests: LinearGradient endPoint.y swings the ramp towards the card's bottom edge, turning a horizontal
      gradient into a diagonal one.
      Target: LinearGradient  Channel: endPoint.y  Type: float
-     Expect: gap
+     Expect: supported
      Ref: - -->
 <pagx width="320" height="200">
   <Layer left="0" right="0" top="0" bottom="0">
