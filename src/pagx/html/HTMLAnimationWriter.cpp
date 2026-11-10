@@ -265,15 +265,23 @@ void CollectKeyframeTimesAndEasing(const std::vector<Keyframe<T>>& keys, std::se
       // different curves on the same segment cannot share one stop: remember the time and split the
       // segment into linear sub-stops instead (see EmitBundleKeyframeStops).
       auto it = easingOut.find(k.time);
-      if (it == easingOut.end() || it->second.type == KeyframeInterpolationType::Linear) {
+      if (it == easingOut.end()) {
         easingOut[k.time] = seg;
-      } else if (it->second != seg && it->second.type != KeyframeInterpolationType::Hold &&
-                 seg.type != KeyframeInterpolationType::Hold &&
-                 it->second.type != KeyframeInterpolationType::None &&
-                 seg.type != KeyframeInterpolationType::None) {
-        // Only a curve conflict is split; a hold key already needs `steps(1, end)`, which the dense
-        // sampling below cannot reproduce.
-        mixedOut.insert(k.time);
+      } else {
+        bool curveConflict = it->second != seg &&
+                             it->second.type != KeyframeInterpolationType::Hold &&
+                             seg.type != KeyframeInterpolationType::Hold &&
+                             it->second.type != KeyframeInterpolationType::None &&
+                             seg.type != KeyframeInterpolationType::None;
+        if (curveConflict) {
+          // Two channels disagree on this segment. A hold key is not a conflict: it needs
+          // `steps(1, end)`, which the fallback sampling cannot reproduce.
+          mixedOut.insert(k.time);
+        }
+        if (it->second.type == KeyframeInterpolationType::Linear) {
+          // Keep the non-linear curve as the representative of the stop.
+          easingOut[k.time] = seg;
+        }
       }
     }
   }
@@ -1075,6 +1083,18 @@ struct BundleChannelSet {
   // Times where two channels of the same rule want different timing functions. The stop there must
   // be split into linear sub-stops, because one stop's easing drives every property in the rule.
   std::set<Frame> mixedEasingTimes = {};
+  // Which property groups this rule drives, as a bit mask: 1 = opacity/visibility, 2 = everything
+  // else (transform, paint, geometry...). A rule normally drives both; when the two groups want
+  // different timing functions the bundle is emitted as two rules with disjoint properties.
+  int propertyGroups = 3;
+  // Per-group timing, so each split rule keeps only its own stops and easing.
+  std::set<Frame> opacityGroupTimes = {};
+  std::set<Frame> transformGroupTimes = {};
+  std::unordered_map<Frame, SegmentEasing> opacityGroupEasings = {};
+  std::unordered_map<Frame, SegmentEasing> transformGroupEasings = {};
+  std::set<Frame> opacityGroupMixed = {};
+  std::set<Frame> transformGroupMixed = {};
+  bool crossGroupConflict = false;
 };
 
 struct BundleTimingInfo {
@@ -1489,7 +1509,23 @@ BundleChannelSet CollectBundleChannels(
       if (BindChannelToBundleSet(objTarget, ch, solidToPainter, result)) {
         ExtractChannelTimesAndEasing(ch, result.keyTimes, result.stopEasings,
                                      result.mixedEasingTimes);
+        // Opacity and visibility are their own property group: they can ride their own animation
+        // without colliding with the transform/paint group.
+        auto role = LookupChannelRole(objTarget->nodeType(), ch->name);
+        bool opacityGroup =
+            role == TargetChannelRole::Opacity || role == TargetChannelRole::LayerVisibility;
+        ExtractChannelTimesAndEasing(
+            ch, opacityGroup ? result.opacityGroupTimes : result.transformGroupTimes,
+            opacityGroup ? result.opacityGroupEasings : result.transformGroupEasings,
+            opacityGroup ? result.opacityGroupMixed : result.transformGroupMixed);
       }
+    }
+  }
+  for (const auto& entry : result.opacityGroupEasings) {
+    auto other = result.transformGroupEasings.find(entry.first);
+    if (other != result.transformGroupEasings.end() && other->second != entry.second) {
+      result.crossGroupConflict = true;
+      break;
     }
   }
   if (result.starPointCountCh != nullptr &&
@@ -2365,7 +2401,12 @@ std::string EvaluateKeyframeCssDecls(const DomTargetBundle& bundle, const Bundle
                                      Frame t, bool& needsZeroOrigin,
                                      const float* alphaOverride = nullptr) {
   std::string decls;
-  if (chSet.alphaCh != nullptr) {
+  // `propertyGroups` says which halves of this rule are active. A bundle normally drives both; when
+  // opacity and the transform/paint group need different timing functions it is emitted as two rules
+  // with disjoint properties, because one stop's timing function covers every property in its rule.
+  const bool wantsOpacity = (chSet.propertyGroups & 1) != 0;
+  const bool wantsRest = (chSet.propertyGroups & 2) != 0;
+  if (wantsOpacity && chSet.alphaCh != nullptr) {
     float a = alphaOverride != nullptr ? *alphaOverride : EvalFloatChannel(chSet.alphaCh, t, 1.0f);
     AppendCssDecl(decls, "opacity", CssFloatToString(a));
   }
@@ -2377,11 +2418,14 @@ std::string EvaluateKeyframeCssDecls(const DomTargetBundle& bundle, const Bundle
     auto css = BlendModeToMixBlendMode(mode);
     AppendCssDecl(decls, "mix-blend-mode", css != nullptr ? css : "normal");
   }
-  if (chSet.visibleCh != nullptr && bundle.primaryHost != nullptr &&
+  if (wantsOpacity && chSet.visibleCh != nullptr && bundle.primaryHost != nullptr &&
       bundle.primaryHost->nodeType() == NodeType::Layer) {
     bool visible =
         EvalBoolChannel(chSet.visibleCh, t, static_cast<const Layer*>(bundle.primaryHost)->visible);
     AppendCssDecl(decls, "visibility", visible ? "visible" : "hidden");
+  }
+  if (!wantsRest) {
+    return decls;
   }
   EmitTransformCssAtFrame(bundle, chSet, t, decls, needsZeroOrigin);
   EmitGeometryCssAtFrame(bundle, chSet, tagName, t, decls, needsZeroOrigin);
@@ -3870,33 +3914,65 @@ std::string HTMLAnimationSession::emitKeyframesAndWeave(std::string& bodyHtml) {
       // a text span), and paint channels map to a different CSS property per kind. Keyframes are
       // therefore generated per tag name, and kinds that produce identical stops share one rule.
       bool needsZeroOrigin = false;
+      // One rule normally. Two when the opacity group and the transform/paint group want different
+      // timing functions: a stop's timing function covers every property in its rule, so each group
+      // gets its own rule (and its own entry in the element's comma-separated animation list).
+      std::vector<BundleChannelSet> ruleSets = {};
+      std::vector<BundleTimingInfo> ruleTimings = {};
+      if (!chSet.crossGroupConflict) {
+        ruleSets.push_back(chSet);
+        ruleTimings.push_back(timing);
+      } else {
+        BundleChannelSet opacitySet = chSet;
+        opacitySet.propertyGroups = 1;
+        opacitySet.keyTimes = chSet.opacityGroupTimes;
+        opacitySet.stopEasings = chSet.opacityGroupEasings;
+        opacitySet.mixedEasingTimes = chSet.opacityGroupMixed;
+        BundleChannelSet restSet = chSet;
+        restSet.propertyGroups = 2;
+        restSet.keyTimes = chSet.transformGroupTimes;
+        restSet.stopEasings = chSet.transformGroupEasings;
+        restSet.mixedEasingTimes = chSet.transformGroupMixed;
+        for (const auto* set : {&opacitySet, &restSet}) {
+          if (set->keyTimes.empty()) {
+            continue;
+          }
+          ruleSets.push_back(*set);
+          ruleTimings.push_back(ComputeBundleTiming(anim, mount.offset, *set));
+        }
+      }
       std::unordered_map<std::string, std::string> keyframesNameByTag = {};
       std::vector<std::pair<std::string, std::string>> emittedRules = {};
       for (const auto& element : elements) {
-        auto nameIt = keyframesNameByTag.find(element.tagName);
-        if (nameIt == keyframesNameByTag.end()) {
-          std::string stops =
-              EmitBundleKeyframeStops(bundle, chSet, timing, element.tagName, needsZeroOrigin);
-          std::string kfName = {};
-          for (const auto& rule : emittedRules) {
-            if (rule.first == stops) {
-              kfName = rule.second;
-              break;
+        for (size_t ruleIndex = 0; ruleIndex < ruleSets.size(); ++ruleIndex) {
+          const BundleChannelSet& ruleSet = ruleSets[ruleIndex];
+          const BundleTimingInfo& ruleTiming = ruleTimings[ruleIndex];
+          std::string ruleKey = element.tagName + "#" + std::to_string(ruleIndex);
+          auto nameIt = keyframesNameByTag.find(ruleKey);
+          if (nameIt == keyframesNameByTag.end()) {
+            std::string stops = EmitBundleKeyframeStops(bundle, ruleSet, ruleTiming,
+                                                        element.tagName, needsZeroOrigin);
+            std::string kfName = {};
+            for (const auto& rule : emittedRules) {
+              if (rule.first == stops) {
+                kfName = rule.second;
+                break;
+              }
             }
+            if (kfName.empty()) {
+              kfName = MakeSafeKeyframesName(bundle.domId, animCounter++);
+              keyframesCss += "@keyframes " + kfName + " {\n" + stops + "}\n";
+              emittedRules.emplace_back(stops, kfName);
+            }
+            nameIt = keyframesNameByTag.emplace(ruleKey, kfName).first;
           }
-          if (kfName.empty()) {
-            kfName = MakeSafeKeyframesName(bundle.domId, animCounter++);
-            keyframesCss += "@keyframes " + kfName + " {\n" + stops + "}\n";
-            emittedRules.emplace_back(stops, kfName);
+          if (edits.animDecls.find(element.id) == edits.animDecls.end()) {
+            edits.idOrder.push_back(element.id);
           }
-          nameIt = keyframesNameByTag.emplace(element.tagName, kfName).first;
+          edits.animDecls[element.id].push_back(BuildAnimationShorthand(
+              anim, nameIt->second, ruleTiming, mount.offset, mount.scope != 0));
+          edits.playStates[element.id].push_back(mount.playing);
         }
-        if (edits.animDecls.find(element.id) == edits.animDecls.end()) {
-          edits.idOrder.push_back(element.id);
-        }
-        edits.animDecls[element.id].push_back(
-            BuildAnimationShorthand(anim, nameIt->second, timing, mount.offset, mount.scope != 0));
-        edits.playStates[element.id].push_back(mount.playing);
       }
       if (needsZeroOrigin) {
         for (const auto& element : elements) {
