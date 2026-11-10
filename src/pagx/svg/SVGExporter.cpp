@@ -2686,6 +2686,14 @@ bool SVGWriter::writeTextAsFont(SVGBuilder& out, const Text* text, const FillStr
   // quoted-and-escaped form so the value cannot break out of its attribute context.
   out.addAttribute("font-family", QuoteFontFamilyIfNeeded(fontResult.familyName));
   out.addAttribute("font-size", FloatToString(fontSize));
+  // The embedded font carries the regular face only, so the faux flags have to travel as CSS
+  // weight / style or the browser would render the glyphs upright and un-bolded.
+  if (text->fauxBold) {
+    out.addAttribute("font-weight", "bold");
+  }
+  if (text->fauxItalic) {
+    out.addAttribute("font-style", "italic");
+  }
   out.addAttribute("x", xList);
   out.addAttribute("y", yList);
   if (hasRotation) {
