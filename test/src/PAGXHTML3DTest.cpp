@@ -1566,21 +1566,21 @@ PAG_TEST(PAGXHTML3DTest, InvalidAngleUnitsDropTheTransform) {
 }
 
 /**
- * Test case: a `calc()` length argument resolves against the element box, including percentages and
- * nested parentheses. The X axis is relative to the width, the Y axis to the height.
+ * Test case: a percentage length argument resolves against the element box (width on X, height on
+ * Y). `calc()` is not supported: it needs CSS type checking, and a `calc()` argument has to be
+ * reported as unsupported rather than guessed.
  */
-PAG_TEST(PAGXHTML3DTest, CalcLengthArgumentsResolveAgainstTheElementBox) {
-  struct CalcCase {
+PAG_TEST(PAGXHTML3DTest, PercentLengthArgumentsResolveAgainstTheElementBox) {
+  struct PercentCase {
     const char* transform;
     float tx;
     float ty;
   };
   // Box is 80x40.
-  const CalcCase cases[] = {
-      {"translateX(calc(100% - 10px))", 70.0f, 0.0f},
-      {"translateY(calc(50% + 4px))", 0.0f, 24.0f},
-      {"translate(calc((100% - 40px) / 2), calc(25% * 2))", 20.0f, 20.0f},
-      {"translateX(calc(10px + 5px))", 15.0f, 0.0f},
+  const PercentCase cases[] = {
+      {"translateX(50%)", 40.0f, 0.0f},
+      {"translateY(25%)", 0.0f, 10.0f},
+      {"translate(10%, 50%)", 8.0f, 20.0f},
   };
   for (const auto& item : cases) {
     std::string html = R"HTML(
@@ -1598,6 +1598,18 @@ PAG_TEST(PAGXHTML3DTest, CalcLengthArgumentsResolveAgainstTheElementBox) {
     EXPECT_TRUE(NearlyEqual(box->matrix.ty, item.ty, 0.01f))
         << item.transform << " ty=" << box->matrix.ty;
   }
+
+  auto calcDoc = ParseHtml(R"HTML(
+    <html><body style="width:200px;height:120px">
+      <div id="box" style="width:80px;height:40px;background-color:#000;
+           transform:translateX(calc(100% - 10px))"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(calcDoc, nullptr);
+  EXPECT_TRUE(HasDiagnosticContaining(calcDoc, "not a px length"));
+  auto* calcBox = FindLayerById(calcDoc, "box");
+  ASSERT_NE(calcBox, nullptr);
+  EXPECT_TRUE(calcBox->matrix.isIdentity()) << "calc() must not be guessed into a length";
 }
 
 /**

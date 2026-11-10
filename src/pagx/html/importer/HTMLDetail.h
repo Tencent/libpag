@@ -206,9 +206,10 @@ std::string ExtractParenArgs(const std::string& value);
 
 // Parse a single-call CSS function expression. `trimmed` is expected to be already
 // whitespace-trimmed. On success `outName` receives the lower-cased function name and
-// `outArgs` receives the trimmed argument body. The parser is strict: it rejects compound
-// or nested calls (any `)` other than the final one, any non-whitespace content after the
-// closing `)`, or an empty function name).
+// `outArgs` receives the trimmed argument body. The closing paren is matched by depth, so an argument
+// may carry parentheses of its own (`translateX(calc(100% - 10px))`, `rotate3d(var(--x), 0, 0, 45deg)`);
+// the parser still rejects a compound chain (non-whitespace content after the closing `)`) and an
+// empty function name.
 bool ParseCssFunctionCall(const std::string& trimmed, std::string& outName, std::string& outArgs);
 
 // Strip trailing slashes so file path resolution doesn't pick up wrong directories.

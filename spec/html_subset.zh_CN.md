@@ -176,7 +176,7 @@
 | `mix-blend-mode: <mode>` | `Layer.blendMode = <mode>` |
 | `filter: blur(X) drop-shadow(X Y [B] [C])`（不支持 spread 或 `inset`） | `<BlurFilter>` / `<DropShadowFilter>` 链；静态颜色调整使用 `<ColorMatrixFilter>` |
 | `backdrop-filter: blur(X)` | `<BackgroundBlurStyle>` |
-| `transform: <fn-list>` | 按 CSS 顺序合成为一个 4x4 姿态。所有函数都支持：`translate[X\|Y\|Z\|3d]`、`scale[X\|Y\|Z\|3d]`、`rotate[X\|Y\|Z\|3d]`、`skewX`/`skewY`/`skew`、`matrix`、`matrix3d`、`perspective`。函数之间不需要分隔（`rotate(45deg)scale(2)` 合法），长度参数可以是 `px`、相对元素盒的百分比（X 取宽度、Y 取高度）或二者的 `calc()`。角度参数接受 `deg` / `grad` / `rad` / `turn`（大小写不敏感）；无单位角度只有 `0` 合法，其它单位会让整条声明失效。仍停留在 z = 0 平面的姿态写入 `Layer.matrix`；带深度或透视的姿态写入 `Layer.matrix3D`（3D 姿态必须可逆）。`transform-style: preserve-3d` 映射到 `Layer.preserve3D` |
+| `transform: <fn-list>` | 按 CSS 顺序合成为一个 4x4 姿态。所有函数都支持：`translate[X\|Y\|Z\|3d]`、`scale[X\|Y\|Z\|3d]`、`rotate[X\|Y\|Z\|3d]`、`skewX`/`skewY`/`skew`、`matrix`、`matrix3d`、`perspective`。函数之间不需要分隔（`rotate(45deg)scale(2)` 合法），长度参数可以是 `px`、相对元素盒的百分比（X 取宽度、Y 取高度）。`calc()` 暂不支持：它需要 CSS 量纲校验，而快照链路给的是已计算值。角度参数接受 `deg` / `grad` / `rad` / `turn`（大小写不敏感）；无单位角度只有 `0` 合法，其它单位会让整条声明失效。仍停留在 z = 0 平面的姿态写入 `Layer.matrix`；带深度或透视的姿态写入 `Layer.matrix3D`（3D 姿态必须可逆）。`transform-style: preserve-3d` 映射到 `Layer.preserve3D` |
 | `perspective` / `perspective-origin` | 声明元素作为相机作用于**直接子级**：距离必须是正长度；`perspective-origin`（默认盒中心）会被共轭进每个子层姿态，因为 PAGX 没有 origin 参数。详见 §13.7 |
 | `transform-origin` | 按元素盒子解析（`px`、`%`、`left`/`center`/`right`/`top`/`bottom`，以及可选的 px 深度），写入 `Layer.anchor` / `anchorZ`，姿态本身不带支点。只有无法解析的原点（百分比 / 关键字但盒子没有绝对尺寸）才告警并退回左上角支点 |
 | Layer 上的 `overflow: hidden` | `Layer.clipToBounds = true` |
