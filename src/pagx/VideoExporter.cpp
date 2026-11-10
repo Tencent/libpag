@@ -33,6 +33,7 @@
 #include "pagx/VideoExportFrame.h"
 #include "pagx/VideoExportInternal.h"
 #include "pagx/nodes/Animation.h"
+#include "pagx/runtime/Drawable.h"
 #include "tgfx/core/Bitmap.h"
 #include "tgfx/core/Pixmap.h"
 
@@ -335,6 +336,23 @@ bool VideoExporter::ResolveSampling(const Options& options, const PlaybackPlan& 
 
 std::shared_ptr<VideoExporter> VideoExporter::Make(std::shared_ptr<PAGXDocument> document,
                                                    const Options& options, std::string* errorMsg) {
+  return MakeInternal(std::move(document), nullptr, options, errorMsg);
+}
+
+std::shared_ptr<VideoExporter> VideoExporter::MakeWithSurface(
+    std::shared_ptr<PAGXDocument> document, std::shared_ptr<PAGSurface> surface,
+    const Options& options, std::string* errorMsg) {
+  if (surface == nullptr) {
+    SetError(errorMsg, "the export surface is null");
+    return nullptr;
+  }
+  return MakeInternal(std::move(document), std::move(surface), options, errorMsg);
+}
+
+std::shared_ptr<VideoExporter> VideoExporter::MakeInternal(std::shared_ptr<PAGXDocument> document,
+                                                           std::shared_ptr<PAGSurface> surface,
+                                                           const Options& options,
+                                                           std::string* errorMsg) {
   if (!ValidateOptions(document, options, errorMsg)) {
     return nullptr;
   }
@@ -359,10 +377,39 @@ std::shared_ptr<VideoExporter> VideoExporter::Make(std::shared_ptr<PAGXDocument>
     SetError(errorMsg, "the output dimensions must be finite, positive, and fit in an int");
     return nullptr;
   }
-  std::shared_ptr<PAGSurface> surface = {};
   std::shared_ptr<tgfx::Bitmap> bitmap = {};
-  if (!CreateResources(width, height, &surface, &bitmap, errorMsg)) {
-    return nullptr;
+  if (surface == nullptr) {
+    if (!CreateResources(width, height, &surface, &bitmap, errorMsg)) {
+      return nullptr;
+    }
+  } else {
+    if (surface->width() != width || surface->height() != height) {
+      SetError(errorMsg, "the export surface dimensions do not match the expected output of " +
+                             std::to_string(width) + "x" + std::to_string(height));
+      return nullptr;
+    }
+    auto device = surface->drawable->getDevice();
+    if (device == nullptr) {
+      SetError(errorMsg, "the export surface has no GPU device");
+      return nullptr;
+    }
+    auto* context = device->lockContext();
+    if (context == nullptr) {
+      SetError(errorMsg, "failed to lock the export surface device");
+      return nullptr;
+    }
+    auto tgfxSurface = surface->drawable->getSurface(context);
+    auto validContext = tgfxSurface != nullptr && tgfxSurface->getContext() == context;
+    device->unlock();
+    if (!validContext) {
+      SetError(errorMsg, "the export surface has no valid GPU context");
+      return nullptr;
+    }
+    bitmap = std::make_shared<tgfx::Bitmap>(width, height, false, false);
+    if (bitmap->isEmpty()) {
+      SetError(errorMsg, "failed to allocate the frame bitmap");
+      return nullptr;
+    }
   }
 
   auto* displayOptions = scene->getDisplayOptions();
