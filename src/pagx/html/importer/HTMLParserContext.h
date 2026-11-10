@@ -83,6 +83,11 @@ class HTMLParserContext {
   Layer* convertElement(const std::shared_ptr<DOMNode>& element,
                         const HTMLInheritedStyle& inherited, int depth);
 
+  // Folds the parent camera carried by `inherited` into `box`. The branches of `convertElement` each
+  // build their own box (text host / svg / img / regular element) and all need the same treatment.
+  void attachParentCamera(HTMLBoxAttributes& box, const std::shared_ptr<DOMNode>& element,
+                          const HTMLInheritedStyle& inherited);
+
   // Container conversion (for <div>-like elements). Emits the standard "outer
   // background + inner padded container" double-layer when both background and
   // padding/layout are present.

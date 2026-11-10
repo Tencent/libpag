@@ -5563,7 +5563,6 @@ const HELPER_FNS = [
   liftBoxOntoCameraWrapper,
   rewritePerspectiveKeyframes,
   cameraDistanceForElement,
-  animationNamesFor,
   staticCameraFor,
   transformOriginDepth,
   perspectiveOriginXY,

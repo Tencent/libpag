@@ -70,7 +70,9 @@ bool ParseScalarFloat(const std::string& token, float& out) {
   if (trimmed.empty()) return false;
   char* end = nullptr;
   const float value = std::strtof(trimmed.c_str(), &end);
-  if (end == trimmed.c_str() || !Trim(end).empty()) return false;
+  // `strtof` reports overflow as +-inf and still consumes the token, so `1e300` has to be rejected
+  // here instead of leaking into the caller as a "non-finite pose".
+  if (end == trimmed.c_str() || !Trim(end).empty() || !std::isfinite(value)) return false;
   out = value;
   return true;
 }

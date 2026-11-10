@@ -72,7 +72,9 @@ bool Animates3DTransform(const std::unordered_map<std::string, html::CssKeyframe
       if (i == value.size() || value[i] == ',' ||
           std::isspace(static_cast<unsigned char>(value[i]))) {
         if (i > start) {
-          names.push_back(ToLower(Trim(value.substr(start, i - start))));
+          // `@keyframes` names keep their authored case (`HTMLStyleCascade` stores them verbatim),
+          // so the reference must not be lower-cased here.
+          names.push_back(Trim(value.substr(start, i - start)));
         }
         start = i + 1;
       }
@@ -780,6 +782,17 @@ Layer* HTMLParserContext::convertBody(const std::shared_ptr<DOMNode>& body, floa
   return wrapper;
 }
 
+void HTMLParserContext::attachParentCamera(HTMLBoxAttributes& box,
+                                           const std::shared_ptr<DOMNode>& element,
+                                           const HTMLInheritedStyle& inherited) {
+  ApplyParentPerspective(
+      box, inherited.parentPerspectivePx, inherited.parentPerspectiveOriginX,
+      inherited.parentPerspectiveOriginY, inherited.parentBorderWidthPx,
+      inherited.parentPerspectivePx > 0.0f &&
+          Animates3DTransform(_styleCascade->keyframes(), _styleCascade->getResolvedStyle(element)),
+      element->name, *_diagnostics, _flowChildPerspectiveWarned);
+}
+
 Layer* HTMLParserContext::convertElement(const std::shared_ptr<DOMNode>& element,
                                          const HTMLInheritedStyle& inherited, int depth) {
   if (depth >= MAX_HTML_RECURSION_DEPTH) {
@@ -800,21 +813,11 @@ Layer* HTMLParserContext::convertElement(const std::shared_ptr<DOMNode>& element
   if (!isPagxTextHost && element->findAttribute("data-pagx-text-part") != nullptr) {
     return nullptr;
   }
-  // The branches below each build their own box (text host / svg / img / regular element) and all
-  // need the parent camera folded in the same way, so the call lives here instead of four times.
-  const auto attachParentCamera = [&](HTMLBoxAttributes& box) {
-    ApplyParentPerspective(box, inherited.parentPerspectivePx, inherited.parentPerspectiveOriginX,
-                           inherited.parentPerspectiveOriginY, inherited.parentBorderWidthPx,
-                           inherited.parentPerspectivePx > 0.0f &&
-                               Animates3DTransform(_styleCascade->keyframes(),
-                                                   _styleCascade->getResolvedStyle(element)),
-                           element->name, *_diagnostics, _flowChildPerspectiveWarned);
-  };
   if (isPagxTextHost && IsContainerTag(tag)) {
     // Per-glyph / TextModifier / TextPath container host: convert the whole container into a
     // single semantic Text layer instead of recursing into its PUA glyph spans.
     HTMLBoxAttributes box = _styleCascade->computeBoxAttributes(element);
-    attachParentCamera(box);
+    attachParentCamera(box, element, inherited);
     return _layerBuilder->wrapForMargin(
         _textFragmentBuilder->convertPAGXTextHost(element, inherited, box.parentPerspectivePx,
                                                   box.localPerspectiveOriginX,
@@ -837,19 +840,19 @@ Layer* HTMLParserContext::convertElement(const std::shared_ptr<DOMNode>& element
   }
   if (tag == "svg") {
     HTMLBoxAttributes box = _styleCascade->computeBoxAttributes(element);
-    attachParentCamera(box);
+    attachParentCamera(box, element, inherited);
     return _layerBuilder->wrapForMargin(convertInlineSvg(element, box, inherited), box);
   }
   if (tag == "img") {
     HTMLBoxAttributes box = _styleCascade->computeBoxAttributes(element);
-    attachParentCamera(box);
+    attachParentCamera(box, element, inherited);
     return _layerBuilder->wrapForMargin(convertImage(element, box), box);
   }
 
   HTMLInheritedStyle childInherited = _styleCascade->resolveInheritedStyle(
       element, inherited, /*recordFontFallbacks=*/!isPagxTextHost);
   HTMLBoxAttributes box = _styleCascade->computeBoxAttributes(element);
-  attachParentCamera(box);
+  attachParentCamera(box, element, inherited);
 
   if (IsContainerTag(tag)) {
     return _layerBuilder->wrapForMargin(convertContainer(element, box, childInherited, depth), box);
