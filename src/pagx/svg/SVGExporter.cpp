@@ -544,6 +544,12 @@ class SVGWriter {
                  float alpha);
   void writeTextAsPath(SVGBuilder& out, const Text* text, const FillStrokeInfo& fs, const Matrix& m,
                        float alpha);
+
+  // Emits a glyph run at an explicit origin: one <g> carrying the run's painters, then per-glyph
+  // <path> / <image> children. Shared by the standalone Text path and by a TextBox run that carries
+  // pre-shaped GlyphRun data.
+  bool WriteGlyphGeometry(SVGBuilder& out, const Text* text, float originX, float originY,
+                          const FillStrokeInfo& fs, float alpha, const std::string& transform);
   // WOFF2 path: renders pre-shaped GlyphRun glyphs as a real <text> element referencing the
   // generated @font-face font, using PUA Unicode characters mapped 1:1 to glyph IDs. Returns
   // false when the run cannot be losslessly expressed as <text> (per-glyph scales / skews,
@@ -2421,26 +2427,16 @@ void SVGWriter::writePath(SVGBuilder& out, const Path* path, const FillStrokeInf
 
 // ── writeTextAsPath ─────────────────────────────────────────────────────────
 
-void SVGWriter::writeTextAsPath(SVGBuilder& out, const Text* text, const FillStrokeInfo& fs,
-                                const Matrix& m, float alpha) {
-  auto renderPos = text->renderPosition();
-  // Apply TextBox padding as an additional offset (origin is top-left of box,
-  // not centred). Matches writeTextWithLayout's anchor computation.
-  if (fs.textBox) {
-    // For container-mode text inside a TextBox the caller has already composed
-    // the box transform; padding is applied here as an origin shift into the
-    // inset rect.
-    renderPos.x += fs.textBox->padding.left;
-    renderPos.y += fs.textBox->padding.top;
-  }
+bool SVGWriter::WriteGlyphGeometry(SVGBuilder& out, const Text* text, float originX, float originY,
+                                   const FillStrokeInfo& fs, float alpha,
+                                   const std::string& transform) {
   std::vector<GlyphPath> glyphPaths;
   std::vector<GlyphImage> glyphImages;
-  ComputeGlyphPathsAndImages(*text, renderPos.x, renderPos.y, &glyphPaths, &glyphImages);
+  ComputeGlyphPathsAndImages(*text, originX, originY, &glyphPaths, &glyphImages);
   if (glyphPaths.empty() && glyphImages.empty()) {
-    return;
+    return false;
   }
 
-  std::string transform = MatrixToSVGTransform(m);
   out.openElement("g");
   if (!transform.empty()) {
     out.addAttribute("transform", transform);
@@ -2561,6 +2557,22 @@ void SVGWriter::writeTextAsPath(SVGBuilder& out, const Text* text, const FillStr
   }
 
   out.closeElement();
+  return true;
+}
+
+void SVGWriter::writeTextAsPath(SVGBuilder& out, const Text* text, const FillStrokeInfo& fs,
+                                const Matrix& m, float alpha) {
+  auto renderPos = text->renderPosition();
+  // Apply TextBox padding as an additional offset (origin is top-left of box,
+  // not centred). Matches writeTextWithLayout's anchor computation.
+  if (fs.textBox) {
+    // For container-mode text inside a TextBox the caller has already composed
+    // the box transform; padding is applied here as an origin shift into the
+    // inset rect.
+    renderPos.x += fs.textBox->padding.left;
+    renderPos.y += fs.textBox->padding.top;
+  }
+  WriteGlyphGeometry(out, text, renderPos.x, renderPos.y, fs, alpha, MatrixToSVGTransform(m));
 }
 
 // ── writeTextAsFont ─────────────────────────────────────────────────────────
