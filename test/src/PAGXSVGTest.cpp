@@ -5717,4 +5717,54 @@ PAGX_TEST(PAGXSVGTest, SVGExport_HiddenOverflowDropsAllLines) {
   EXPECT_TRUE(warned) << (warnings.empty() ? "no warnings" : warnings[0]);
 }
 
+// ST18: the embedded WOFF2 face carries the regular style only, so faux bold / italic have to
+// travel as CSS weight / style or the exported glyphs lose them.
+PAGX_TEST(PAGXSVGTest, SVGExport_EmbeddedFontCarriesFauxStyle) {
+  auto doc = pagx::PAGXDocument::Make(200, 100);
+  auto* font = doc->makeNode<pagx::Font>("fauxFont");
+  font->unitsPerEm = 1000;
+  auto* glyph = doc->makeNode<pagx::Glyph>();
+  glyph->path = doc->makeNode<pagx::PathData>();
+  *glyph->path = pagx::PathDataFromSVGString("M 0,0 L 700,0 L 700,-800 L 0,-800 Z");
+  glyph->advance = 700;
+  font->glyphs.push_back(glyph);
+
+  auto* layer = doc->makeNode<pagx::Layer>("layer");
+  auto* text = doc->makeNode<pagx::Text>("run");
+  text->fontSize = 50;
+  text->fauxBold = true;
+  text->fauxItalic = true;
+  auto* run = doc->makeNode<pagx::GlyphRun>();
+  run->font = font;
+  run->fontSize = 50;
+  run->glyphs = {1};
+  text->glyphRuns.push_back(run);
+  layer->contents = {text, MakeSolidFillSVG(doc.get(), 0, 0, 0)};
+  doc->layers.push_back(layer);
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("<text"), std::string::npos);
+  EXPECT_NE(svg.find("font-weight=\"bold\""), std::string::npos);
+  EXPECT_NE(svg.find("font-style=\"italic\""), std::string::npos);
+}
+
+// ST18: native <text> has no glyph runs to inspect, so the same faux flags must be emitted from
+// the Text node itself.
+PAGX_TEST(PAGXSVGTest, SVGExport_NativeTextCarriesFauxStyle) {
+  auto doc = pagx::PAGXDocument::Make(200, 100);
+  auto* layer = doc->makeNode<pagx::Layer>("layer");
+  auto* text = doc->makeNode<pagx::Text>("run");
+  text->text = "Hi";
+  text->fontSize = 20;
+  text->fauxBold = true;
+  text->fauxItalic = true;
+  layer->contents = {text, MakeSolidFillSVG(doc.get(), 0, 0, 0)};
+  doc->layers.push_back(layer);
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("<text"), std::string::npos);
+  EXPECT_NE(svg.find("font-weight=\"bold\""), std::string::npos);
+  EXPECT_NE(svg.find("font-style=\"italic\""), std::string::npos);
+}
+
 }  // namespace pag
