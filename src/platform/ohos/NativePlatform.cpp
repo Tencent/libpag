@@ -73,20 +73,12 @@ void NativePlatform::traceImage(const tgfx::ImageInfo& info, const void* pixels,
   }
 }
 
-std::string NativePlatform::getCacheDir() const {
-  return _cacheDir;
-}
-
 std::shared_ptr<DisplayLink> NativePlatform::createDisplayLink(
     std::function<void()> callback) const {
   if (!callback) {
     return nullptr;
   }
   return std::make_shared<NativeDisplayLink>(callback);
-}
-
-void NativePlatform::setCacheDir(const std::string& cacheDir) {
-  _cacheDir = cacheDir;
 }
 
 }  // namespace pag

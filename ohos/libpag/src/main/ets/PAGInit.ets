@@ -195,6 +195,12 @@ export class PAGInit {
   }
 
   private static InitCacheDir() {
-    JPAGDiskCache.SetCacheDir(getContext().cacheDir);
+    JPAGDiskCache.SetCacheDir(PAGInit.GetDefaultCacheDir());
+  }
+
+  // The cache lives in a dedicated sub-directory because the application cache directory is shared
+  // with other SDKs, which may create their own files and folders there.
+  static GetDefaultCacheDir(): string {
+    return getContext().cacheDir + '/libpag';
   }
 }

@@ -18,7 +18,6 @@
 
 #include "JPAGDiskCache.h"
 #include <cstdint>
-#include "NativePlatform.h"
 #include "platform/ohos/JsHelper.h"
 #include "rendering/caches/DiskCache.h"
 
@@ -54,9 +53,7 @@ static napi_value SetCacheDir(napi_env env, napi_callback_info info) {
   if (length <= 0) {
     return nullptr;
   }
-  auto nativePlatform = const_cast<NativePlatform*>(
-      reinterpret_cast<const NativePlatform*>(NativePlatform::Current()));
-  nativePlatform->setCacheDir(cacheDir);
+  PAGDiskCache::SetCacheDir(cacheDir);
   return nullptr;
 }
 
