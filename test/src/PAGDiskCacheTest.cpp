@@ -847,17 +847,16 @@ PAG_TEST(PAGDiskCacheTest, CacheDirectorySwitchReloadsConfiguration) {
  * bookkeeping rather than duplicate its entries and disk size.
  */
 PAG_TEST(PAGDiskCacheTest, ForeignEntriesInCacheFolder) {
-  auto cacheDir = Platform::Current()->getCacheDir();
-  ScopedDiskCacheCleanup cleanup;
-  DiskIOWorker::GetInstance()->waitAll();
-  PAGDiskCache::RemoveAll();
-  DiskIOWorker::GetInstance()->waitAll();
+  ASSERT_NO_FATAL_FAILURE(CheckNoOpenDiskCacheFiles());
+  ScopedDiskCacheDirectory cleanup;
+  ASSERT_FALSE(cleanup.directory.empty());
+  PAGDiskCache::SetCacheDir(cleanup.directory);
   auto data = ReadFile("resources/apitest/polygon.pag");
   ASSERT_TRUE(data != nullptr);
   auto cacheKey = "https://pag.io/resources/apitest/polygon.pag";
   ASSERT_TRUE(DiskCache::WriteFile(cacheKey, data));
   DiskIOWorker::GetInstance()->waitAll();
-  auto folder = cacheDir + "/files";
+  auto folder = cleanup.directory + "/files";
   auto foreignFile = folder + "/foreign.db";
   std::ofstream stream(foreignFile);
   ASSERT_TRUE(stream.is_open());
@@ -890,8 +889,6 @@ PAG_TEST(PAGDiskCacheTest, ForeignEntriesInCacheFolder) {
   EXPECT_TRUE(std::filesystem::exists(folder + "/" + std::to_string(cacheFileID) + ".bin"));
   EXPECT_TRUE(std::filesystem::exists(foreignFile));
   EXPECT_TRUE(std::filesystem::exists(folder + "/subdir"));
-  std::filesystem::remove(foreignFile);
-  std::filesystem::remove(folder + "/subdir");
 }
 
 /**
