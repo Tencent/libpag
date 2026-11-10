@@ -2552,6 +2552,11 @@ void SVGWriter::writeTextAsPath(SVGBuilder& out, const Text* text, const FillStr
     out.addRequiredAttribute("width", static_cast<float>(imgW));
     out.addRequiredAttribute("height", static_cast<float>(imgH));
     out.addAttribute("transform", MatrixToSVGTransform(gi.transform));
+    // A bitmap glyph is an <image> child of the run's <g>; fill-opacity does not reach images, so
+    // the accumulated layer / group alpha has to be applied here or the glyph stays opaque.
+    if (alpha < 1.0f) {
+      out.addAttribute("opacity", FloatToString(alpha));
+    }
     out.closeElementSelfClosing();
   }
 
