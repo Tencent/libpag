@@ -20,7 +20,6 @@
 #include "pagx/PAGSurface.h"
 #include "pagx/runtime/Drawable.h"
 #include "rendering/utils/AsyncReadback.h"
-#include "tgfx/core/Bitmap.h"
 #include "tgfx/core/Pixmap.h"
 #include "tgfx/gpu/GPUBuffer.h"
 
@@ -28,7 +27,7 @@ namespace pagx {
 
 std::shared_ptr<VideoExportFrameImpl> VideoExportFrameImpl::MakeGPU(
     std::shared_ptr<VideoExportState> state, int64_t index, std::shared_ptr<PAGSurface> surface,
-    std::shared_ptr<tgfx::Bitmap> staticCache, std::string* errorMsg) {
+    std::shared_ptr<tgfx::Pixmap> staticCache, std::string* errorMsg) {
   auto impl = std::make_shared<VideoExportFrameImpl>(std::move(state), index);
   impl->surface = std::move(surface);
   impl->staticCache = std::move(staticCache);
@@ -65,7 +64,7 @@ std::shared_ptr<VideoExportFrameImpl> VideoExportFrameImpl::MakeGPU(
 }
 
 std::shared_ptr<VideoExportFrameImpl> VideoExportFrameImpl::MakeCPU(
-    std::shared_ptr<VideoExportState> state, int64_t index, std::shared_ptr<tgfx::Bitmap> pixels) {
+    std::shared_ptr<VideoExportState> state, int64_t index, std::shared_ptr<tgfx::Pixmap> pixels) {
   auto impl = std::make_shared<VideoExportFrameImpl>(std::move(state), index);
   impl->cpuPixels = std::move(pixels);
   return impl;
@@ -166,8 +165,7 @@ bool VideoExportFrameImpl::readGPUPixels(void* dstPixels, size_t dstRowBytes) {
                             tgfx::AlphaType::Premultiplied, dstRowBytes);
   auto success = copyTo(destination, dstPixels);
   if (success && staticCache != nullptr) {
-    tgfx::Pixmap cache(*staticCache);
-    success = copyTo(cache.info(), cache.writablePixels());
+    success = copyTo(staticCache->info(), staticCache->writablePixels());
   }
   buffer->unmap();
   device->unlock();
@@ -183,11 +181,10 @@ bool VideoExportFrameImpl::readPixels(void* dstPixels, size_t dstRowBytes) {
   }
   auto success = false;
   if (cpuPixels != nullptr) {
-    tgfx::Pixmap source(*cpuPixels);
     auto destination =
-        tgfx::ImageInfo::Make(source.width(), source.height(), tgfx::ColorType::RGBA_8888,
+        tgfx::ImageInfo::Make(cpuPixels->width(), cpuPixels->height(), tgfx::ColorType::RGBA_8888,
                               tgfx::AlphaType::Premultiplied, dstRowBytes);
-    success = !destination.isEmpty() && source.readPixels(destination, dstPixels);
+    success = !destination.isEmpty() && cpuPixels->readPixels(destination, dstPixels);
   } else {
     success = readGPUPixels(dstPixels, dstRowBytes);
   }
