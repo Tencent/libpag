@@ -264,16 +264,15 @@ python3 tools/anim_coverage.py --check
 offsetX/offsetY/shadowOnly` 与 `DropShadowFilter.shadowOnly` 列入 `CHANNEL_EXEMPTIONS`，标注为
 「需 JS 侧逐帧重写滤镜」，不属于 CSS 这一期。
 
-**豁免清单的定位：不是"永远做不了"，而是"CSS 这一期做不了、留给下一期 JS"。** 每个条目都写清了原因和
-下一期要做什么，通道的 `Expect: gap` 用例继续保留，缺口仍然可度量。
+**豁免清单的定位：不是"永远做不了"，而是"CSS 这一期做不了、说清由谁接手"。** 每个条目都带一个标签，
+`tools/anim_coverage.py` 里按标签归类，通道的 `Expect: gap` 用例继续保留，缺口仍然可度量。
 
-按原因分三类：
-
-| 原因 | 例子 | 下一期怎么做 |
-|------|------|--------------|
-| CSS 无法表达 | 单轴模糊（`DropShadowStyle.blurX`、`BackgroundBlurStyle.blurY`）、内阴影的 offset/blur/spread、玻璃参数、SVG 滤镜原语的几何属性、`ColorStop.offset` | JS 逐帧重写滤镜/重绘 |
-| 渲染器尚未写入 | `TextPath` 的 10 个通道（`convertTextPath()` 没有注册 writer，参考帧不动） | 渲染器补 writer 后再谈导出 |
-| 数值本身无意义 | `Layer.scale.z`（合成顺序决定它不改变画面） | 不需要 |
+| 标签 | 含义 | 条目 | 覆盖 |
+|------|------|-----:|------|
+| `js-pending` | CSS 无法表达，JS 逐帧重绘可做 | 19 | SVG 滤镜几何 6、样式参数 11、`ColorStop.offset` 1、光栅化渐变 2 |
+| `js-after-static` | 静态还没画出该效果，补齐后再谈逐帧 | 9 | 噪声节点 2、玻璃参数 7 |
+| `renderer-gap` | 渲染器不应用该通道，导出侧（含 JS）无解 | 10 | `TextPath` |
+| `no-op` | 数值不改变画面，无需实现 | 1 | `Layer.scale.z` |
 
 **"导出侧还没实现"的通道依然不进豁免**：那种通道保留 `Expect: gap` 用例，它就是待办清单——实现后把 `Expect`
 改成 `supported`。比如 `Rectangle.position.x`、`Ellipse.roundness` 目前仍走这条路。
@@ -290,8 +289,9 @@ offsetX/offsetY/shadowOnly` 与 `DropShadowFilter.shadowOnly` 列入 `CHANNEL_EX
 | `DropShadowStyle.spread` | 阴影 div 的 `left/top/width/height/border-radius` | 0.9985 |
 | `InnerShadowStyle.color` | `<feFlood>` 的 `flood-color` | 0.9964 |
 
-其余样式通道已列入 `CHANNEL_EXEMPTIONS`（`STYLE_CSS_UNSUPPORTED`）：单轴模糊的 CSS 模糊是各向同性的（实测只能到
-0.96），内阴影的 offset/blur/spread 是滤镜原语属性，玻璃参数在静态里就只是近似。
+其余样式通道已列入 `CHANNEL_EXEMPTIONS`：`DropShadowStyle` / `InnerShadowStyle` /
+`BackgroundBlurStyle` 的模糊与几何参数标 `js-pending`（CSS 模糊各向同性，实测只能到 0.96；内阴影几何在滤镜原语上），
+`GlassStyle` 的 7 个参数标 `js-after-static`（静态本身就只是近似）。
 
 **静态导出缺失的节点（整节点豁免）**：
 

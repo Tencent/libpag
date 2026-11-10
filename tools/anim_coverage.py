@@ -41,65 +41,65 @@ NODE_ORDER = [
 # A channel that is merely not implemented yet does NOT belong here: its `Expect: gap` case is the
 # roadmap entry, and it turns into `supported` when the channel lands. Exempting it would hide the
 # work item and drop it from the coverage table.
-# The exemptions are not "this can never work": they are "the CSS exporter cannot express it, so it
-# waits for the JS pass". Each entry names the reason and what the JS side would have to do. A
-# channel listed here still keeps its `Expect: gap` case whenever one exists, so the gap stays
+# Every exemption is one of four kinds. The list no longer means "this can never work": it says why
+# the CSS pass cannot do it and who picks it up next.
+#   js-pending       the CSS exporter cannot express it; a JS export can redraw it per frame
+#   js-after-static  the static export does not draw the effect yet, so animation has nothing to move
+#   renderer-gap     the runtime never applies the channel, so no exporter (CSS or JS) can show it
+#   no-op            the value cannot change a rendered pixel; nothing to implement
+# A channel listed here still keeps its `Expect: gap` case whenever one exists, so the gap stays
 # measured instead of disappearing from the table.
-STYLE_CSS_UNSUPPORTED = "CSS 无法表达该样式参数，留待下一期由 JS 逐帧重绘"
+JS_PENDING = "js-pending：CSS 无法表达，JS 逐帧重绘"
+JS_AFTER_STATIC = "js-after-static：静态尚未画出该效果，补齐后再逐帧动画"
+RENDERER_GAP = "renderer-gap：渲染器不应用该通道，参考帧不动，导出侧（含 JS）无解"
+NO_OP = "no-op：合成顺序决定它不改变画面，无需实现"
+
 CHANNEL_EXEMPTIONS = {
-    ("Layer", "scale.z"): "合成顺序 P·T·R·(K·S) 中缩放先于旋转作用于 z=0 的平面路径，见 README §7",
+    # Scaling happens before the rotation on a z=0 plane, so scale.z cannot reach a pixel.
+    ("Layer", "scale.z"): NO_OP + "（P·T·R·(K·S)，见 README §7）",
 }
 
-# Whole nodes with no static export: `src/pagx/html` never references them, so nothing is painted at
-# t=0 and a channel case would compare a drawn reference against an empty frame. Listed as static
-# gaps in the README; drop the entry once the node is exported.
-# Conic and Diamond gradients are rasterised to a PNG at export time (a CSS conic-gradient inside
-# pattern/foreignObject does not paint reliably in headless Chromium), so the fill is an <image>:
-# there is no CSS gradient left to move. Animating them needs a per-frame raster, i.e. the JS side.
-RASTER_GRADIENT = "静态导出会光栅化成 PNG，画面上只剩 <image>，CSS 无渐变可动画，需逐帧重绘位图"
+# Whole nodes whose static export is missing or rasterised. Drop the entry once the node is drawn.
 NODE_EXEMPTIONS = {
-    "ConicGradient": RASTER_GRADIENT,
-    "DiamondGradient": RASTER_GRADIENT,
-    "NoiseStyle": "静态导出未实现该节点（writer 无引用），t=0 画面为空，需先补静态能力",
-    "NoiseFilter": "静态导出未实现该节点（writer 无引用），t=0 只画出底色、无噪声，需先补静态能力",
+    # A CSS conic-gradient inside pattern/foreignObject does not paint reliably in headless Chromium,
+    # so the fill is emitted as a PNG and there is no CSS gradient left to move.
+    "ConicGradient": JS_PENDING + "（静态已光栅化成 <image>，逐帧重绘位图即可）",
+    "DiamondGradient": JS_PENDING + "（同上）",
+    "NoiseStyle": JS_AFTER_STATIC + "（writer 零引用，t=0 画面为空）",
+    "NoiseFilter": JS_AFTER_STATIC + "（t=0 只有底色、没有噪点）",
 }
 
 # A pipeline filter's geometry (dx / dy / stdDeviation) and its shadowOnly switch are attributes on
 # the SVG filter primitives, not CSS properties: measured, keyframes that set dx / stdDeviation are
-# ignored (zero pixels change between the first and last frame), while flood-color does animate. So
-# these channels need a JS-side export that rewrites the filter per frame and stay out of the CSS
-# milestone. `filter/07,08,11,12,14,15` documents the gap.
-FILTER_CSS_UNSUPPORTED = "SVG 滤镜原语的几何属性不是 CSS 属性，关键帧无效，需 JS 侧逐帧重写滤镜"
+# ignored (zero pixels change between the first and last frame), while flood-color does animate.
 for _channel in ("blurX", "blurY", "offsetX", "offsetY", "shadowOnly"):
-    CHANNEL_EXEMPTIONS[("InnerShadowFilter", _channel)] = FILTER_CSS_UNSUPPORTED
-CHANNEL_EXEMPTIONS[("DropShadowFilter", "shadowOnly")] = FILTER_CSS_UNSUPPORTED
+    CHANNEL_EXEMPTIONS[("InnerShadowFilter", _channel)] = JS_PENDING + "（重写 <filter> 原语）"
+CHANNEL_EXEMPTIONS[("DropShadowFilter", "shadowOnly")] = JS_PENDING + "（重写 <filter> 原语）"
+
 # A colour stop's position is the `offset` attribute of <stop>, not a CSS property.
-CHANNEL_EXEMPTIONS[("ColorStop", "offset")] = "stop 的 offset 是 XML 属性，不是 CSS 属性，无法用关键帧驱动"
-# Style channels the CSS exporter cannot drive, kept for the JS pass:
+CHANNEL_EXEMPTIONS[("ColorStop", "offset")] = JS_PENDING + "（逐帧重建 <stop> 的 offset）"
+
+# Style parameters the CSS exporter cannot drive:
 # - a single-axis blur (blurX or blurY alone) has no CSS equivalent: filter:blur() and
 #   backdrop-filter:blur() are isotropic, measured 0.96 against the reference;
-# - an inner shadow's offset / blur / spread live on SVG filter primitives (feOffset, feGaussianBlur),
-#   which are attributes, not CSS properties;
-# - the glass parameters have no CSS counterpart at all, the static export only approximates them.
+# - an inner shadow's offset / blur / spread live on SVG filter primitives (feOffset, feGaussianBlur).
 for _channel in ("blurX", "blurY", "showBehindLayer"):
-    CHANNEL_EXEMPTIONS[("DropShadowStyle", _channel)] = STYLE_CSS_UNSUPPORTED
+    CHANNEL_EXEMPTIONS[("DropShadowStyle", _channel)] = JS_PENDING + "（CSS blur 各向同性，实测 0.96）"
 for _channel in ("blurX", "blurY", "offsetX", "offsetY", "spread"):
-    CHANNEL_EXEMPTIONS[("InnerShadowStyle", _channel)] = STYLE_CSS_UNSUPPORTED
+    CHANNEL_EXEMPTIONS[("InnerShadowStyle", _channel)] = JS_PENDING + "（内阴影是滤镜管线，几何在原语上）"
 for _channel in ("blurX", "blurY"):
-    CHANNEL_EXEMPTIONS[("BackgroundBlurStyle", _channel)] = STYLE_CSS_UNSUPPORTED
+    CHANNEL_EXEMPTIONS[("BackgroundBlurStyle", _channel)] = JS_PENDING + "（backdrop 模糊无单轴写法）"
+# The glass effect has no CSS counterpart at all; the static export only approximates it (t=0 ~0.97),
+# so it has to be drawn properly before any frame can move.
 for _channel in ("depth", "dispersion", "frost", "lightAngle", "lightIntensity", "refraction", "splay"):
-    CHANNEL_EXEMPTIONS[("GlassStyle", _channel)] = STYLE_CSS_UNSUPPORTED
+    CHANNEL_EXEMPTIONS[("GlassStyle", _channel)] = JS_AFTER_STATIC + "（静态只是近似，t=0 ≈0.97）"
 
 # TextPath channels are registered as animatable in PAGXNodeChannel.cpp, but the renderer never
 # applies them: LayerBuilder::convertTextPath() registers no channel writer (convertTextModifier()
-# does, via setAccessor), so `pagx render --time` draws the same frame at every time and a case would
-# compare two static images. Measured: rotation / position.x / scale.x / alpha animations all render
-# identical first and last frames. Remove these entries and add cases once the renderer writes them.
-TEXT_PATH_RENDERER_GAP = "渲染器 convertTextPath() 未注册通道写入，参考帧不会动，待渲染器支持后补用例"
+# does, via setAccessor), so `pagx render --time` draws the same frame at every time.
 for _channel in ("alpha", "anchor.x", "anchor.y", "position.x", "position.y", "rotation", "scale.x",
                  "scale.y", "skew", "skewAxis"):
-    CHANNEL_EXEMPTIONS[("TextPath", _channel)] = TEXT_PATH_RENDERER_GAP
-
+    CHANNEL_EXEMPTIONS[("TextPath", _channel)] = RENDERER_GAP + "（convertTextPath 无 writer）"
 
 
 def load_registry():
