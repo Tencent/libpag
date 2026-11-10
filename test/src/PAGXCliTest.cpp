@@ -4512,8 +4512,8 @@ CLI_TEST(PAGXCliTest, VideoEncoder_EncodesPaddedFramesWhenFFmpegIsAvailable) {
 
   auto decoded = RunCapturedProcess(
       {location.path, "-hide_banner", "-loglevel", "error", "-i", options.outputFile, "-vf",
-       "scale=in_color_matrix=bt709:in_range=tv:out_range=pc,format=rgba", "-vsync", "0", "-f",
-       "rawvideo", "pipe:1"});
+       "scale=in_color_matrix=bt709:in_range=tv:out_range=pc,format=rgba", "-fps_mode",
+       "passthrough", "-f", "rawvideo", "pipe:1"});
   ASSERT_EQ(decoded.exitCode, 0) << decoded.errorOutput;
   const size_t frameBytes = static_cast<size_t>(width) * height * 4;
   ASSERT_EQ(decoded.output.size(), frameBytes * frameCount);
@@ -4885,7 +4885,7 @@ CLI_TEST(PAGXCliTest, Export_Mp4MetadataAndDecodedFramesMatch) {
   auto decoded =
       RunCapturedProcess({location.path, "-hide_banner", "-loglevel", "error", "-i", outputPath,
                           "-vf", "scale=in_color_matrix=bt709:in_range=tv:out_range=pc,format=rgba",
-                          "-vsync", "0", "-f", "rawvideo", "pipe:1"});
+                          "-fps_mode", "passthrough", "-f", "rawvideo", "pipe:1"});
   ASSERT_EQ(decoded.exitCode, 0) << decoded.errorOutput;
   const char* timeSeconds[] = {"0", "0.05", "0.1", "0.15", "0.2", "0.25", "0.3"};
   const size_t frameBytes = 300 * 100 * 4;
