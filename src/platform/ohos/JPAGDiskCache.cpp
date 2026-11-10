@@ -125,14 +125,14 @@ napi_value JPAGDiskCache::Constructor(napi_env, napi_callback_info) {
 }
 
 bool JPAGDiskCache::Init(napi_env env, napi_value exports) {
-  napi_property_descriptor classProp[] = {PAG_STATIC_METHOD_ENTRY(MaxDiskSize, MaxDiskSize),
-                                          PAG_STATIC_METHOD_ENTRY(SetMaxDiskSize, SetMaxDiskSize),
-                                          PAG_STATIC_METHOD_ENTRY(RemoveAll, RemoveAll),
-                                          PAG_STATIC_METHOD_ENTRY(SetCacheDir, SetCacheDir),
-                                          PAG_STATIC_METHOD_ENTRY(SetDefaultCacheDir,
-                                                                  SetDefaultCacheDir),
-                                          PAG_STATIC_METHOD_ENTRY(ReadFile, ReadFile),
-                                          PAG_STATIC_METHOD_ENTRY(WriteFile, WriteFile)};
+  napi_property_descriptor classProp[] = {
+      PAG_STATIC_METHOD_ENTRY(MaxDiskSize, MaxDiskSize),
+      PAG_STATIC_METHOD_ENTRY(SetMaxDiskSize, SetMaxDiskSize),
+      PAG_STATIC_METHOD_ENTRY(RemoveAll, RemoveAll),
+      PAG_STATIC_METHOD_ENTRY(SetCacheDir, SetCacheDir),
+      PAG_STATIC_METHOD_ENTRY(SetDefaultCacheDir, SetDefaultCacheDir),
+      PAG_STATIC_METHOD_ENTRY(ReadFile, ReadFile),
+      PAG_STATIC_METHOD_ENTRY(WriteFile, WriteFile)};
   auto status = DefineClass(env, exports, ClassName(), sizeof(classProp) / sizeof(classProp[0]),
                             classProp, Constructor, "");
   return status == napi_ok;
