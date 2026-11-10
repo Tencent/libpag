@@ -114,27 +114,61 @@ bool HasDynamicContent(const PAGXDocument* document,
   return false;
 }
 
+// Returns the layer that uses `mask` as its mask. TGFX stores the relation only on the mask side
+// (Layer::maskOwner), so the owner has to be located from the tree. Owners inside the mask's own
+// subtree are not reported: they reference the target as a mask without making the target itself a
+// mask child, so the target still has to be drawn with that relationship intact.
+std::shared_ptr<tgfx::Layer> FindMaskOwner(const std::shared_ptr<tgfx::Layer>& layer,
+                                           const tgfx::Layer* mask) {
+  if (layer == nullptr || mask == nullptr || layer.get() == mask) {
+    return nullptr;
+  }
+  if (layer->mask().get() == mask) {
+    return layer;
+  }
+  for (const auto& child : layer->children()) {
+    auto owner = FindMaskOwner(child, mask);
+    if (owner != nullptr) {
+      return owner;
+    }
+  }
+  return nullptr;
+}
+
 // Temporarily replaces the target with an identity parent so that the normal child compositing
 // path applies the target's transform, alpha, visibility, mask and scrollRect exactly once. The
 // original tree is restored on destruction.
 class OutputTargetParent {
  public:
-  explicit OutputTargetParent(const std::shared_ptr<tgfx::Layer>& target)
+  OutputTargetParent(const std::shared_ptr<tgfx::Layer>& root,
+                     const std::shared_ptr<tgfx::Layer>& target)
       : target(target), parent(target != nullptr ? target->parent() : nullptr) {
     if (target == nullptr || parent == nullptr) {
       return;
     }
+    maskOwner = FindMaskOwner(root, target.get());
     wrapper = tgfx::Layer::Make();
     if (wrapper == nullptr || !parent->replaceChild(target, wrapper)) {
       wrapper = nullptr;
       return;
     }
+    // TGFX skips child layers that act as another layer's mask, so a target referenced by a
+    // `mask` attribute would never be drawn through the wrapper. The owner lives outside this
+    // wrapper, so releasing the mask only affects that skip check for the duration of the draw;
+    // the original relationship is restored in the destructor.
+    if (maskOwner != nullptr) {
+      maskOwner->setMask(nullptr);
+    }
     wrapper->addChild(target);
   }
 
   ~OutputTargetParent() {
-    if (wrapper != nullptr) {
-      parent->replaceChild(wrapper, target);
+    if (wrapper == nullptr) {
+      return;
+    }
+    parent->replaceChild(wrapper, target);
+    if (maskOwner != nullptr) {
+      maskOwner->setMask(target);
     }
   }
 
@@ -152,6 +186,7 @@ class OutputTargetParent {
  private:
   std::shared_ptr<tgfx::Layer> target = nullptr;
   tgfx::Layer* parent = nullptr;
+  std::shared_ptr<tgfx::Layer> maskOwner = nullptr;
   std::shared_ptr<tgfx::Layer> wrapper = nullptr;
 };
 
@@ -256,7 +291,7 @@ void DrawOutputTarget(tgfx::Canvas* canvas, const std::shared_ptr<tgfx::Layer>& 
     root->draw(canvas);
     return;
   }
-  OutputTargetParent parent(targetLayer);
+  OutputTargetParent parent(root, targetLayer);
   if (!parent.isValid()) {
     return;
   }

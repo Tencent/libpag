@@ -29,6 +29,7 @@
 #include "pagx/PAGDisplayOptions.h"
 #include "pagx/PAGStateMachine.h"
 #include "pagx/PAGTimeline.h"
+#include "pagx/types/Point.h"
 #include "pagx/types/Rect.h"
 
 namespace tgfx {
@@ -255,14 +256,21 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
                 bool autoClear);
 
   // Converts a surface-space point to the layer tree's root coordinate space using the display
-  // list's zoomScale and contentOffset. Returns false if the surface point cannot be mapped (zoom
-  // scale is zero). Used by PAGLayer::hitTestPoint so handles can hit-test in surface coordinates.
+  // list's zoomScale and contentOffset, plus the output window origin when a target view is
+  // active. Returns false if the surface point cannot be mapped (zoom scale is zero). Used by
+  // PAGLayer::hitTestPoint so handles can hit-test in surface coordinates.
   bool surfaceToRoot(float surfaceX, float surfaceY, float* rootX, float* rootY) const;
 
-  // Writes the root-to-surface transform (zoomScale then contentOffset) into out and returns true.
-  // Returns false if out is null. Used by PAGLayer::getGlobalMatrix to build the local-to-surface
-  // matrix. Returned as a pagx Matrix to keep tgfx out of this header.
+  // Writes the root-to-surface transform (zoomScale then contentOffset, shifted by the output
+  // window origin when a target view is active) into out and returns true. Returns false if out is
+  // null. Used by PAGLayer::getGlobalMatrix to build the local-to-surface matrix. Returned as a
+  // pagx Matrix to keep tgfx out of this header.
   bool rootToSurfaceMatrix(Matrix* out) const;
+
+  // Returns the root-space origin of the output window that draw() subtracts for a target view, or
+  // (0, 0) when the scene renders the whole canvas. Query helpers apply the same shift so bounds,
+  // matrices and hit testing stay in the surface space the caller actually sees.
+  Point outputViewOrigin() const;
 
   std::shared_ptr<PAGXDocument> document = nullptr;
   std::shared_ptr<PAGComposition> _rootComposition = nullptr;

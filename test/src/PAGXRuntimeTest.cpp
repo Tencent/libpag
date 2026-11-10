@@ -35,6 +35,7 @@
 #include "pagx/runtime/KeyframeEvaluator.h"
 #include "pagx/runtime/KeyframeEvaluatorImpl.h"
 #include "pagx/tgfx.h"
+#include "renderer/LayerBuilder.h"
 #include "tgfx/core/Bitmap.h"
 #include "tgfx/core/Data.h"
 #include "tgfx/core/Pixmap.h"
@@ -956,6 +957,77 @@ PAGX_TEST(PAGXRuntimeTest, RepeatedTargetViewDrawKeepsCanvasState) {
   ASSERT_TRUE(ReadSurfacePixels(surface, &secondFrame));
   EXPECT_EQ(secondFrame, firstFrame);
   EXPECT_FALSE(scene->hasContentChanged());
+}
+
+/**
+ * Test case: surface-space queries must apply the same output-window shift as draw(). The red
+ * square is centered at root (25,25) and covers (20,20)-(30,30); with an output window starting at
+ * (20,20) it appears at (0,0)-(10,10) on the surface.
+ */
+PAGX_TEST(PAGXRuntimeTest, TargetViewQueriesApplyOutputWindowOrigin) {
+  auto doc = MakeTargetViewDocument();
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+  auto* targetNode = doc->findNode<pagx::Layer>("target");
+  ASSERT_NE(targetNode, nullptr);
+  auto* binding = scene->rootComposition()->binding.get();
+  ASSERT_NE(binding, nullptr);
+  auto runtimeTarget = binding->get<tgfx::Layer>(targetNode);
+  ASSERT_NE(runtimeTarget, nullptr);
+  auto it = scene->layerRegistry.find(runtimeTarget.get());
+  ASSERT_NE(it, scene->layerRegistry.end());
+  auto target = it->second->shared_from_this();
+  ASSERT_NE(target, nullptr);
+
+  auto bounds = scene->getGlobalBounds(target);
+  EXPECT_FLOAT_EQ(bounds.x, 0);
+  EXPECT_FLOAT_EQ(bounds.y, 0);
+  EXPECT_FLOAT_EQ(bounds.width, 10);
+  EXPECT_FLOAT_EQ(bounds.height, 10);
+  EXPECT_TRUE(target->hitTestPoint(5, 5));
+  EXPECT_FALSE(target->hitTestPoint(15, 15));
+  // Local (20,20) maps to surface (0,0), so the root-to-surface matrix translates by -20.
+  auto matrix = target->getGlobalMatrix();
+  EXPECT_FLOAT_EQ(matrix.tx, -20);
+  EXPECT_FLOAT_EQ(matrix.ty, -20);
+
+  // The output-window shift composes with the display zoom and content offset exactly like draw().
+  auto* options = scene->getDisplayOptions();
+  options->setZoomScale(2);
+  options->setContentOffset(10, 5);
+  auto zoomed = scene->getGlobalBounds(target);
+  EXPECT_FLOAT_EQ(zoomed.x, 10);
+  EXPECT_FLOAT_EQ(zoomed.y, 5);
+  EXPECT_FLOAT_EQ(zoomed.width, 20);
+  EXPECT_FLOAT_EQ(zoomed.height, 20);
+  EXPECT_TRUE(target->hitTestPoint(10, 5));
+  EXPECT_FALSE(target->hitTestPoint(0, 0));
+}
+
+/**
+ * Test case: a target that another layer references as its mask must still be drawn. TGFX skips
+ * child layers owned as masks, which used to drop the whole output when the target was such a mask.
+ */
+PAGX_TEST(PAGXRuntimeTest, TargetViewDrawsTargetReferencedAsMask) {
+  auto doc = MakeTargetViewDocument();
+  auto* target = doc->findNode<pagx::Layer>("target");
+  ASSERT_NE(target, nullptr);
+  auto* masked = doc->makeNode<pagx::Layer>("masked");
+  masked->width = 100;
+  masked->height = 100;
+  masked->mask = target;
+  doc->layers.push_back(masked);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+  auto surface = pagx::PAGSurface::MakeOffscreen(20, 20);
+  ASSERT_TRUE(surface != nullptr);
+  ASSERT_TRUE(scene->draw(surface));
+  std::vector<uint8_t> pixels = {};
+  ASSERT_TRUE(ReadSurfacePixels(surface, &pixels));
+  EXPECT_EQ(pixels[3], 255u);
+  // The mask owner is only released for the draw; the document relationship is restored.
+  EXPECT_EQ(masked->mask, target);
 }
 
 PAGX_TEST(PAGXRuntimeTest, OutputViewEditsInvalidateRenderedContent) {

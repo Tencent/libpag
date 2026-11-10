@@ -80,8 +80,9 @@ bool HasDeclaredOutputView(const PAGXDocument& document);
  * Draws only the given target layer onto the canvas. The layer's own transform, alpha,
  * visibility, mask and scrollRect are applied exactly once through a temporary parent, and
  * backdrop-dependent layer styles sample the ancestors and prior siblings of the target in the
- * original tree while later siblings are excluded. The original tree shape is restored before
- * returning.
+ * original tree while later siblings are excluded. A target that another layer references as its
+ * mask is temporarily released from that ownership so the mask skip rule does not drop it from the
+ * output. The original tree shape is restored before returning.
  * @param canvas the destination canvas in the target's parent coordinate space.
  * @param root the root layer of the tree that owns the target; used as the coordinate space.
  * @param targetLayer the layer to draw.

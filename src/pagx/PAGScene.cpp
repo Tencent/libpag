@@ -773,6 +773,14 @@ Rect PAGScene::getGlobalBounds(const std::shared_ptr<PAGLayer>& pagLayer) const 
   return FromTGFX(surfaceBounds);
 }
 
+Point PAGScene::outputViewOrigin() const {
+  if (outputViewState != OutputViewState::Valid || document == nullptr ||
+      !document->outputBounds.has_value()) {
+    return {};
+  }
+  return {document->outputBounds->x, document->outputBounds->y};
+}
+
 bool PAGScene::surfaceToRoot(float surfaceX, float surfaceY, float* rootX, float* rootY) const {
   if (rootX == nullptr || rootY == nullptr) {
     return false;
@@ -782,8 +790,9 @@ bool PAGScene::surfaceToRoot(float surfaceX, float surfaceY, float* rootX, float
     return false;
   }
   const auto& contentOffset = displayList->contentOffset();
-  *rootX = (surfaceX - contentOffset.x) / zoomScale;
-  *rootY = (surfaceY - contentOffset.y) / zoomScale;
+  const auto origin = outputViewOrigin();
+  *rootX = (surfaceX - contentOffset.x) / zoomScale + origin.x;
+  *rootY = (surfaceY - contentOffset.y) / zoomScale + origin.y;
   return true;
 }
 
@@ -793,7 +802,13 @@ bool PAGScene::rootToSurfaceMatrix(Matrix* out) const {
   }
   float zoomScale = displayList->zoomScale();
   const auto& contentOffset = displayList->contentOffset();
-  *out = {zoomScale, 0, 0, zoomScale, contentOffset.x, contentOffset.y};
+  const auto origin = outputViewOrigin();
+  *out = {zoomScale,
+          0,
+          0,
+          zoomScale,
+          contentOffset.x - origin.x * zoomScale,
+          contentOffset.y - origin.y * zoomScale};
   return true;
 }
 
