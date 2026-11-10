@@ -213,6 +213,11 @@ float ComputeRangeSelectorFactor(const RangeSelector* selector, size_t glyphInde
 // be evaluated without mutating the node.
 float ComputeRangeSelectorFactor(const RangeSelector* selector, size_t glyphIndex,
                                  size_t totalGlyphs, float start, float end, float offset);
+// Same with the falloff shaping supplied too: `easeIn`/`easeOut` bend the triangle curve and
+// `weight` scales the whole factor, so an animated selector has to evaluate them per frame.
+float ComputeRangeSelectorFactor(const RangeSelector* selector, size_t glyphIndex,
+                                 size_t totalGlyphs, float start, float end, float offset,
+                                 float easeIn, float easeOut, float weight);
 
 struct ArcLengthLUT {
   std::vector<float> arcLengths = {};

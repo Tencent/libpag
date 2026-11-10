@@ -295,9 +295,9 @@ static bool RangeSelectorGlyphsAnimatable(const TextModifier* modifier) {
     return false;
   }
   auto* selector = static_cast<const RangeSelector*>(modifier->selectors[0]);
-  bool rationalShape = selector->shape == SelectorShape::RampUp ||
-                       selector->shape == SelectorShape::RampDown ||
-                       selector->shape == SelectorShape::Square;
+  // Every shape is supported now: the rational ones fit one bezier per piece, the others (triangle,
+  // round, smooth) are sampled by the keyframe emitter.
+  bool rationalShape = true;
   // Color and stroke-width blends are not emitted per frame; weight below zero flips the factor
   // sign, which the static path folds through |f| and a linear easing cannot.
   return rationalShape && !selector->randomOrder && selector->weight >= 0.0f &&
@@ -313,6 +313,13 @@ float ComputeRangeSelectorFactor(const RangeSelector* selector, size_t glyphInde
 
 float ComputeRangeSelectorFactor(const RangeSelector* selector, size_t glyphIndex,
                                  size_t totalGlyphs, float start, float end, float offset) {
+  return ComputeRangeSelectorFactor(selector, glyphIndex, totalGlyphs, start, end, offset,
+                                    selector->easeIn, selector->easeOut, selector->weight);
+}
+
+float ComputeRangeSelectorFactor(const RangeSelector* selector, size_t glyphIndex,
+                                 size_t totalGlyphs, float start, float end, float offset,
+                                 float easeIn, float easeOut, float weight) {
   if (totalGlyphs == 0) {
     return 0.0f;
   }
@@ -359,8 +366,7 @@ float ComputeRangeSelectorFactor(const RangeSelector* selector, size_t glyphInde
         // tgfx does — linear-triangle * post-multiplicative easing is a cheaper approximation
         // that fails to reproduce the flattened peak and compressed transition visible e.g.
         // in selector_advanced.pagx EASED MOTION (easeIn=easeOut=0.8).
-        factor = CalculateTriangleFactorBezier(textCenter, rangeStart, rangeEnd, selector->easeOut,
-                                               selector->easeIn);
+        factor = CalculateTriangleFactorBezier(textCenter, rangeStart, rangeEnd, easeOut, easeIn);
         break;
       }
       case SelectorShape::Round: {
@@ -435,7 +441,7 @@ float ComputeRangeSelectorFactor(const RangeSelector* selector, size_t glyphInde
   // Triangle handles easeIn/easeOut inside CalculateTriangleFactorBezier via bezier control
   // points. Other shapes are untouched by easeIn/easeOut in tgfx — see TextSelector.cpp where
   // only CalculateTriangleFactor consumes those attributes — so no post-scale is applied here.
-  return factor * selector->weight;
+  return factor * weight;
 }
 
 //==============================================================================
