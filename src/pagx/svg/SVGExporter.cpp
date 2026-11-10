@@ -3416,9 +3416,11 @@ void SVGWriter::writeLayerContents(SVGBuilder& out, const Layer* layer, const Ma
 
 void SVGWriter::writeLayer(SVGBuilder& out, const Layer* layer) {
   // An animated visibility channel turns the layer into a lasting SMIL host, so the static invisible
-  // state must not elide the element that carries the animation.
+  // state must not elide the element that carries the animation. A hidden layer is skipped
+  // regardless of whether it owns a mask: the mask only describes what the owner clips, it does not
+  // make hidden content visible.
   bool animated = _animWriter.HasLayerAnimates(layer);
-  if (!layer->visible && layer->mask == nullptr && !animated) {
+  if (!layer->visible && !animated) {
     return;
   }
 
@@ -3563,10 +3565,15 @@ void SVGWriter::writeLayerBody(SVGBuilder& out, const Layer* layer, float perChi
   // PAGX renderer and the HTML preview. The check recurses through Group / TextBox containers
   // so a foreground painter buried inside a nested Group still triggers the second pass — the
   // shallow flat-list scan would otherwise leave it suppressed by both passes' filters.
-  bool hasForeground = HasForegroundPainter(layer->contents);
+  // The renderer draws a layer's composition INSTEAD of its vector contents (LayerBuilder picks
+  // one or the other), so emitting both would paint the authored content on top of the composition.
+  bool hasComposition = layer->composition != nullptr;
+  bool hasForeground = !hasComposition && HasForegroundPainter(layer->contents);
 
-  writeLayerContents(out, layer, {}, perChildAlpha, LayerPlacement::Background);
-  if (layer->composition != nullptr) {
+  if (!hasComposition) {
+    writeLayerContents(out, layer, {}, perChildAlpha, LayerPlacement::Background);
+  }
+  if (hasComposition) {
     for (const auto* compLayer : layer->composition->layers) {
       if (perChildAlpha < 1.0f) {
         out.openElement("g");

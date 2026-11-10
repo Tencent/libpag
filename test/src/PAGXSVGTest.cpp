@@ -5160,4 +5160,71 @@ PAGX_TEST(PAGXSVGTest, SVGExport_ToFileIsAtomic) {
   EXPECT_FALSE(std::filesystem::exists(missing));
 }
 
+// ST33: a hidden layer is skipped even when it owns a mask — the mask describes what the owner
+// clips, it does not make hidden content visible.
+PAGX_TEST(PAGXSVGTest, SVGExport_HiddenLayerWithMaskIsSkipped) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto* owner = doc->makeNode<pagx::Layer>("owner");
+  owner->visible = false;
+  auto* rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {100, 100};
+  rect->size = {80, 80};
+  auto* fill = doc->makeNode<pagx::Fill>();
+  auto* green = doc->makeNode<pagx::SolidColor>();
+  green->color = {0.0f, 1.0f, 0.0f, 1.0f};
+  fill->color = green;
+  owner->contents = {rect, fill};
+
+  auto* mask = doc->makeNode<pagx::Layer>("mask");
+  auto* maskRect = doc->makeNode<pagx::Rectangle>();
+  maskRect->position = {100, 100};
+  maskRect->size = {60, 60};
+  auto* maskFill = doc->makeNode<pagx::Fill>();
+  auto* white = doc->makeNode<pagx::SolidColor>();
+  white->color = {1.0f, 1.0f, 1.0f, 1.0f};
+  maskFill->color = white;
+  mask->contents = {maskRect, maskFill};
+  owner->mask = mask;
+  owner->children.push_back(mask);
+  doc->layers.push_back(owner);
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  // The owner's unique fill must not reach the output; the mask layer itself may still appear as a
+  // <mask> definition.
+  EXPECT_EQ(svg.find("#00FF00"), std::string::npos);
+}
+
+// ST34: the renderer draws the composition instead of the layer's vector contents, so the exporter
+// must not paint both.
+PAGX_TEST(PAGXSVGTest, SVGExport_CompositionWinsOverContents) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto* composition = doc->makeNode<pagx::Composition>("comp");
+  auto* compLayer = doc->makeNode<pagx::Layer>("compLayer");
+  auto* compRect = doc->makeNode<pagx::Rectangle>();
+  compRect->position = {100, 100};
+  compRect->size = {80, 80};
+  auto* compFill = doc->makeNode<pagx::Fill>();
+  auto* blue = doc->makeNode<pagx::SolidColor>();
+  blue->color = {0.0f, 0.0f, 1.0f, 1.0f};
+  compFill->color = blue;
+  compLayer->contents = {compRect, compFill};
+  composition->layers.push_back(compLayer);
+
+  auto* owner = doc->makeNode<pagx::Layer>("owner");
+  owner->composition = composition;
+  auto* ownRect = doc->makeNode<pagx::Rectangle>();
+  ownRect->position = {100, 100};
+  ownRect->size = {40, 40};
+  auto* ownFill = doc->makeNode<pagx::Fill>();
+  auto* red = doc->makeNode<pagx::SolidColor>();
+  red->color = {1.0f, 0.0f, 0.0f, 1.0f};
+  ownFill->color = red;
+  owner->contents = {ownRect, ownFill};
+  doc->layers.push_back(owner);
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("#0000FF"), std::string::npos);
+  EXPECT_EQ(svg.find("#FF0000"), std::string::npos);
+}
+
 }  // namespace pag
