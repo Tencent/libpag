@@ -722,6 +722,25 @@ bool SplitTransformFunctions(const std::string& value, std::vector<std::string>*
   return !out->empty();
 }
 
+// Which axis a `transform-origin` token may occupy. `left` / `right` are horizontal, `top` /
+// `bottom` vertical; `center`, lengths and percentages fill either axis.
+enum class OriginAxis { Horizontal, Vertical, Any };
+
+OriginAxis OriginAxisOf(const std::string& token) {
+  if (token == "left" || token == "right") {
+    return OriginAxis::Horizontal;
+  }
+  if (token == "top" || token == "bottom") {
+    return OriginAxis::Vertical;
+  }
+  return OriginAxis::Any;
+}
+
+bool IsOriginKeyword(const std::string& token) {
+  return token == "left" || token == "right" || token == "top" || token == "bottom" ||
+         token == "center";
+}
+
 HTMLTransformOrigin ResolveTransformOrigin(const std::string& value, float width, float height,
                                            HTMLValueParser& valueParser) {
   HTMLTransformOrigin origin = {};
@@ -735,36 +754,33 @@ HTMLTransformOrigin ResolveTransformOrigin(const std::string& value, float width
   }
 
   // CSS orders the two components by which axis each token belongs to, not by position: `bottom
-  // left` is x=left, y=bottom, and `top 20px` is x=20px, y=top. `center` and bare lengths belong to
-  // neither axis on their own, so they fill whichever axis the keyword did not take (and, when both
-  // are neutral, the first is X as usual).
-  enum class AxisHint { X, Y, Neutral };
-  const auto hintOf = [](const std::string& token) {
-    if (token == "left" || token == "right") {
-      return AxisHint::X;
-    }
-    if (token == "top" || token == "bottom") {
-      return AxisHint::Y;
-    }
-    return AxisHint::Neutral;
-  };
-
+  // left` is x=left, y=bottom and `center left` is x=left, y=center. A length may only take a slot
+  // whose keyword class is `Any`, so `top 20px` and `20px left` are invalid declarations (Chromium
+  // drops them and falls back to `50% 50%`) while `20px top`, `left 20px` and `20px center` are fine.
   std::string tokenX = "center";
   std::string tokenY = "center";
+  bool invalid = false;
   if (tokens.size() == 1) {
-    if (hintOf(tokens[0]) == AxisHint::Y) {
+    if (OriginAxisOf(tokens[0]) == OriginAxis::Vertical) {
       tokenY = tokens[0];
     } else {
       tokenX = tokens[0];
     }
   } else {
-    const AxisHint first = hintOf(tokens[0]);
-    const AxisHint second = hintOf(tokens[1]);
-    if (first == second && first != AxisHint::Neutral) {
-      // `left right` / `top bottom` name the same axis twice, which is not a valid origin.
-      return origin;
-    }
-    if (first == AxisHint::Y || second == AxisHint::X) {
+    const OriginAxis first = OriginAxisOf(tokens[0]);
+    const OriginAxis second = OriginAxisOf(tokens[1]);
+    const bool firstIsLength = !IsOriginKeyword(tokens[0]);
+    const bool secondIsLength = !IsOriginKeyword(tokens[1]);
+    if (first == second && first != OriginAxis::Any) {
+      // `left right` / `top bottom` name the same axis twice.
+      invalid = true;
+    } else if (first == OriginAxis::Vertical && secondIsLength) {
+      // `top 20px`: the vertical keyword cannot precede a bare length.
+      invalid = true;
+    } else if (firstIsLength && second == OriginAxis::Horizontal) {
+      // `20px left`: a bare length cannot precede a horizontal keyword.
+      invalid = true;
+    } else if (first == OriginAxis::Vertical || second == OriginAxis::Horizontal) {
       tokenX = tokens[1];
       tokenY = tokens[0];
     } else {
@@ -772,6 +788,18 @@ HTMLTransformOrigin ResolveTransformOrigin(const std::string& value, float width
       tokenY = tokens[1];
     }
   }
+
+  if (invalid) {
+    // An invalid `<position>` drops the declaration, so the initial `50% 50%` applies. Reporting it
+    // keeps the author-facing diagnostic honest rather than silently pivoting elsewhere.
+    origin.valid = false;
+    if (std::isfinite(width) && std::isfinite(height)) {
+      origin.point = Point{width * 0.5f, height * 0.5f};
+      origin.resolved = true;
+    }
+    return origin;
+  }
+
   const float x = ResolveOriginAxis(tokenX, width, valueParser);
   const float y = ResolveOriginAxis(tokenY, height, valueParser);
   if (!std::isfinite(x) || !std::isfinite(y)) {
