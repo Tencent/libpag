@@ -2918,4 +2918,36 @@ PAGX_TEST(PAGXUtilsTest, IsSupportedImageMimePinsTheSpecSet) {
   EXPECT_FALSE(pagx::IsSupportedImageMime(nullptr));
 }
 
+// ST31: vector and bitmap glyphs of one run must stay in glyph order so the writer can paint them
+// back to back; the two-list API loses that interleaving.
+PAGX_TEST(PAGXUtilsTest, ComputeGlyphDrawItems_PreservesGlyphOrder) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto* font = doc->makeNode<pagx::Font>();
+  font->unitsPerEm = 1000;
+  auto* pathGlyph = doc->makeNode<pagx::Glyph>();
+  pathGlyph->path = doc->makeNode<pagx::PathData>();
+  *pathGlyph->path = pagx::PathDataFromSVGString("M0 0 L10 0 L10 10 Z");
+  pathGlyph->advance = 10.0f;
+  font->glyphs.push_back(pathGlyph);
+  auto* imageGlyph = doc->makeNode<pagx::Glyph>();
+  imageGlyph->image = doc->makeNode<pagx::Image>();
+  imageGlyph->advance = 10.0f;
+  font->glyphs.push_back(imageGlyph);
+
+  auto* text = doc->makeNode<pagx::Text>();
+  auto* run = doc->makeNode<pagx::GlyphRun>();
+  run->font = font;
+  run->fontSize = 1000.0f;
+  run->glyphs = {1, 2, 1};
+  text->glyphRuns.push_back(run);
+
+  auto items = pagx::ComputeGlyphDrawItems(*text, 0, 0);
+  ASSERT_EQ(items.size(), 3u);
+  EXPECT_NE(items[0].pathData, nullptr);
+  EXPECT_EQ(items[0].image, nullptr);
+  EXPECT_NE(items[1].image, nullptr);
+  EXPECT_EQ(items[1].pathData, nullptr);
+  EXPECT_NE(items[2].pathData, nullptr);
+}
+
 }  // namespace pag

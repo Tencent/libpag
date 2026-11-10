@@ -239,6 +239,29 @@ std::vector<GlyphImage> ComputeGlyphImages(const Text& text, float textPosX, flo
   return result;
 }
 
+std::vector<GlyphDrawItem> ComputeGlyphDrawItems(const Text& text, float textPosX, float textPosY) {
+  auto positioned = WalkGlyphs(text, textPosX, textPosY);
+  std::vector<GlyphDrawItem> result = {};
+  result.reserve(positioned.size());
+  for (const auto& entry : positioned) {
+    GlyphPath path = {};
+    if (TryMakeGlyphPath(entry, &path)) {
+      GlyphDrawItem item = {};
+      item.transform = path.transform;
+      item.pathData = path.pathData;
+      result.push_back(item);
+    }
+    GlyphImage image = {};
+    if (TryMakeGlyphImage(entry, &image)) {
+      GlyphDrawItem item = {};
+      item.transform = image.transform;
+      item.image = image.image;
+      result.push_back(item);
+    }
+  }
+  return result;
+}
+
 Rect ComputeGlyphRunTextBounds(const Text& text) {
   // Horizontal span: walk the pen exactly like WalkGlyphs (same positions /
   // xOffsets / advance-accumulator fallback and the same missing-glyph skips),

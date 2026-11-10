@@ -2430,10 +2430,8 @@ void SVGWriter::writePath(SVGBuilder& out, const Path* path, const FillStrokeInf
 bool SVGWriter::WriteGlyphGeometry(SVGBuilder& out, const Text* text, float originX, float originY,
                                    const FillStrokeInfo& fs, float alpha,
                                    const std::string& transform) {
-  std::vector<GlyphPath> glyphPaths;
-  std::vector<GlyphImage> glyphImages;
-  ComputeGlyphPathsAndImages(*text, originX, originY, &glyphPaths, &glyphImages);
-  if (glyphPaths.empty() && glyphImages.empty()) {
+  auto items = ComputeGlyphDrawItems(*text, originX, originY);
+  if (items.empty()) {
     return false;
   }
 
@@ -2453,26 +2451,23 @@ bool SVGWriter::WriteGlyphGeometry(SVGBuilder& out, const Text* text, float orig
   bool fitGradientToRun = IsGradientSource(fs.fill ? fs.fill->color : nullptr) ||
                           IsGradientSource(fs.stroke ? fs.stroke->color : nullptr);
 
-  std::vector<std::string> bakedPaths;
   if (fitGradientToRun) {
     float minX = std::numeric_limits<float>::max();
     float minY = std::numeric_limits<float>::max();
     float maxX = std::numeric_limits<float>::lowest();
     float maxY = std::numeric_limits<float>::lowest();
-    bakedPaths.reserve(glyphPaths.size());
-    for (const auto& gp : glyphPaths) {
-      if (!gp.pathData) {
+    for (const auto& item : items) {
+      if (item.pathData == nullptr) {
         continue;
       }
       PathData baked = PathDataFromSVGString("");
-      baked = *gp.pathData;
-      baked.transform(gp.transform);
+      baked = *item.pathData;
+      baked.transform(item.transform);
       Rect b = baked.getBounds();
       minX = std::min(minX, b.x);
       minY = std::min(minY, b.y);
       maxX = std::max(maxX, b.x + b.width);
       maxY = std::max(maxY, b.y + b.height);
-      bakedPaths.push_back(PathDataToSVGString(baked));
     }
     if (maxX > minX && maxY > minY) {
       _gradientUserSpaceBounds = Rect::MakeLTRB(minX, minY, maxX, maxY);
@@ -2505,30 +2500,31 @@ bool SVGWriter::WriteGlyphGeometry(SVGBuilder& out, const Text* text, float orig
   }
   _animWriter.WritePainterAnimates(out, fs.fill, fs.stroke, alpha);
 
-  if (fitGradientToRun) {
-    for (const auto& d : bakedPaths) {
+  // Vector glyphs become <path> children and bitmap glyphs <image> children, emitted in glyph
+  // order because a run may mix both kinds and a later drawable can cover an earlier one.
+  for (const auto& item : items) {
+    if (item.pathData != nullptr) {
       out.openElement("path");
-      out.addAttribute("d", d);
+      if (fitGradientToRun) {
+        PathData baked = PathDataFromSVGString("");
+        baked = *item.pathData;
+        baked.transform(item.transform);
+        out.addAttribute("d", PathDataToSVGString(baked));
+      } else {
+        out.addAttribute("transform", MatrixToSVGTransform(item.transform));
+        out.addAttribute("d", PathDataToSVGString(*item.pathData));
+      }
       out.closeElementSelfClosing();
+      continue;
     }
-  } else {
-    for (const auto& gp : glyphPaths) {
-      out.openElement("path");
-      out.addAttribute("transform", MatrixToSVGTransform(gp.transform));
-      out.addAttribute("d", PathDataToSVGString(*gp.pathData));
-      out.closeElementSelfClosing();
-    }
-  }
-
-  // Bitmap glyphs (emoji / colour fonts). Each image is emitted as an <image>
-  // element transformed into its per-glyph pixel-space origin. Mirror PPT's
-  // writeTextAsPath bitmap loop (PPTExporter.cpp:1566).
-  for (const auto& gi : glyphImages) {
-    if (!gi.image) {
+    // Bitmap glyphs (emoji / colour fonts). Each image is emitted as an <image>
+    // element transformed into its per-glyph pixel-space origin. Mirror PPT's
+    // writeTextAsPath bitmap loop (PPTExporter.cpp:1566).
+    if (item.image == nullptr) {
       continue;
     }
     bool mimeRecognized = true;
-    std::string href = GetImageHref(gi.image, &mimeRecognized);
+    std::string href = GetImageHref(item.image, &mimeRecognized);
     if (href.empty()) {
       continue;
     }
@@ -2540,14 +2536,14 @@ bool SVGWriter::WriteGlyphGeometry(SVGBuilder& out, const Text* text, float orig
     }
     int imgW = 0;
     int imgH = 0;
-    if (!GetImageDimensions(gi.image, &imgW, &imgH) || imgW <= 0 || imgH <= 0) {
+    if (!GetImageDimensions(item.image, &imgW, &imgH) || imgW <= 0 || imgH <= 0) {
       continue;
     }
     out.openElement("image");
     out.addAttribute("href", href);
     out.addRequiredAttribute("width", static_cast<float>(imgW));
     out.addRequiredAttribute("height", static_cast<float>(imgH));
-    out.addAttribute("transform", MatrixToSVGTransform(gi.transform));
+    out.addAttribute("transform", MatrixToSVGTransform(item.transform));
     // A bitmap glyph is an <image> child of the run's <g>; fill-opacity does not reach images, so
     // the accumulated layer / group alpha has to be applied here or the glyph stays opaque.
     if (alpha < 1.0f) {

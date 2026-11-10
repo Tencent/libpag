@@ -125,6 +125,26 @@ void ComputeGlyphPathsAndImages(const Text& text, float textPosX, float textPosY
                                 std::vector<GlyphPath>* paths, std::vector<GlyphImage>* images);
 
 /**
+ * A single drawable produced by a pre-shaped glyph, in glyph order. A glyph may carry a vector
+ * outline, a bitmap, or both; callers must paint the entries in this order because a later bitmap
+ * can cover an earlier outline and vice versa.
+ */
+struct GlyphDrawItem {
+  // Layer-space transform: glyph placement for outlines, pixel-rect placement for bitmaps.
+  Matrix transform;
+  const PathData* pathData = nullptr;
+  const Image* image = nullptr;
+};
+
+/**
+ * Converts text glyph runs into an ordered list of glyph drawables. Unlike
+ * ComputeGlyphPathsAndImages (which returns two separate lists), this preserves the relative order
+ * of vector and bitmap glyphs within each run.
+ * textPosX/textPosY are the base position for glyph placement.
+ */
+std::vector<GlyphDrawItem> ComputeGlyphDrawItems(const Text& text, float textPosX, float textPosY);
+
+/**
  * Computes the bounding box of a Text's pre-shaped GlyphRuns in the Text's local coordinate space
  * (i.e. as if textPos were (0, 0), so callers add renderPosition() themselves). The horizontal span
  * runs from each glyph's pen origin to its advance edge (pen origin + scaled advance), matching the
