@@ -1386,7 +1386,7 @@ PAGX_TEST(PAGXSVGTest, SVGExport_DropShadowStyle) {
  * Vector export reports the loss of non-zero spread for both shadow styles and preserves the
  * zero-spread output. Zero values do not emit warnings.
  */
-PAGX_TEST(PAGXSVGTest, SVGExport_ShadowSpreadWarnings) {
+PAGX_TEST(PAGXSVGTest, SVGExport_ShadowSpreadUsesMorphology) {
   for (const auto* spread : {"8", "-8", "0"}) {
     SCOPED_TRACE(spread);
     auto xml = std::string(R"(<pagx width="100" height="100"><Layer>)") +
@@ -1399,14 +1399,16 @@ PAGX_TEST(PAGXSVGTest, SVGExport_ShadowSpreadWarnings) {
     auto svg = pagx::SVGExporter::ToSVG(*doc, {}, &warnings);
     EXPECT_FALSE(svg.empty());
     EXPECT_NE(svg.find("<feMerge"), std::string::npos);
+    EXPECT_TRUE(warnings.empty()) << (warnings.empty() ? "" : warnings[0]);
     if (std::string(spread) == "0") {
-      EXPECT_TRUE(warnings.empty());
+      EXPECT_EQ(svg.find("<feMorphology"), std::string::npos);
     } else {
-      ASSERT_EQ(warnings.size(), 2u);
-      EXPECT_NE(warnings[0].find("DropShadowStyle spread"), std::string::npos);
-      EXPECT_NE(warnings[0].find("'drop'"), std::string::npos);
-      EXPECT_NE(warnings[1].find("InnerShadowStyle spread"), std::string::npos);
-      EXPECT_NE(warnings[1].find("'inner'"), std::string::npos);
+      // A non-zero spread grows (positive) or shrinks (negative) the silhouette before blurring.
+      EXPECT_NE(svg.find("<feMorphology"), std::string::npos);
+      EXPECT_NE(
+          svg.find(std::string(spread)[0] == '-' ? "operator=\"erode\"" : "operator=\"dilate\""),
+          std::string::npos);
+      EXPECT_NE(svg.find("radius=\"8\""), std::string::npos);
     }
   }
 }
