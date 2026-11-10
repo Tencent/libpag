@@ -3892,9 +3892,9 @@ CLI_TEST(PAGXHtmlTest, AnimationStrokeMiterLimitIsEmitted) {
 // A RangeSelector `start` channel moves which glyphs the TextModifier reaches, so every glyph gets
 // its own rule. With linear keys the rampUp factor of a glyph is a rational function of time, so
 // each monotonic piece is one stop pair with a fitted cubic-bezier instead of per-frame stops.
-// One CSS stop carries one timing function for every property in its rule, so a bezier-eased channel
-// and a linear one cannot share a stop: the rule is rewritten as evenly spaced linear pieces, which
-// keeps the eased channel sampled and the linear one exact.
+// One CSS stop carries one timing function for every property in its rule, so a bezier-eased
+// opacity and a linear translation cannot share a rule. They are emitted as two rules with disjoint
+// properties and one comma-separated animation list, which keeps both curves exact - no sampling.
 CLI_TEST(PAGXHtmlTest, AnimationMixedEasingSplitsTheRule) {
   const char* xml = R"(<pagx width="320" height="200">
     <Layer id="splitBox" x="40" y="60" width="80" height="80">
@@ -3924,15 +3924,21 @@ CLI_TEST(PAGXHtmlTest, AnimationMixedEasingSplitsTheRule) {
   ASSERT_FALSE(html.empty());
   auto tag = FindTagContaining(html, "id=\"splitBox\"");
   ASSERT_FALSE(tag.empty()) << html;
-  auto rule = KeyframesRuleNamed(html, AnimationNameOfTag(tag));
-  ASSERT_FALSE(rule.empty()) << html;
-  // No stop may carry the bezier: it would drag the linear translation along with it.
-  EXPECT_EQ(rule.find("animation-timing-function"), std::string::npos) << rule;
-  EXPECT_GT(CountOccurrences(rule, "transform:"), 4u) << rule;
-  // At 25% the eased channel is at its bezier value (0.3033, not the linear 0.4) while the
-  // translation is exactly the linear one (40 -> 160 is a third of the way at 25%: 60px).
-  EXPECT_NE(rule.find("opacity: 0.3033"), std::string::npos) << rule;
-  EXPECT_NE(rule.find("translate(60px, 0px)"), std::string::npos) << rule;
+  // Two rules, one per property group.
+  EXPECT_EQ(CountOccurrences(html, "@keyframes "), 2u) << html;
+  auto declPos = tag.find("animation:");
+  ASSERT_NE(declPos, std::string::npos) << tag;
+  auto declEnd = tag.find_first_of(";\"", declPos);
+  std::string decl =
+      tag.substr(declPos, declEnd == std::string::npos ? std::string::npos : declEnd - declPos);
+  // One comma-separated list, each entry with its own curve (the bezier's own commas do not count).
+  EXPECT_EQ(CountOccurrences(decl, ", pagx_"), 1u) << decl;
+  EXPECT_NE(decl.find("cubic-bezier(0.42, 0, 0.58, 1)"), std::string::npos) << decl;
+  EXPECT_NE(decl.find("linear"), std::string::npos) << decl;
+  // The opacity rule needs only the alpha keys, and the transform rule keeps x's own three keys:
+  // nothing is sampled.
+  EXPECT_EQ(CountOccurrences(html, "opacity:"), 2u) << html;
+  EXPECT_EQ(CountOccurrences(html, "translate(120px, 0px)"), 1u) << html;
 }
 
 CLI_TEST(PAGXHtmlTest, AnimationRangeSelectorStartFansOutToGlyphs) {
