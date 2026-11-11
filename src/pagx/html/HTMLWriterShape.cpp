@@ -2212,7 +2212,12 @@ void HTMLWriter::emitSVGContent(HTMLBuilder& out, const std::vector<GeoInfo>& ge
         break;
       }
       case NodeType::Ellipse: {
-        if (trim) {
+        // `<ellipse>` always begins its implicit contour at the right-hand midpoint, while tgfx
+        // starts the oval at the top centre (SkPath::addOval startIndex=0). `stroke-dasharray`
+        // phase is measured from the contour start, so a dashed oval would land a quarter
+        // perimeter off; emit the `<path>` form, whose start GeoToPathData already matches.
+        bool needsPathForDash = stroke && !stroke->dashes.empty();
+        if (trim || needsPathForDash) {
           PathData pathData = PathDataFromSVGString("");
           GeoToPathData(g.element, g.type, pathData);
           std::string d = PathDataToSVGString(pathData);
