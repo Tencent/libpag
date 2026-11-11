@@ -1143,6 +1143,11 @@ static bool IsSolidTextPaint(const std::string& paint) {
   return !paint.empty() && paint != "none" && paint.rfind("url(", 0) != 0;
 }
 
+// A paint string that references a gradient / pattern definition.
+static bool IsUrlPaint(const std::string& paint) {
+  return paint.rfind("url(", 0) == 0;
+}
+
 Group* SVGParserContext::convertText(const std::shared_ptr<DOMNode>& element,
                                      const InheritedStyle& inheritedStyle) {
   auto group = _document->makeNode<Group>();
@@ -1201,6 +1206,9 @@ Group* SVGParserContext::convertText(const std::shared_ptr<DOMNode>& element,
   bool uniformFill = true;
   bool allRunsNone = false;
   std::string groupFill = {};
+  // Gradient / pattern reference declared by the runs (a tspan may be the only place a paint is
+  // written), resolved into the group-level Fill instead of being dropped.
+  std::string groupPaintRef = {};
   // Alpha of the group-level Fill, taken from the first run when every run agrees.
   float groupFillOpacity = 1.0f;
   if (!emittedRuns.empty()) {
@@ -1271,6 +1279,10 @@ Group* SVGParserContext::convertText(const std::shared_ptr<DOMNode>& element,
       }
     }
 
+    // Reference geometry for gradient / pattern paints: objectBoundingBox units resolve against
+    // the text element's bounds, the same box the element-level fill would use.
+    const Rect textBounds = getShapeBounds(element);
+
     for (const auto& run : emittedRuns) {
       auto text = _document->makeNode<Text>();
       text->position = {run.startX, run.baseline};
@@ -1291,9 +1303,15 @@ Group* SVGParserContext::convertText(const std::shared_ptr<DOMNode>& element,
         auto runGroup = _document->makeNode<Group>();
         runGroup->elements.push_back(text);
         auto fillNode = _document->makeNode<Fill>();
-        auto solidColor = _document->makeNode<SolidColor>();
-        solidColor->color = parseColor(fill);
-        fillNode->color = solidColor;
+        if (IsUrlPaint(fill)) {
+          // A run may be the only place its paint is declared (a tspan gradient over an unfilled
+          // <text>). Resolve the reference here; parseColor would read it as black.
+          fillNode->color = getColorSourceForRef(resolveUrl(fill), textBounds);
+        } else {
+          auto solidColor = _document->makeNode<SolidColor>();
+          solidColor->color = parseColor(fill);
+          fillNode->color = solidColor;
+        }
         fillNode->alpha = run.fillOpacity;
         runGroup->elements.push_back(fillNode);
         group->elements.push_back(runGroup);
@@ -1337,6 +1355,9 @@ Group* SVGParserContext::convertText(const std::shared_ptr<DOMNode>& element,
       if (paintDiffers && IsSolidTextPaint(firstFill)) {
         groupFill = firstFill;
         groupFillOpacity = firstFillOpacity;
+      } else if (paintDiffers && IsUrlPaint(firstFill)) {
+        groupPaintRef = resolveUrl(firstFill);
+        groupFillOpacity = firstFillOpacity;
       }
     }
   }
@@ -1348,9 +1369,17 @@ Group* SVGParserContext::convertText(const std::shared_ptr<DOMNode>& element,
     fillNode->color = solidColor;
     fillNode->alpha = groupFillOpacity;
     group->elements.push_back(fillNode);
+  } else if (!groupPaintRef.empty()) {
+    // A tspan-only gradient: resolve the reference at the text bounds so the run's paint survives.
+    if (auto* colorSource = getColorSourceForRef(groupPaintRef, getShapeBounds(element))) {
+      auto fillNode = _document->makeNode<Fill>();
+      fillNode->color = colorSource;
+      fillNode->alpha = groupFillOpacity;
+      group->elements.push_back(fillNode);
+    }
   }
   // Every run asking for "none" must stay unpainted; the element default would otherwise fill them.
-  bool includeFill = uniformFill && groupFill.empty() && !allRunsNone;
+  bool includeFill = uniformFill && groupFill.empty() && groupPaintRef.empty() && !allRunsNone;
   addFillStroke(element, group->elements, inheritedStyle, includeFill);
   return group;
 }

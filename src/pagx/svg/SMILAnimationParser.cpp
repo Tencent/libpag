@@ -305,8 +305,8 @@ static void ComputeBezierInHandle(KeyframeInterpolationType interpolation,
 }
 
 // Reads repeatCount attribute: returns -1.0 for "indefinite", 1.0 when absent or unparseable,
-// otherwise the count (clamped to >=1.0). Fractional counts are preserved so ExpandRepeatCount can
-// truncate the final repetition at the fractional offset. Callers compare > 1.0 instead of > 1.
+// otherwise the count. A positive fractional count truncates the final repetition at that offset
+// (repeatCount="1.5" plays one and a half iterations), so it is kept instead of raised to 1.
 static double ParseRepeatCount(const std::string& value) {
   if (value == "indefinite") {
     return -1.0;
@@ -315,7 +315,8 @@ static double ParseRepeatCount(const std::string& value) {
     return 1.0;
   }
   double count = std::atof(value.c_str());
-  if (count < 1.0) {
+  if (!std::isfinite(count) || count <= 0.0) {
+    // SMIL treats a non-positive repeatCount as an error and ignores it.
     return 1.0;
   }
   return count;
@@ -512,16 +513,21 @@ static bool KeyframeTimeLess(const Keyframe<T>& a, const Keyframe<T>& b) {
   return a.time < b.time;
 }
 
-static float LerpFloat(float a, float b, double t) {
-  return a + (b - a) * static_cast<float>(t);
-}
-
+// Appends the later segment's own keys (`from` = its first animated frame). The segment also
+// carries a synthesized "state before begin" hold at frame 0; appending it would put a second key
+// on an existing timestamp, and that hold would then become the left endpoint for the frames the
+// earlier segment still owns.
 template <typename T>
-static void AppendTypedKeyframes(TypedChannel<T>* base, const TypedChannel<T>* extra) {
+static void AppendTypedKeyframes(TypedChannel<T>* base, const TypedChannel<T>* extra, Frame from) {
   if (base == nullptr || extra == nullptr) {
     return;
   }
-  base->keyframes.insert(base->keyframes.end(), extra->keyframes.begin(), extra->keyframes.end());
+  for (const auto& key : extra->keyframes) {
+    if (key.time < from) {
+      continue;
+    }
+    base->keyframes.push_back(key);
+  }
   // The appended segment may start later than keys already in the base track; a track keyed by
   // timestamp has to stay ordered, otherwise evaluation stops at the first out-of-order pair.
   std::stable_sort(base->keyframes.begin(), base->keyframes.end(), KeyframeTimeLess<T>);
@@ -560,48 +566,79 @@ static Frame ChannelStartFrame(const Channel* channel) {
       return FirstAnimatedFrame(static_cast<const TypedChannel<Matrix>*>(channel));
     }
     case ChannelValueType::Bool: {
-      auto* ch = static_cast<const TypedChannel<bool>*>(channel);
-      return ch->keyframes.empty() ? 0 : ch->keyframes.front().time;
+      return FirstAnimatedFrame(static_cast<const TypedChannel<bool>*>(channel));
     }
     default:
       return 0;
   }
 }
 
-// Rotates a typed track by phaseShift of one iteration. A negative begin on a looping animation
-// means the animation already started before frame 0, so the values are re-sampled at the wrapped
-// positions and the track then starts at frame 0.
+// Rotates a typed track by phaseShift of one iteration: g(t) = f((t + offset) mod dur). A negative
+// begin on a looping animation means it already started before frame 0, so every authored key
+// moves back by `offset` (wrapped into [0, dur]) and keeps its value; both boundaries are pinned so
+// the runtime never clamps a frame to a value from the wrong side of the seam.
 template <typename T>
 static void ShiftChannelPhase(TypedChannel<T>* channel, Frame durFrames, double phaseShift) {
   if (channel == nullptr || channel->keyframes.empty() || phaseShift <= 0.0 || durFrames <= 0) {
     return;
   }
   const auto offset = static_cast<Frame>(std::round(phaseShift * static_cast<double>(durFrames)));
-  std::vector<Keyframe<T>> shifted = {};
-  shifted.reserve(channel->keyframes.size());
-  for (const auto& key : channel->keyframes) {
-    double u = static_cast<double>(key.time) / static_cast<double>(durFrames) + phaseShift;
-    u -= std::floor(u);
-    Frame time = static_cast<Frame>(std::round(u * static_cast<double>(durFrames)));
-    auto shiftedKey = key;
-    shiftedKey.time = time;
-    // Sample the source track at the time this key actually represents, not at its new timestamp:
-    // reading the track at `time` returns the already-shifted pose, which collapses the whole
-    // track onto one value.
-    Frame sampleTime = key.time + offset;
-    while (sampleTime > durFrames) {
-      sampleTime -= durFrames;
-    }
-    shiftedKey.value = std::get<T>(channel->evaluateAt(sampleTime));
-    shifted.push_back(shiftedKey);
+  if (offset <= 0 || offset >= durFrames) {
+    return;
   }
-  std::stable_sort(shifted.begin(), shifted.end(), KeyframeTimeLess<T>);
-  // wrap-around can map the first and last key onto the same phase; keep the times strictly
-  // increasing so a track keyed by timestamp does not drop one of them.
-  for (size_t i = 1; i < shifted.size(); ++i) {
-    if (shifted[i].time <= shifted[i - 1].time) {
-      shifted[i].time = shifted[i - 1].time + 1;
+  struct ShiftedKey {
+    Frame time = 0;
+    Frame sourceTime = 0;
+    Keyframe<T> key = {};
+  };
+  std::vector<ShiftedKey> entries = {};
+  entries.reserve(channel->keyframes.size());
+  for (const auto& key : channel->keyframes) {
+    ShiftedKey entry = {};
+    entry.sourceTime = key.time;
+    entry.time = key.time - offset;
+    if (entry.time < 0) {
+      entry.time += durFrames;
     }
+    entry.key = key;
+    entries.push_back(entry);
+  }
+  std::stable_sort(entries.begin(), entries.end(), [](const ShiftedKey& a, const ShiftedKey& b) {
+    if (a.time != b.time) {
+      return a.time < b.time;
+    }
+    // Both loop endpoints can land on the seam frame; the pre-wrap value (the later source time)
+    // comes first so the jump at the seam keeps its direction.
+    return a.sourceTime > b.sourceTime;
+  });
+  std::vector<Keyframe<T>> shifted = {};
+  shifted.reserve(entries.size() + 2);
+  for (const auto& entry : entries) {
+    auto key = entry.key;
+    key.time = entry.time;
+    if (!shifted.empty() && key.time <= shifted.back().time) {
+      // Two source keys collapsing onto one frame: keep both by moving the later one one frame on.
+      key.time = shifted.back().time + 1;
+    }
+    shifted.push_back(key);
+  }
+  auto makeBoundary = [channel](Frame time, Frame sampleTime) {
+    Keyframe<T> key = {};
+    key.time = time;
+    key.value = std::get<T>(channel->evaluateAt(sampleTime));
+    key.interpolation = KeyframeInterpolationType::Linear;
+    return key;
+  };
+  if (shifted.front().time > 0) {
+    auto head = makeBoundary(0, offset);
+    if (shifted.front().interpolation == KeyframeInterpolationType::Hold) {
+      head.interpolation = KeyframeInterpolationType::Hold;
+    }
+    shifted.insert(shifted.begin(), head);
+  }
+  if (shifted.back().time < durFrames) {
+    // g(dur) wraps back onto the phase start, so the tail is the same value as the head.
+    shifted.push_back(makeBoundary(durFrames, offset));
   }
   channel->keyframes = std::move(shifted);
 }
@@ -762,6 +799,16 @@ std::unordered_map<const DOMNode*, ResolvedTiming> SMILAnimationParser::ResolveA
     }
   }
 
+  // Clock `end` values depend on nothing, so they are resolved before the begin fixed point:
+  // `begin="a.end"` has to see a's real end, which ActiveDuration folds into the active duration.
+  // Syncbase `end` values still need begin times and stay in the pass after the begins.
+  for (auto& info : infos) {
+    if (info.hasClockEnd) {
+      info.resolvedEnd = info.clockEnd;
+      info.endResolved = true;
+    }
+  }
+
   // Solve begin times to a fixed point.
   bool progress = true;
   while (progress) {
@@ -887,11 +934,13 @@ std::unordered_map<const DOMNode*, ResolvedTiming> SMILAnimationParser::ResolveA
   return result;
 }
 
-// Expands a float-typed channel's keyframes to repeat the animation repeatCount times. When
-// accumulate is true, each repetition's values are offset by k * (lastValue - firstValue) so the
-// animation accumulates across loops. The original keyframes are replaced by the expanded set.
-static void ExpandFloatRepeatCount(Channel* channel, Frame durFrames, double repeatCount,
-                                   bool accumulate) {
+// Expands a float-typed channel's keyframes to repeat the animation repeatCount times.
+// accumulate="sum" offsets repetition k by the final value of one full iteration (SMIL accumulates
+// the previous iteration's end value, not its delta), so a sequence that starts at a non-zero value
+// keeps climbing: cx 10→20 repeats as 20→30, never as 30→40. The fractional tail copies the keys
+// the remainder round actually covers and ends at the value the authored curve has at the cut.
+static void ExpandFloatRepeatCount(Channel* channel, Frame durFrames, Frame beginFrames,
+                                   double repeatCount, bool accumulate) {
   auto* ch = static_cast<TypedChannel<float>*>(channel);
   auto original = ch->keyframes;
   if (original.empty() || repeatCount <= 1.0) {
@@ -899,13 +948,17 @@ static void ExpandFloatRepeatCount(Channel* channel, Frame durFrames, double rep
   }
   int fullRepeats = static_cast<int>(std::floor(repeatCount));
   double fraction = repeatCount - std::floor(repeatCount);
-  float delta = 0.0f;
+  float step = 0.0f;
   if (accumulate && original.size() >= 2) {
-    delta = original.back().value - original.front().value;
+    step = original.back().value;
   }
+  // The tail value must come from the authored curve at the cut: interpolating first→last reads
+  // the wrong value for a multi-keyframe sequence (values 0;1;0 cut at 0.5 ends at 1, not 0).
+  TypedChannel<float> source = {};
+  source.keyframes = original;
   ch->keyframes.clear();
   for (int k = 0; k < fullRepeats; ++k) {
-    float offset = static_cast<float>(k) * delta;
+    float offset = static_cast<float>(k) * step;
     Frame timeOffset = static_cast<Frame>(k) * durFrames;
     for (size_t idx = 0; idx < original.size(); ++idx) {
       auto key = original[idx];
@@ -916,38 +969,45 @@ static void ExpandFloatRepeatCount(Channel* channel, Frame durFrames, double rep
       ch->keyframes.push_back(key);
     }
   }
-  // Fractional tail: sample one extra keyframe at the fractional boundary so the last repetition
-  // is truncated rather than dropped. The boundary value is the interpolated value at the original
-  // keyframe whose normalized time equals the fraction (linear interp between first and second
-  // keyframe covers the common case; for multi-keyframe sequences we sample at fraction of dur).
   if (fraction > 0.0 && original.size() >= 2) {
     int k = fullRepeats;
-    float offset = static_cast<float>(k) * delta;
+    float offset = static_cast<float>(k) * step;
     Frame timeOffset = static_cast<Frame>(k) * durFrames;
-    Frame fractionalTime = timeOffset + static_cast<Frame>(std::round(fraction * durFrames));
-    // Sample the original keyframe sequence at the fractional position. Use the first keyframe's
-    // interpolation mode (commonly Linear) and interpolate between the two surrounding originals.
-    float firstVal = original.front().value + offset;
-    float lastVal = original.back().value + offset;
-    float sampled = firstVal + (lastVal - firstVal) * static_cast<float>(fraction);
+    Frame cutTime = beginFrames + timeOffset + static_cast<Frame>(std::round(fraction * durFrames));
+    // Copy the keys of the truncated remainder round, stopping at the cut; the key that lands on
+    // the cut is re-emitted below with the value the curve has there.
+    for (const auto& originalKey : original) {
+      auto key = originalKey;
+      key.time += timeOffset;
+      if (key.time >= cutTime) {
+        break;
+      }
+      if (!ch->keyframes.empty() && key.time <= ch->keyframes.back().time) {
+        continue;
+      }
+      if (accumulate) {
+        key.value += offset;
+      }
+      ch->keyframes.push_back(key);
+    }
     Keyframe<float> key = {};
-    key.time = fractionalTime;
+    key.time = cutTime;
     if (!ch->keyframes.empty() && key.time <= ch->keyframes.back().time) {
       // round(fraction * durFrames) can collapse onto the previous period end.
       key.time = ch->keyframes.back().time + 1;
     }
-    key.value = sampled;
-    key.interpolation = original.front().interpolation;
-    key.bezierOut = original.front().bezierOut;
-    key.bezierIn = original.front().bezierIn;
+    key.value = std::get<float>(source.evaluateAt(
+                    beginFrames + static_cast<Frame>(std::round(fraction * durFrames)))) +
+                offset;
+    key.interpolation = KeyframeInterpolationType::Linear;
     ch->keyframes.push_back(key);
   }
 }
 
 // Expands a Color-typed channel's keyframes similarly to ExpandFloatRepeatCount, accumulating
 // each color channel independently.
-static void ExpandColorRepeatCount(Channel* channel, Frame durFrames, double repeatCount,
-                                   bool accumulate) {
+static void ExpandColorRepeatCount(Channel* channel, Frame durFrames, Frame beginFrames,
+                                   double repeatCount, bool accumulate) {
   auto* ch = static_cast<TypedChannel<Color>*>(channel);
   auto original = ch->keyframes;
   if (original.empty() || repeatCount <= 1.0) {
@@ -955,13 +1015,15 @@ static void ExpandColorRepeatCount(Channel* channel, Frame durFrames, double rep
   }
   int fullRepeats = static_cast<int>(std::floor(repeatCount));
   double fraction = repeatCount - std::floor(repeatCount);
-  Color delta = {0, 0, 0, 0};
+  Color step = {0, 0, 0, 0};
   if (accumulate && original.size() >= 2) {
-    delta.red = original.back().value.red - original.front().value.red;
-    delta.green = original.back().value.green - original.front().value.green;
-    delta.blue = original.back().value.blue - original.front().value.blue;
-    delta.alpha = original.back().value.alpha - original.front().value.alpha;
+    step.red = original.back().value.red;
+    step.green = original.back().value.green;
+    step.blue = original.back().value.blue;
+    step.alpha = original.back().value.alpha;
   }
+  TypedChannel<Color> source = {};
+  source.keyframes = original;
   ch->keyframes.clear();
   for (int k = 0; k < fullRepeats; ++k) {
     Frame timeOffset = static_cast<Frame>(k) * durFrames;
@@ -969,10 +1031,10 @@ static void ExpandColorRepeatCount(Channel* channel, Frame durFrames, double rep
       auto key = original[idx];
       key.time += timeOffset;
       if (accumulate) {
-        key.value.red += static_cast<float>(k) * delta.red;
-        key.value.green += static_cast<float>(k) * delta.green;
-        key.value.blue += static_cast<float>(k) * delta.blue;
-        key.value.alpha += static_cast<float>(k) * delta.alpha;
+        key.value.red += static_cast<float>(k) * step.red;
+        key.value.green += static_cast<float>(k) * step.green;
+        key.value.blue += static_cast<float>(k) * step.blue;
+        key.value.alpha += static_cast<float>(k) * step.alpha;
       }
       ch->keyframes.push_back(key);
     }
@@ -980,34 +1042,93 @@ static void ExpandColorRepeatCount(Channel* channel, Frame durFrames, double rep
   if (fraction > 0.0 && original.size() >= 2) {
     int k = fullRepeats;
     Frame timeOffset = static_cast<Frame>(k) * durFrames;
-    Frame fractionalTime = timeOffset + static_cast<Frame>(std::round(fraction * durFrames));
-    Color firstVal = original.front().value;
-    Color lastVal = original.back().value;
-    if (accumulate) {
-      firstVal.red += static_cast<float>(k) * delta.red;
-      firstVal.green += static_cast<float>(k) * delta.green;
-      firstVal.blue += static_cast<float>(k) * delta.blue;
-      firstVal.alpha += static_cast<float>(k) * delta.alpha;
-      lastVal.red += static_cast<float>(k) * delta.red;
-      lastVal.green += static_cast<float>(k) * delta.green;
-      lastVal.blue += static_cast<float>(k) * delta.blue;
-      lastVal.alpha += static_cast<float>(k) * delta.alpha;
+    Frame cutTime = beginFrames + timeOffset + static_cast<Frame>(std::round(fraction * durFrames));
+    for (const auto& originalKey : original) {
+      auto key = originalKey;
+      key.time += timeOffset;
+      if (key.time >= cutTime) {
+        // The key on the cut is re-emitted below from the curve.
+        break;
+      }
+      if (!ch->keyframes.empty() && key.time <= ch->keyframes.back().time) {
+        continue;
+      }
+      if (accumulate) {
+        key.value.red += static_cast<float>(k) * step.red;
+        key.value.green += static_cast<float>(k) * step.green;
+        key.value.blue += static_cast<float>(k) * step.blue;
+        key.value.alpha += static_cast<float>(k) * step.alpha;
+      }
+      ch->keyframes.push_back(key);
     }
     Keyframe<Color> key = {};
-    key.time = fractionalTime;
+    key.time = cutTime;
     if (!ch->keyframes.empty() && key.time <= ch->keyframes.back().time) {
       // round(fraction * durFrames) can collapse onto the previous period end.
       key.time = ch->keyframes.back().time + 1;
     }
-    key.value.red = firstVal.red + (lastVal.red - firstVal.red) * static_cast<float>(fraction);
-    key.value.green =
-        firstVal.green + (lastVal.green - firstVal.green) * static_cast<float>(fraction);
-    key.value.blue = firstVal.blue + (lastVal.blue - firstVal.blue) * static_cast<float>(fraction);
-    key.value.alpha =
-        firstVal.alpha + (lastVal.alpha - firstVal.alpha) * static_cast<float>(fraction);
-    key.interpolation = original.front().interpolation;
-    key.bezierOut = original.front().bezierOut;
-    key.bezierIn = original.front().bezierIn;
+    key.value = std::get<Color>(
+        source.evaluateAt(beginFrames + static_cast<Frame>(std::round(fraction * durFrames))));
+    if (accumulate) {
+      key.value.red += static_cast<float>(k) * step.red;
+      key.value.green += static_cast<float>(k) * step.green;
+      key.value.blue += static_cast<float>(k) * step.blue;
+      key.value.alpha += static_cast<float>(k) * step.alpha;
+    }
+    key.interpolation = KeyframeInterpolationType::Linear;
+    ch->keyframes.push_back(key);
+  }
+}
+
+// Copies one iteration of a matrix/bool track into the expanded channel, then closes the
+// fractional remainder round at the value the authored track has when the repetition is cut.
+template <typename T>
+static void ExpandTypedRepeatCount(TypedChannel<T>* ch, Frame durFrames, Frame beginFrames,
+                                   double repeatCount) {
+  auto original = ch->keyframes;
+  if (original.empty() || repeatCount <= 1.0) {
+    return;
+  }
+  int fullRepeats = static_cast<int>(std::floor(repeatCount));
+  double fraction = repeatCount - std::floor(repeatCount);
+  TypedChannel<T> source = {};
+  source.keyframes = original;
+  ch->keyframes.clear();
+  for (int k = 0; k < fullRepeats; ++k) {
+    Frame timeOffset = static_cast<Frame>(k) * durFrames;
+    for (size_t idx = 0; idx < original.size(); ++idx) {
+      auto key = original[idx];
+      key.time += timeOffset;
+      ch->keyframes.push_back(key);
+    }
+  }
+  if (fraction > 0.0 && original.size() >= 2) {
+    int k = fullRepeats;
+    Frame timeOffset = static_cast<Frame>(k) * durFrames;
+    Frame cutTime = beginFrames + timeOffset + static_cast<Frame>(std::round(fraction * durFrames));
+    // Copy the keys the remainder round covers, so a multi-keyframe sequence keeps its shape
+    // instead of collapsing into a single interpolated endpoint.
+    for (const auto& originalKey : original) {
+      auto key = originalKey;
+      key.time += timeOffset;
+      if (key.time >= cutTime) {
+        // The key on the cut is re-emitted below from the curve.
+        break;
+      }
+      if (!ch->keyframes.empty() && key.time <= ch->keyframes.back().time) {
+        continue;
+      }
+      ch->keyframes.push_back(key);
+    }
+    Keyframe<T> key = {};
+    key.time = cutTime;
+    if (!ch->keyframes.empty() && key.time <= ch->keyframes.back().time) {
+      // round(fraction * durFrames) can collapse onto the previous period end.
+      key.time = ch->keyframes.back().time + 1;
+    }
+    key.value = std::get<T>(
+        source.evaluateAt(beginFrames + static_cast<Frame>(std::round(fraction * durFrames))));
+    key.interpolation = KeyframeInterpolationType::Linear;
     ch->keyframes.push_back(key);
   }
 }
@@ -1015,7 +1136,7 @@ static void ExpandColorRepeatCount(Channel* channel, Frame durFrames, double rep
 // Dispatches repeatCount expansion to the correct TypedChannel<T> specialization based on
 // valueType. Non-numeric types (bool/string) repeat without accumulation.
 static void ExpandRepeatCount(Channel* channel, ChannelValueType valueType, Frame durFrames,
-                              double repeatCount, bool accumulate) {
+                              Frame beginFrames, double repeatCount, bool accumulate) {
   if (repeatCount <= 1.0) {
     return;
   }
@@ -1024,84 +1145,21 @@ static void ExpandRepeatCount(Channel* channel, ChannelValueType valueType, Fram
   }
   switch (valueType) {
     case ChannelValueType::Float:
-      ExpandFloatRepeatCount(channel, durFrames, repeatCount, accumulate);
+      ExpandFloatRepeatCount(channel, durFrames, beginFrames, repeatCount, accumulate);
       break;
     case ChannelValueType::Color:
-      ExpandColorRepeatCount(channel, durFrames, repeatCount, accumulate);
+      ExpandColorRepeatCount(channel, durFrames, beginFrames, repeatCount, accumulate);
       break;
     case ChannelValueType::Matrix: {
       // Matrix repeats copy keyframes without accumulation. animateTransform accumulate on a
       // baked matrix is intentionally ignored, matching animateMotion's accumulate behaviour.
-      auto* ch = static_cast<TypedChannel<Matrix>*>(channel);
-      auto original = ch->keyframes;
-      if (original.empty()) {
-        break;
-      }
-      int fullRepeats = static_cast<int>(std::floor(repeatCount));
-      double fraction = repeatCount - std::floor(repeatCount);
-      ch->keyframes.clear();
-      for (int k = 0; k < fullRepeats; ++k) {
-        Frame timeOffset = static_cast<Frame>(k) * durFrames;
-        for (size_t idx = 0; idx < original.size(); ++idx) {
-          auto key = original[idx];
-          key.time += timeOffset;
-          ch->keyframes.push_back(key);
-        }
-      }
-      // Fractional tail: sample one extra matrix keyframe at the fractional boundary by linearly
-      // interpolating between the first and last original (runtime MixTGFXMatrix will re-blend).
-      if (fraction > 0.0 && original.size() >= 2) {
-        int k = fullRepeats;
-        Frame timeOffset = static_cast<Frame>(k) * durFrames;
-        Frame fractionalTime = timeOffset + static_cast<Frame>(std::round(fraction * durFrames));
-        const auto& first = original.front().value;
-        const auto& last = original.back().value;
-        Keyframe<Matrix> key = {};
-        key.time = fractionalTime;
-        if (!ch->keyframes.empty() && key.time <= ch->keyframes.back().time) {
-          // round(fraction * durFrames) can collapse onto the previous period end.
-          key.time = ch->keyframes.back().time + 1;
-        }
-        key.value.a = LerpFloat(first.a, last.a, fraction);
-        key.value.b = LerpFloat(first.b, last.b, fraction);
-        key.value.c = LerpFloat(first.c, last.c, fraction);
-        key.value.d = LerpFloat(first.d, last.d, fraction);
-        key.value.tx = LerpFloat(first.tx, last.tx, fraction);
-        key.value.ty = LerpFloat(first.ty, last.ty, fraction);
-        key.interpolation = original.front().interpolation;
-        key.bezierOut = original.front().bezierOut;
-        key.bezierIn = original.front().bezierIn;
-        ch->keyframes.push_back(key);
-      }
+      ExpandTypedRepeatCount(static_cast<TypedChannel<Matrix>*>(channel), durFrames, beginFrames,
+                             repeatCount);
       break;
     }
     case ChannelValueType::Bool: {
-      auto* ch = static_cast<TypedChannel<bool>*>(channel);
-      auto original = ch->keyframes;
-      if (original.empty()) {
-        break;
-      }
-      int fullRepeats = static_cast<int>(std::floor(repeatCount));
-      double fraction = repeatCount - std::floor(repeatCount);
-      ch->keyframes.clear();
-      for (int k = 0; k < fullRepeats; ++k) {
-        Frame timeOffset = static_cast<Frame>(k) * durFrames;
-        for (size_t idx = 0; idx < original.size(); ++idx) {
-          auto key = original[idx];
-          key.time += timeOffset;
-          ch->keyframes.push_back(key);
-        }
-      }
-      if (fraction > 0.0 && original.size() >= 2) {
-        auto key = original.front();
-        key.time = static_cast<Frame>(fullRepeats) * durFrames +
-                   static_cast<Frame>(std::round(fraction * durFrames));
-        if (!ch->keyframes.empty() && key.time <= ch->keyframes.back().time) {
-          // round(fraction * durFrames) can collapse onto the previous period end.
-          key.time = ch->keyframes.back().time + 1;
-        }
-        ch->keyframes.push_back(key);
-      }
+      ExpandTypedRepeatCount(static_cast<TypedChannel<bool>*>(channel), durFrames, beginFrames,
+                             repeatCount);
       break;
     }
     default:
@@ -1455,23 +1513,25 @@ static std::vector<Channel*> MergeAdditiveChannels(std::vector<ChannelWithAdditi
           base = next;
           continue;
         }
-        ApplyEndTimeLimit(base, base->valueType(), handover);
+        // The earlier segment owns everything up to the frame before the handover; the later one
+        // starts exactly on it, so the two halves never share a timestamp.
+        ApplyEndTimeLimit(base, base->valueType(), handover - 1);
         switch (base->valueType()) {
           case ChannelValueType::Float:
             AppendTypedKeyframes(static_cast<TypedChannel<float>*>(base),
-                                 static_cast<TypedChannel<float>*>(next));
+                                 static_cast<TypedChannel<float>*>(next), handover);
             break;
           case ChannelValueType::Color:
             AppendTypedKeyframes(static_cast<TypedChannel<Color>*>(base),
-                                 static_cast<TypedChannel<Color>*>(next));
+                                 static_cast<TypedChannel<Color>*>(next), handover);
             break;
           case ChannelValueType::Matrix:
             AppendTypedKeyframes(static_cast<TypedChannel<Matrix>*>(base),
-                                 static_cast<TypedChannel<Matrix>*>(next));
+                                 static_cast<TypedChannel<Matrix>*>(next), handover);
             break;
           case ChannelValueType::Bool:
             AppendTypedKeyframes(static_cast<TypedChannel<bool>*>(base),
-                                 static_cast<TypedChannel<bool>*>(next));
+                                 static_cast<TypedChannel<bool>*>(next), handover);
             break;
           default:
             break;
@@ -1568,6 +1628,86 @@ static KeyValue ReadBaseValue(const ChannelTarget& target) {
     return false;
   }
   return 0.0f;
+}
+
+// PAGX channels replace the property when evaluated, while an additive="sum" track only carries
+// deltas. When a channel has no replace segment to merge into, the target's static value has to be
+// folded into the track: without it the target collapses to the delta at frame 0, and an animation
+// with begin>0 shows that delta before it starts (the runtime clamps to the first keyframe).
+static void FoldStaticBaseIntoAdditiveChannel(Channel* channel, Node* targetNode,
+                                              const std::string& targetId) {
+  if (channel == nullptr || targetNode == nullptr) {
+    return;
+  }
+  ChannelTarget target = {};
+  target.node = targetNode;
+  target.nodeId = targetId;
+  target.channelName = channel->name;
+  target.valueType = channel->valueType();
+  const KeyValue baseValue = ReadBaseValue(target);
+  switch (channel->valueType()) {
+    case ChannelValueType::Float: {
+      auto* ch = static_cast<TypedChannel<float>*>(channel);
+      if (ch->keyframes.empty()) {
+        return;
+      }
+      const float base = std::get<float>(baseValue);
+      for (auto& key : ch->keyframes) {
+        key.value += base;
+      }
+      if (ch->keyframes.front().time > 0) {
+        Keyframe<float> key = {};
+        key.time = 0;
+        key.value = base;
+        key.interpolation = KeyframeInterpolationType::Hold;
+        ch->keyframes.insert(ch->keyframes.begin(), key);
+      }
+      break;
+    }
+    case ChannelValueType::Color: {
+      auto* ch = static_cast<TypedChannel<Color>*>(channel);
+      if (ch->keyframes.empty()) {
+        return;
+      }
+      const Color base = std::get<Color>(baseValue);
+      for (auto& key : ch->keyframes) {
+        key.value.red += base.red;
+        key.value.green += base.green;
+        key.value.blue += base.blue;
+        key.value.alpha += base.alpha;
+      }
+      if (ch->keyframes.front().time > 0) {
+        Keyframe<Color> key = {};
+        key.time = 0;
+        key.value = base;
+        key.interpolation = KeyframeInterpolationType::Hold;
+        ch->keyframes.insert(ch->keyframes.begin(), key);
+      }
+      break;
+    }
+    case ChannelValueType::Bool: {
+      auto* ch = static_cast<TypedChannel<bool>*>(channel);
+      if (ch->keyframes.empty()) {
+        return;
+      }
+      const bool base = std::get<bool>(baseValue);
+      for (auto& key : ch->keyframes) {
+        key.value = key.value || base;
+      }
+      if (ch->keyframes.front().time > 0) {
+        Keyframe<bool> key = {};
+        key.time = 0;
+        key.value = base;
+        key.interpolation = KeyframeInterpolationType::Hold;
+        ch->keyframes.insert(ch->keyframes.begin(), key);
+      }
+      break;
+    }
+    default:
+      // Matrix folding needs the layer's full static pose and is applied by buildAnimation;
+      // string/int channels have no additive arithmetic.
+      break;
+  }
 }
 
 static bool FloatKeyframeTimeLess(const Keyframe<float>& a, const Keyframe<float>& b) {
@@ -2063,6 +2203,94 @@ void SMILAnimationParser::ScaleDashOffsetKeyframes(const std::shared_ptr<DOMNode
   }
 }
 
+void SMILAnimationParser::ApplyAttributeUnitConversions(SVGParserContext& ctx, PAGXDocument* doc,
+                                                        const std::string& attributeName,
+                                                        const AnimatedNodeInfo& nodeInfo,
+                                                        const ChannelTarget& target,
+                                                        std::vector<Channel*>& channels) {
+  if (channels.empty() || target.valueType != ChannelValueType::Float) {
+    return;
+  }
+  auto scaleChannel = [](Channel* channel, float factor, float offset) {
+    auto* ch = static_cast<TypedChannel<float>*>(channel);
+    for (auto& key : ch->keyframes) {
+      key.value = key.value * factor + offset;
+    }
+  };
+
+  // `r` drives both axes of an ellipse, and the PAGX Ellipse channel stores diameters.
+  if (attributeName == "r") {
+    auto* heightChannel = CreateChannelForType(doc, ChannelValueType::Float, "size.height");
+    if (heightChannel != nullptr) {
+      auto* widthChannel = static_cast<TypedChannel<float>*>(channels.front());
+      for (const auto& key : widthChannel->keyframes) {
+        AppendKeyframe(heightChannel, ChannelValueType::Float, key.time, key.value,
+                       key.interpolation, key.bezierOut, key.bezierIn);
+      }
+      channels.push_back(heightChannel);
+    }
+    for (auto* channel : channels) {
+      scaleChannel(channel, 2.0f, 0.0f);
+    }
+    return;
+  }
+
+  // `rx`/`ry` are radii on an <ellipse>; on a <rect> they drive roundness (a pixel value).
+  if ((attributeName == "rx" || attributeName == "ry") && target.node != nullptr &&
+      target.node->nodeType() == NodeType::Ellipse) {
+    scaleChannel(channels.front(), 2.0f, 0.0f);
+    return;
+  }
+
+  // SVG rects are anchored at the top-left corner while a PAGX Rectangle is anchored at its
+  // center: `x`/`y` values shift by half the static size.
+  if (attributeName == "x" || attributeName == "y") {
+    auto* rect = static_cast<Rectangle*>(findContentNode(nodeInfo, NodeType::Rectangle));
+    if (rect != nullptr) {
+      const float offset =
+          (attributeName == "x") ? rect->size.width / 2.0f : rect->size.height / 2.0f;
+      scaleChannel(channels.front(), 1.0f, offset);
+    }
+    return;
+  }
+
+  if (attributeName != "stroke-dashoffset") {
+    return;
+  }
+  // SVG `pathLength` normalises dash values into the author's coordinate space. The static
+  // dasharray/dashoffset are scaled back to user units when the Stroke is created, so animated
+  // stroke-dashoffset keyframes need the same scale; otherwise the dash phase jumps at frame 0.
+  ScaleDashOffsetKeyframes(nodeInfo.domElement, channels, ctx);
+  // <circle>/<ellipse> need the same phase+direction correction that addFillStroke applies to the
+  // static Stroke.dashOffset (90-degree phase alignment with SVG's 3 o'clock start + tgfx's
+  // reverse-path dashOffset direction). Without it the animated dasharray draws in the mirror
+  // direction from the SVG side, producing symmetric arc frames rather than a matching animation.
+  auto element = nodeInfo.domElement;
+  if (element == nullptr || (element->name != "circle" && element->name != "ellipse")) {
+    return;
+  }
+  float rx = 0.0f;
+  float ry = 0.0f;
+  if (element->name == "circle") {
+    rx = ry = ctx.parseLength(ctx.getAttribute(element, "r"), ctx.getViewBoxWidth());
+  } else {
+    rx = ctx.parseLength(ctx.getAttribute(element, "rx"), ctx.getViewBoxWidth());
+    ry = ctx.parseLength(ctx.getAttribute(element, "ry"), ctx.getViewBoxHeight());
+  }
+  const float sum = rx + ry;
+  if (sum <= 0.0f) {
+    return;
+  }
+  // Ramanujan's first approximation; exact when rx == ry.
+  const float h = (rx - ry) * (rx - ry) / (sum * sum);
+  const float perimeter =
+      static_cast<float>(M_PI) * sum * (1.0f + 3.0f * h / (10.0f + std::sqrt(4.0f - 3.0f * h)));
+  const float correction = perimeter / 4.0f;
+  for (auto* channel : channels) {
+    scaleChannel(channel, 1.0f, -correction);
+  }
+}
+
 std::vector<Channel*> SMILAnimationParser::parseAnimate(
     SVGParserContext& ctx, PAGXDocument* doc, const std::shared_ptr<DOMNode>& animElement,
     const AnimatedNodeInfo& nodeInfo, float frameRate, const ResolvedTiming& timing,
@@ -2119,6 +2347,29 @@ std::vector<Channel*> SMILAnimationParser::parseAnimate(
   auto toStr = ctx.getAttribute(animElement, "to");
   auto byStr = ctx.getAttribute(animElement, "by");
 
+  // to-only/by-only start from the element's current value. That base has to be composed in
+  // SVG-attribute space: some PAGX channels use a different unit (radius -> diameter, rect x ->
+  // center) and the attribute conversions only run over the finished keyframes, so starting from
+  // the runtime value would convert the base a second time.
+  auto readAttributeBase = [&ctx, &nodeInfo, &target, &attributeName]() -> KeyValue {
+    if (nodeInfo.domElement != nullptr) {
+      std::string attribute = ctx.getAttribute(nodeInfo.domElement, attributeName);
+      if (!attribute.empty()) {
+        return parseValue(ctx, attribute, target.valueType);
+      }
+    }
+    // Attribute not written on the element: colors, alpha and visibility share their unit with the
+    // PAGX channel, so the static value is the right base there; geometric attributes default to 0
+    // in SVG and are converted together with the animated values.
+    if (target.valueType == ChannelValueType::Color || target.valueType == ChannelValueType::Bool ||
+        attributeName == "opacity" || attributeName == "fill-opacity" ||
+        attributeName == "stroke-opacity" || attributeName == "stroke-width" ||
+        attributeName == "stroke-miterlimit") {
+      return ReadBaseValue(target);
+    }
+    return parseValue(ctx, "0", target.valueType);
+  };
+
   std::vector<KeyValue> keyValues = {};
   if (!valuesStr.empty()) {
     auto tokens = SplitSemicolons(valuesStr);
@@ -2140,19 +2391,18 @@ std::vector<Channel*> SMILAnimationParser::parseAnimate(
       keyValues.push_back(byValue);
     }
   } else if (!toStr.empty()) {
-    // to-only: SMIL animates from the current base value. The true base value is a runtime
-    // sandwich-priority concept; approximate with the target node's static value.
-    keyValues.push_back(ReadBaseValue(target));
+    // to-only: SMIL animates from the element's current value to `to`.
+    keyValues.push_back(readAttributeBase());
     keyValues.push_back(parseValue(ctx, toStr, target.valueType));
   } else if (!byStr.empty()) {
     // by-only: from the base value to base + by (numeric additive types only).
-    KeyValue baseValue = ReadBaseValue(target);
+    KeyValue byBase = readAttributeBase();
     KeyValue byValue = parseValue(ctx, byStr, target.valueType);
-    keyValues.push_back(baseValue);
+    keyValues.push_back(byBase);
     if (target.valueType == ChannelValueType::Float) {
-      keyValues.push_back(std::get<float>(baseValue) + std::get<float>(byValue));
+      keyValues.push_back(std::get<float>(byBase) + std::get<float>(byValue));
     } else if (target.valueType == ChannelValueType::Color) {
-      Color c = std::get<Color>(baseValue);
+      Color c = std::get<Color>(byBase);
       const Color& by = std::get<Color>(byValue);
       c.red += by.red;
       c.green += by.green;
@@ -2235,44 +2485,9 @@ std::vector<Channel*> SMILAnimationParser::parseAnimate(
   }
   channels.push_back(primaryChannel);
 
-  // Special case: "r" on a circle drives both size.width and size.height (r*2).
-  if (attributeName == "r" && target.valueType == ChannelValueType::Float) {
-    auto* sizeChannel = CreateChannelForType(doc, ChannelValueType::Float, "size.height");
-    if (sizeChannel != nullptr) {
-      for (size_t i = 0; i < keyValues.size(); ++i) {
-        Frame time = beginFrames + static_cast<Frame>(std::round(keyTimes[i] * durFrames));
-        float r = std::get<float>(keyValues[i]);
-        KeyValue sizeValue = r * 2.0f;
-        Point bezierOut = {};
-        Point bezierIn = {};
-        if (interpolation == KeyframeInterpolationType::Bezier && i < keyValues.size() - 1) {
-          if (i < splines.size()) {
-            bezierOut = {static_cast<float>(splines[i].p1x), static_cast<float>(splines[i].p1y)};
-            bezierIn = {static_cast<float>(splines[i].p2x), static_cast<float>(splines[i].p2y)};
-          }
-        }
-        AppendKeyframe(sizeChannel, ChannelValueType::Float, time, sizeValue, interpolation,
-                       bezierOut, bezierIn);
-      }
-      channels.push_back(sizeChannel);
-    }
-    // Also adjust the primary channel (size.width) values to r*2.
-    auto* widthChannel = static_cast<TypedChannel<float>*>(primaryChannel);
-    for (auto& key : widthChannel->keyframes) {
-      key.value *= 2.0f;
-    }
-  }
-
-  // Special case: "rx"/"ry" on ellipse need *2 to convert radius to diameter. On <rect>,
-  // rx/ry drive roundness (a pixel value) and must NOT be scaled.
-  if ((attributeName == "rx" || attributeName == "ry") &&
-      target.valueType == ChannelValueType::Float && target.node != nullptr &&
-      target.node->nodeType() == NodeType::Ellipse) {
-    auto* sizeChannel = static_cast<TypedChannel<float>*>(primaryChannel);
-    for (auto& key : sizeChannel->keyframes) {
-      key.value *= 2.0f;
-    }
-  }
+  // Attribute-space keyframe values -> PAGX channel units (radius -> diameter incl. the companion
+  // axis, rect corner -> center, dash phase). Shared with <set> so both write the same units.
+  ApplyAttributeUnitConversions(ctx, doc, attributeName, nodeInfo, target, channels);
 
   // Special case: "stdDeviation" on a filter drives both blurX and blurY. SVG's stdDeviation
   // accepts "x" (uniform) or "x y" (per-axis). parseValue only reads the first number, so
@@ -2313,60 +2528,6 @@ std::vector<Channel*> SMILAnimationParser::parseAnimate(
     }
   }
 
-  // Special case: "x"/"y" on rectangle need +width/2 or +height/2 to convert top-left to center.
-  if ((attributeName == "x" || attributeName == "y") &&
-      target.valueType == ChannelValueType::Float) {
-    auto* rect = static_cast<Rectangle*>(findContentNode(nodeInfo, NodeType::Rectangle));
-    if (rect != nullptr) {
-      float offset = (attributeName == "x") ? rect->size.width / 2.0f : rect->size.height / 2.0f;
-      auto* posChannel = static_cast<TypedChannel<float>*>(primaryChannel);
-      for (auto& key : posChannel->keyframes) {
-        key.value += offset;
-      }
-    }
-  }
-
-  // SVG `pathLength` normalises dash values into the author's coordinate space. The static
-  // dasharray/dashoffset are scaled back to user units when the Stroke is created, so animated
-  // stroke-dashoffset keyframes need the same scale; otherwise the dash phase jumps at frame 0.
-  if (attributeName == "stroke-dashoffset" && target.valueType == ChannelValueType::Float) {
-    ScaleDashOffsetKeyframes(nodeInfo.domElement, channels, ctx);
-  }
-
-  // Special case: <animate attributeName="stroke-dashoffset"> on a <circle>/<ellipse> needs the
-  // same phase+direction correction that addFillStroke applies to the static Stroke.dashOffset
-  // (90-degree phase alignment with SVG's 3 o'clock start + tgfx's reverse-path dashOffset
-  // direction). Without this the animated stroke-dasharray draws in the mirror direction
-  // from the SVG side, producing symmetric arc frames rather than a matching animation.
-  if (attributeName == "stroke-dashoffset" && target.valueType == ChannelValueType::Float &&
-      target.node != nullptr) {
-    auto el = nodeInfo.domElement;
-    if (el && (el->name == "circle" || el->name == "ellipse")) {
-      float rx = 0.0f;
-      float ry = 0.0f;
-      if (el->name == "circle") {
-        rx = ry = ctx.parseLength(ctx.getAttribute(el, "r"), ctx.getViewBoxWidth());
-      } else {
-        rx = ctx.parseLength(ctx.getAttribute(el, "rx"), ctx.getViewBoxWidth());
-        ry = ctx.parseLength(ctx.getAttribute(el, "ry"), ctx.getViewBoxHeight());
-      }
-      const float sum = rx + ry;
-      if (sum > 0.0f) {
-        // Ramanujan's first approximation; exact when rx == ry.
-        const float h = (rx - ry) * (rx - ry) / (sum * sum);
-        const float perimeter = static_cast<float>(M_PI) * sum *
-                                (1.0f + 3.0f * h / (10.0f + std::sqrt(4.0f - 3.0f * h)));
-        const float correction = perimeter / 4.0f;
-        for (auto* ch : channels) {
-          auto* fch = static_cast<TypedChannel<float>*>(ch);
-          for (auto& key : fch->keyframes) {
-            key.value -= correction;
-          }
-        }
-      }
-    }
-  }
-
   // Fold the negative-begin phase into the values so the track starts at frame 0.
   if (phaseShift > 0.0) {
     for (auto* ch : channels) {
@@ -2384,10 +2545,13 @@ std::vector<Channel*> SMILAnimationParser::parseAnimate(
   // not expanded here.
   double repeatCount = ResolveRepeatCount(ctx.getAttribute(animElement, "repeatCount"),
                                           ctx.getAttribute(animElement, "repeatDur"), durSeconds);
-  bool accumulate = (ctx.getAttribute(animElement, "accumulate") == "sum");
+  // SMIL ignores accumulate on a to-animation: there is no per-iteration delta to add, the end
+  // value is the animation's target.
+  const bool toOnly = valuesStr.empty() && fromStr.empty() && !toStr.empty() && byStr.empty();
+  bool accumulate = (ctx.getAttribute(animElement, "accumulate") == "sum") && !toOnly;
   if (repeatCount > 1.0) {
     for (auto* ch : channels) {
-      ExpandRepeatCount(ch, target.valueType, durFrames, repeatCount, accumulate);
+      ExpandRepeatCount(ch, target.valueType, durFrames, beginFrames, repeatCount, accumulate);
     }
     outEndFrame = beginFrames + static_cast<Frame>(durFrames * repeatCount);
   } else if (repeatCount > 0.0 && repeatCount < 1.0) {
@@ -2495,6 +2659,13 @@ std::vector<Channel*> SMILAnimationParser::parseSet(SVGParserContext& ctx, PAGXD
   AppendKeyframe(channel, target.valueType, beginFrames, value, KeyframeInterpolationType::Hold, {},
                  {});
 
+  // The `to` value is authored in SVG-attribute space, so it needs the same attribute -> channel
+  // conversions <animate> applies (radius -> diameter incl. the companion axis, rect corner ->
+  // center, dash phase). Running them before the base-value keyframes keeps this track and the
+  // static value in the same unit.
+  std::vector<Channel*> setChannels = {channel};
+  ApplyAttributeUnitConversions(ctx, doc, attributeName, nodeInfo, target, setChannels);
+
   // Compute end frame and determine fill mode. <set> defaults to fill="remove": when dur is
   // set the element reverts to base value after begin+dur. When dur is absent the <set> effect
   // is permanent (treated as freeze), matching SMIL semantics for indefinite-duration <set>.
@@ -2523,10 +2694,12 @@ std::vector<Channel*> SMILAnimationParser::parseSet(SVGParserContext& ctx, PAGXD
 
   // Add base-value keyframes for begin-offset and fill="remove" semantics.
   KeyValue baseValue = ReadBaseValue(target);
-  AddBaseValueKeyframes(channel, target.valueType, baseValue, beginFrames, endFrame, fillFreeze,
-                        ctx.getAttribute(setElement, "additive") == "sum");
+  for (auto* setChannel : setChannels) {
+    AddBaseValueKeyframes(setChannel, target.valueType, baseValue, beginFrames, endFrame,
+                          fillFreeze, ctx.getAttribute(setElement, "additive") == "sum");
+  }
 
-  channels.push_back(channel);
+  channels = std::move(setChannels);
   return channels;
 }
 
@@ -2732,7 +2905,7 @@ std::vector<Channel*> SMILAnimationParser::parseAnimateTransform(
   double repeatCount = ResolveRepeatCount(ctx.getAttribute(animElement, "repeatCount"),
                                           ctx.getAttribute(animElement, "repeatDur"), durSeconds);
   if (repeatCount > 1.0) {
-    ExpandRepeatCount(ch, ChannelValueType::Matrix, durFrames, repeatCount, false);
+    ExpandRepeatCount(ch, ChannelValueType::Matrix, durFrames, beginFrames, repeatCount, false);
     outEndFrame = beginFrames + static_cast<Frame>(durFrames * repeatCount);
   } else if (repeatCount > 0.0 && repeatCount < 1.0) {
     // A repeatDur shorter than one iteration truncates the single pass.
@@ -2786,8 +2959,12 @@ static void SimplifyMotionSamples(const std::vector<tgfx::Point>& points, size_t
     if (lengthSquared <= 1e-6f) {
       distance = std::hypot(p.x - a.x, p.y - a.y);
     } else {
-      const float cross = std::abs(dx * (p.y - a.y) - dy * (p.x - a.x));
-      distance = cross / std::sqrt(lengthSquared);
+      // Distance to the segment, not to its infinite line: a path that folds back on itself
+      // (M0 0 L100 0 L20 0) puts its extreme point on the line's extension, and measuring against
+      // the extension would drop that point and flatten the turn.
+      float t = (dx * (p.x - a.x) + dy * (p.y - a.y)) / lengthSquared;
+      t = std::max(0.0f, std::min(1.0f, t));
+      distance = std::hypot(p.x - (a.x + dx * t), p.y - (a.y + dy * t));
     }
     if (distance > maxDistance) {
       maxDistance = distance;
@@ -2895,18 +3072,27 @@ std::vector<Channel*> SMILAnimationParser::parseAnimateMotion(
     }
   }
 
-  // Determine sample count: adaptive based on path length, clamped to [32, 256]. When keyPoints
-  // are provided, the sample count is fixed by the keyPoints list.
-  int sampleCount = 0;
-  if (!keyPoints.empty()) {
-    sampleCount = static_cast<int>(keyPoints.size());
+  // Control poses of the motion: each one anchors a path progress to a normalized time. Without
+  // keyPoints the element sweeps the whole path once; with keyPoints each authored point pins one
+  // progress/time pair, and the span between two of them is sampled along the path (below).
+  struct MotionControl {
+    double progress = 0.0;
+    double time = 0.0;
+  };
+  std::vector<MotionControl> controls = {};
+  if (keyPoints.empty()) {
+    // A loop phase shift slides the whole sweep along the path. Progress keeps advancing past 1.0
+    // so the sequence stays monotonic across the wrap; the distance is taken modulo the path
+    // length, and without a shift the final sample must stay on the path end rather than wrap.
+    controls.push_back({phaseShift, 0.0});
+    controls.push_back({phaseShift + 1.0, 1.0});
   } else {
-    sampleCount = static_cast<int>(totalLength / 10.0f);
-    if (sampleCount < 32) sampleCount = 32;
-    if (sampleCount > 256) sampleCount = 256;
-  }
-  if (sampleCount < 2) {
-    sampleCount = 2;
+    for (size_t i = 0; i < keyPoints.size(); ++i) {
+      const double time = motionKeyTimes.empty()
+                              ? static_cast<double>(i) / static_cast<double>(keyPoints.size() - 1)
+                              : motionKeyTimes[i];
+      controls.push_back({keyPoints[i], time});
+    }
   }
 
   // Parse rotate attribute: "auto" / "auto-reverse" / <number> (default "0").
@@ -2930,66 +3116,92 @@ std::vector<Channel*> SMILAnimationParser::parseAnimateMotion(
     Frame time = 0;
     Matrix matrix = {};
     tgfx::Point position = {};
+    /// Authored control pose: kept through simplification so the curve is pinned at these points.
+    bool control = false;
   };
   std::vector<MotionKey> samples;
-  // Sample densely first; the keyframes actually emitted are decimated afterwards, so the density
-  // here only bounds the geometric resolution of the simplification.
-  int denseCount = sampleCount;
-  if (keyPoints.empty()) {
-    denseCount = static_cast<int>(totalLength * 2.0f);
-    if (denseCount < 128) denseCount = 128;
-    if (denseCount > 512) denseCount = 512;
-  }
-  for (int i = 0; i < denseCount; ++i) {
-    double normalizedTime = static_cast<double>(i) / static_cast<double>(denseCount - 1);
-    // Progress keeps advancing past 1.0 so the sequence stays monotonic across the wrap; the
-    // distance below is taken modulo the path length.
-    // Progress only wraps when a loop phase shift is applied. Without a shift the final sample must
-    // stay on the path end, otherwise floor(1.0) sends it back to the start and the track ends with
-    // an identity matrix.
-    double progress = normalizedTime + phaseShift;
-    double pathProgress = phaseShift > 0.0 ? progress - std::floor(progress) : progress;
-    if (!keyPoints.empty()) {
-      pathProgress = keyPoints[i];
+  for (size_t segment = 0; segment + 1 < controls.size(); ++segment) {
+    const auto& start = controls[segment];
+    const auto& end = controls[segment + 1];
+    const double deltaProgress = end.progress - start.progress;
+    // Adaptive density: one sample per 10 user units of the span, clamped so a short hop still has
+    // enough samples to describe a curve while a long sweep does not explode into thousands of keys.
+    double spanLength = std::abs(deltaProgress) * static_cast<double>(totalLength);
+    int steps = static_cast<int>(std::ceil(spanLength / 10.0));
+    if (steps < 8) {
+      steps = 8;
     }
-    float distance = static_cast<float>(pathProgress) * totalLength;
-    tgfx::Point pos = {};
-    tgfx::Point tan = {};
-    if (!pathMeasure->getPosTan(distance, &pos, &tan)) {
-      continue;
+    if (steps > 128) {
+      steps = 128;
     }
-    Matrix m = Matrix::Translate(pos.x, pos.y);
-    if (rotateAuto || rotateAutoReverse) {
-      float angle = atan2f(tan.y, tan.x) * 180.0f / static_cast<float>(M_PI);
-      if (rotateAutoReverse) {
-        angle += 180.0f;
+    // The first sample of every later span repeats the previous span's endpoint.
+    for (int i = (segment == 0 ? 0 : 1); i <= steps; ++i) {
+      const double u = static_cast<double>(i) / static_cast<double>(steps);
+      const double progress = start.progress + deltaProgress * u;
+      double pathProgress = phaseShift > 0.0 ? progress - std::floor(progress) : progress;
+      if (pathProgress < 0.0) {
+        pathProgress = 0.0;
+      } else if (pathProgress > 1.0) {
+        pathProgress = 1.0;
       }
-      m = m * Matrix::Rotate(angle);
-    } else if (hasFixedRotation) {
-      m = m * Matrix::Rotate(fixedRotation);
+      const float distance = static_cast<float>(pathProgress) * totalLength;
+      tgfx::Point pos = {};
+      tgfx::Point tan = {};
+      if (!pathMeasure->getPosTan(distance, &pos, &tan)) {
+        continue;
+      }
+      Matrix m = Matrix::Translate(pos.x, pos.y);
+      if (rotateAuto || rotateAutoReverse) {
+        float angle = atan2f(tan.y, tan.x) * 180.0f / static_cast<float>(M_PI);
+        if (rotateAutoReverse) {
+          angle += 180.0f;
+        }
+        m = m * Matrix::Rotate(angle);
+      } else if (hasFixedRotation) {
+        m = m * Matrix::Rotate(fixedRotation);
+      }
+      if (!additive) {
+        // animateMotion supplements the element's own transform even without additive="sum"; SVG
+        // never lets a motion path replace the base transform. staticMatrix already carries the
+        // viewBox mapping, so no separate content-matrix step is needed here.
+        m = staticMatrix * m;
+      }
+      const double sampleTime = start.time + (end.time - start.time) * u;
+      Frame time = beginFrames + static_cast<Frame>(std::round(sampleTime * durFrames));
+      const bool isControl = (segment == 0 && i == 0) || (i == steps);
+      if (!samples.empty() && samples.back().time == time) {
+        // Several samples can round onto one frame; an authored control pose wins over a sampled
+        // interior key, and the later sample wins otherwise.
+        if (isControl || !samples.back().control) {
+          samples.back() = {time, m, pos, isControl};
+        }
+        continue;
+      }
+      samples.push_back({time, m, pos, isControl});
     }
-    if (additive) {
-      // See parseAnimateTransform: the static pose is applied once after merging.
-    } else {
-      // animateMotion supplements the element's own transform even without additive="sum"; SVG
-      // never lets a motion path replace the base transform. staticMatrix already carries the
-      // viewBox mapping, so no separate content-matrix step is needed here.
-      m = staticMatrix * m;
-    }
-    double sampleTime = motionKeyTimes.empty() ? normalizedTime : motionKeyTimes[i];
-    Frame time = beginFrames + static_cast<Frame>(std::round(sampleTime * durFrames));
-    samples.push_back({time, m, pos});
   }
-  if (samples.size() >= 3 && keyPoints.empty()) {
+  if (samples.size() >= 3) {
     std::vector<tgfx::Point> positions;
     positions.reserve(samples.size());
-    for (const auto& sample : samples) {
-      positions.push_back(sample.position);
-    }
     std::vector<char> keep(samples.size(), 0);
+    for (size_t i = 0; i < samples.size(); ++i) {
+      positions.push_back(samples[i].position);
+      if (samples[i].control) {
+        keep[i] = 1;
+      }
+    }
     keep.front() = 1;
     keep.back() = 1;
-    SimplifyMotionSamples(positions, 0, positions.size() - 1, 1.0f, &keep);
+    // Simplify each span between two control poses: interior samples that stay within a pixel of
+    // the chord are dropped, the authored poses themselves never are.
+    size_t spanStart = 0;
+    for (size_t i = 1; i < samples.size(); ++i) {
+      if (keep[i] == 0) {
+        continue;
+      }
+      SimplifyMotionSamples(positions, spanStart, i, 1.0f, &keep);
+      spanStart = i;
+    }
     std::vector<MotionKey> simplified;
     simplified.reserve(samples.size());
     for (size_t i = 0; i < samples.size(); ++i) {
@@ -3010,7 +3222,7 @@ std::vector<Channel*> SMILAnimationParser::parseAnimateMotion(
   double repeatCount = ResolveRepeatCount(ctx.getAttribute(animElement, "repeatCount"),
                                           ctx.getAttribute(animElement, "repeatDur"), durSeconds);
   if (repeatCount > 1.0) {
-    ExpandRepeatCount(ch, ChannelValueType::Matrix, durFrames, repeatCount, false);
+    ExpandRepeatCount(ch, ChannelValueType::Matrix, durFrames, beginFrames, repeatCount, false);
     outEndFrame = beginFrames + static_cast<Frame>(durFrames * repeatCount);
   } else if (repeatCount > 0.0 && repeatCount < 1.0) {
     // A repeatDur shorter than one iteration truncates the single pass.
@@ -3297,16 +3509,21 @@ Animation* SMILAnimationParser::buildAnimation(
         // pose is folded in exactly once here. A replace base track already defines the whole
         // pose and must not receive it.
         bool matrixBaseIsAdditive = false;
+        // Channel names that carry a replace segment: their merged track already spells the full
+        // value, so no static base may be folded into them.
+        std::unordered_set<std::string> replaceNames = {};
         for (const auto& entry : channels) {
           if (entry.channel->name == "matrix" &&
               entry.channel->valueType() == ChannelValueType::Matrix) {
             matrixBaseIsAdditive = entry.additive;
-            break;
+          }
+          if (!entry.additive) {
+            replaceNames.insert(entry.channel->name);
           }
         }
         obj->channels = MergeAdditiveChannels(&channels);
+        auto* targetNode = doc->findNode(targetId);
         if (matrixBaseIsAdditive) {
-          auto* targetNode = doc->findNode(targetId);
           if (targetNode != nullptr && targetNode->nodeType() == NodeType::Layer) {
             const auto& staticPose = static_cast<Layer*>(targetNode)->matrix;
             for (auto* channel : obj->channels) {
@@ -3319,6 +3536,12 @@ Animation* SMILAnimationParser::buildAnimation(
               }
             }
           }
+        }
+        for (auto* channel : obj->channels) {
+          if (replaceNames.count(channel->name) != 0) {
+            continue;
+          }
+          FoldStaticBaseIntoAdditiveChannel(channel, targetNode, targetId);
         }
         if (!obj->channels.empty()) {
           animation->objects.push_back(obj);

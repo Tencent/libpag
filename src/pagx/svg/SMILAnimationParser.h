@@ -223,6 +223,17 @@ class SMILAnimationParser {
   static void ScaleDashOffsetKeyframes(const std::shared_ptr<DOMNode>& element,
                                        std::vector<Channel*>& channels, SVGParserContext& ctx);
 
+  /// Applies the SVG-attribute → PAGX-channel unit conversions for one animated attribute to the
+  /// channels it produced: radius → diameter (plus the companion axis for `r`), rect corner →
+  /// center, and the dash-phase correction for `stroke-dashoffset`. Shared by <animate> and <set>
+  /// so both write the same units, and applied to finished keyframes only — the base-value
+  /// keyframes added afterwards already carry the converted static value.
+  static void ApplyAttributeUnitConversions(SVGParserContext& ctx, PAGXDocument* doc,
+                                            const std::string& attributeName,
+                                            const AnimatedNodeInfo& nodeInfo,
+                                            const ChannelTarget& target,
+                                            std::vector<Channel*>& channels);
+
   // Parses a single <animateTransform> element into a single Matrix channel driving the Layer's
   // runtime "matrix" channel. Each keyframe's transform params (translate/scale/rotate/skewX/
   // skewY, including rotate's "angle cx cy" form) are baked into a full Matrix. additive="sum"

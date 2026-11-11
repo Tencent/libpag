@@ -7043,4 +7043,279 @@ PAGX_TEST(PAGXSVGTest, SVGImport_ClipAndNestedMaskVisibleRestored) {
   }
 }
 
+// =============================================================================
+// SMIL regression tests: motion sampling, fractional repeats, accumulate, additive
+// base values, attribute-unit conversions and tspan-only paints.
+// =============================================================================
+
+static pagx::TypedChannel<float>* FindFloatChannel(pagx::Animation* animation,
+                                                   const std::string& name) {
+  for (auto* object : animation->objects) {
+    for (auto* channel : object->channels) {
+      if (channel->name == name && channel->valueType() == pagx::ChannelValueType::Float) {
+        return static_cast<pagx::TypedChannel<float>*>(channel);
+      }
+    }
+  }
+  return nullptr;
+}
+
+/**
+ * animate_motion_keypoints_curve.svg: keyPoints pins the endpoints of a curved motion path, and the
+ * curve between them is still sampled — the element follows the path instead of the straight chord.
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_AnimateMotionKeyPointsCurve) {
+  auto doc = pagx::SVGImporter::Parse(
+      ProjectPath::Absolute("resources/svg/animation/animate_motion_keypoints_curve.svg"));
+  ASSERT_NE(doc, nullptr);
+  auto* anim = static_cast<pagx::Animation*>(doc->animations[0]);
+  ASSERT_EQ(anim->objects.size(), 1u);
+  auto* ch = static_cast<pagx::TypedChannel<pagx::Matrix>*>(anim->objects[0]->channels[0]);
+  // Two authored control poses plus interior samples for the curve.
+  EXPECT_GT(ch->keyframes.size(), 2u);
+  const auto midpoint = std::get<pagx::Matrix>(ch->evaluateAt(30));
+  // Halfway along the arc the quadratic reaches (50, 50); the chord would give (50, 0).
+  EXPECT_NEAR(midpoint.tx, 50.0f, 3.0f);
+  EXPECT_NEAR(midpoint.ty, 50.0f, 3.0f);
+}
+
+/**
+ * animate_motion_foldback.svg: a path that folds back on itself keeps its extreme point instead of
+ * being simplified away as "on the line".
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_AnimateMotionFoldback) {
+  auto doc = pagx::SVGImporter::Parse(
+      ProjectPath::Absolute("resources/svg/animation/animate_motion_foldback.svg"));
+  ASSERT_NE(doc, nullptr);
+  auto* anim = static_cast<pagx::Animation*>(doc->animations[0]);
+  auto* ch = static_cast<pagx::TypedChannel<pagx::Matrix>*>(anim->objects[0]->channels[0]);
+  float maxX = 0.0f;
+  for (const auto& key : ch->keyframes) {
+    maxX = std::max(maxX, key.value.tx);
+  }
+  EXPECT_NEAR(maxX, 100.0f, 0.5f);
+  EXPECT_NEAR(ch->keyframes.back().value.tx, 20.0f, 0.5f);
+}
+
+/**
+ * repeat_count_fractional_values.svg: repeatCount="1.5" copies the keys of the remainder round and
+ * ends at the value the authored curve has at the cut, not at the interpolation of its endpoints.
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_FractionalRepeatCountKeepsRemainderKeys) {
+  auto doc = pagx::SVGImporter::Parse(
+      ProjectPath::Absolute("resources/svg/animation/repeat_count_fractional_values.svg"));
+  ASSERT_NE(doc, nullptr);
+  auto* anim = static_cast<pagx::Animation*>(doc->animations[0]);
+  // 2s at 60fps = 120 frames per cycle; 1.5 cycles = 180 frames.
+  EXPECT_EQ(anim->duration, 180);
+  auto* ch = FindFloatChannel(anim, "alpha");
+  ASSERT_NE(ch, nullptr);
+  EXPECT_NEAR(std::get<float>(ch->evaluateAt(180)), 1.0f, 1e-4f);
+  // The remainder round climbs 0 → 1 between frame 120 and 180.
+  EXPECT_NEAR(std::get<float>(ch->evaluateAt(150)), 0.5f, 1e-3f);
+}
+
+/**
+ * repeat_count_half.svg: repeatCount="0.5" truncates the single pass instead of being raised to 1.
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_HalfRepeatCountTruncates) {
+  auto doc = pagx::SVGImporter::Parse(
+      ProjectPath::Absolute("resources/svg/animation/repeat_count_half.svg"));
+  ASSERT_NE(doc, nullptr);
+  auto* anim = static_cast<pagx::Animation*>(doc->animations[0]);
+  EXPECT_EQ(anim->duration, 30);
+  auto* ch = FindFloatChannel(anim, "alpha");
+  ASSERT_NE(ch, nullptr);
+  EXPECT_NEAR(std::get<float>(ch->evaluateAt(30)), 0.5f, 1e-4f);
+}
+
+/**
+ * accumulate_sum_nonzero_start.svg: accumulate="sum" adds the previous iteration's end value, so a
+ * sequence that starts at 10 keeps climbing (10→20, 30→40) instead of adding its delta twice.
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_AccumulateSumUsesIterationEndValue) {
+  auto doc = pagx::SVGImporter::Parse(
+      ProjectPath::Absolute("resources/svg/animation/accumulate_sum_nonzero_start.svg"));
+  ASSERT_NE(doc, nullptr);
+  auto* anim = static_cast<pagx::Animation*>(doc->animations[0]);
+  auto* ch = FindFloatChannel(anim, "position.x");
+  ASSERT_NE(ch, nullptr);
+  EXPECT_NEAR(std::get<float>(ch->evaluateAt(90)), 35.0f, 1e-3f);
+  EXPECT_NEAR(std::get<float>(ch->evaluateAt(120)), 40.0f, 1e-3f);
+}
+
+/**
+ * additive_sum_single_track.svg: a lone additive="sum" track carries deltas only, so the target's
+ * static value is folded in — the element keeps its base alpha before begin and after fill="remove".
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_AdditiveSumSingleTrackFoldsBase) {
+  auto doc = pagx::SVGImporter::Parse(
+      ProjectPath::Absolute("resources/svg/animation/additive_sum_single_track.svg"));
+  ASSERT_NE(doc, nullptr);
+  auto* anim = static_cast<pagx::Animation*>(doc->animations[0]);
+  auto* obj = anim->objects[0];
+  ASSERT_EQ(obj->channels.size(), 1u);
+  auto* ch = static_cast<pagx::TypedChannel<float>*>(obj->channels[0]);
+  ASSERT_FALSE(ch->keyframes.empty());
+  // Static alpha 0.6 is held before the animation starts at 1s.
+  EXPECT_EQ(ch->keyframes.front().time, 0);
+  EXPECT_NEAR(ch->keyframes.front().value, 0.6f, 1e-4f);
+  EXPECT_NEAR(std::get<float>(ch->evaluateAt(60)), 0.6f, 1e-4f);
+  EXPECT_NEAR(std::get<float>(ch->evaluateAt(120)), 1.1f, 1e-4f);
+  // fill="remove": the delta falls back to the identity, i.e. the static value again.
+  EXPECT_NEAR(std::get<float>(ch->evaluateAt(121)), 0.6f, 1e-4f);
+}
+
+/**
+ * to_only_radius.svg: to-only composes in attribute space, so r=10 → to=20 becomes diameters
+ * 20 → 40 on both axes instead of mixing the runtime diameter with the attribute radius.
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_ToOnlyRadiusConvertsBothEnds) {
+  auto doc =
+      pagx::SVGImporter::Parse(ProjectPath::Absolute("resources/svg/animation/to_only_radius.svg"));
+  ASSERT_NE(doc, nullptr);
+  auto* anim = static_cast<pagx::Animation*>(doc->animations[0]);
+  for (const char* name : {"size.width", "size.height"}) {
+    auto* ch = FindFloatChannel(anim, name);
+    ASSERT_NE(ch, nullptr) << name;
+    ASSERT_GE(ch->keyframes.size(), 2u) << name;
+    EXPECT_NEAR(ch->keyframes.front().value, 20.0f, 1e-4f) << name;
+    EXPECT_NEAR(ch->keyframes.back().value, 40.0f, 1e-4f) << name;
+  }
+}
+
+/**
+ * by_only_rect_position.svg: by-only composes in attribute space, so x=10 + by=40 converts to
+ * PAGX center coordinates (20 → 60) instead of offsetting an already-converted base.
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_ByOnlyRectPositionConvertsBothEnds) {
+  auto doc = pagx::SVGImporter::Parse(
+      ProjectPath::Absolute("resources/svg/animation/by_only_rect_position.svg"));
+  ASSERT_NE(doc, nullptr);
+  auto* anim = static_cast<pagx::Animation*>(doc->animations[0]);
+  auto* ch = FindFloatChannel(anim, "position.x");
+  ASSERT_NE(ch, nullptr);
+  ASSERT_GE(ch->keyframes.size(), 2u);
+  EXPECT_NEAR(ch->keyframes.front().value, 20.0f, 1e-4f);
+  EXPECT_NEAR(ch->keyframes.back().value, 60.0f, 1e-4f);
+}
+
+/**
+ * set_radius_and_position.svg: <set> reuses the <animate> attribute → channel conversions, so
+ * `r="20"` writes a diameter and `x="50"` writes the rect center.
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_SetReusesAttributeConversions) {
+  auto doc = pagx::SVGImporter::Parse(
+      ProjectPath::Absolute("resources/svg/animation/set_radius_and_position.svg"));
+  ASSERT_NE(doc, nullptr);
+  auto* anim = static_cast<pagx::Animation*>(doc->animations[0]);
+  for (const char* name : {"size.width", "size.height"}) {
+    auto* ch = FindFloatChannel(anim, name);
+    ASSERT_NE(ch, nullptr) << name;
+    EXPECT_NEAR(ch->keyframes.front().value, 40.0f, 1e-4f) << name;
+  }
+  auto* position = FindFloatChannel(anim, "position.x");
+  ASSERT_NE(position, nullptr);
+  EXPECT_NEAR(position->keyframes.front().value, 60.0f, 1e-4f);
+}
+
+/**
+ * text_tspan_gradient.svg: a gradient declared only on a <tspan> is resolved into the text's Fill
+ * instead of being dropped with the element-level paint.
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_TspanOnlyGradientKeepsReference) {
+  auto doc =
+      pagx::SVGImporter::Parse(ProjectPath::Absolute("resources/svg/text/text_tspan_gradient.svg"));
+  ASSERT_NE(doc, nullptr);
+  ASSERT_FALSE(doc->layers.empty());
+  std::vector<pagx::Element*> fills = {};
+  for (auto* layer : doc->layers) {
+    CollectElementsByType(layer, pagx::NodeType::Fill, fills);
+  }
+  ASSERT_FALSE(fills.empty());
+  bool hasGradientFill = false;
+  for (auto* element : fills) {
+    auto* fill = static_cast<pagx::Fill*>(element);
+    if (fill->color != nullptr && fill->color->nodeType() == pagx::NodeType::LinearGradient) {
+      hasGradientFill = true;
+    }
+  }
+  EXPECT_TRUE(hasGradientFill) << "tspan-only gradient must survive as a LinearGradient fill";
+}
+
+/**
+ * syncbase_begin_uses_end.svg: `begin="a.end"` must use a's own `end` (2s), not begin + dur
+ * (10s). The clock end is resolved before the begin fixed point so this works in document order.
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_SyncbaseBeginUsesResolvedEnd) {
+  auto doc = pagx::SVGImporter::Parse(
+      ProjectPath::Absolute("resources/svg/animation/syncbase_begin_uses_end.svg"));
+  ASSERT_NE(doc, nullptr);
+  ASSERT_FALSE(doc->animations.empty());
+  auto* anim = static_cast<pagx::Animation*>(doc->animations[0]);
+  // The fill animation starts at 2s (frame 120); 10s (frame 600) would mean `end` was ignored.
+  auto* colorChannel = static_cast<pagx::TypedChannel<pagx::Color>*>(nullptr);
+  for (auto* object : anim->objects) {
+    for (auto* channel : object->channels) {
+      if (channel->name == "color" && channel->valueType() == pagx::ChannelValueType::Color) {
+        colorChannel = static_cast<pagx::TypedChannel<pagx::Color>*>(channel);
+      }
+    }
+  }
+  ASSERT_NE(colorChannel, nullptr);
+  ASSERT_GE(colorChannel->keyframes.size(), 2u);
+  // The pre-begin hold sits at frame 0; the animated segment itself starts at 2s (frame 120).
+  bool startsAtEndOfA = false;
+  bool startsAtDurOfA = false;
+  for (const auto& key : colorChannel->keyframes) {
+    startsAtEndOfA = startsAtEndOfA || key.time == 120;
+    startsAtDurOfA = startsAtDurOfA || key.time == 600;
+  }
+  EXPECT_TRUE(startsAtEndOfA) << "begin=\"a.end\" must resolve to a's end (2s), not begin + dur";
+  EXPECT_FALSE(startsAtDurOfA);
+  EXPECT_EQ(colorChannel->keyframes.back().time, 180);
+}
+
+/**
+ * replace_segments_handover.svg: two replace segments on one attribute keep both halves. The later
+ * segment's synthesized frame-0 hold must not be appended, otherwise it becomes the left endpoint
+ * for the frames the first segment still owns.
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_ReplaceSegmentsKeepFirstSegment) {
+  auto doc = pagx::SVGImporter::Parse(
+      ProjectPath::Absolute("resources/svg/animation/replace_segments_handover.svg"));
+  ASSERT_NE(doc, nullptr);
+  auto* anim = static_cast<pagx::Animation*>(doc->animations[0]);
+  auto* ch = FindFloatChannel(anim, "alpha");
+  ASSERT_NE(ch, nullptr);
+  ASSERT_GE(ch->keyframes.size(), 3u);
+  for (size_t i = 1; i < ch->keyframes.size(); ++i) {
+    EXPECT_LT(ch->keyframes[i - 1].time, ch->keyframes[i].time) << "timestamps must be unique";
+  }
+  // Segment one (1 -> 0.5 over 60 frames) stays in charge until the handover.
+  EXPECT_NEAR(std::get<float>(ch->evaluateAt(30)), 0.746f, 0.02f);
+  EXPECT_NEAR(std::get<float>(ch->evaluateAt(60)), 0.0f, 1e-3f);
+  EXPECT_NEAR(std::get<float>(ch->evaluateAt(120)), 1.0f, 1e-3f);
+}
+
+/**
+ * negative_begin_loop.svg: a looping animation with begin="-1s" starts mid-iteration. The track is
+ * g(t) = f((t + offset) mod dur), so it must ramp up to the seam and restart there instead of
+ * collapsing onto the single sampled value.
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_NegativeBeginIndefiniteLoop) {
+  auto doc = pagx::SVGImporter::Parse(
+      ProjectPath::Absolute("resources/svg/animation/negative_begin_loop.svg"));
+  ASSERT_NE(doc, nullptr);
+  auto* anim = static_cast<pagx::Animation*>(doc->animations[0]);
+  auto* ch = FindFloatChannel(anim, "alpha");
+  ASSERT_NE(ch, nullptr);
+  ASSERT_GE(ch->keyframes.size(), 3u);
+  // Half an iteration in: 0.5 at frame 0, reaching 1 at the seam (frame 60), back to 0 after it.
+  EXPECT_NEAR(std::get<float>(ch->evaluateAt(0)), 0.5f, 1e-3f);
+  EXPECT_NEAR(std::get<float>(ch->evaluateAt(30)), 0.75f, 0.02f);
+  EXPECT_NEAR(std::get<float>(ch->evaluateAt(60)), 1.0f, 1e-3f);
+  EXPECT_NEAR(std::get<float>(ch->evaluateAt(90)), 0.25f, 0.02f);
+}
+
 }  // namespace pag
