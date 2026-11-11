@@ -22,7 +22,7 @@
       <Object target="modifier">
         <Channel name="anchor.x" type="float">
           <Key time="0" value="0" interpolation="linear"/>
-          <Key time="60" value="40"/>
+          <Key time="60" value="140"/>
         </Channel>
       </Object>
     </Animation>
