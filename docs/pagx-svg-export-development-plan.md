@@ -682,6 +682,7 @@ ToSVG严格失败返回空结果、ToFile返回false、CLI非零；warnings=null
 | 本轮 ST16 部分（2026-11-11） | `ModifierResolver` 析构时按构造前 node 数移除本次创建的临时节点；Merge 产生的 even-odd Fill 改为克隆，不再修改作者 Fill；重复 SVG 导出的 node 数与输出字节稳定；四套件 1095 / 1097 | 两处均为既有基线；Repeater 乘性预算、shared PathData 污染与并发导出未覆盖 |
 | 本轮 ST45 部分（2026-11-11） | 零 scale Group 保留退化 matrix 并输出结构有效的 SVG，不强行 inverse 恢复；新增结构回归 | 仅验证 Group + Rectangle + Fill；Painter 捕获前后 singular、Fill/Stroke/Mask 组合与像素未验证 |
 | 本轮 S6 API 部分（2026-11-11） | 新增 `SVGStaticExportPolicy` / `SVGTextExportMode`，设置时覆盖 deprecated `bakeUnsupported` / `convertTextToPath`；CLI 增加 `--svg-static-policy` / `--svg-text-mode`；VectorOnly 对需要新增效果位图的图层直接拒绝（ToSVG 返回空并告警），BestEffort 保留降级告警；两项映射 + 拒绝/降级回归通过 | Named/All、diagnostics / reasonCode、预算、D6 浏览器门禁、策略可用性基线、ST32/37/41/44/46 仍未做 |
+| 本轮 ST36 部分（2026-11-11） | `ToSVG` 每次都用 `options.fontConfig` 重跑 `applyLayout`，约束修改后导出不再复用旧 resolved 尺寸；新增编辑后导出回归 | 外部 Font / fontConfig 冷热与 ST37 externalDoc 预扫未做 |
 
 ### 4.8 S3 文字待办清单（下一批入口）
 

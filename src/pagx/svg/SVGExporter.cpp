@@ -4473,9 +4473,10 @@ std::string SVGExporter::ToSVG(PAGXDocument& doc, const Options& options,
   // Mirror PPTExporter: resolve layout before reading the matrix helpers. BuildLayerMatrix composes
   // each Layer's generated layout position outside its authored x / y and transform, and
   // BuildGroupMatrix reads each Group's renderPosition().
-  if (!doc.isLayoutApplied()) {
-    doc.applyLayout(options.fontConfig);
-  }
+  // Always re-run layout with the effective font config. A caller may have laid the document out
+  // with a different FontConfig, or edited constraints since the first layout; skipping here would
+  // serialize stale resolved geometry.
+  doc.applyLayout(options.fontConfig);
   bool bakeUnsupported = options.bakeUnsupported;
   bool rejectUnsupported = !options.bakeUnsupported;
   if (options.staticPolicy.has_value()) {

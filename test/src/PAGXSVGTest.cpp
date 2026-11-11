@@ -6372,6 +6372,40 @@ PAGX_TEST(PAGXSVGTest, SVGExport_TextModeOverridesDeprecatedFlag) {
   EXPECT_NE(nativeSvg.find("@font-face"), std::string::npos);
 }
 
+// S3/S5: exporting after a constraint edit must re-run layout instead of serializing stale
+// resolved geometry.
+PAGX_TEST(PAGXSVGTest, SVGExport_ReLayoutsAfterConstraintEdit) {
+  auto doc = pagx::PAGXDocument::Make(300, 200);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  layer->width = 300;
+  layer->height = 200;
+  auto* box = doc->makeNode<pagx::TextBox>();
+  box->width = 100;
+  box->height = 60;
+  box->padding.top = 10;
+  box->padding.right = 10;
+  box->padding.bottom = 10;
+  box->padding.left = 10;
+  box->textAlign = pagx::TextAlign::End;
+  auto* text = doc->makeNode<pagx::Text>();
+  text->text = "Hi";
+  text->fontFamily = "Arial";
+  text->fontSize = 20;
+  box->elements = {text, MakeSolidFillSVG(doc.get(), 0, 0, 0)};
+  layer->contents = {box};
+  doc->layers.push_back(layer);
+  doc->applyLayout();
+
+  pagx::SVGExportOptions options = {};
+  options.convertTextToPath = false;
+  auto before = pagx::SVGExporter::ToSVG(*doc, options);
+  EXPECT_NE(before.find(" x=\"90\""), std::string::npos);
+
+  box->width = 250;
+  auto after = pagx::SVGExporter::ToSVG(*doc, options);
+  EXPECT_NE(after.find(" x=\"240\""), std::string::npos);
+}
+
 // A Group's alpha has to survive until the painter that draws its geometry, even when that painter
 // sits outside the Group.
 PAGX_TEST(PAGXSVGTest, SVGExport_GroupAlphaReachesOuterPainter) {
