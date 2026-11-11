@@ -5821,4 +5821,37 @@ PAGX_TEST(PAGXSVGTest, SVGExport_GroupAlphaReachesOuterPainter) {
   EXPECT_NE(svg.find("fill-opacity=\"0.5\""), std::string::npos) << svg;
 }
 
+// Pixel check for the accumulated group alpha: the exported SVG is imported back and rendered, so
+// the assertion covers what a viewer actually paints rather than the attribute spelling.
+PAGX_PIXEL_TEST(PAGXSVGTest, SVGExport_GroupAlphaRoundTripPixels) {
+  pag::DeviceLockScope deviceLock;
+  ASSERT_TRUE(static_cast<bool>(deviceLock));
+  auto* context = deviceLock.context();
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto* layer = doc->makeNode<pagx::Layer>("layer");
+  auto* group = doc->makeNode<pagx::Group>("group");
+  group->alpha = 0.5f;
+  auto* rect = doc->makeNode<pagx::Rectangle>("rect");
+  rect->position = {100, 100};
+  rect->size = {80, 80};
+  group->elements = {rect};
+  layer->contents = {group, MakeSolidFillSVG(doc.get(), 1.0f, 0.0f, 0.0f)};
+  doc->layers.push_back(layer);
+  doc->applyLayout();
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  auto roundTrip = pagx::SVGImporter::ParseString(svg);
+  ASSERT_TRUE(roundTrip != nullptr);
+  roundTrip->applyLayout();
+  auto tgfxLayer = pagx::LayerBuilder::Build(roundTrip.get());
+  ASSERT_TRUE(tgfxLayer != nullptr);
+
+  auto surface = Surface::Make(context, 200, 200);
+  ASSERT_TRUE(surface != nullptr);
+  DisplayList displayList;
+  displayList.root()->addChild(tgfxLayer);
+  displayList.render(surface.get(), false);
+  EXPECT_TRUE(Baseline::Compare(surface, "PAGXSVGTest/GroupAlphaRoundTrip"));
+}
+
 }  // namespace pag
