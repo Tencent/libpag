@@ -85,6 +85,27 @@
 
 namespace pagx {
 
+// Serializes a document into XML while handing image payloads to the archive. The builder,
+// options and archive live on the object, so the write functions that only forward to one
+// another do not have to carry them through every signature.
+class PAGXSerializer {
+ public:
+  PAGXSerializer(const PAGXExporter::Options& options, PAGXArchiveWriter* archive);
+
+  std::string serialize(const PAGXDocument& doc);
+
+ private:
+  void writeLayer(const Layer* node);
+  void writeVectorElement(const Element* node);
+  void writeResource(const Node* node);
+  void writeColorSource(const ColorSource* node);
+  void writeImageReference(const Image* image);
+
+  XMLBuilder _xml;
+  const PAGXExporter::Options& _options;
+  PAGXArchiveWriter* _archive = nullptr;
+};
+
 //==============================================================================
 // Helper functions for converting types to strings
 //==============================================================================
@@ -110,7 +131,8 @@ static std::string ImageSourceForXML(const Image* image, PAGXArchiveWriter* arch
 
 // Writes an `image` attribute for ImagePattern / Glyph references. A referenced resource keeps its
 // `@id` form in both export modes; only anonymous images resolve to an inline source.
-static void WriteImageReference(XMLBuilder& xml, const Image* image, PAGXArchiveWriter* archive) {
+void PAGXSerializer::writeImageReference(const Image* image) {
+  auto& xml = _xml;
   if (image == nullptr) {
     return;
   }
@@ -118,7 +140,7 @@ static void WriteImageReference(XMLBuilder& xml, const Image* image, PAGXArchive
     xml.addAttribute("image", "@" + image->id);
     return;
   }
-  auto source = ImageSourceForXML(image, archive);
+  auto source = ImageSourceForXML(image, _archive);
   if (!source.empty()) {
     xml.addAttribute("image", source);
   }
@@ -217,17 +239,8 @@ static bool ShouldSkipPosition(const Point& position, const Point& defaultPos, f
 
 using Options = PAGXExporter::Options;
 
-static std::string Serialize(const PAGXDocument& doc, const Options& options,
-                             PAGXArchiveWriter* archive);
-static void WriteColorSource(XMLBuilder& xml, const ColorSource* node, PAGXArchiveWriter* archive);
-static void WriteVectorElement(XMLBuilder& xml, const Element* node, const Options& options,
-                               PAGXArchiveWriter* archive);
 static void WriteLayerStyle(XMLBuilder& xml, const LayerStyle* node);
 static void WriteLayerFilter(XMLBuilder& xml, const LayerFilter* node);
-static void WriteResource(XMLBuilder& xml, const Node* node, const Options& options,
-                          PAGXArchiveWriter* archive);
-static void WriteLayer(XMLBuilder& xml, const Layer* node, const Options& options,
-                       PAGXArchiveWriter* archive);
 static void WriteAnimation(XMLBuilder& xml, const Animation* animation);
 
 static void WriteCustomData(XMLBuilder& xml, const Node* node) {
@@ -619,7 +632,8 @@ static void WriteGradientCommon(XMLBuilder& xml, const Gradient* gradient) {
   }
 }
 
-static void WriteColorSource(XMLBuilder& xml, const ColorSource* node, PAGXArchiveWriter* archive) {
+void PAGXSerializer::writeColorSource(const ColorSource* node) {
+  auto& xml = _xml;
   switch (node->nodeType()) {
     case NodeType::SolidColor: {
       auto solid = static_cast<const SolidColor*>(node);
@@ -685,7 +699,7 @@ static void WriteColorSource(XMLBuilder& xml, const ColorSource* node, PAGXArchi
       auto pattern = static_cast<const ImagePattern*>(node);
       xml.openElement("ImagePattern");
       xml.addAttribute("id", pattern->id);
-      WriteImageReference(xml, pattern->image, archive);
+      writeImageReference(pattern->image);
       if (pattern->tileModeX != Default<ImagePattern>().tileModeX) {
         xml.addAttribute("tileModeX", TileModeToString(pattern->tileModeX));
       }
@@ -717,8 +731,8 @@ static void WriteColorSource(XMLBuilder& xml, const ColorSource* node, PAGXArchi
 // VectorElement writing
 //==============================================================================
 
-static void WriteVectorElement(XMLBuilder& xml, const Element* node, const Options& options,
-                               PAGXArchiveWriter* archive) {
+void PAGXSerializer::writeVectorElement(const Element* node) {
+  auto& xml = _xml;
   switch (node->nodeType()) {
     case NodeType::Rectangle: {
       auto rect = static_cast<const Rectangle*>(node);
@@ -863,7 +877,7 @@ static void WriteVectorElement(XMLBuilder& xml, const Element* node, const Optio
       xml.addDimensionAttribute("width", text->width, text->percentWidth);
       xml.addDimensionAttribute("height", text->height, text->percentHeight);
       WriteCustomData(xml, node);
-      if (options.skipGlyphData || text->glyphRuns.empty()) {
+      if (_options.skipGlyphData || text->glyphRuns.empty()) {
         xml.closeElementSelfClosing();
       } else {
         xml.closeElementStart();
@@ -954,7 +968,7 @@ static void WriteVectorElement(XMLBuilder& xml, const Element* node, const Optio
       WriteCustomData(xml, node);
       if (needsInlineColorSource) {
         xml.closeElementStart();
-        WriteColorSource(xml, fill->color, archive);
+        writeColorSource(fill->color);
         xml.closeElement();
       } else {
         xml.closeElementSelfClosing();
@@ -992,7 +1006,7 @@ static void WriteVectorElement(XMLBuilder& xml, const Element* node, const Optio
       WriteCustomData(xml, node);
       if (needsInlineColorSource) {
         xml.closeElementStart();
-        WriteColorSource(xml, stroke->color, archive);
+        writeColorSource(stroke->color);
         xml.closeElement();
       } else {
         xml.closeElementSelfClosing();
@@ -1185,7 +1199,7 @@ static void WriteVectorElement(XMLBuilder& xml, const Element* node, const Optio
       } else {
         xml.closeElementStart();
         for (const auto& element : textBox->elements) {
-          WriteVectorElement(xml, element, options, archive);
+          writeVectorElement(element);
         }
         xml.closeElement();
       }
@@ -1251,7 +1265,7 @@ static void WriteVectorElement(XMLBuilder& xml, const Element* node, const Optio
       } else {
         xml.closeElementStart();
         for (const auto& element : group->elements) {
-          WriteVectorElement(xml, element, options, archive);
+          writeVectorElement(element);
         }
         xml.closeElement();
       }
@@ -1525,14 +1539,14 @@ static std::string EscapeEnumOption(const std::string& option) {
   return escaped;
 }
 
-static void WriteResource(XMLBuilder& xml, const Node* node, const Options& options,
-                          PAGXArchiveWriter* archive) {
+void PAGXSerializer::writeResource(const Node* node) {
+  auto& xml = _xml;
   switch (node->nodeType()) {
     case NodeType::Image: {
       auto image = static_cast<const Image*>(node);
       xml.openElement("Image");
       xml.addAttribute("id", image->id);
-      auto source = ImageSourceForXML(image, archive);
+      auto source = ImageSourceForXML(image, _archive);
       if (!source.empty()) {
         xml.addAttribute("source", source);
       } else {
@@ -1569,7 +1583,7 @@ static void WriteResource(XMLBuilder& xml, const Node* node, const Options& opti
       } else {
         xml.closeElementStart();
         for (const auto& layer : comp->layers) {
-          WriteLayer(xml, layer, options, archive);
+          writeLayer(layer);
         }
         if (!comp->animations.empty()) {
           xml.openElement("Animations");
@@ -1587,7 +1601,7 @@ static void WriteResource(XMLBuilder& xml, const Node* node, const Options& opti
           xml.closeElement();
         }
         for (const auto& bind : comp->dataBinds) {
-          WriteResource(xml, bind, options, archive);
+          writeResource(bind);
         }
         xml.closeElement();
       }
@@ -1595,7 +1609,7 @@ static void WriteResource(XMLBuilder& xml, const Node* node, const Options& opti
     }
     case NodeType::Font: {
       // Skip Font resources if skipGlyphData is true
-      if (options.skipGlyphData) {
+      if (_options.skipGlyphData) {
         break;
       }
       auto font = static_cast<const Font*>(node);
@@ -1620,7 +1634,7 @@ static void WriteResource(XMLBuilder& xml, const Node* node, const Options& opti
             xml.addAttribute("path", PathDataToSVGString(*glyph->path));
           }
           if (glyph->image != nullptr) {
-            WriteImageReference(xml, glyph->image, archive);
+            writeImageReference(glyph->image);
           }
           if (glyph->offset != Default<Glyph>().offset) {
             xml.addAttribute("offset", PointToString(glyph->offset));
@@ -1639,7 +1653,7 @@ static void WriteResource(XMLBuilder& xml, const Node* node, const Options& opti
     case NodeType::ConicGradient:
     case NodeType::DiamondGradient:
     case NodeType::ImagePattern: {
-      WriteColorSource(xml, static_cast<const ColorSource*>(node), archive);
+      writeColorSource(static_cast<const ColorSource*>(node));
       break;
     }
     case NodeType::ViewModel: {
@@ -1748,8 +1762,8 @@ static void WriteResource(XMLBuilder& xml, const Node* node, const Options& opti
 // Layer writing
 //==============================================================================
 
-static void WriteLayer(XMLBuilder& xml, const Layer* node, const Options& options,
-                       PAGXArchiveWriter* archive) {
+void PAGXSerializer::writeLayer(const Layer* node) {
+  auto& xml = _xml;
   xml.openElement("Layer");
   xml.addAttribute("id", node->id);
   xml.addAttribute("name", node->name);
@@ -1860,7 +1874,7 @@ static void WriteLayer(XMLBuilder& xml, const Layer* node, const Options& option
 
   // Write VectorElement (contents) directly without container node.
   for (const auto& element : node->contents) {
-    WriteVectorElement(xml, element, options, archive);
+    writeVectorElement(element);
   }
 
   // Write LayerStyle (styles) directly without container node.
@@ -1902,7 +1916,7 @@ static void WriteLayer(XMLBuilder& xml, const Layer* node, const Options& option
 
   // Write child Layers.
   for (const auto& child : node->children) {
-    WriteLayer(xml, child, options, archive);
+    writeLayer(child);
   }
 
   xml.closeElement();
@@ -1913,13 +1927,15 @@ static void WriteLayer(XMLBuilder& xml, const Layer* node, const Options& option
 //==============================================================================
 
 std::string PAGXExporter::ToXML(const PAGXDocument& doc, const Options& options) {
-  return Serialize(doc, options, nullptr);
+  PAGXSerializer serializer(options, nullptr);
+  return serializer.serialize(doc);
 }
 
 std::shared_ptr<Data> PAGXExporter::ToData(const PAGXDocument& doc, const Options& options,
                                            std::string* errorMsg) {
   PAGXArchiveWriter archive(doc);
-  auto xml = Serialize(doc, options, &archive);
+  PAGXSerializer serializer(options, &archive);
+  auto xml = serializer.serialize(doc);
   auto data = archive.Finish(xml, errorMsg);
   if (data != nullptr && errorMsg != nullptr) {
     auto warning = archive.DescribeUnresolvedReferences();
@@ -1928,9 +1944,12 @@ std::shared_ptr<Data> PAGXExporter::ToData(const PAGXDocument& doc, const Option
   return data;
 }
 
-static std::string Serialize(const PAGXDocument& doc, const Options& options,
-                             PAGXArchiveWriter* archive) {
-  XMLBuilder xml(true);
+PAGXSerializer::PAGXSerializer(const Options& options, PAGXArchiveWriter* archive)
+    : _xml(true), _options(options), _archive(archive) {
+}
+
+std::string PAGXSerializer::serialize(const PAGXDocument& doc) {
+  auto& xml = _xml;
   xml.appendDeclaration();
 
   xml.openElement("pagx");
@@ -1942,7 +1961,7 @@ static std::string Serialize(const PAGXDocument& doc, const Options& options,
 
   // Write Layers first (for better readability)
   for (const auto& layer : doc.layers) {
-    WriteLayer(xml, layer, options, archive);
+    writeLayer(layer);
   }
   // Write the document-level <Animations> block. doc.animations holds Animation and StateMachine
   // definitions parsed from the document's <Animations> block (in declaration order). Animation and
@@ -2016,7 +2035,7 @@ static std::string Serialize(const PAGXDocument& doc, const Options& options,
     xml.closeElement();
   }
   for (const auto& bind : doc.dataBinds) {
-    WriteResource(xml, bind, options, archive);
+    writeResource(bind);
   }
 
   // Write Resources section at the end (only if there are exportable resources)
@@ -2025,7 +2044,7 @@ static std::string Serialize(const PAGXDocument& doc, const Options& options,
     if (resource->id.empty() || !IsExportableResource(resource.get())) {
       continue;
     }
-    if (options.skipGlyphData && resource->nodeType() == NodeType::Font) {
+    if (_options.skipGlyphData && resource->nodeType() == NodeType::Font) {
       continue;
     }
     hasResources = true;
@@ -2037,7 +2056,7 @@ static std::string Serialize(const PAGXDocument& doc, const Options& options,
 
     for (const auto& resource : doc.nodes) {
       if (!resource->id.empty() && IsExportableResource(resource.get())) {
-        WriteResource(xml, resource.get(), options, archive);
+        writeResource(resource.get());
       }
     }
 
