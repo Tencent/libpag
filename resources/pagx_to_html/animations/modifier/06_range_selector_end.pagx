@@ -2,7 +2,6 @@
 <!-- Tests: RangeSelector end widens the rampUp range from the first quarter to the whole word, so each
      glyph's lift shrinks as the ramp stretches across it.
      Target: RangeSelector  Channel: end  Type: float
-     Expect: supported
      Note: 文本类用例按 README §6.1：显式 letterSpacing，逐字几何以 PAGX layoutRuns 为准。
      Ref: PAGXHtmlTest.AnimationRangeSelectorStartFansOutToGlyphs -->
 <pagx width="320" height="200">

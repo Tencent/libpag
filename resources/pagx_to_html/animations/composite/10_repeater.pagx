@@ -2,7 +2,6 @@
 <!-- Tests: One Repeater drives every channel at once while its copy count changes from two to five, so each frame
      has to re-expand the copies with a moving pivot, step, scale, rotation and alpha ramp.
      Target: Composite  Channel: copies,offset,anchor.x,anchor.y,position.x,position.y,rotation,scale.x,scale.y,startAlpha,endAlpha  Type: mixed
-     Expect: supported
      Ref: - -->
 <pagx width="320" height="200">
   <Layer left="0" right="0" top="0" bottom="0">

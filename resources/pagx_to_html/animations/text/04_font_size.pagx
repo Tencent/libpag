@@ -2,7 +2,6 @@
 <!-- Tests: A font size channel scales the glyphs up from a small size, so the exported keyframes have to drive a
      length that CSS cannot take from the same property as the static style.
      Target: Text  Channel: fontSize  Type: float
-     Expect: supported
      Ref: - -->
 <pagx width="320" height="200">
   <Layer left="0" right="0" top="0" bottom="0">

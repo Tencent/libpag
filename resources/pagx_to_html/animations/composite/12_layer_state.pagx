@@ -3,7 +3,6 @@
      the backdrop, and visible hides the second card in the middle of the timeline. Both are held
      rather than interpolated, so the exporter has to emit step stops and keep them per channel.
      Target: Layer  Channel: blendMode,visible  Type: int,bool
-     Expect: supported
      Ref: - -->
 <pagx width="320" height="200">
   <Layer left="0" right="0" top="0" bottom="0">

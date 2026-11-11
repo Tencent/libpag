@@ -2,7 +2,6 @@
 <!-- Tests: a keyframed color that already carries half alpha is multiplied by the static Fill
      alpha of 0.5, so the animated fill must never exceed a quarter opacity.
      Target: Fill  Channel: color  Type: color
-     Expect: supported
      Ref: - -->
 <pagx width="320" height="200">
   <Layer left="0" right="0" top="0" bottom="0">

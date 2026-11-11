@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: InnerShadowFilter color shifts the rim from deep navy to bright amber, so the whole inner shadow re-tints.
      Target: InnerShadowFilter  Channel: color  Type: color
-     Expect: supported
      Ref: - -->
 <pagx width="320" height="200">
   <Layer left="0" right="0" top="0" bottom="0">

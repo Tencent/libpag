@@ -3,7 +3,6 @@
      Ellipse w/h/position, Polystar pointCount and the four radius/roundness channels plus rotation and
      position. Each node has to rebuild one path per frame from several independent channels.
      Target: Composite  Channel: size.width,size.height,position.x,position.y,roundness,pointCount,outerRadius,innerRadius,outerRoundness,innerRoundness,rotation  Type: mixed
-     Expect: supported
      Ref: - -->
 <pagx width="320" height="200">
   <Layer left="0" right="0" top="0" bottom="0">

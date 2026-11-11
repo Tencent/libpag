@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: DropShadowFilter offsetY moves a hard shadow from behind the box to below it.
      Target: DropShadowFilter  Channel: offsetY  Type: float
-     Expect: supported
      Ref: - -->
 <pagx width="320" height="200">
   <Layer left="0" right="0" top="0" bottom="0">

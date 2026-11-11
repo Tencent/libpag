@@ -2,7 +2,6 @@
 <!-- Tests: A card whose drop shadow grows (spread), slides (offsetX) and re-tints (color) while an
      inner shadow on the second card re-colours: two style nodes animating on the same timeline.
      Target: DropShadowStyle, InnerShadowStyle  Channel: spread, offsetX, color  Type: mixed
-     Expect: supported
      Ref: PAGXHtmlTest.AnimationShadowStyleKeyframes -->
 <pagx width="320" height="200">
   <Layer left="0" right="0" top="0" bottom="0">

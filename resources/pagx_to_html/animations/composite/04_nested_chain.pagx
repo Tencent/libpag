@@ -2,7 +2,6 @@
 <!-- Tests: A Layer, a Group and a TextBox each animate their own position / rotation / scale / skew / anchor /
      alpha, so three transform chains and three opacity factors stack on one element tree.
      Target: Composite  Channel: alpha,position.x,position.y,rotation,scale.x,scale.y,skew,skewAxis,anchor.x,anchor.y,alpha  Type: mixed
-     Expect: supported
      Ref: - -->
 <pagx width="320" height="200">
   <Layer left="0" right="0" top="0" bottom="0">

@@ -3,7 +3,6 @@
      skew.x / skew.y / anchor.x / anchor.y / alpha. The keys are staggered so the exporter has to merge
      nine channels into one transform and one opacity track instead of replaying a single curve.
      Target: Composite  Channel: x,y,rotation.z,scale.x,scale.y,skew.x,skew.y,anchor.x,anchor.y,alpha  Type: mixed
-     Expect: supported
      Ref: - -->
 <pagx width="320" height="200">
   <Layer left="0" right="0" top="0" bottom="0">

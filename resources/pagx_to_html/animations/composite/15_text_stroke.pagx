@@ -2,7 +2,6 @@
 <!-- Tests: A TextModifier strokes its glyphs and the stroke re-colours while the same modifier
      rotates them: two modifier channels plus a pose channel on one timeline.
      Target: TextModifier  Channel: strokeColor,strokeWidth,rotation  Type: mixed
-     Expect: supported
      Ref: PAGXHtmlTest.AnimationTextModifierStroke -->
 <pagx width="320" height="200">
   <Layer left="0" right="0" top="0" bottom="0">

@@ -2,7 +2,6 @@
 <!-- Tests: RangeSelector start widens the selector from the first glyph to the whole word, so the text modifier
      lifts letters one by one.
      Target: RangeSelector  Channel: start  Type: float
-     Expect: supported
      Note: 文本类用例按 README §6.1：显式 letterSpacing，逐字几何以 PAGX layoutRuns 为准。
      Ref: - -->
 <pagx width="320" height="200">

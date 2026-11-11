@@ -3,7 +3,6 @@
      share one transform list, so the frame must emit the full chain (translate + rotate) and drop the
      tag's left/top; emitting only the position delta loses both the base position and the rotation.
      Target: Layer  Channel: x, rotation.z  Type: float
-     Expect: supported
      Ref: PAGXHtmlTest.AnimationLayerPositionAndPoseShareOneTransform -->
 <pagx width="320" height="200">
   <Layer left="0" right="0" top="0" bottom="0"><Rectangle left="0" right="0" top="0" bottom="0"/><Fill color="#F8FAFC"/></Layer>

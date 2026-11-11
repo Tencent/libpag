@@ -2,7 +2,6 @@
 <!-- Tests: under pingPong the evaluationOffset is applied to the raw timeline before the triangle
      wave fold, so the mirrored phase is offset as well.
      Target: Layer  Channel: alpha  Type: float
-     Expect: supported
      Ref: test/src/PAGXTest.cpp:7035 -->
 <pagx width="320" height="200">
   <Resources>

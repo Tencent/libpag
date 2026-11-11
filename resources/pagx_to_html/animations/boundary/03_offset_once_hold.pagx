@@ -4,7 +4,6 @@
      the exported keyframes need explicit 0% and 100% stops instead of interpolating from the
      element's static style.
      Target: Layer  Channel: alpha,x  Type: float
-     Expect: supported
      Ref: - -->
 <pagx width="400" height="160">
   <Layer left="0" right="0" top="0" bottom="0">

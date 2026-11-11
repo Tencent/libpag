@@ -3,7 +3,6 @@
      replaces the layer's x/y translation, so each key carries the translate that keeps the box on
      the canvas.
      Target: Layer  Channel: matrix  Type: matrix
-     Expect: supported
      Ref: - -->
 <pagx width="320" height="200">
   <Layer left="0" right="0" top="0" bottom="0">

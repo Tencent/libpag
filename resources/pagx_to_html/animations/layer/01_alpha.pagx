@@ -3,7 +3,6 @@
      canonical baseline for the alpha channel and also the reference for linear interpolation with
      loop="once", so the interpolation and timing families do not repeat it.
      Target: Layer  Channel: alpha  Type: float
-     Expect: supported
      Ref: - -->
 <pagx width="320" height="200">
   <Layer left="0" right="0" top="0" bottom="0">

@@ -2,7 +2,6 @@
 <!-- Tests: a contour mask Path collapses by moving its two right edge points on the x axis, so the
      masked content is fully visible at the start and almost fully clipped at the end.
      Target: Path  Channel: point1.x,point2.x  Type: float
-     Expect: supported
      Ref: test/src/PAGXTest.cpp:11010 -->
 <pagx width="320" height="200">
   <Layer left="0" right="0" top="0" bottom="0">

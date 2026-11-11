@@ -2,7 +2,6 @@
 <!-- Tests: hold interpolation keeps each key value flat until the next key, so the alpha steps land in
      the middle of the timeline instead of at the end of it.
      Target: Layer  Channel: alpha  Type: float
-     Expect: supported
      Ref: - -->
 <pagx width="320" height="200">
   <Layer left="0" right="0" top="0" bottom="0">

@@ -2,7 +2,6 @@
 <!-- Tests: RangeSelector offset slides a half-word rampDown window across the text, so the lift sweeps
      from the left glyphs to the right ones.
      Target: RangeSelector  Channel: offset  Type: float
-     Expect: supported
      Note: 文本类用例按 README §6.1：显式 letterSpacing，逐字几何以 PAGX layoutRuns 为准。
      Ref: PAGXHtmlTest.AnimationRangeSelectorStartFansOutToGlyphs -->
 <pagx width="320" height="200">

@@ -2,7 +2,6 @@
 <!-- Tests: when the last key sits 30 frames before the end of a looping animation the value holds
      from that key to the end of every cycle.
      Target: Layer  Channel: alpha  Type: float
-     Expect: supported
      Ref: - -->
 <pagx width="320" height="200">
   <Layer left="0" right="0" top="0" bottom="0">

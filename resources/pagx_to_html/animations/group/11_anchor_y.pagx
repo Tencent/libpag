@@ -2,7 +2,6 @@
 <!-- Tests: Group anchor.y slides the pivot of a statically rotated group, so the triangle swings around the new
      pivot instead of spinning in place.
      Target: Group  Channel: anchor.y  Type: float
-     Expect: supported
      Ref: - -->
 <pagx width="320" height="200">
   <Layer left="0" right="0" top="0" bottom="0">

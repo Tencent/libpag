@@ -3,7 +3,6 @@
      start / end / offset on one path, plus RoundCorner.radius on a second shape. Stroke parameters,
      dash phase and the trim window all rewrite the same SVG element per frame.
      Target: Composite  Channel: color,color,alpha,width,dashOffset,miterLimit,start,end,offset,radius  Type: mixed
-     Expect: supported
      Ref: - -->
 <pagx width="320" height="200">
   <Layer left="0" right="0" top="0" bottom="0">

@@ -2,7 +2,6 @@
 <!-- Tests: a Fill references a SolidColor resource by id and the animation drives the resource
      itself rather than the painter.
      Target: SolidColor  Channel: color  Type: color
-     Expect: supported
      Ref: - -->
 <pagx width="320" height="200">
   <Resources>

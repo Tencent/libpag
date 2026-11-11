@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: A Repeater startAlpha fades the first copy in, so the row goes from tail-only to fully fanned.
      Target: Repeater  Channel: startAlpha  Type: float
-     Expect: supported
      Ref: - -->
 <pagx width="320" height="200">
   <Layer left="0" right="0" top="0" bottom="0">
