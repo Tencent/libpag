@@ -766,6 +766,15 @@ static CssLineBoxAlignment ComputeLineBoxAlignment(const std::string& fontFamily
   return result;
 }
 
+float TextLineHeightForCSS(const std::string& fontFamily, const std::string& fontStyle,
+                           float fontSize, bool singleLine) {
+  auto alignment = ComputeLineBoxAlignment(fontFamily, fontStyle, fontSize);
+  if (!alignment.hasFont) {
+    return 0.0f;
+  }
+  return singleLine ? alignment.singleLineHeight : alignment.lineHeight;
+}
+
 void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
                            const Stroke* stroke, const TextBox* tb, float alpha) {
   if (!text->glyphRuns.empty()) {

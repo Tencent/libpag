@@ -2288,6 +2288,15 @@ void EmitTextCssAtFrame(const DomTargetBundle& bundle, const BundleChannelSet& c
   if (chSet.fontSizeCh != nullptr) {
     float size = EvalFloatChannel(chSet.fontSizeCh, t, text != nullptr ? text->fontSize : 0.0f);
     AppendCssDecl(decls, "font-size", CssFloatToString(size) + "px");
+    // The line box is what puts the glyphs on PAGX's baseline, and it scales with the font: leaving
+    // it at the authored size makes a growing font drift off its row (0.92 -> 0.39 on text/04).
+    if (text != nullptr) {
+      bool singleLine = text->text.find('\n') == std::string::npos;
+      float lineHeight = TextLineHeightForCSS(text->fontFamily, text->fontStyle, size, singleLine);
+      if (lineHeight > 0.0f) {
+        AppendCssDecl(decls, "line-height", CssFloatToString(lineHeight) + "px");
+      }
+    }
   }
   if (chSet.letterSpacingCh != nullptr) {
     float spacing =

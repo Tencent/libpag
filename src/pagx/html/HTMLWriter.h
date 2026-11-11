@@ -607,6 +607,12 @@ struct RichTextSpan {
   const Stroke* stroke = nullptr;
 };
 
+// Line height that puts browser-rendered text on the same rows as PAGX's own layout: the single
+// line box is shrunk onto PAGX's baseline row, a multi-line block keeps PAGX's line advance.
+// Returns 0 when the family cannot be resolved (the caller then keeps the default line box).
+float TextLineHeightForCSS(const std::string& fontFamily, const std::string& fontStyle,
+                           float fontSize, bool singleLine);
+
 class HTMLWriter {
  public:
   HTMLWriter(HTMLBuilder* defs, HTMLWriterContext* ctx) : _defs(defs), _ctx(ctx) {
