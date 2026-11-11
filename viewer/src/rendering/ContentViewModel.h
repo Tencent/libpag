@@ -117,8 +117,8 @@ class ContentViewModel : public QObject {
   /// Resets the view transform to the default (no zoom, no pan).
   void resetView();
 
-  /// Adjusts the pan offset to compensate for a surface size change, keeping the content visually
-  /// anchored at the same position. All parameters are in surface pixel coordinates.
+  /// Adjusts the pan offset to preserve the content point at the viewport center while keeping user
+  /// zoom. All parameters are in surface pixel coordinates.
   void adjustForSurfaceResize(double oldSurfaceWidth, double oldSurfaceHeight,
                               double newSurfaceWidth, double newSurfaceHeight, double contentWidth,
                               double contentHeight);

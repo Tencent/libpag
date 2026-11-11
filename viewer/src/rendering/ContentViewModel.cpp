@@ -83,18 +83,15 @@ void ContentViewModel::adjustForSurfaceResize(double oldSurfaceWidth, double old
   }
   auto oldContentScale = std::min(oldSurfaceWidth / contentWidth, oldSurfaceHeight / contentHeight);
   auto newContentScale = std::min(newSurfaceWidth / contentWidth, newSurfaceHeight / contentHeight);
-  auto oldContentOffsetX = (oldSurfaceWidth - contentWidth * oldContentScale) * 0.5;
-  auto oldContentOffsetY = (oldSurfaceHeight - contentHeight * oldContentScale) * 0.5;
-  auto newContentOffsetX = (newSurfaceWidth - contentWidth * newContentScale) * 0.5;
-  auto newContentOffsetY = (newSurfaceHeight - contentHeight * newContentScale) * 0.5;
+  auto ratio = newContentScale / oldContentScale;
+  // Scale center-relative pan by the fit ratio to preserve the content at the viewport center.
   {
     std::lock_guard<std::mutex> lock(viewTransformMutex);
-    if (viewTransform.zoomScale == 1.0 && viewTransform.offsetX == 0.0 &&
-        viewTransform.offsetY == 0.0) {
-      return;
-    }
-    viewTransform.offsetX += (oldContentOffsetX - newContentOffsetX) * viewTransform.zoomScale;
-    viewTransform.offsetY += (oldContentOffsetY - newContentOffsetY) * viewTransform.zoomScale;
+    auto zoomOffsetScale = (viewTransform.zoomScale - 1) * 0.5;
+    viewTransform.offsetX = (viewTransform.offsetX + oldSurfaceWidth * zoomOffsetScale) * ratio -
+                            newSurfaceWidth * zoomOffsetScale;
+    viewTransform.offsetY = (viewTransform.offsetY + oldSurfaceHeight * zoomOffsetScale) * ratio -
+                            newSurfaceHeight * zoomOffsetScale;
   }
 }
 

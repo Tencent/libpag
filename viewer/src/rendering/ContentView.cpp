@@ -20,6 +20,7 @@
 #include <QQuickWindow>
 #include <QSGImageNode>
 #include <algorithm>
+#include <cmath>
 #include "RenderThread.h"
 
 namespace pag {
@@ -166,29 +167,22 @@ QRectF ContentView::textureRect(QSGTexture* texture) const {
   }
   auto textureWidth = static_cast<double>(textureSize.width());
   auto textureHeight = static_cast<double>(textureSize.height());
-  // Both renderers fit the content into the surface at a uniform scale and center it, so the
-  // content area of the texture is known from its size alone. Placing that area at the same fit in
-  // the current canvas makes a stale frame look like the frame that is about to be rendered.
+  auto pixelRatio = window() == nullptr ? 1.0 : window()->devicePixelRatio();
+  auto targetWidth = std::ceil(rect.width() * pixelRatio);
+  auto targetHeight = std::ceil(rect.height() * pixelRatio);
   auto textureFit = std::min(textureWidth / contentWidth, textureHeight / contentHeight);
-  auto canvasFit = std::min(rect.width() / contentWidth, rect.height() / contentHeight);
+  auto canvasFit = std::min(targetWidth / contentWidth, targetHeight / contentHeight);
   if (textureFit <= 0) {
     return rect;
   }
-  auto transform = viewModel->getViewTransform();
-  auto pixelRatio = window() == nullptr ? 1.0 : window()->devicePixelRatio();
-  auto scale = canvasFit / textureFit;
-  auto contentX =
-      ((textureWidth - contentWidth * textureFit) * 0.5) * transform.zoomScale + transform.offsetX;
-  auto contentY = ((textureHeight - contentHeight * textureFit) * 0.5) * transform.zoomScale +
-                  transform.offsetY;
-  auto targetX = ((rect.width() - contentWidth * canvasFit) * 0.5) * transform.zoomScale +
-                 transform.offsetX / pixelRatio;
-  auto targetY = ((rect.height() - contentHeight * canvasFit) * 0.5) * transform.zoomScale +
-                 transform.offsetY / pixelRatio;
-  auto width = textureWidth * scale;
-  auto height = textureHeight * scale;
-  return {rect.x() + targetX - contentX * scale, rect.y() + targetY - contentY * scale, width,
-          height};
+  // Scale the previous canvas around its center so the same content point remains centered.
+  // Do not infer old frame placement from the current mutable user transform.
+  auto ratio = canvasFit / textureFit;
+  auto width = textureWidth * ratio;
+  auto height = textureHeight * ratio;
+  return {rect.x() + (targetWidth - width) / (2 * pixelRatio),
+          rect.y() + (targetHeight - height) / (2 * pixelRatio), width / pixelRatio,
+          height / pixelRatio};
 }
 
 }  // namespace pag
