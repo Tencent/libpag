@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <QEventLoop>
 #include "ui/AlertInfoModel.h"
 #include "ui/BaseWindow.h"
 
@@ -37,10 +38,11 @@ class AlertWindow : public BaseWindow {
 
  private:
   void init(const std::vector<AlertInfo>& infos);
-  void wait() const;
+  void wait();
 
   bool continue_ = false;
   bool cancel = false;
+  QEventLoop* eventLoop = nullptr;
   std::unique_ptr<AlertInfoModel> alertInfoModel = nullptr;
 };
 
