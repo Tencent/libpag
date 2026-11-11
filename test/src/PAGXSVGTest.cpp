@@ -6500,6 +6500,58 @@ PAGX_TEST(PAGXSVGTest, SVGExport_TextBoxPreservesWhitespace) {
   EXPECT_NE(svg.find("A  B"), std::string::npos);
 }
 
+// ST30: a tab stop cannot be represented by SVG whitespace, so the native box splits the run and
+// positions the post-tab segment from the layout glyph x.
+PAGX_TEST(PAGXSVGTest, SVGExport_TextBoxTabUsesLayoutPosition) {
+  auto doc = pagx::PAGXDocument::Make(200, 100);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* box = doc->makeNode<pagx::TextBox>();
+  box->width = 180;
+  box->height = 80;
+  auto* text = doc->makeNode<pagx::Text>();
+  text->text = "A\tB";
+  text->fontFamily = "Arial";
+  text->fontSize = 20;
+  box->elements = {text, MakeSolidFillSVG(doc.get(), 0, 0, 0)};
+  layer->contents = {box};
+  doc->layers.push_back(layer);
+
+  pagx::SVGExportOptions options = {};
+  options.convertTextToPath = false;
+  auto svg = pagx::SVGExporter::ToSVG(*doc, options);
+  EXPECT_EQ(svg.find('\t'), std::string::npos);
+  size_t tspanCount = 0;
+  for (size_t pos = svg.find("<tspan"); pos != std::string::npos;
+       pos = svg.find("<tspan", pos + 1)) {
+    ++tspanCount;
+  }
+  EXPECT_GE(tspanCount, 2u);
+}
+
+// ST30: an RTL paragraph uses the right edge as its inline start; the base direction must be
+// exported or the browser lays mixed digits/punctuation with an LTR base.
+PAGX_TEST(PAGXSVGTest, SVGExport_TextBoxRTLBaseDirection) {
+  auto doc = pagx::PAGXDocument::Make(120, 100);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* box = doc->makeNode<pagx::TextBox>();
+  box->width = 100;
+  box->height = 60;
+  auto* text = doc->makeNode<pagx::Text>();
+  text->text = "שלום";
+  text->fontFamily = "Arial";
+  text->fontSize = 20;
+  box->elements = {text, MakeSolidFillSVG(doc.get(), 0, 0, 0)};
+  layer->contents = {box};
+  doc->layers.push_back(layer);
+
+  pagx::SVGExportOptions options = {};
+  options.convertTextToPath = false;
+  auto svg = pagx::SVGExporter::ToSVG(*doc, options);
+  EXPECT_NE(svg.find("direction=\"rtl\""), std::string::npos);
+  EXPECT_NE(svg.find("x=\"100\""), std::string::npos);
+  EXPECT_EQ(svg.find("text-anchor=\"end\""), std::string::npos);
+}
+
 // ST30: CJK lines break without spaces, so justify has to use textLength rather than word-spacing.
 PAGX_TEST(PAGXSVGTest, SVGExport_TextBoxCJKJustifyUsesTextLength) {
   auto doc = pagx::PAGXDocument::Make(100, 300);

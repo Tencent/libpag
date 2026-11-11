@@ -3116,6 +3116,47 @@ static int CountWordSpaces(const std::string& text) {
   return count;
 }
 
+// Counts UTF-8 code points in [begin, end). Invalid trailing bytes are ignored.
+static size_t CountCodepoints(const std::string& text, size_t begin, size_t end) {
+  size_t count = 0;
+  size_t i = begin;
+  end = std::min(end, text.size());
+  while (i < end) {
+    auto c = static_cast<unsigned char>(text[i]);
+    size_t bytes = 1;
+    if (c >= 0xF0) {
+      bytes = 4;
+    } else if (c >= 0xE0) {
+      bytes = 3;
+    } else if (c >= 0xC0) {
+      bytes = 2;
+    }
+    if (i + bytes > end) {
+      break;
+    }
+    i += bytes;
+    count++;
+  }
+  return count;
+}
+
+// Flattens the horizontal layout-run x positions in logical glyph order. Returns empty when the
+// layout data is missing so tab handling can fall back to plain spaces.
+static std::vector<float> CollectLayoutGlyphX(const TextLayoutResult& result, const Text* text) {
+  auto* mutableText = const_cast<Text*>(text);
+  const auto* runs = result.getGlyphRuns(mutableText);
+  if (runs == nullptr) {
+    return {};
+  }
+  std::vector<float> xs = {};
+  for (const auto& run : *runs) {
+    for (const auto& position : run.positions) {
+      xs.push_back(position.x);
+    }
+  }
+  return xs;
+}
+
 // CJK scripts break between characters without an ASCII space. Justified native text therefore
 // needs textLength / lengthAdjust rather than word-spacing.
 static bool HasCJKBreakOpportunity(const std::string& text) {
@@ -3238,7 +3279,8 @@ static void ResolveHorizontalAnchoring(const TextBox* box, bool rtl, TextAnchori
       break;
     case TextAlign::Justify:
       out->anchor = TextAnchor::Start;
-      out->anchorX = paddingLeft;
+      // In an RTL paragraph Start sits on the right edge.
+      out->anchorX = rtl ? effectiveWidth - paddingRight : paddingLeft;
       out->justifyWidth = effectiveWidth - paddingLeft - paddingRight;
       break;
     default:
@@ -3647,9 +3689,20 @@ void SVGWriter::writeTextBoxGroup(SVGBuilder& out, const TextBox* textBox,
       out.addAttribute("transform", svgTransform);
     }
     out.addAttribute("xml:space", "preserve");
-    if (anchoring.anchor == TextAnchor::Center) {
+    if (rtl) {
+      out.addAttribute("direction", "rtl");
+    }
+    TextAnchor emitAnchor = anchoring.anchor;
+    if (rtl) {
+      if (emitAnchor == TextAnchor::Start) {
+        emitAnchor = TextAnchor::End;
+      } else if (emitAnchor == TextAnchor::End) {
+        emitAnchor = TextAnchor::Start;
+      }
+    }
+    if (emitAnchor == TextAnchor::Center) {
       out.addAttribute("text-anchor", "middle");
-    } else if (anchoring.anchor == TextAnchor::End) {
+    } else if (emitAnchor == TextAnchor::End) {
       out.addAttribute("text-anchor", "end");
     }
     ApplyTextBoxBodyAttrs(out, textBox);
@@ -3702,10 +3755,46 @@ void SVGWriter::writeTextBoxGroup(SVGBuilder& out, const TextBox* textBox,
         ++i;
         continue;
       }
-      out.openElement("tspan");
-      WriteSharedTextAttrs(out, run.text, TextAnchor::Start);
-      applyPainters(out, runFs, {}, alpha);
-      finishTextElement(out, runFs, alpha, lineText);
+      if (lineText.find('\t') == std::string::npos) {
+        out.openElement("tspan");
+        WriteSharedTextAttrs(out, run.text, TextAnchor::Start);
+        applyPainters(out, runFs, {}, alpha);
+        finishTextElement(out, runFs, alpha, lineText);
+        ++i;
+        continue;
+      }
+      auto glyphX = CollectLayoutGlyphX(layoutResult, run.text);
+      bool mapped = !glyphX.empty() &&
+                    glyphX.size() == CountCodepoints(run.text->text, 0, run.text->text.size());
+      size_t codepointCursor = CountCodepoints(run.text->text, 0, entry.byteStart);
+      size_t segmentStart = 0;
+      while (segmentStart <= lineText.size()) {
+        auto tabPos = lineText.find('\t', segmentStart);
+        std::string segment = lineText.substr(
+            segmentStart, tabPos == std::string::npos ? std::string::npos : tabPos - segmentStart);
+        bool needsPosition = segmentStart > 0;
+        float segmentX = 0;
+        bool hasPosition = false;
+        if (needsPosition && mapped && codepointCursor < glyphX.size()) {
+          segmentX = anchoring.anchorX + glyphX[codepointCursor] - entry.startX;
+          hasPosition = true;
+        }
+        if (needsPosition && !hasPosition) {
+          segment = " " + segment;
+        }
+        out.openElement("tspan");
+        if (hasPosition) {
+          out.addRequiredAttribute("x", segmentX);
+        }
+        WriteSharedTextAttrs(out, run.text, TextAnchor::Start);
+        applyPainters(out, runFs, {}, alpha);
+        finishTextElement(out, runFs, alpha, segment);
+        if (tabPos == std::string::npos) {
+          break;
+        }
+        codepointCursor += CountCodepoints(lineText, segmentStart, tabPos) + 1;
+        segmentStart = tabPos + 1;
+      }
       ++i;
     }
     out.closeElement();
