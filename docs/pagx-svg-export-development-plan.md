@@ -4,6 +4,7 @@
 > 源码基点：`847116b92`。源码定位相对于 `/Users/lifengdy/Desktop/project/libpag`，均使用 `file:line`。
 > 本轮仅修改本文档，没有源码实现、构建、测试或像素验证；所有推荐决策仍待确认。
 > **2026-11-10 补**：新增 1.4 执行分层、4.6 接口迁移、4.7 可用性基线；H0 热修批次（F3 / F5 / F9 / A08）已落地并各带一个回归用例。
+> 本次四项契约补充以 `a7c6c9f23` 重新核对：第2.8节固定ST21/ST22/ST28，第3.8节固定M4/M5依赖及账本门禁。仅补文档，不修改或认证用户已有实现。
 
 ## 1. 总览、范围与待确认决策
 
@@ -207,9 +208,9 @@ Font.glyphs 首次 render 后修改为 undefined（`include/pagx/nodes/Font.h:10
 
 #### S3：文字、最终 glyph 与布局
 
-- 文件：`src/pagx/svg/SVGExporter.cpp`、`src/pagx/utils/TextUtils.{h,cpp}`、`src/pagx/TextLayout.{h,cpp}`、`src/pagx/TextLayoutParams.h`、`src/renderer/GlyphRunRenderer.{h,cpp}`、`src/pagx/utils/Woff2FontGenerator.{h,cpp}`、`test/src/PAGXSVGTest.cpp`。
+- 文件：`src/pagx/svg/SVGExporter.cpp`、`src/pagx/utils/TextUtils.{h,cpp}`、`src/pagx/TextLayout.{h,cpp}`、`src/pagx/TextLayoutParams.h`、`include/pagx/nodes/LayoutNode.h`、`src/pagx/LayoutNode.cpp`、`src/pagx/nodes/TextBox.cpp`、`src/renderer/GlyphRunRenderer.{h,cpp}`、`src/pagx/utils/Woff2FontGenerator.{h,cpp}`、`test/src/PAGXSVGTest.cpp`、`test/src/PAGXTest.cpp`。
 - 任务：TextBox 两模式共用 Painter；layoutRuns / glyphRuns、多 Font / size、7 数组、offset / advance / anchor / faux、bitmap alpha 和 run 顺序；resolved box / valid empty；TextPath 八字段、Selector 全分支、TextModifier base / overlay；有效 fontConfig、Font 不可变与串行缓存。
-- 验收：ST8—ST10、ST18、ST20—ST22、ST28—ST31、ST36 / ST44、C12—C15 / C19；RTL / 竖排 / rich text、Native 损失与 PUA 原文边界独立验证，共用 PPT / HTML 字形路径不回归。
+- 验收：ST8—ST10、ST18、ST20—ST22、ST28—ST31、ST36/ST44、C12—C15/C19；ST21按第2.8.1节分支/数字/排他capture，ST22按TP01—TP16，ST28按第2.8.3节继承入口/逐轴分配/0与NaN。RTL/竖排/rich text、Native损失与PUA原文边界独立验证，PPT/HTML共用字形不回归。
 
 #### S4：几何、Stroke 与 modifier
 
@@ -234,6 +235,134 @@ Font.glyphs 首次 render 后修改为 undefined（`include/pagx/nodes/Font.h:10
 附录 D.1 的 C01—C24 覆盖不可替代的交互，附录 E 的 ST1—ST46 保留缺陷与补核查依据；闭合 enum 逐值、bool 双值、optional unset / 0 / 非 0、数组空 / 短 / 完整 / 超预算。无动画文档开关字节相等只证明无动态不回归，不证明静态像素正确。
 
 原生 / bake 比较同一 D6 / D7 输入，固定资源后采一帧；关键区域、轮廓和字形位置直接检测，SSIM 辅助。源 SVG→PAGX 与 PAGX→SVG 两段分别判损失，不让双方同错的 round-trip 抵消缺陷。
+
+### 2.8 ST21 / ST22 / ST28 的固定实现与验收契约
+
+本节以当前 `a7c6c9f23` 的 PAGX / tgfx 实际实现为依据，补清语义、数字参考与实现入口，不改用另一份 AE 导出，也不新增 TextBox 字段。以下期望值是源码推导的测试标准，尚未在本轮运行验证；旧进度记录中的“已收口”不代替这些组合验收。
+
+#### 2.8.1 ST21：override 是有权重的绘制覆盖，不是无条件换 Fill
+
+**唯一语义：遵守 tgfx::TextModifier + FillPainter / StrokePainter。** `fillColor` / `strokeColor` 的 alpha 是覆盖权重，selector factor 的绝对值参与权重；不直接替换源 Painter，不对原 shader 颜色先做一个简单 lerp。依据 `third_party/tgfx/src/layers/vectors/TextModifier.cpp:44`、`third_party/tgfx/src/layers/vectors/FillStyle.cpp:66`、`third_party/tgfx/src/layers/vectors/StrokeStyle.cpp:63`。
+
+定义 `f` 为组合 selector factor，`u=abs(f)`。GlyphStyle 初始 override 权重 `w=0`，不含原 Fill / Stroke 的颜色。逐个 modifier 按作者顺序累积，旧 override RGB 为 `C`，新 override RGB 为 `U`、alpha 为 `a`：
+
+```text
+t = a * u
+if t <= 0: keep the previous override
+wNext = w + (1 - w) * t
+if t >= 1: CNext = U
+else: CNext = (C * w * (1 - t) + U * t) / wNext
+```
+
+不在 `wNext=0` 时做除法；transparent override 不清除已有覆盖，optional unset 只是不施加这一项。glyph 自身 alpha 独立累积：`gNext = g * max(0, 1 + (modifier.alpha - 1) * u)`。变换仍使用有符号 `f`，不能把所有通道统一改为 `u`。
+
+**最终绘制分支写死如下。** 令 `r = effectivePainterAlpha * glyphStyle.alpha`；effectivePainterAlpha 按实际 Painter / 作用域求值，Layer 的整体合成 alpha 保留在其原位置。原 ColorSource 自带的 alpha 仍在 base shader 内，不再重复计入 `r`。
+
+| 最终覆盖权重 | base 分支 | overlay 分支 |
+|---|---|---|
+| `w=0` | 原 shader，原 Painter blendMode，paint alpha=`r`，绘制一次 | 不绘制 |
+| `0<w<1` | **完整原 shader**，paint alpha=`r`，原 blendMode；不乘 `1-w` | 紧接着绘制 RGB=`C`、shader alpha=`w` 的纯色覆盖，paint alpha=`r`，固定 SrcOver |
+| `w=1` | 不绘制 | 仅纯色覆盖，shader alpha=`1`、paint alpha=`r`，固定 SrcOver |
+
+这是每个有效 Painter、每个连续 glyph-style run 的分支，不是整段文字先画一次 base 再画全部 overlay。overlay 沿用原 Painter 的 placement；Stroke 两分支使用相同最终 runStroke、cap / join、alignment 和原 pathEffect。最终宽度由 `BlendStrokeWidth(baseWidth, GlyphStyle)` 求值，不以颜色权重代替 strokeWidthFactor。没有有效源 Fill / Stroke 时，颜色 modifier **不会凭空创建 Painter**；原 Stroke width<=0 不产生 Painter，不能靠 override 把它复活。
+
+**拆组和累计几何的处理必须具有排他性。** 推荐不把 styled glyph 的局部 Fill 回插到共享 PAGX 元素列表；在导出局部 DrawRecord 中发射最终绘制叶子：
+
+```text
+for each effective painter in draw order:
+  for each captured geometry in that painter:
+    for each contiguous glyph-style run in source order:
+      emit the base branch if w < 1
+      emit the overlay branch if w > 0
+      consume the original draw identity (painter, geometry, run, placement)
+```
+
+同一原 Painter 的旧绘制记录被上述最终分支**替换**，不能保留旧整段 Fill 再追加局部 Fill。发射的叶子不重新进入任何祖先 Painter 的累计 geometry；若确需临时 PAGX Group，必须重建对应 Painter capture 列表及同下标 innerMatrices，并移除它对这些输出克隆的再次消费。**普通嵌套 Group 不是隔离证明**。其他本来就消费同一源 geometry 的合法 Painter 各自保留一次完整分支，不能全局删除所有外部 Fill，也不能把真实多 Painter 合并成一个颜色。
+
+`Painter::captureGeometries` 保存 Geometry 引用而非冻结 glyph style，后置 modifier 会改变已捕获 Painter 最终看到的 glyph；依据 `third_party/tgfx/src/layers/vectors/Painter.cpp:25`、`third_party/tgfx/src/layers/vectors/Painter.cpp:34`。源 Geometry / Font / GlyphRun 不增加 per-character paint 字段，最终 GlyphStyle 与分支由导出局部产物承载。部分覆盖的 base+overlay 不能套统一 `<g opacity=r>`，必须各分支施加 paint alpha，避免改变重叠合成。
+
+**整数几何与可手算的颜色验收：** 采用边长20、采样点位于满覆盖内部的单 glyph，工作色空间SRGB、透明背景、蓝色不透明 base、红色 override。alpha/权重的分数是语义输入，不是模糊几何坐标。
+
+| 输入 | 预期有效绘制及像素（预乘RGBA） |
+|---|---|
+| `w=0, r=1` | 一次蓝色：`(0,0,1,1)` |
+| `w=1/2, r=1` | 蓝base一次+红overlay一次：`(1/2,0,1/2,1)` |
+| `w=1/2, r=1/2` | 两分支分别半透明：`(1/4,0,3/8,5/8)`；非预乘RGB=`(2/5,0,3/5)`，不是alpha=1/2的紫色 |
+| `w=1, r=1/2` | 只有半透明红：`(1/2,0,0,1/2)`；base必须不存在 |
+| 红、绿modifier依次 `a=1, u=1/2` | 累积 `w=3/4, C=(1/3,2/3,0)`；不是最后直接变绿 |
+| 在已有override后加 `a=0` 或 optional unset | 已有 `w,C` 不变；不清空、也不多画 |
+
+还必须验证：gradient / pattern base、非Normal base blend、带描边及strokeWidthFactor、多Painter、后置modifier、bitmap/vector混排、AA边缘。结构断言固定每个来源draw的分支数量和顺序，像素与tgfx对照；AA边缘和复杂blend不能用满覆盖内部公式替代完整渲染。ST21通过这些门禁前不能仅凭“拆成局部Fill”声明已支持。
+
+#### 2.8.2 ST22：以 tgfx 为唯一标准的沿线坐标验收
+
+**以本仓库 tgfx::TextPath 的实际语句为准，不以 AE 样例为基准；AE只可作为附加输入，不能覆盖当前PAGX模型契约。** 当前八个作者字段是 `path, baselineOrigin, baselineAngle, firstMargin, lastMargin, perpendicular, reversed, forceAlignment`，声明见 `include/pagx/nodes/TextPath.h:35`。用户关心的“闭合”“超出路径”“字距”“垂直对齐”分别是路径结构/沿线规则/force间距/normal法向投影，不新增同名字段。
+
+设路径长度`L>0`，`M`为geometry到TextPath共同空间的矩阵，`G`为旧glyph矩阵，`A`为去除G平移后的线性部分，`a`为实际glyph anchor，`p=M*G*a`，baseline origin=`O`，baseline angle=`beta`：
+
+```text
+Normal:
+  d = dot(p - O, (cos(beta), sin(beta)))
+  h = dot(p - O, (-sin(beta), cos(beta)))
+  s = firstMargin + d
+  lastMargin does not participate
+ForceAlignment:
+  extraGap = 0
+  if N > 1 and sum(fontAdvance) > 0:
+    extraGap = (L + lastMargin - firstMargin - sum(fontAdvance)) / (N - 1)
+  s[i] = firstMargin + fontAdvance[i] / 2 + sum(fontAdvance before i) + i * extraGap
+  h = 0
+```
+
+force使用字体水平advance，不额外乘glyph.scale，不拉伸字形；忽略旧position、baselineOrigin/Angle和旧法向偏移。各glyph advance不同时，anchor间距不是等距。`lastMargin`为**终点方向的有符号偏移**：负值留白，正值扩出路径；不能把两端正margin都当内缩。余量为负时保留负extraGap，不自行拒绝或夹零。
+
+然后按固定次序：`reversed`令`s=L-s`；闭合路径仅在`s<0或s>L`时正模回绕，恰好`s=L`保留终点与末段切线；开放路径超端沿起点/终点切线延伸，不裁字也不clamp。normal的新anchor为`q=P(s)+h*(-tangent.y,tangent.x)`；force为`q=P(s)`。reversed改变沿线距离和perpendicular的旋转方向，**不把这个法向再取负**。
+
+perpendicular=true时`R=Rotate(arg(reversed ? -tangent : tangent)-beta)`，force旋转使用beta=0；false时R=I，保留已有glyph线性变换而非强制字形直立。新局部矩阵为 `GNext = inverse(M) * Translate(q - R*A*a) * R*A`，保证`M*GNext*a=q`。使用不可逆M时不强行求逆恢复，按第2.2节有效几何/失败契约处理。多contour当前只测量第一contour，不自行走到下一contour。依据 `third_party/tgfx/src/layers/vectors/TextPath.cpp:95`、`:117`、`:127`、`:155`、`:170`、`:217`。
+
+**统一参考资源，避免依赖系统字体：** 程序构造向量Font，unitsPerEm=100、fontSize=100、三个glyph各advance=20、anchor=(10,0)，旧G分别平移(0,10)、(20,10)、(40,10)，所以旧anchor为(10,10)、(30,10)、(50,10)。可用glyph轮廓矩形(0,-8)到(20,2)，M=I、O=(0,0)、beta=0。定义H100为`M0 0 L100 0`，H200为`M0 0 L200 0`；V100/V200为对应竖直线。闭合Q为`M0 0 L50 0 L50 50 L0 50 Z`，L=200；闭合测试取h=0并用firstMargin设置目标距离。
+
+| 验收ID / 语义 | 输入变化 | 必须相等的参考anchor / 旋转 |
+|---|---|---|
+| TP01 起点偏移 / normal | H100、first=10或-20 | x分别20/40/60或-10/10/30，y均10；H100换H200不自动铺满 |
+| TP02 normal首尾留白 | 固定first=10，改变last为-10/0/20 | 始终(20,10)/(40,10)/(60,10)，证明normal不消费last |
+| TP03 normal法向 / perpendicular | V100、true/false | anchor均(-10,10)/(-10,30)/(-10,50)；true追加+90°，false不加旋转，glyph已有A保留 |
+| TP04 反向距离与法向 | reversed=true，H100/V100 | H为(90,10)/(70,10)/(50,10)、true追加180°；V为(-10,90)/(-10,70)/(-10,50)、true追加-90°；false无追加 |
+| TP05 真反向path≠reversed标记 | H100路径改为`M100 0 L0 0`，reversed=false | anchor=(90,-10)/(70,-10)/(50,-10)，追加180°；不能照TP04保留y=10 |
+| TP06 对齐基准 | 单glyph旧anchor=(15,30)、O=(5,0)、beta=90°、H100 | d=30、h=-10，q=(30,-10)、perpendicular=true追加-90°；normal使用anchor不是glyph左上角 |
+| TP07 force字距与法向 | force=true，H100/H200或V100 | H100=(10,0)/(50,0)/(90,0)，H200=(10,0)/(100,0)/(190,0)；V100=(0,10)/(0,50)/(0,90)；旧y=10消失 |
+| TP08 force首尾符号 | H100，first=10,last=-10 | extraGap=10，x=20/50/80，y=0，正first留起始空白、负last留终止空白 |
+| TP09 开放超端与负间距 | force H100：first=-20,last=20；或first=80,last=-80 | 前者x=-10/50/110沿线延伸；后者extraGap=-60，x=90/50/10，不clamp或拒绝负间距 |
+| TP10 非等advance | force H200，advance=20/40/60、anchor=10/20/30 | extraGap=40，x=10/80/170，不等距anchor也不拉伸glyph |
+| TP11 单字 / 空路径 | force单glyph advance20，first=10，任意last/O/beta | s=20；N=0、path空或L<=0时TextPath不修改glyph，不伪造字形 |
+| TP12 闭合与终点 | Q，s=-10/210/0/200、h=0 | -10→190→(0,10)，210→10→(10,0)；0/200都为(0,0)，0切线向右、200末切线向上，不混同回绕端点 |
+| TP13 先reverse再闭合回绕 | Q，reversed=true，s原=-10/210 | L-s得到210/-10，再模为10/190；q=(10,0)/(0,10)，旋转再用反向切线 |
+| TP14 多contour | H100后追加远处V200，normal距离s=110、h=0 | 仍沿第一H延伸到(110,0)，不进入后续V |
+| TP15 布局与字距单位 | H100设置width=200,left=30,top=40，force三glyph | path变成(30,40)→(230,40)，O变(30,40)；q=(40,40)/(130,40)/(220,40)，glyph advance仍20，不把字形放大两倍 |
+| TP16 force忽略基准、保留A | TP07上改变旧position、O、beta，或给glyph已有90°线性旋转 | q仍与TP07相同；force不消费旧基准，已有A不被清掉，最终R按beta=0求 |
+
+TP03首glyph的true矩阵为`{a=0,b=1,c=-1,d=0,tx=-10,ty=0}`，映射(10,0)得到(-10,10)；false矩阵为Translate(-20,10)。加入非恒等可逆M时直接断言`M*GNext*a=q`，不要只比较一张看起来位置差不多的截图。
+
+布局入口复用 `src/pagx/nodes/TextPath.cpp:35`、`src/pagx/nodes/TextPath.cpp:67` 和 `src/renderer/LayerBuilder.cpp:2344`：先求uniform scale k及平移T，再得到`path'=k*path+T`、`O'=k*O+T`；first/last、font advance、glyph线性矩阵和angle不跟随k再缩放。glyph字距输入若来自Text.letterSpacing，应先塑形生成旧G；normal保留其沿线投影，force按自己的extraGap重排，不另设TextPath letterSpacing。
+
+**通过标准：** TP01—TP16在独立向量字形的anchor/矩阵测试中位置误差<=1e-4文档像素、矩阵分量误差<=1e-4；数值均有限。再用同一fixture对照tgfx和导出SVG的轮廓、裁剪、Painter/override及可见区域，按D6固定环境门禁验收。曲线路径采样复用tgfx PathMeasure，不用AE或自写弧长近似替换；曲线、尖角、TextModifier前后次序与layout另补组合。源码推导坐标不能在本轮标成已通过测试。
+
+#### 2.8.3 ST28：保留，修的是继承尺寸的读取优先级
+
+**不删除ST28，不新增TextBox.width/height/Native字段。** `TextBox : Group : Element, LayoutNode`，width/height实际声明在LayoutNode并被继承：`include/pagx/nodes/TextBox.h:43`、`include/pagx/nodes/Group.h:36`、`include/pagx/nodes/LayoutNode.h:94`、`include/pagx/nodes/LayoutNode.h:100`。Native是SVG导出路径/拟议输出模式，不是TextBox数据字段。
+
+明确入口：XML `width/height`在 `src/pagx/PAGXImporter.cpp:1307` 调用ReadDimension写继承字段；约束分配在 `src/pagx/LayoutNode.cpp:150`；TextBox实际排版在 `src/pagx/nodes/TextBox.cpp:129` 使用layoutWidth/layoutHeight减padding。SVG先在 `src/pagx/svg/SVGExporter.cpp:4048` 完成layout，Native分支 `src/pagx/svg/SVGExporter.cpp:3678` → `writeTextBoxGroup` → `MakeTextBoxParams`又重新选尺寸。当前 `src/pagx/utils/TextUtils.cpp:515`、`:525` 错误先取author值，`:533`再减padding，覆盖了已解析的更高优先级双边/百分比尺寸。
+
+固定修复规则：
+
+- **布局完成的容器TextBox（elements非空）：** EffectiveTextBoxWidth/Height优先读取该次layout的有效外框尺寸，含合法0，不再先返回author值；MakeTextBoxParams只减自身padding一次。实际优先级双边约束→百分比→author→内容测量，布局阶段已完成，导出不得重新计算一套低优先级尺寸。
+- **modifier-only TextBox（elements空）：** 明确author轴可作测量输入，百分比/双边轴必须有真正完成的分配才读取resolved，含合法0；没有任何尺寸来源的轴保持NaN/unbounded。不能把空盒测量的0误作百分比/约束已生效。
+- **实际布局入口必须一起修：** `src/pagx/nodes/TextBox.cpp:134` 调用 `CollectLayoutNodes(elements,true)`，而 `src/pagx/LayoutNode.cpp:267` 当前连空的子TextBox也跳过。限定调整这条收集路径：普通Text仍由typesetting负责，空modifier-only子TextBox加入布局列表，先updateSize(context)完成author/首选测量，再PerformConstraintLayout分配对应轴，随后读取参数；不只在helper里换优先级，也不把未测量的NaN首选尺寸传给分配。
+- **有效性读取固定为逐轴状态：** 复用LayoutNode现有layoutWidth/layoutHeight产物，增加只读 `resolvedLayoutSize()` 访问方法返回原始Size并保留未分配NaN（不是新增作者字段）。helper只在该轴确有分配时读取，合法0不回退；unbounded modifier轴按输入来源保持NaN。`layoutBounds()`会把未知轴伪装成0，不能单靠它或doc.layoutApplied判子轴已分配。
+- helper用于最终输出/运行树的调用前置是对应节点和轴完成有效layout；SVG/PPT入口及LayerBuilder/TextHolder路径共同保证。需要未布局测量的代码留在原测量路径，不调用最终尺寸helper；百分比/双边尚未分配就诊断/先完成布局，不能回退旧author或0。
+- 不覆写author width/height，不通过加默认值/强转绕过未知状态；共用 `TextUtils.h/.cpp` 的helper与参数构造一次修正，覆盖 `src/renderer/LayerBuilder.cpp:3634` 的TextHolder及 `src/pagx/ppt/PPTTextWriter.cpp:1102` 等调用方。
+
+整数验收：父框300×200、无parent padding，TextBox author100×60，left=20/right=30/top=10/bottom=20，自身padding四边10：author保持100×60；resolved外框250×170；有效text params为230×150，**不是当前80×40**。删除双边约束、改percentWidth=80/percentHeight=50时，resolved外框240×100、params220×80；只author时外框100×60、params80×40。Horizontal wrap看有效width，Vertical wrap看有效height。再用300×200外层容器TextBox、无outer padding，内部空modifier-only TextBox percentWidth=80/percentHeight=50，断言它确实参与分配且为240×100而不是测量0；双边left=170/right=130分配width=0应保持合法0。空modifier-only且无尺寸来源保持NaN。另测layout重跑与all-lines Hidden空结果，SDK/Native/PPT/TextHolder不得各选一套宽高。
 
 ## 3. 动效导出：全通道分类与编译
 
@@ -287,7 +416,7 @@ Font.glyphs 首次 render 后修改为 undefined（`include/pagx/nodes/Font.h:10
 | BlendFilter | 1 | `color` | N/G 真正 ColorFilter source/dest/alpha 与固定 blendMode；Plus / 非等价合成 B；M4 | `src/pagx/PAGXNodeChannel.cpp:921` |
 | NoiseFilter | 7 | `size, density, seed, color, firstColor, secondColor, opacity` | B 活跃三 mode / input offset / phase；inactive U/无贡献与 density0 input no-op 分开；M4 分类、MB 可选 | `src/pagx/PAGXNodeChannel.cpp:934` |
 
-合计 175；其中 styles / filters 完整 51 项。当前 `IsSupportedChannel` 只接受 7 类 / 39 项（Layer、Group、TextBox、Rectangle、Ellipse、Fill、Stroke），不是 175 项支持证明，也不额外计 ColorSource（`src/pagx/svg/SVGAnimationPlan.cpp:67`）。
+合计175，其中styles/filters完整51项。原重组基点白名单为7类/39项；本次 `a7c6c9f23` 已增加BlurFilter、四种阴影filter/style的offset/blur及BlendFilter.color，`IsSupportedChannel`共13类/58项（`src/pagx/svg/SVGAnimationPlan.cpp:67`）。这是当前接线集合，不是175项全支持或组合保真证明；颜色源、stop、d及文字展开按本节M4/M5子步骤同步白名单和 `SVGCoverageLedger`。
 
 ### 3.3 表外通道、类型与目标准入
 
@@ -411,15 +540,52 @@ MB范围包含3D、conic/diamond、noise、backdrop/Glass、复杂shape/text/eff
 
 #### M4：颜色源、渐变与可原生 effects
 
-- 文件：`src/pagx/svg/SVGAnimationPlan.cpp`、`src/pagx/svg/SVGAnimationWriter.{h,cpp}`、`src/pagx/svg/SVGExporter.cpp`、`test/src/PAGXSVGTest.cpp`。
-- 任务：SolidColor / linear / radial / stops 的共享引用、defs 实例与动态 fit；LerpColor / P3 / alpha；明确扩 Blur / Drop / Inner / Blend 及 style 可等价参数，逐步输入、spread / behind / Only / region 全时段验证；其余 effect 全部 B/U 判定。
+- 文件：`src/pagx/svg/SVGAnimationPlan.cpp`、`src/pagx/svg/SVGCoverageLedger.{h,cpp}`、`src/pagx/svg/SVGAnimationWriter.{h,cpp}`、`src/pagx/svg/SVGExporter.cpp`、`src/renderer/LayerBuilder.{h,cpp}`、`test/src/PAGXSVGTest.cpp`、`test/src/PAGXTest.cpp`。
+- 任务：按下面M4.0—M4.3顺序落实源/消费者与stop/defs实例映射，再做SolidColor、stop、linear/radial参数及联合fit；LerpColor/P3/alpha；可等价effects作为M4.E支路，逐步输入、spread/behind/Only/region全时段验证；其余effect全部B/U判定。每次放行同步Plan、ledger和真实输出门禁，不将Planned当Supported。
 - 验收：175 表中本阶段每项直接求值 / 像素，完整 51 effect 项不漏；Noise inactive / no-op 与 B 分开，conic / diamond 退化条件覆盖，不用“后续”冒充分类。
 
 #### M5：动态 geometry、文字与 Selector
 
-- 文件：`src/pagx/utils/ModifierResolver.{h,cpp}`、`src/pagx/svg/SVGAnimationPlan.{h,cpp}`、`src/pagx/svg/SVGAnimationWriter.{h,cpp}`、`src/pagx/svg/SVGExporter.cpp`、`src/renderer/LayerBuilder.cpp`、`src/pagx/TextLayout.cpp`、`test/src/PAGXSVGTest.cpp`、共用评测入口。
-- 任务：Path point / Polystar / Trim / Round / Repeater 来源与局部求值；稳定 d 与显式 topology；Text 九通道、TextHolder flush / reshape、TextModifier 十三与 Selector 六通道的最终 glyph / paint；有限 host 换图先源头准入或拒绝。
+- 文件：`src/pagx/utils/ModifierResolver.{h,cpp}`、`src/pagx/svg/SVGAnimationPlan.{h,cpp}`、`src/pagx/svg/SVGCoverageLedger.{h,cpp}`、`src/pagx/svg/SVGAnimationWriter.{h,cpp}`、`src/pagx/svg/SVGExporter.cpp`、`src/renderer/LayerBuilder.cpp`、`src/renderer/TextHolder.cpp`、`src/pagx/TextLayout.cpp`、`third_party/tgfx/include/tgfx/layers/vectors/Text.h`、`third_party/tgfx/src/layers/vectors/Text.cpp`、`test/src/PAGXSVGTest.cpp`、`test/src/PAGXTest.cpp`、共用评测入口。
+- 任务：按M5.0—M5.4，先共用局部最终产物，稳定d、Text.x/y、七shaping通道，再联合动态bounds/颜色/stop/modifier/拓扑；Path point、Polystar/Trim/Round/Repeater来源与求值，ST21最终paint及ST22坐标标准按第2.8节；有限host换图先源头准入或拒绝，不跳过后排组合。
 - 验收：F11 / F13 / F17；静态 modifier 不冻动态 geometry，变化 copy / glyph 数可审计，Text / fonts / faux / overlay 与路径 renderScale 正确；不污染 Font / nodes。
+
+#### M4/M5：固定展开顺序、前置依赖与台账准入
+
+本表固定四类展开的执行次序，不需要实施时再询问。当前已存在 `src/pagx/svg/SVGCoverageLedger.h:32` 的Supported/Planned/NotExpressible实现状态和 `src/pagx/svg/SVGAnimationPlan.cpp:67` 的白名单；它们不等同正文N/G/B/U能力分类。**当前a7c6c9f23白名单为13类/58项**，SolidColor、Gradient、ColorStop、Path、Text及动态modifier尚未放行；不按旧7类/39项覆盖用户已有滤镜增量。未发现已实现的ModifierDependencyGraph，本方案只扩现有resolver产物/DrawRecord来源，不能引用不存在的图模块当作前置。
+
+共同前置Q：S1的实例/引用/Painter capture与宿主，S3的最终glyph及第2.8节ST21/ST22/ST28，S4的modifier顺序/来源，S5的静态ColorSource/defs/fit；M1的typed/contextDoc/Clock和M2的ordered pose/alpha；M3至少具备本子批次所需的关键帧、Hold、区间求值、序列化和预算门禁。**不要求先做完所有M3高级组合再做独立N轨道，但某条G轨道缺其误差/预算能力时必须保持Planned或明确拒绝，不能先放行再补证明。**
+
+| 固定子步骤 / 优先级 | 内容与硬依赖 | 可并行/可后排边界 | 本步骤退出门禁 |
+|---|---|---|---|
+| M4.0，必须最先 | 建立source/stop→全部实际runtime消费者→各defs实例的映射；先修下述runtime资源绑定扇出，只最后一个consumer被写入的现状不能作为正确oracle；Planned依赖也不能单PNG冻结 | 映射供source/stop/gradient共用，不等待d或动态文字；基于现有colorSourceUsers与局部bindings扩展，跨Composition实例不共享写入 | 同源多Fill/Stroke、共享stop跨gradient/index、多defs和双实例；实际runtime全部consumer更新且mix一次，无仅SVG正确而oracle仍漏写 |
+| M4.1，第一类先做 | `SolidColor.color`：源binding传播到各实际消费点，Painter/color/scope alpha按第2.8.1完整求值；依赖M4.0 | 和M4.2实现逻辑独立，可并行；连续实施采用先M4.1再M4.2。M5组合不作为静态几何/固定glyph颜色的硬前置 | 共享SolidColor多消费者、源与Painter同有绑定的真实顺序、透明/P3/外部实例、颜色与alpha同时变化 |
+| M4.2，与第一类同级必须做 | `ColorStop.offset/color`两通道：在正确stop宿主写offset、stop-color、stop-opacity；依赖M4.0、静态Gradient规范化和Typed颜色求值 | **不依赖SolidColor输出，也不依赖linear/radial端点动画**，现有静态gradient足以承载。不能把conic/diamond的radial降级宿主算作原生stop保真 | linear/radial静态几何+动画stop，重复/边界/重排及混色/alpha、同stop多个defs实例；conic/diamond消费者正确B/拒绝分类 |
+| M4.3，随后完成颜色类 | linear四端点分量、radial中心/半径三分量与fit/退化；依赖M4.0和实际paint-fit表达式 | 可与M4.1/M4.2开发并行，但合并后必须联合测试；动态bounds组合在M5后补最终门禁，不能一开始宣称所有组合Supported | 端点/中心/radius与stop一起求值、零/负/单stop退化、P3/alpha、共享defs/实例。完成颜色/stop独立子集后才进入后续展开 |
+| M5.0，d与文字共用基础必须先做 | 导出局部按时刻求值→真实modifier/最终glyph-style→有效Painter几何；保留source/copy/capture/局部matrix/paint分支；依赖Q，不修改共享模板 | 可在颜色子批次同时建设；**不新建一套文字几何求值器**，d和文字复用同一最终产物。ST21覆盖不要求给GlyphRun新增paint字段 | 局部产物稳定、模板无污染、静态modifier作用动态输入、被modifier替换后的绑定仍可定位 |
+| M5.1，第三类先完成稳定d | Path `point{N}.x/y`、固定拓扑Polystar/Trim/Round最终路径及d序列化；依赖M5.0及M3本轨道插值/误差/预算 | 固定拓扑d并不在算法上依赖动画stop，但按本次连续顺序在M4.3后交付。动态glyph或变副本/点数可以后排，**不能省掉** | point索引/原始空间/renderScale、verb结构与中间帧、Mask+modifier、原生SVG d浏览器支持；表外point族独立登记而不伪造反射175条 |
+| M5.2，第四类先做位置 | Text.x/y的runtime写入不触发reshape，但最终发射需继续经过TextPath/modifier；无沿线依赖且可证整体平移才N，normal沿曲线重新求值为G，force忽略旧位置的该消费者为无贡献 | 可早于M5.1/并行，不等待七shaping；不能因writer直接改position就把所有最终输出判N。同Text其他有效消费者仍分别判断 | 固定glyph各出口、层/Group/TextBox/Mask，另对normal曲线和force无贡献测试；不重复layout/padding，不全局丢该Text的x/y轨道 |
+| M5.3，第四类随后做塑形 | Text七shaping通道经TextHolder的强制实际塑形、有效空清除和anchor保留入口（下文固定）；依赖M5.0、ST28及字体，不能以当前null blob continue视为成功 | 和d序列化可并行；string/bool可预编译有限glyph状态。Text→Shape参与Trim/Round/Merge的联合输出等待M5.1；未闭合的有效塑形分支拒绝而非显示旧glyph | typed/字体/尺寸/字距/faux、all-embedded转新文字、文本变空/Hidden全丢、custom anchors、bounds/glyph切换；ST21/ST22随新glyph求值 |
+| M5.4，最后完成跨类与结构变化 | 颜色/stop+动态bounds+d+重塑形、TextModifier/RangeSelector、Repeater变副本/点数与拓扑；依赖M4.1—M4.3、M5.1—M5.3及所需M3 G能力 | 可后排到基本子集之后，**全量完成不可跳过**；无法G等价的组合落B且D8禁用时拒绝，不靠静态freeze | 动态fit/region、同属性多Clock、逐glyphbase/overlay、离散拓扑、连续误差和预算，A12—A20直接验证 |
+
+**M4.0 的源端入口写定：** `src/renderer/LayerBuilder.cpp:1983` 每次convertColorSource产生独立对象，`:2103`重复建立stop/index绑定，而 `src/renderer/LayerBuilder.h:133` 的set只保留同node的最后对象。沿用每个Painter自己的runtime对象，不通过无条件共享对象改变Fill.color的局部写入语义；对SolidColor/Gradient/ColorStop资源channel在同一RuntimeBinding实例内建立实际消费者扇出，复用colorSourceUsers索引并记录stop对应各gradient/index。一次资源apply按writer顺序更新每个去重后的实际对象，mix不得对同一对象重复应用；Painter.color仍只写自身对象，两个slot互不写串。源码、读回/解绑/重建和SVG消费者映射一并修，不能只让SVG全部变色而reference只变最后一个。读回只有消费者值一致时才能代表一个资源值，若已因局部Painter写入分歧，不能任取last供TwoWay；该分歧按所选绑定契约明确诊断/拒绝。新增runtime与SVG联合测试后才放行M4.1—M4.3。
+
+**M5.3 的源端入口写定：** `src/renderer/TextHolder.cpp:157` 当前flush仍用默认embedded fast path，`src/pagx/TextLayout.cpp:1745` 在全部带GlyphRun时只给bounds；null blob continue又保留旧内容，单参数setTextBlob会清掉原anchors。实际七shaping覆盖时，调用已有 `TextLayout::Layout(elements,params,&context,false)` 强制从有效TextGlyphParams塑形，不修改作者glyphRuns。分类非空成功、有效空结果、资源/塑形失败；有效空（text为空或Hidden全丢）新增明确的tgfx::Text::clearTextBlob()并由TextHolder调用，保持Text对象和position、清空blob/anchors且invalidate，不调用当前会no-op的setTextBlob(nullptr)；失败分支按策略拒绝，不能用旧glyph假成功。非空成功以当前显式anchors按glyph序保留，按新glyph数量截断/补零，再调用setTextBlob(blob,anchors)，默认anchor由新font advance/2求值；不要盲目单参数清空。同步 `third_party/tgfx/include/tgfx/layers/vectors/Text.h`、其Text.cpp、TextHolder与相关测试；该方法是实际调用的空状态入口，不新增PAGX glyph paint字段。验证all-embedded旧字→新字、非空→空→非空、Hidden有效空、不同字体/数量及anchor结合ST21/ST22。clearTextBlob须在对应tgfx源码中实现并重编/更新实际链接依赖，不能只改缓存头文件或靠默认空blob绕过链接/行为错误；源码级验证沿用项目TGFX_DIR路径。入口未完成时对应shaping条目保持Planned/拒绝。
+
+现有滤镜参数增量作为M4.E独立支路保留并回归；新增效果参数依赖S2的有序effect图和M3轨道，不能阻塞无effect的颜色/stop/d/文字基本子集，也不能用“已有P1”证明全部51项效果通道已支持。D8已选禁用，B类保留明确拒绝；MB不会因上述四类展开而自动启用。
+
+连续执行顺序固定为：`Q → M4.0 → M4.1 → M4.2 → M4.3 → M5.0 → M5.1 → M5.2 → M5.3 → M5.4 → M6`。可并行列只说明真实依赖，不要求实施期间反复征求选择；它不是减少范围的理由。
+
+**白名单与SVGCoverageLedger的同步规则（每个子步骤都执行）：**
+
+1. 先完成Planned条目的binding、真实输出宿主和该支持子集的测试，不提前把Planned改Supported。`SVGCoverageLedger`的note准确说明支持组合/限制；当前“text/font是bake only”“stop的参数可动”不能代替已经存在的输出。
+2. 某子集通过typed XML→Channel求值→ordered apply→最终glyph/paint/geometry→SVG重建、确定性browser seek后，在同一次变更中加入Plan白名单并升级相应ledger条目；验证一个节点类型的一条通道不自动放行其全部通道。
+3. 增加Plan支持集合与ledger Supported集合的双向检查，再验证真实输出和条件拒绝：无误放行、无Supported而Writer丢弃、无Plan支持却ledger漏项。当前 `test/src/PAGXSVGTest.cpp:5084` 仅验证反射表与175/30账本双向完整，**不验证白名单/输出/像素**，必须补这层门禁。
+4. SourceColor/stop直接目标、共享消费者和defs实例都纳入依赖判定；Gradient参数动态时不可继续用静态bounds。类型合法但某种复杂组合未实现，应在该实例能力判断中拒绝/报告，不靠类型级Supported掩盖。
+5. 保持反射台账30类/175条；Path `point{N}.x/y`是表外可变族，单列模式、索引和输出门禁，不硬塞固定条目改变计数；ImageRef/PAGImage未闭合仍不得宣传换图成功。
+6. 每个升级的测试含原点、关键点左右、区间内部、终态、Loop/PingPong第二周期及暂停/offset；每个拒绝项有确定诊断/非成功冻结的断言。现有已支持通道不能因为新类型加入白名单而改变其Clock/alpha/静态输出。
+
+这些是执行契约，不是本轮实现。当前映射/输出入口依据为 `src/pagx/svg/SVGAnimationWriter.cpp:1500`、`src/pagx/svg/SVGExporter.cpp:704`、`src/renderer/LayerBuilder.cpp:617`、`src/renderer/TextHolder.cpp:157`；ModifierResolver当前只烘焙几何通道TextModifier，不能视为ST21或动态d/重塑形已经完成。
 
 #### MB：仅 D8 同意后的可选阶段
 
@@ -517,9 +683,9 @@ ToSVG严格失败返回空结果、ToFile返回false、CLI非零；warnings=null
 | ST10 | glyph `fill-opacity` 与位图字形缺 alpha 因子 | `writeTextAsPath` |
 | ST18 | `fauxBold` / `fauxItalic` 在 WOFF2 与 outline 路径上丢失 | `BuildStyledTypeface` |
 | ST20 | `RangeSelector` 的 index offset / shape / 首 mode | `TextUtils::CollectRichTextRuns` 一带 |
-| ST21 | `TextModifier` 的 base + overlay 多层 paint | 同上 |
-| ST22 | `TextPath` 八字段沿线布局 | `writeTextWithLayout` |
-| ST28 | Native 模式 width 优先于双边约束 | `MakeTextBoxParams` |
+| ST21 | 累积override与base/overlay分支、排他draw归属 | `ModifierResolver::bakeTextModifier`及导出局部glyph/paint发射；第2.8.1节 |
+| ST22 | TextPath八字段/布局到最终glyph矩阵 | `LayerBuilder::convertTextPath`、tgfx::TextPath::apply、局部glyph发射；第2.8.2节TP01—TP16 |
+| ST28 | Native重排版错取继承author尺寸，覆盖resolved双边/百分比 | `EffectiveTextBoxWidth/Height`→`MakeTextBoxParams`→`writeTextBoxGroup`；第2.8.3节，不新增字段 |
 | ST29 | 空布局 fallback 重新画出被 Hidden 的行 | `writeTextWithLayout` |
 | ST31 | 同一 run 内 vector / bitmap 字形先 path 后 image，破坏遮挡序 | `ComputeGlyphPathsAndImages` + `writeTextAsPath` |
 
@@ -531,7 +697,9 @@ ST9 / ST10 / ST18 / ST29 / ST31 已收口：`writeTextAsFont` 走字形 advance�
 
 ST20 已收口：新增 `TextSelectorEvaluator`（`src/pagx/utils/TextSelectorUtils.h`）实现 RangeSelector 的单位换算（Percentage / Index）、offset 先作用于两端、start > end 交换、六种 shape（Square / RampUp / RampDown / Triangle / Round / Smooth，Triangle 吃 easeIn / easeOut）、randomOrder 的确定性洗牌，以及多选择器按序合并（首个选择器直接取值，Subtract 从 1 起算，逐次 clamp 到 [-1, 1]）。`ModifierResolver` 遇到仅含几何通道的 TextModifier 时，把 position / rotation / scale / skew / anchor 按字符权重烘进前置 Text 的 GlyphRun 通道并丢弃该 modifier；含 alpha / fillColor / strokeColor / strokeWidth 或 skewAxis 的 modifier 仍保留给烘焙路径。SVG 侧用 `ModifierResolver::CanBakeTextModifiers` 让探针跳过这类图层，不再整层栅格化；原生 TextBox 的元素列表也会先经过 resolver。克隆 Text 会清空 id，避免文档里出现两个同 id 节点；`randomSeed == 0` 时额外套用 AE 的首字符固定映射表，保证第一个字符的落点稳定。若 modifier 之后还有 Text 嵌在更早的 Group / TextBox 里，resolver 保留 modifier 并让探针不跳过，避免外层 modifier 打不到嵌套字形而静默丢效果。
 
-ST21 / ST22 仍未收口：per-character alpha / paint 覆盖没有 GlyphRun 通道可承载，TextPath 的八字段沿线布局仍只有 tgfx 实现。默认 `bakeUnsupported=true` 时这两类图层继续以 PNG 补丁保真。ST28 所述 Native 模式在本仓库 `TextBox` 上不存在（仅有 width / height / wordWrap / overflow），无对应改动入口。
+ST21/ST22当前仍有输出缺口，但不再把“GlyphRun没有paint通道”当作无实现路线：按第2.8.1节在导出局部GlyphStyle/DrawRecord中承载权重与排他base/overlay；按第2.8.2节复用tgfx沿线求值并以TP01—TP16的数字标准验收。现有PNG回退只记为当前表示，不能证明上述矢量语义已实现。
+
+ST28必须保留：TextBox确实继承Group→LayoutNode的width/height，Native是Exporter分支不是节点字段。入口和双边/百分比/author/内容测量的优先级已在第2.8.3节写定，包含容器有效0与modifier-only unbounded的区别；不删除此条、不新增width/Native字段。
 
 现有盲区保留依据：cross-parent Mask 只查 warning / defs 且父恒等（`test/src/PAGXSVGTest.cpp:4433`）；伪 JPEG / WebP 头仅 MIME（`test/src/PAGXSVGTest.cpp:3183`、`test/src/PAGXSVGTest.cpp:3211`）；bitmap fallback 无真实数据（`test/src/PAGXSVGTest.cpp:3506`）；动画字符串测试从 `test/src/PAGXSVGTest.cpp:4556` 起。开关用例未做字节相等、普通Layer timeline不证Composition scope、PingPong未全属性、paused/offset仅begin均需直接复现；render CLI当前已有nested驱动，不沿用此前“仅顶层”的旧描述。
 
@@ -768,9 +936,9 @@ PropertyData 是 runtime 投影而非模型清单（`include/pagx/PropertyData.h
 | GlyphRun.xOffsets / positions | 每索引 positions 优先再加 xOffset；两者缺用 default cursor，三出口推进不同 | S3：7 数组 empty / short / full / extra；首 glyph 有 explicit position 后第二 glyph 对齐 runtime，不强制等长 |
 | GlyphRun.anchors / scales / rotations / skews | advance 中心+pivot，绕 glyph 原点组合，不是 SVG 字符 rotate | S3：非零 run origin / anchor / rotate / skew / 负 scale / vector offset，bitmap / vector 交错保持次序 |
 | TextBox.textAlign / paragraphAlign / writingMode / lineHeight / wordWrap / overflow | 有 elements 容器 / 空 elements modifier；logical axes，Hidden 丢整行 / 列，resolved 优先 | S3：6 项全分支、constraint 覆 author、all/some/none overflow、glyph-only / 非 Text / foreground；valid empty 不画原文 |
-| TextPath.path / baselineOrigin / baselineAngle / firstMargin / lastMargin / perpendicular / reversed / forceAlignment | path / baseline 共同空间；normal 法向，force 按 advance 重排；open 超端延伸 / closed 回绕，当前首 contour | S3：八项 / layout、normal / force、单 / 多 glyph、两方向、0/90°、margin；force 长度 pathLength+lastMargin-firstMargin，不猜注释 |
+| TextPath.path / baselineOrigin / baselineAngle / firstMargin / lastMargin / perpendicular / reversed / forceAlignment | 以tgfx实际求值为准，normal不消费last；force长度L+last-first，先reverse再closed回绕，open切线延伸，perpendicular只改旋转，首contour | S3：第2.8.2节TP01—TP16给定向量glyph、水平/竖直/闭合path、anchor/矩阵、margin/法向/基准/layout数字期望，不使用AE作替代基准 |
 | TextModifier.anchor / position / rotation / scale / skew / skewAxis / alpha | scope 全局 glyph index；signed factor transform、abs factor alpha/paint；scale=1+(scale-1)*factor | S3：跨 Text/run、factor -1/0/部分/1、modifier 顺序、已有 Painter 后改、共用 final matrix |
-| TextModifier.fillColor / strokeColor / strokeWidth / selectors | optional unset≠0；override alpha 是权重，可 base+overlay 多 paint，独立 stroke factor | S3/S1：base gradient / pattern+半透明 override、串联、非 Normal blend、explicit0 width、无 selector factor1；非只改 RGBA |
+| TextModifier.fillColor / strokeColor / strokeWidth / selectors | optional unset≠0；按absFactor累积override权重；0只base、部分完整base再SrcOver overlay、1只overlay，strokeWidthFactor独立 | S3/S1：第2.8.1节公式/数值/排他Painter capture为固定契约；同Painter旧draw被替换，局部Fill不再次进入祖先累计几何，多合法Painter各保一次 |
 | RangeSelector.start / end / offset / unit / shape / easeIn / easeOut / mode / weight / randomOrder / randomSeed | glyph 数非原文长；Index 仅 start/end 归一后 offset 直接加；Triangle ease、6 shape / 6 mode / 首 selector、seed uint16 | S3：2×6×6、顺序 / 首 Subtract、连字 / combining / RTL、0/大 seed、swap start/end、factor 与像素 |
 | SolidColor.color | RGBA / ColorSpace，P3 分量不直接当 sRGB fallback | S5：两空间、三 alpha、转换 / 量化 / blend 底色、固定目标 |
 | Gradient.matrix / colorStops / fitsToGeometry | Painter 空间 / 每 geometry fit；default / 单色 / 重复 / 单调收口；空间 alpha / premultiply 非时间 LerpColor | S5：empty / one / repeat / missing ends / nonmonotonic、退化轴 / mixed space / 透明红蓝；实际 fit 非随意 tight |
@@ -970,14 +1138,14 @@ ST1—ST42 合为一表，不再旧 / 新两篇；ST43—ST46 是本轮契约补
 | ST18 | `src/renderer/GlyphRunRenderer.cpp:200`faux；`src/pagx/svg/SVGExporter.cpp:2480`WOFF2/outline漏样式 | 真实style+faux、outline/advance/bounds/Mask、Native/WOFF2/path/bitmap分别；S3 |
 | ST19 | `src/renderer/LayerBuilder.cpp:2261`sampling；`src/pagx/utils/RasterUtils.cpp:401`bake漏 | 6sampling×16tile、放缩旋转真实纹理，native/bake同源；S5 |
 | ST20 | `third_party/tgfx/src/layers/vectors/TextSelector.cpp:436`Index offset/shape/首mode | 完整factor/glyph/mode/seed，非字符串长；S3 |
-| ST21 | `third_party/tgfx/src/layers/vectors/TextModifier.cpp:225`base+overlay | gradient+半透明override/stroke factor/串联，最终paint非仅属性；S3/S1 |
-| ST22 | `third_party/tgfx/src/layers/vectors/TextPath.cpp:170`完整沿线glyph | 八字段/baseline/法向/force/margin/open延伸/closed回绕；S3 |
+| ST21 | `third_party/tgfx/src/layers/vectors/TextModifier.cpp:44`累积权重；`third_party/tgfx/src/layers/vectors/FillStyle.cpp:66`、`third_party/tgfx/src/layers/vectors/StrokeStyle.cpp:63`分支 | 第2.8.1节：部分base完整再overlay，权重1跳base；每源Painter排他替换，不让局部Fill再次被祖先消费；数值/gradient/blend/stroke验收；S3/S1 |
+| ST22 | `third_party/tgfx/src/layers/vectors/TextPath.cpp:95`、`:117`、`:127`、`:170`、`:217`实际坐标与分支 | 第2.8.2节tgfx唯一标准及TP01—TP16；normal不消费last、force有符号终偏移、法向/旋转分离、闭合/open/第一contour/layout明确；S3 |
 | ST23 | `third_party/tgfx/src/layers/vectors/MergePath.cpp:70`清旧Painter，resolver只换slots | Rect→Fill→Rect→Merge→Stroke、Merge后无Painter、Text→Shape；S4 |
 | ST24 | `third_party/tgfx/src/layers/vectors/Repeater.cpp:139`Below末copy先；`src/pagx/utils/ModifierResolver.cpp:711`反序 | 相交不同alpha、真次序/整数幂，负底分数幂独立边界；S4 |
 | ST25 | `third_party/tgfx/src/core/shaders/GradientShader.cpp:140`空间插值/premultiply | 透明红蓝内部、P3/mixed，非时间LerpColor；S5 |
 | ST26 | `third_party/tgfx/src/core/shaders/GradientShader.cpp:337`退化/单stop | linear/conic近等首色、radial/diamond近0末色、正常/阈值/无效；S5 |
 | ST27 | `third_party/tgfx/src/layers/vectors/Rectangle.cpp:80`零轴微轮廓 | 零/负轴+Stroke/cap/dash/Trim，Fill独立，与singular区分；S4 |
-| ST28 | `src/pagx/utils/TextUtils.cpp:492`Native author尺寸优先 | width80双边resolved120、竖height，同layout结果；S3/S1 |
+| ST28 | `include/pagx/nodes/TextBox.h:43`→`include/pagx/nodes/Group.h:36`→`include/pagx/nodes/LayoutNode.h:94`的继承尺寸；`src/pagx/utils/TextUtils.cpp:515`、`:525`误先author | 保留、不新增字段；第2.8.3节父300×200、author100×60、resolved250×170、inset230×150；Native/PPT/TextHolder同源，0与unbounded分开；S3/S1 |
 | ST29 | `src/pagx/svg/SVGExporter.cpp:2839`empty fallback重画Hidden文字 | all/some/none有效行，valid empty≠missing metadata；S3 |
 | ST30 | `src/pagx/svg/SVGExporter.cpp:2504`、`src/pagx/TextLayout.cpp:1082`Native空白/BiDi/justify差 | 连space/tab/CJK无space/RTL数字rich text、两text模式；S3 |
 | ST31 | `src/pagx/svg/SVGExporter.cpp:2316`先path后bitmap | 合法多Font先bitmap后vector重叠，保run序；S3 |
@@ -1021,7 +1189,7 @@ F1—F12 原 ID 全保留；F13—F18 是动态补审。除历史官方样例证
 | F14 | `src/pagx/PAGAnimation.cpp:59`、`src/pagx/PAGAnimation.cpp:111`merge/filter；`src/renderer/LayerBuilder.cpp:192`、`src/renderer/LayerBuilder.cpp:267`shared pose | 静态masked/同anim跨Object/跨anim ordered mix三层，matrix不屏z/anchor、后component decompose；M2 |
 | F15 | `src/pagx/runtime/KeyframeEvaluatorImpl.h:106`T{}、`src/pagx/svg/SVGAnimationWriter.cpp:129`clamp key、`src/pagx/svg/SVGAnimationWriter.cpp:191`Hold近似；`src/pagx/runtime/BezierEasing.cpp:104`、`src/pagx/utils/ColorSpaceUtils.cpp:78`overshoot | 跨duration t0=50、空≠无、单/1-frame/D1/D0/nonfinite/duplicate ordered keys、float不clamp/Color分量clamp、No epsilon；M3 |
 | F16 | `src/pagx/runtime/PAGComposition.cpp:57`、`src/pagx/runtime/PAGComposition.cpp:130`paused IDs共享 | 同slot同ID任paused禁全advance但apply全执行，兄弟slot独立、ordinal≠pause scope；M1 |
-| F17 | `src/pagx/PAGXNodeChannel.cpp:486`175/30 registry、`src/pagx/svg/SVGAnimationPlan.cpp:67`39/7白名单 | 每通道primary/组合和真实output审计，51 effect/九Text/十三Modifier/六Selector/表外不漏；classified≠supported；M0/M4/M5/M6 |
+| F17 | `src/pagx/PAGXNodeChannel.cpp:486`175/30 registry；本次 `src/pagx/svg/SVGAnimationPlan.cpp:67`58/13白名单与 `src/pagx/svg/SVGCoverageLedger.cpp:30`实现状态 | M4.0—M5.4逐子集同步Plan、ledger和输出/拒绝门禁；颜色、stop、d、Text完整依赖不漏，Planned/Supported≠N/G证明；M0/M4/M5/M6 |
 | F18 | `src/pagx/PAGAnimation.cpp:274`Clock、`src/pagx/PAGScene.cpp:514`宿主flush、`src/pagx/utils/RasterUtils.cpp:351`背景合成契约 | 多Clock无公周期、finite事件/3D/noise/complex fallback；D8禁用拒绝、明确MB初态/window/resources/resolution/sampling/tail/repeat/预算，无界U；M3/MB/M6 |
 
 ### 5.1 只读 coverage 校验与维护门禁
