@@ -63,8 +63,10 @@ function WriteCache(directory, cache) {
 test('CLI selects explicit backends and rejects malformed or filtered updates', function () {
   assert.equal(ParseOptions(['--backend', 'webgpu', '--filter=Suite.*']).backend, 'webgpu');
   assert.equal(ParseOptions(['--filter', 'Suite.*']).filter, 'Suite.*');
+  assert.equal(ParseOptions(['--backend=webgpu', '--async-video-export']).asyncVideoExport, true);
   for (const args of [['--backend'], ['--backend=metal'], ['--unknown'], ['--filter='],
-    ['--mode=update', '--filter=Suite.*']]) {
+    ['--mode=update', '--filter=Suite.*'], ['--async-video-export'],
+    ['--backend=webgpu', '--async-video-export', '--filter=Suite.*']]) {
     assert.throws(function parse() { ParseOptions(args); });
   }
 });
