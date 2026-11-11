@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Static perspective origin</title>
+    <!--
+      `transform: perspective()` on a *static* box, with an off-centre `transform-origin`.
+
+      Two things are pinned here:
+        1. the importer keeps the 4x4 pose and puts the pivot on `Layer.anchor` (no baked
+           translation), including the two-value vs three-value origin forms;
+        2. `tools/html-snapshot` rewrites this form into a parent camera layer whose
+           `perspective-origin` must be the element's own `transform-origin` — reading it after the
+           transform is stripped silently falls back to the box centre and moves the projection by
+           ~6px at `d = 600px`. A pivot with depth keeps the function form instead, because
+           `perspective-origin` has no depth component.
+
+      This is a static page, so it lives in the subset corpus (`cases/`), not in
+      `animations/css/`; the animated function-form and property-form paths are covered by
+      `animations/css/45_rotate3d_center`, `46_rotate3d_offcenter_pivot` and `50_perspective_property`.
+      Pixel check: run `tools/html-snapshot/eval/run.js` with the corpus set to
+      `resources/html/cases` and `only` set to `static-perspective-origin`.
+    -->
+    <style>
+      body { background-color: #0f172a; display: flex; gap: 10px; padding: 20px; }
+    </style>
+  </head>
+  <body style="width: 240px; height: 160px;">
+    <div name="corner" style="width: 90px; height: 70px; border-radius: 10px;
+         background-color: #38bdf8;
+         transform: perspective(600px) rotateY(-32deg); transform-origin: bottom left;"></div>
+    <div name="centre" style="width: 90px; height: 70px; border-radius: 10px;
+         background-color: #f472b6;
+         transform: perspective(600px) rotateY(32deg); transform-origin: right top;"></div>
+  </body>
+</html>

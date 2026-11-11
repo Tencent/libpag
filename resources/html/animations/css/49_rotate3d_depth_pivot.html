@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Rotate3D Depth Pivot</title>
+    <!--
+      The pivot sits 30px off the layer plane (`transform-origin` third value), at the card's
+      bottom-left corner. Tilting about X then moves the card along Z as well: the pivot is a fixed
+      point, so the plane itself travels toward or away from the viewer and its projected size
+      changes. Baking the pivot into every keyframe loses that depth term; keeping it on the layer
+      (`anchor.z`) reproduces it frame by frame.
+
+      Known model difference (accepted, see spec/html_subset.md 13.7): CSS conjugates the
+      projection with `transform-origin` too, i.e. T(a) * P * L * T(-a), while PAGX / AE /
+      Lottie keep it outside the pivot, i.e. P * T(a) * L * T(-a). `perspective-origin`
+      carries only x / y, so no camera placement reproduces a pivot that sits off the layer
+      plane. The rewrite is skipped and the element keeps the function form, i.e. its pose still
+      carries the projection: the residual is the ordering term above, not a dropped camera.
+      Expect this case to stay near SSIM 0.91 / 2.9% (canvas 240x160, card 120x80, `d = 600px`,
+      30px pivot depth). The eval report marks it as `camSkip=depth-pivot`.
+    -->
+    <style>
+      @keyframes tilt3d {
+        0%   { transform: perspective(600px) rotateX(-45deg); }
+        50%  { transform: perspective(600px) rotateX(45deg); }
+        100% { transform: perspective(600px) rotateX(-45deg); }
+      }
+    </style>
+  </head>
+  <body style="width: 240px; height: 160px; background-color: #0F172A;">
+    <div id="card"
+         style="position: absolute; left: 60px; top: 40px;
+                width: 120px; height: 80px; border-radius: 12px;
+                background-color: #38BDF8;
+                transform-origin: 0px 80px 30px;
+                animation: tilt3d 2.4s ease-in-out infinite;">
+      <div style="position: absolute; left: 24px; top: 24px;
+                  width: 72px; height: 32px; border-radius: 8px;
+                  background-color: #F472B6;"></div>
+    </div>
+  </body>
+</html>

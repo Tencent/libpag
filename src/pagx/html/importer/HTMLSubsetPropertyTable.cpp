@@ -24,6 +24,7 @@
 #include <sstream>
 #include <string>
 #include "pagx/html/importer/HTMLDetail.h"
+#include "pagx/html/importer/HTMLTransform3D.h"
 
 namespace pagx::html {
 
@@ -313,53 +314,35 @@ std::string PassThrough(const std::string& value, const PropertyContext&, HTMLTr
   return Trim(value);
 }
 
-// CSS `transform` is mapped onto the TextBox / Layer transform fields by
-// HTMLStyleResolver. Single-function forms (skewX/skewY/rotate/scale[X|Y]/
-// translate[X|Y]) populate the discrete fields and TextBox uses them
-// directly. The `matrix(a, b, c, d, tx, ty)` shorthand is also accepted —
-// the resolver writes the six floats straight into `HTMLTransform.matrix`
-// so non-text Layers can forward the affine onto `Layer.matrix`. The
-// `matrix3d(...)` 3D form is accepted too: the resolver projects it
-// orthographically onto its 2D affine subset (exact for matrices without
-// perspective, approximate otherwise). Compound chains like
-// `skewX(-5deg) rotate(10deg)` and the remaining 3D variants
-// (`rotate3d`/`perspective`) still require decomposition that the importer
-// does not implement, so they are dropped with a warning.
+// CSS `transform` is a whitespace-separated function list. Every function in the list must be one
+// the importer can compose into its 4x4 pose (translate / scale / rotate / skew / matrix / matrix3d /
+// perspective, including the 3D variants); argument validation happens in the resolver so a
+// malformed list yields one actionable diagnostic there instead of being silently chopped here.
 std::string TransformTransform(const std::string& value, const PropertyContext&,
                                HTMLTransformContext& diags) {
   std::string trimmed = Trim(value);
   if (trimmed.empty()) return std::string();
   std::string lc = ToLower(trimmed);
   if (lc == "none") return std::string();
-  std::string fn;
-  std::string args;
-  if (!ParseCssFunctionCall(trimmed, fn, args)) {
-    // Distinguish "no parens at all" from "compound chain or trailing junk" so the diagnostic
-    // matches the caller's authoring mistake.
-    size_t openParen = trimmed.find('(');
-    if (openParen == std::string::npos || openParen == 0) {
-      return DropProperty("transform", value, "is not a recognised function form", diags);
+  std::vector<std::string> tokens = {};
+  if (!SplitTransformFunctions(trimmed, &tokens)) {
+    return DropProperty("transform", value, "is malformed", diags);
+  }
+  for (const auto& token : tokens) {
+    std::string fn;
+    std::string args;
+    if (!ParseCssFunctionCall(token, fn, args) || !IsSupportedTransformFunction(fn)) {
+      return DropProperty("transform", value,
+                          "uses a transform function outside the supported set "
+                          "(translate / scale / rotate / skew / matrix / matrix3d / perspective)",
+                          diags);
     }
-    return DropProperty("transform", value,
-                        "compound transforms are not supported; use a single function "
-                        "(skewX/skewY/rotate/scale/translate)",
-                        diags);
   }
-  if (fn == "skewx" || fn == "skewy" || fn == "rotate" || fn == "scale" || fn == "scalex" ||
-      fn == "scaley" || fn == "translate" || fn == "translatex" || fn == "translatey" ||
-      fn == "matrix" || fn == "matrix3d") {
-    return trimmed;
-  }
-  return DropProperty("transform", value,
-                      "is not in the supported function set "
-                      "(skewX/skewY/rotate/scale[X|Y]/translate[X|Y]/matrix/matrix3d)",
-                      diags);
+  return trimmed;
 }
 
-// `transform-origin` is forwarded verbatim. The downstream resolver only
-// understands the default "50% 50%" form (the typical inline output) and
-// warns when it sees something else, so the table-level transform is a
-// straight pass-through.
+// `transform-origin` is forwarded verbatim: the importer resolves the full CSS form (px, percentage,
+// keywords, plus the optional depth), so the table only trims the value.
 std::string TransformTransformOrigin(const std::string& value, const PropertyContext&,
                                      HTMLTransformContext&) {
   return Trim(value);
@@ -457,11 +440,13 @@ const PropertyEntry SubsetPropertyEntries[] = {
     {"-webkit-text-stroke", PropAction::Keep, nullptr, nullptr},
     {"-webkit-text-stroke-width", PropAction::Keep, nullptr, nullptr},
     {"-webkit-text-stroke-color", PropAction::Keep, nullptr, nullptr},
-    // `transform` and `transform-origin` are forwarded so HTMLStyleResolver can map the
-    // function back onto the TextBox / Group transform fields. The handler enforces the
-    // supported single-function subset; compound chains and matrix(...) forms are dropped.
+    // `transform` and `transform-origin` are forwarded. The handler only validates the value: it
+    // tokenises the function list, and drops the whole declaration when a function is malformed or
+    // outside the supported set. Composition and the pivot mapping happen later, in the resolver.
     {"transform", PropAction::Transform, &TransformTransform, nullptr},
     {"transform-origin", PropAction::Transform, &TransformTransformOrigin, nullptr},
+    // `transform-style: preserve-3d` maps onto `Layer.preserve3D`; the flat default is a no-op.
+    {"transform-style", PropAction::Keep, nullptr, nullptr},
     // Animation. The shorthand and longhands are kept verbatim through the filter so the importer
     // can map `@keyframes`-driven animations onto PAGX animations (see spec/html_subset.md §13).
     // The canonical snapshot output emits the `animation` shorthand; longhands are accepted for
@@ -487,8 +472,13 @@ const PropertyEntry SubsetPropertyEntries[] = {
     {"margin-right", PropAction::Transform, &ResolveLength, nullptr},
     {"margin-bottom", PropAction::Transform, &ResolveLength, nullptr},
     {"margin-left", PropAction::Transform, &ResolveLength, nullptr},
+    // `perspective` is forwarded so the importer can push it onto the children: PAGX keeps the
+    // projection on the layer that owns the pose, CSS keeps it on the parent.
+    {"perspective", PropAction::Keep, nullptr, nullptr},
+    // `perspective-origin` is the vanishing point of that camera; the importer folds it into the
+    // child pose, so the authored value has to survive the subset pass.
+    {"perspective-origin", PropAction::Keep, nullptr, nullptr},
     // Explicit drops -- recorded with rich diagnostics rather than the default "not in subset".
-    {"perspective", PropAction::Drop, nullptr, "is not in the subset"},
     {"outline", PropAction::Drop, nullptr, "is not in the subset"},
     {"float", PropAction::Drop, nullptr, "is not in the subset"},
     {"order", PropAction::Drop, nullptr, "is not in the subset"},

@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Rotate Off-Center Pivot</title>
+    <!--
+      The pivot sits at the left edge (0px 8px), i.e. off both the box centre and the box origin.
+      Baking it into every keyframe turns the pivot translation into a per-frame value that the
+      runtime interpolates separately from the rotation, which makes the bar orbit instead of
+      swinging. With an explicit pivot the rotation keeps the left edge fixed.
+    -->
+    <style>
+      @keyframes sweep {
+        0%   { transform: rotate(-30deg); }
+        50%  { transform: rotate(30deg); }
+        100% { transform: rotate(-30deg); }
+      }
+    </style>
+  </head>
+  <body style="width: 240px; height: 160px; background-color: #0F172A;">
+    <div id="hand"
+         style="position: absolute; left: 120px; top: 80px;
+                width: 90px; height: 16px; border-radius: 8px;
+                background-color: #38BDF8;
+                transform-origin: 0px 8px;
+                animation: sweep 2s ease-in-out infinite;"></div>
+    <div style="position: absolute; left: 112px; top: 72px;
+                width: 16px; height: 16px; border-radius: 8px;
+                background-color: #F472B6;"></div>
+  </body>
+</html>

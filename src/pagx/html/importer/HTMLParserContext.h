@@ -83,6 +83,11 @@ class HTMLParserContext {
   Layer* convertElement(const std::shared_ptr<DOMNode>& element,
                         const HTMLInheritedStyle& inherited, int depth);
 
+  // Folds the parent camera carried by `inherited` into `box`. The branches of `convertElement` each
+  // build their own box (text host / svg / img / regular element) and all need the same treatment.
+  void attachParentCamera(HTMLBoxAttributes& box, const std::shared_ptr<DOMNode>& element,
+                          const HTMLInheritedStyle& inherited);
+
   // Container conversion (for <div>-like elements). Emits the standard "outer
   // background + inner padded container" double-layer when both background and
   // padding/layout are present.
@@ -154,7 +159,9 @@ class HTMLParserContext {
   // `animation` declaration so the post-tree-build animation pass can emit a PAGX animation
   // bound to this layer. All `<img>`, inline `<svg>`, and container conversion paths funnel
   // their final outer Layer through this helper to ensure animation capture is exhaustive.
-  void assignElementId(Layer* layer, const std::shared_ptr<DOMNode>& element);
+  void assignElementId(Layer* layer, const std::shared_ptr<DOMNode>& element,
+                       float parentPerspectivePx = 0.0f, float localPerspectiveOriginX = NAN,
+                       float localPerspectiveOriginY = NAN);
 
   // Rebuilds a PAGX mask layer from the element's CSS `mask-image` (alpha / luminance) or
   // `clip-path` (contour) — the latter from a `url(#id)` <clipPath> reference or a CSS basic
@@ -302,10 +309,23 @@ class HTMLParserContext {
   // `_valueParser` and `_idAllocator`; document handle + keyframes registry bound in parseDOM.
   std::unique_ptr<HTMLAnimationBuilder> _animationBuilder = nullptr;
 
+  // A `perspective` parent whose child is placed by layout cannot be projected exactly; the first
+  // such child reports it, the rest stay quiet (see ApplyParentPerspective).
+  bool _flowChildPerspectiveWarned = false;
+
   // Elements carrying an `animation` declaration, paired with their finalised outer Layer.
   // Recorded during `assignElementId` and processed after the whole tree is built (so background
   // fills used by `color` channels already exist).
-  std::vector<std::pair<std::shared_ptr<DOMNode>, Layer*>> _pendingAnimations = {};
+  struct PendingAnimation {
+    std::shared_ptr<DOMNode> element = nullptr;
+    Layer* layer = nullptr;
+    // CSS `perspective` declared on the parent, folded into every keyframe pose, plus its
+    // `perspective-origin` in the element's local coordinates.
+    float parentPerspectivePx = 0.0f;
+    float localPerspectiveOriginX = NAN;
+    float localPerspectiveOriginY = NAN;
+  };
+  std::vector<PendingAnimation> _pendingAnimations = {};
 
   // Inline-SVG shape descendants (`<path>`, `<rect>`, …) that declare a CSS animation. The wrapping
   // `<svg>` is serialised into a single import directive that is expanded (resolved) only after the

@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html>
+  <head><title>transform-origin keyword order</title></head>
+  <body style="width: 240px; height: 120px; display: flex; gap: 12px; padding: 16px;
+               box-sizing: border-box; overflow: hidden; background-color: #E2E8F0;">
+    <!-- The vertical keyword comes first: x is `left`, y is `bottom`. -->
+    <div style="width: 90px; height: 70px; background-color: #6366F1;
+                transform: rotate(18deg); transform-origin: bottom left;"></div>
+    <!-- A length in the first slot pairs with the vertical keyword in the second: `top 20px` would
+         be an invalid declaration (Chromium drops it), while `20px top` is valid. -->
+    <div style="width: 90px; height: 70px; background-color: #22C55E;
+                transform: rotate(-18deg); transform-origin: 20px top;"></div>
+  </body>
+</html>
