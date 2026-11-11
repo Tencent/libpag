@@ -74,12 +74,14 @@ struct VideoEncodeOptions {
 };
 
 /**
- * Builds the ffmpeg argv for the rawvideo stdin pipeline; arguments[0] is `ffmpegPath`. Returns
- * false and fills `errorMsg` when the options cannot form a valid command line.
+ * Builds the ffmpeg argv for the rawvideo stdin pipeline; arguments[0] is `ffmpegPath` and
+ * `outputPath` is the exact file ffmpeg must write. Returns false and fills `errorMsg` when the
+ * options cannot form a valid command line. Dry-run passes the documented `.part` placeholder;
+ * real encoding passes its unique staging path.
  */
 bool BuildFFmpegCommandLine(const std::string& ffmpegPath, const VideoFormatSpec& format,
-                            const VideoEncodeOptions& options, std::vector<std::string>* arguments,
-                            std::string* errorMsg);
+                            const VideoEncodeOptions& options, const std::string& outputPath,
+                            std::vector<std::string>* arguments, std::string* errorMsg);
 
 /** Joins argv into a single shell-like line, for --dry-run output and error messages. */
 std::string FormatCommandLine(const std::vector<std::string>& arguments);
@@ -92,13 +94,17 @@ bool SplitArguments(const std::string& text, std::vector<std::string>* arguments
 /** Result of looking for the ffmpeg executable. */
 struct FFmpegLocation {
   std::string path = {};
-  /** Source of `path`: "--ffmpeg", "FFMPEG_BIN" or "PATH". Empty when nothing was found. */
+  /** Source of `path`: "--ffmpeg", "FFMPEG_BIN", "managed cache" or "PATH". Empty on failure. */
   std::string source = {};
   /** Why the lookup failed; empty when `path` is set. */
   std::string error = {};
 };
 
-/** Finds ffmpeg, in order: `explicitPath`, then the FFMPEG_BIN environment variable, then PATH. */
+/**
+ * Finds ffmpeg in order: explicitPath, FFMPEG_BIN, the packaged manifest's managed cache, then PATH.
+ * Invalid explicit choices fail immediately. The manifest is discovered relative to the executable;
+ * PAGX_FFMPEG_MANIFEST_PATH overrides that discovery for custom package layouts and tests.
+ */
 FFmpegLocation FindFFmpeg(const std::string& explicitPath);
 
 /** Initializes process-level signal handling required by the native CLI and its test runners. */

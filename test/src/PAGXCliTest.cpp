@@ -561,8 +561,15 @@ CLI_PIXEL_TEST(PAGXCliTest, Render_Text) {
 
 CLI_TEST(PAGXCliTest, Render_MissingFile) {
   auto outputPath = TempDir() + "/RenderMissingFile.png";
-  auto ret = CallRun(pagx::cli::RunRender, {"render", "-o", outputPath, "nonexistent.pagx"});
+  std::string errors;
+  int ret = 0;
+  {
+    StreamCapture capturedErr(std::cerr);
+    ret = CallRun(pagx::cli::RunRender, {"render", "-o", outputPath, "nonexistent.pagx"});
+    errors = capturedErr.str();
+  }
   EXPECT_NE(ret, 0);
+  EXPECT_NE(errors.find("pagx render: error: failed to load"), std::string::npos);
 }
 
 CLI_TEST(PAGXCliTest, Render_DefaultOutput) {
@@ -577,8 +584,42 @@ CLI_TEST(PAGXCliTest, Render_DefaultOutput) {
 CLI_TEST(PAGXCliTest, Render_InvalidScale) {
   auto inputPath = TestResourcePath("render_basic.pagx");
   auto outputPath = TempDir() + "/RenderInvalidScale.png";
-  auto ret = CallRun(pagx::cli::RunRender, {"render", "-o", outputPath, "--scale", "0", inputPath});
+  std::string errors;
+  int ret = 0;
+  {
+    StreamCapture capturedErr(std::cerr);
+    ret = CallRun(pagx::cli::RunRender, {"render", "-o", outputPath, "--scale", "0", inputPath});
+    errors = capturedErr.str();
+  }
   EXPECT_NE(ret, 0);
+  EXPECT_NE(errors.find("pagx render: error: invalid scale"), std::string::npos);
+}
+
+CLI_TEST(PAGXCliTest, Render_FontAndSequenceErrorsUseTheErrorPrefix) {
+  auto inputPath = TestResourcePath("render_basic.pagx");
+  std::string errors;
+  int ret = 0;
+  {
+    StreamCapture capturedErr(std::cerr);
+    ret = CallRun(pagx::cli::RunRender,
+                  {"render", "--font", TempDir() + "/missing-font.ttf", inputPath});
+    errors = capturedErr.str();
+  }
+  EXPECT_NE(ret, 0);
+  EXPECT_NE(errors.find("pagx render: error: failed to load font"), std::string::npos);
+
+  auto framesPath = TempDir() + "/render-sequence-not-a-directory";
+  {
+    std::ofstream out(framesPath);
+    out << "file";
+  }
+  {
+    StreamCapture capturedErr(std::cerr);
+    ret = CallRun(pagx::cli::RunRender, {"render", "--frames-dir", framesPath, inputPath});
+    errors = capturedErr.str();
+  }
+  EXPECT_NE(ret, 0);
+  EXPECT_NE(errors.find("pagx render: error: failed to create directory"), std::string::npos);
 }
 
 CLI_TEST(PAGXCliTest, Render_InvalidCrop) {
@@ -4211,6 +4252,33 @@ static void WriteExecutable(const std::string& path, const std::string& contents
   std::filesystem::permissions(path, std::filesystem::perms::owner_all);
 }
 
+class ScopedEnvironmentVariable {
+ public:
+  ScopedEnvironmentVariable(const char* name, const std::string& value) : name(name) {
+    const auto* current = std::getenv(name);
+    hadValue = current != nullptr;
+    savedValue = hadValue ? current : "";
+    Set(value);
+  }
+
+  ~ScopedEnvironmentVariable() {
+    Set(hadValue ? savedValue : "");
+  }
+
+ private:
+  void Set(const std::string& value) {
+#ifdef _WIN32
+    _putenv_s(name.c_str(), value.c_str());
+#else
+    setenv(name.c_str(), value.c_str(), 1);
+#endif
+  }
+
+  std::string name = {};
+  std::string savedValue = {};
+  bool hadValue = false;
+};
+
 static pagx::cli::VideoEncodeOptions DefaultVideoOptions() {
   pagx::cli::VideoEncodeOptions options = {};
   options.width = 320;
@@ -4225,7 +4293,8 @@ static std::vector<std::string> BuildMp4CommandLine(const pagx::cli::VideoEncode
   auto* format = pagx::cli::FindVideoFormat("mp4");
   EXPECT_NE(format, nullptr);
   std::vector<std::string> arguments = {};
-  auto ok = pagx::cli::BuildFFmpegCommandLine("ffmpeg", *format, options, &arguments, errorMsg);
+  auto ok = pagx::cli::BuildFFmpegCommandLine("ffmpeg", *format, options,
+                                              options.outputFile + ".part", &arguments, errorMsg);
   EXPECT_TRUE(ok);
   return arguments;
 }
@@ -4250,6 +4319,7 @@ CLI_TEST(PAGXCliTest, VideoFormat_OnlyMp4IsSupported) {
   EXPECT_EQ(mp4->defaultEncoder, "libx264");
   EXPECT_EQ(mp4->pixelFormat, "yuv420p");
   EXPECT_TRUE(mp4->requiresOpaque);
+  EXPECT_TRUE(mp4->requiresEvenDimensions);
   EXPECT_EQ(pagx::cli::FindVideoFormat("webm"), nullptr);
   EXPECT_EQ(pagx::cli::FindVideoFormat("gif"), nullptr);
   EXPECT_EQ(pagx::cli::FindVideoFormat(""), nullptr);
@@ -4292,6 +4362,19 @@ CLI_TEST(PAGXCliTest, VideoCommandLine_BuildsRawvideoPipeline) {
   EXPECT_NE(filter.find("format=yuv420p"), std::string::npos);
 }
 
+CLI_TEST(PAGXCliTest, VideoCommandLine_UsesTheExplicitOutputPath) {
+  auto options = DefaultVideoOptions();
+  auto* format = pagx::cli::FindVideoFormat("mp4");
+  ASSERT_NE(format, nullptr);
+  std::vector<std::string> arguments = {};
+  std::string errorMsg;
+  ASSERT_TRUE(pagx::cli::BuildFFmpegCommandLine("ffmpeg", *format, options,
+                                                "/tmp/staging/output.mp4", &arguments, &errorMsg));
+  EXPECT_EQ(arguments.back(), "/tmp/staging/output.mp4");
+  EXPECT_EQ(std::find(arguments.begin(), arguments.end(), options.outputFile + ".part"),
+            arguments.end());
+}
+
 CLI_TEST(PAGXCliTest, VideoCommandLine_NormalizesFrameRateForFFmpeg) {
   auto options = DefaultVideoOptions();
   options.frameRate = {30000000000000000LL, 1000000000000000LL};
@@ -4303,8 +4386,8 @@ CLI_TEST(PAGXCliTest, VideoCommandLine_NormalizesFrameRateForFFmpeg) {
   std::vector<std::string> rejectedArguments = {};
   auto* format = pagx::cli::FindVideoFormat("mp4");
   ASSERT_NE(format, nullptr);
-  EXPECT_FALSE(
-      pagx::cli::BuildFFmpegCommandLine("ffmpeg", *format, options, &rejectedArguments, &errorMsg));
+  EXPECT_FALSE(pagx::cli::BuildFFmpegCommandLine(
+      "ffmpeg", *format, options, options.outputFile + ".part", &rejectedArguments, &errorMsg));
   EXPECT_NE(errorMsg.find("not representable"), std::string::npos);
 }
 
@@ -4316,41 +4399,41 @@ CLI_TEST(PAGXCliTest, VideoCommandLine_RejectsInvalidOptions) {
 
   auto options = DefaultVideoOptions();
   options.height = 181;
-  EXPECT_FALSE(
-      pagx::cli::BuildFFmpegCommandLine("ffmpeg", *format, options, &arguments, &errorMsg));
+  EXPECT_FALSE(pagx::cli::BuildFFmpegCommandLine(
+      "ffmpeg", *format, options, options.outputFile + ".part", &arguments, &errorMsg));
   EXPECT_NE(errorMsg.find("even"), std::string::npos);
 
   options = DefaultVideoOptions();
   options.width = 0;
   errorMsg.clear();
-  EXPECT_FALSE(
-      pagx::cli::BuildFFmpegCommandLine("ffmpeg", *format, options, &arguments, &errorMsg));
+  EXPECT_FALSE(pagx::cli::BuildFFmpegCommandLine(
+      "ffmpeg", *format, options, options.outputFile + ".part", &arguments, &errorMsg));
   EXPECT_NE(errorMsg.find("size"), std::string::npos);
 
   options = DefaultVideoOptions();
   options.frameRate = 0;
   errorMsg.clear();
-  EXPECT_FALSE(
-      pagx::cli::BuildFFmpegCommandLine("ffmpeg", *format, options, &arguments, &errorMsg));
+  EXPECT_FALSE(pagx::cli::BuildFFmpegCommandLine(
+      "ffmpeg", *format, options, options.outputFile + ".part", &arguments, &errorMsg));
   EXPECT_NE(errorMsg.find("frame rate"), std::string::npos);
 
   options = DefaultVideoOptions();
   options.crf = 52;
   errorMsg.clear();
-  EXPECT_FALSE(
-      pagx::cli::BuildFFmpegCommandLine("ffmpeg", *format, options, &arguments, &errorMsg));
+  EXPECT_FALSE(pagx::cli::BuildFFmpegCommandLine(
+      "ffmpeg", *format, options, options.outputFile + ".part", &arguments, &errorMsg));
   EXPECT_NE(errorMsg.find("crf"), std::string::npos);
 
   options = DefaultVideoOptions();
   options.outputFile.clear();
   errorMsg.clear();
-  EXPECT_FALSE(
-      pagx::cli::BuildFFmpegCommandLine("ffmpeg", *format, options, &arguments, &errorMsg));
+  EXPECT_FALSE(pagx::cli::BuildFFmpegCommandLine(
+      "ffmpeg", *format, options, options.outputFile + ".part", &arguments, &errorMsg));
   EXPECT_NE(errorMsg.find("output path"), std::string::npos);
 
   errorMsg.clear();
-  EXPECT_FALSE(
-      pagx::cli::BuildFFmpegCommandLine("", *format, DefaultVideoOptions(), &arguments, &errorMsg));
+  EXPECT_FALSE(pagx::cli::BuildFFmpegCommandLine("", *format, DefaultVideoOptions(),
+                                                 "/tmp/out.mp4.part", &arguments, &errorMsg));
   EXPECT_NE(errorMsg.find("ffmpeg path"), std::string::npos);
 }
 
@@ -4376,20 +4459,20 @@ CLI_TEST(PAGXCliTest, VideoCommandLine_RejectsNonEncodingExtraArgs) {
   options.extraArgs = {"-i", "/tmp/extra-input"};
   std::vector<std::string> arguments = {};
   std::string errorMsg;
-  EXPECT_FALSE(
-      pagx::cli::BuildFFmpegCommandLine("ffmpeg", *format, options, &arguments, &errorMsg));
+  EXPECT_FALSE(pagx::cli::BuildFFmpegCommandLine(
+      "ffmpeg", *format, options, options.outputFile + ".part", &arguments, &errorMsg));
   EXPECT_NE(errorMsg.find("unsupported"), std::string::npos);
 
   options.extraArgs = {"-threads", "2"};
   errorMsg.clear();
-  EXPECT_FALSE(
-      pagx::cli::BuildFFmpegCommandLine("ffmpeg", *format, options, &arguments, &errorMsg));
+  EXPECT_FALSE(pagx::cli::BuildFFmpegCommandLine(
+      "ffmpeg", *format, options, options.outputFile + ".part", &arguments, &errorMsg));
   EXPECT_NE(errorMsg.find("unsupported"), std::string::npos);
 
   options.extraArgs = {"-b:v"};
   errorMsg.clear();
-  EXPECT_FALSE(
-      pagx::cli::BuildFFmpegCommandLine("ffmpeg", *format, options, &arguments, &errorMsg));
+  EXPECT_FALSE(pagx::cli::BuildFFmpegCommandLine(
+      "ffmpeg", *format, options, options.outputFile + ".part", &arguments, &errorMsg));
   EXPECT_NE(errorMsg.find("missing value"), std::string::npos);
 }
 
@@ -4444,6 +4527,53 @@ CLI_TEST(PAGXCliTest, VideoFindFFmpeg_RequiresAnExecutable) {
   EXPECT_EQ(location.path, fake);
   EXPECT_EQ(location.source, "--ffmpeg");
   EXPECT_TRUE(location.error.empty());
+}
+
+CLI_TEST(PAGXCliTest, VideoFindFFmpeg_PrefersManagedCacheAndRejectsInvalidEnvironment) {
+#ifdef _WIN32
+  const std::string platform = "win32";
+#elif defined(__APPLE__)
+  const std::string platform = "darwin";
+#else
+  const std::string platform = "linux";
+#endif
+#if defined(__x86_64__) || defined(_M_X64)
+  const std::string target = platform + "-x64";
+#else
+  const std::string target = platform + "-arm64";
+#endif
+#ifdef _WIN32
+  const std::string executableName = "ffmpeg.exe";
+#else
+  const std::string executableName = "ffmpeg";
+#endif
+  auto cacheRoot = std::filesystem::path(TempDir()) / "managed-cache";
+  auto cachedPath = cacheRoot / "v1.0.0" / target / "bin" / executableName;
+  std::filesystem::create_directories(cachedPath.parent_path());
+  WriteExecutable(cachedPath.u8string(), "#!/bin/sh\n");
+  auto manifestPath = std::filesystem::path(TempDir()) / "ffmpeg-manifest.json";
+  {
+    std::ofstream out(manifestPath);
+    out << R"({"release":"v1.0.0","assets":{"darwin-arm64":{},"darwin-x64":{},"linux-arm64":{},"linux-x64":{},"win32-arm64":{},"win32-x64":{}}})";
+  }
+  auto pathDirectory = std::filesystem::path(TempDir()) / "path-ffmpeg";
+  std::filesystem::create_directories(pathDirectory);
+  WriteExecutable((pathDirectory / executableName).u8string(), "#!/bin/sh\n");
+  ScopedEnvironmentVariable manifestEnv("PAGX_FFMPEG_MANIFEST_PATH", manifestPath.u8string());
+  ScopedEnvironmentVariable cacheEnv("PAGX_FFMPEG_CACHE_DIR", cacheRoot.u8string());
+  ScopedEnvironmentVariable ffmpegEnv("FFMPEG_BIN", "");
+  ScopedEnvironmentVariable pathEnv("PATH", pathDirectory.u8string());
+
+  auto location = pagx::cli::FindFFmpeg("");
+  EXPECT_EQ(location.path, cachedPath.u8string());
+  EXPECT_EQ(location.source, "managed cache");
+  {
+    ScopedEnvironmentVariable invalidFFmpeg("FFMPEG_BIN",
+                                            (pathDirectory / "missing-ffmpeg").u8string());
+    location = pagx::cli::FindFFmpeg("");
+    EXPECT_TRUE(location.path.empty());
+    EXPECT_NE(location.error.find("FFMPEG_BIN"), std::string::npos);
+  }
 }
 
 static void FillVideoFrame(std::vector<uint8_t>* frame, size_t stride, int width, int height,
@@ -4507,7 +4637,8 @@ CLI_TEST(PAGXCliTest, VideoEncoder_ExecutesTheValidatedRelativePath) {
     setenv("PATH", pathDirectory.c_str(), 1);
     std::filesystem::current_path(currentDirectory);
     auto location = pagx::cli::FindFFmpeg("ffmpeg");
-    auto encoder = pagx::cli::VideoEncoder::Start(location.path, *format, options, &errorMsg);
+    auto encoder = pagx::cli::VideoEncoder::Start(location.path, *format, options,
+                                                  options.outputFile + ".part", &errorMsg);
     started = encoder != nullptr;
     if (started) {
       std::vector<uint8_t> frame = {};
@@ -4543,7 +4674,8 @@ CLI_TEST(PAGXCliTest, VideoEncoder_EncodesPaddedFramesWhenFFmpegIsAvailable) {
   std::filesystem::remove(options.outputFile + ".part");
 
   std::string errorMsg;
-  auto encoder = pagx::cli::VideoEncoder::Start(location.path, *format, options, &errorMsg);
+  auto encoder = pagx::cli::VideoEncoder::Start(location.path, *format, options,
+                                                options.outputFile + ".part", &errorMsg);
   ASSERT_NE(encoder, nullptr) << errorMsg;
   std::vector<uint8_t> frame = {};
   for (int index = 0; index < frameCount; ++index) {
@@ -4592,10 +4724,12 @@ CLI_TEST(PAGXCliTest, VideoEncoder_UsesDistinctTemporaryFilesForTheSameOutput) {
   std::filesystem::remove(options.outputFile);
 
   std::string errorMsg;
-  auto first = pagx::cli::VideoEncoder::Start(location.path, *format, options, &errorMsg);
+  auto first = pagx::cli::VideoEncoder::Start(location.path, *format, options,
+                                              options.outputFile + ".part", &errorMsg);
   ASSERT_NE(first, nullptr) << errorMsg;
   errorMsg.clear();
-  auto second = pagx::cli::VideoEncoder::Start(location.path, *format, options, &errorMsg);
+  auto second = pagx::cli::VideoEncoder::Start(location.path, *format, options,
+                                               options.outputFile + ".part", &errorMsg);
   ASSERT_NE(second, nullptr) << errorMsg;
 
   std::vector<uint8_t> frame = {};
@@ -4630,7 +4764,8 @@ CLI_TEST(PAGXCliTest, VideoEncoder_FailurePreservesAnUnrelatedFixedPartFile) {
   }
 
   std::string errorMsg;
-  auto encoder = pagx::cli::VideoEncoder::Start(location.path, *format, options, &errorMsg);
+  auto encoder = pagx::cli::VideoEncoder::Start(location.path, *format, options,
+                                                options.outputFile + ".part", &errorMsg);
   ASSERT_NE(encoder, nullptr) << errorMsg;
   std::vector<uint8_t> frame = {};
   FillVideoFrame(&frame, stride, width, height, 0);
@@ -4666,7 +4801,8 @@ CLI_TEST(PAGXCliTest, VideoEncoder_HandlesAnEarlyClosedPipe) {
   auto* format = pagx::cli::FindVideoFormat("mp4");
   ASSERT_NE(format, nullptr);
   std::string errorMsg;
-  auto encoder = pagx::cli::VideoEncoder::Start(script, *format, options, &errorMsg);
+  auto encoder = pagx::cli::VideoEncoder::Start(script, *format, options,
+                                                options.outputFile + ".part", &errorMsg);
   ASSERT_NE(encoder, nullptr) << errorMsg;
   for (int attempt = 0; attempt < 1000 && !std::filesystem::exists(readyFile); ++attempt) {
     usleep(1000);
@@ -4696,7 +4832,8 @@ CLI_TEST(PAGXCliTest, VideoEncoder_ReportsConsumerExitStatus) {
   auto* format = pagx::cli::FindVideoFormat("mp4");
   ASSERT_NE(format, nullptr);
   std::string errorMsg;
-  auto encoder = pagx::cli::VideoEncoder::Start(script, *format, options, &errorMsg);
+  auto encoder = pagx::cli::VideoEncoder::Start(script, *format, options,
+                                                options.outputFile + ".part", &errorMsg);
   ASSERT_NE(encoder, nullptr) << errorMsg;
   std::vector<uint8_t> frame = {};
   FillVideoFrame(&frame, 320 * 4, 320, 180, 0);
@@ -4724,7 +4861,8 @@ CLI_TEST(PAGXCliTest, VideoEncoder_ReportsExecFailureAndPreservesFixedPartFile) 
   auto missingExecutable = TempDir() + "/missing-ffmpeg";
   std::filesystem::remove(missingExecutable);
   std::string errorMsg = {};
-  auto encoder = pagx::cli::VideoEncoder::Start(missingExecutable, *format, options, &errorMsg);
+  auto encoder = pagx::cli::VideoEncoder::Start(missingExecutable, *format, options,
+                                                options.outputFile + ".part", &errorMsg);
 #ifdef _WIN32
   ASSERT_EQ(encoder, nullptr);
   EXPECT_FALSE(errorMsg.empty());
@@ -4756,7 +4894,8 @@ CLI_TEST(PAGXCliTest, VideoEncoder_DoesNotKillAnExternallyReapedProcess) {
   auto options = DefaultVideoOptions();
   options.outputFile = TempDir() + "/externally_reaped.mp4";
   std::string errorMsg;
-  auto encoder = pagx::cli::VideoEncoder::Start(location.path, *format, options, &errorMsg);
+  auto encoder = pagx::cli::VideoEncoder::Start(location.path, *format, options,
+                                                options.outputFile + ".part", &errorMsg);
   ASSERT_NE(encoder, nullptr) << errorMsg;
   auto processId = encoder->childProcessId();
   ASSERT_GT(processId, 0);
@@ -4909,12 +5048,42 @@ CLI_TEST(PAGXCliTest, Export_VideoOptionsAreRejectedForVectorFormats) {
   int ret = 0;
   {
     StreamCapture capturedErr(std::cerr);
-    ret = CallRun(pagx::cli::RunExport, {"export", "--input", inputPath, "--output",
-                                         TempDir() + "/video_options.svg", "--fps", "30"});
+    ret = CallRun(pagx::cli::RunExport,
+                  {"export", "--input", inputPath, "--output", TempDir() + "/video_options.svg",
+                   "--fps", "30", "--duration", "1"});
     errors = capturedErr.str();
   }
   EXPECT_EQ(ret, 1);
   EXPECT_NE(errors.find("--fps is only supported for video formats"), std::string::npos);
+  {
+    StreamCapture capturedErr(std::cerr);
+    ret = CallRun(pagx::cli::RunExport,
+                  {"export", "--input", inputPath, "--output", TempDir() + "/video_options.svg",
+                   "--duration", "1", "--fps", "30"});
+    errors = capturedErr.str();
+  }
+  EXPECT_EQ(ret, 1);
+  EXPECT_NE(errors.find("--duration is only supported for video formats"), std::string::npos);
+}
+
+CLI_TEST(PAGXCliTest, Export_FontOptionsAreRejectedForNonVideoFormats) {
+  auto inputPath = TestResourcePath("render_animated_timelines.pagx");
+  for (const auto* format : {"svg", "pptx", "html"}) {
+    for (const auto* option : {"--font", "--fallback"}) {
+      std::string errors;
+      int ret = 0;
+      {
+        StreamCapture capturedErr(std::cerr);
+        ret = CallRun(pagx::cli::RunExport,
+                      {"export", "--input", inputPath, "--output",
+                       TempDir() + "/font_options." + format, option, "missing.ttf"});
+        errors = capturedErr.str();
+      }
+      EXPECT_EQ(ret, 1);
+      EXPECT_NE(errors.find(std::string(option) + " is only supported for video formats"),
+                std::string::npos);
+    }
+  }
 }
 
 CLI_TEST(PAGXCliTest, Export_Mp4RejectsUnclosedEncoderArguments) {

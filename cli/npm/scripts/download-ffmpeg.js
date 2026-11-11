@@ -78,42 +78,6 @@ function isExecutable(filePath, platform = process.platform) {
   }
 }
 
-function findFFmpegOnPath(env = process.env, platform = process.platform) {
-  const pathValue = env.PATH || '';
-  const names = platform === 'win32' ? ['ffmpeg.exe', 'ffmpeg'] : ['ffmpeg'];
-  for (const directory of pathValue.split(platform === 'win32' ? ';' : ':')) {
-    if (!directory) continue;
-    for (const name of names) {
-      const candidate = path.join(directory, name);
-      if (isExecutable(candidate, platform)) return candidate;
-    }
-  }
-  return null;
-}
-
-function hasExplicitFFmpeg(args, env = process.env) {
-  return Boolean(env.FFMPEG_BIN) || args.some((arg) => arg === '--ffmpeg' || arg.startsWith('--ffmpeg='));
-}
-
-function isMP4Export(args) {
-  if (args[0] !== 'export' || args.includes('--help') || args.includes('-h')) return false;
-  let format = null;
-  let output = null;
-  for (let i = 1; i < args.length; ++i) {
-    if (args[i] === '--format') format = args[++i];
-    else if (args[i].startsWith('--format=')) format = args[i].slice('--format='.length);
-    else if (args[i] === '--output') output = args[++i];
-    else if (args[i].startsWith('--output=')) output = args[i].slice('--output='.length);
-  }
-  return format ? format === 'mp4' : Boolean(output) && path.extname(output).toLowerCase() === '.mp4';
-}
-
-function resolveFFmpegForCLI(args, options = {}) {
-  const env = options.env || process.env;
-  if (hasExplicitFFmpeg(args, env)) return null;
-  return findCachedFFmpeg(options) || findFFmpegOnPath(env, options.platform || process.platform);
-}
-
 function findCachedFFmpeg(options = {}) {
   try {
     const target = resolveTarget(options.platform, options.arch);
@@ -326,12 +290,8 @@ module.exports = {
   downloadFile,
   ensureFFmpeg,
   findCachedFFmpeg,
-  findFFmpegOnPath,
   formatDownloadError,
-  hasExplicitFFmpeg,
   isExecutable,
-  isMP4Export,
-  resolveFFmpegForCLI,
   resolveTarget,
   verifyArchive,
 };

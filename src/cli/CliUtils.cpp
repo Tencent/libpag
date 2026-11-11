@@ -30,6 +30,10 @@
 
 namespace pagx::cli {
 
+std::ostream& CommandError(const std::string& command) {
+  return std::cerr << command << ": error: ";
+}
+
 #ifdef _WIN32
 std::wstring UTF8ToWide(const std::string& value) {
   if (value.empty()) return {};
@@ -69,7 +73,7 @@ std::shared_ptr<PAGXDocument> LoadDocument(const std::string& filePath,
                                            const std::string& command) {
   auto document = PAGXImporter::FromFile(filePath);
   if (document == nullptr) {
-    std::cerr << command << ": failed to load '" << filePath << "'\n";
+    CommandError(command) << "failed to load '" << filePath << "'\n";
     return nullptr;
   }
   for (auto& error : document->errors) {
@@ -83,7 +87,7 @@ bool LoadFontConfig(FontConfig* fontConfig, const std::vector<std::string>& font
   for (const auto& fontFile : fontFiles) {
     auto typeface = tgfx::Typeface::MakeFromPath(fontFile);
     if (typeface == nullptr) {
-      std::cerr << command << ": failed to load font '" << fontFile << "'\n";
+      CommandError(command) << "failed to load font '" << fontFile << "'\n";
       return false;
     }
     fontConfig->registerFont(fontFile, 0, typeface->fontFamily(), typeface->fontStyle());

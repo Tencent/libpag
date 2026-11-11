@@ -2,11 +2,6 @@
 const { execFileSync } = require("child_process");
 const fs = require("fs");
 const path = require("path");
-const {
-  hasExplicitFFmpeg,
-  isMP4Export,
-  resolveFFmpegForCLI,
-} = require("../scripts/download-ffmpeg.js");
 
 const SUPPORTED = ["darwin", "linux", "win32"];
 
@@ -117,19 +112,6 @@ if ((process.argv[2] === '--help' || process.argv[2] === '-h') && process.argv.l
 }
 
 const args = process.argv.slice(2);
-// postinstall downloads ffmpeg. Runtime prefers that pinned cache over PATH, while explicit
-// --ffmpeg/FFMPEG_BIN still win. Runtime never accesses the network.
-if (!hasExplicitFFmpeg(args)) {
-  const ffmpeg = resolveFFmpegForCLI(args);
-  if (ffmpeg) {
-    process.env.FFMPEG_BIN = ffmpeg;
-  } else if (isMP4Export(args) && !args.includes('--dry-run')) {
-    console.error("pagx: ffmpeg is required for MP4 export but was not found.");
-    console.error("pagx: retry the ffmpeg download without reinstalling the package:");
-    console.error('  npm run download:ffmpeg --prefix "$(npm root -g)/@libpag/pagx"');
-    process.exit(1);
-  }
-}
 try {
   execFileSync(binPath, args, { stdio: "inherit" });
 } catch (e) {

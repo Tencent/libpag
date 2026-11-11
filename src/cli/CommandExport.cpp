@@ -178,6 +178,12 @@ static void PrintUsage() {
   std::cout << kCommonUsage << kSVGUsage << kPPTUsage << kMP4Usage << kExampleUsage;
 }
 
+static void MarkVideoOnlyOption(ExportOptions* options, const char* option) {
+  if (options->firstVideoOnlyOption.empty()) {
+    options->firstVideoOnlyOption = option;
+  }
+}
+
 static int ParseVideoOption(int argc, char* argv[], int* index, ExportOptions* options,
                             bool* matched) {
   auto& i = *index;
@@ -190,7 +196,7 @@ static int ParseVideoOption(int argc, char* argv[], int* index, ExportOptions* o
                 << "', must be 1-120 or a ratio such as 30000/1001\n";
       return 1;
     }
-    options->firstVideoOnlyOption = "--fps";
+    MarkVideoOnlyOption(options, "--fps");
   } else if (arg == "--duration" && i + 1 < argc) {
     ++i;
     if (!ParseFloatOption(argv[i], 0.0f, false, &options->duration)) {
@@ -198,21 +204,21 @@ static int ParseVideoOption(int argc, char* argv[], int* index, ExportOptions* o
                 << "', must be a positive number of seconds\n";
       return 1;
     }
-    options->firstVideoOnlyOption = "--duration";
+    MarkVideoOnlyOption(options, "--duration");
   } else if (arg == "--scale" && i + 1 < argc) {
     ++i;
     if (!ParseFloatOption(argv[i], 0.0f, false, &options->scale)) {
       std::cerr << "pagx export: error: invalid scale '" << argv[i] << "'\n";
       return 1;
     }
-    options->firstVideoOnlyOption = "--scale";
+    MarkVideoOnlyOption(options, "--scale");
   } else if (arg == "--background" && i + 1 < argc) {
     if (!ParseHexColor(argv[++i], &options->bgRed, &options->bgGreen, &options->bgBlue,
                        &options->bgAlpha)) {
       std::cerr << "pagx export: error: invalid color format, expected #RRGGBB or #RRGGBBAA\n";
       return 1;
     }
-    options->firstVideoOnlyOption = "--background";
+    MarkVideoOnlyOption(options, "--background");
   } else if (arg == "--crf" && i + 1 < argc) {
     long value = 0;
     ++i;
@@ -221,19 +227,19 @@ static int ParseVideoOption(int argc, char* argv[], int* index, ExportOptions* o
       return 1;
     }
     options->crf = static_cast<int>(value);
-    options->firstVideoOnlyOption = "--crf";
+    MarkVideoOnlyOption(options, "--crf");
   } else if (arg == "--no-crf") {
     options->crf = -1;
-    options->firstVideoOnlyOption = "--no-crf";
+    MarkVideoOnlyOption(options, "--no-crf");
   } else if (arg == "--preset" && i + 1 < argc) {
     options->preset = argv[++i];
-    options->firstVideoOnlyOption = "--preset";
+    MarkVideoOnlyOption(options, "--preset");
   } else if (arg == "--no-preset") {
     options->preset.clear();
-    options->firstVideoOnlyOption = "--no-preset";
+    MarkVideoOnlyOption(options, "--no-preset");
   } else if (arg == "--encoder" && i + 1 < argc) {
     options->encoder = argv[++i];
-    options->firstVideoOnlyOption = "--encoder";
+    MarkVideoOnlyOption(options, "--encoder");
   } else if (arg == "--encoder-args" && i + 1 < argc) {
     std::vector<std::string> extraArgs = {};
     std::string parseError = {};
@@ -242,13 +248,13 @@ static int ParseVideoOption(int argc, char* argv[], int* index, ExportOptions* o
       return 1;
     }
     options->encoderArgs.insert(options->encoderArgs.end(), extraArgs.begin(), extraArgs.end());
-    options->firstVideoOnlyOption = "--encoder-args";
+    MarkVideoOnlyOption(options, "--encoder-args");
   } else if (arg == "--ffmpeg" && i + 1 < argc) {
     options->ffmpegPath = argv[++i];
-    options->firstVideoOnlyOption = "--ffmpeg";
+    MarkVideoOnlyOption(options, "--ffmpeg");
   } else if (arg == "--dry-run") {
     options->dryRun = true;
-    options->firstVideoOnlyOption = "--dry-run";
+    MarkVideoOnlyOption(options, "--dry-run");
   } else {
     *matched = false;
   }
@@ -292,8 +298,10 @@ static int ParseOptions(int argc, char* argv[], ExportOptions* options) {
       options->pptIgnoreGlyphRuns = true;
     } else if (arg == "--font" && i + 1 < argc) {
       options->fontFiles.emplace_back(argv[++i]);
+      MarkVideoOnlyOption(options, "--font");
     } else if (arg == "--fallback" && i + 1 < argc) {
       options->fallbacks.emplace_back(argv[++i]);
+      MarkVideoOnlyOption(options, "--fallback");
     } else if (arg == "--help" || arg == "-h") {
       PrintUsage();
       return -1;
@@ -488,7 +496,8 @@ static int ExportToMP4(const ExportOptions& options, const VideoFormatSpec& form
   encodeOptions.outputFile = options.outputFile;
 
   std::vector<std::string> arguments = {};
-  if (!BuildFFmpegCommandLine(location.path, format, encodeOptions, &arguments, &errorMsg)) {
+  if (!BuildFFmpegCommandLine(location.path, format, encodeOptions, options.outputFile + ".part",
+                              &arguments, &errorMsg)) {
     std::cerr << "pagx export: error: " << errorMsg << "\n";
     return 1;
   }

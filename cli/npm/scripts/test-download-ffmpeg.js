@@ -13,11 +13,7 @@ const {
   downloadFile,
   ensureFFmpeg,
   findCachedFFmpeg,
-  findFFmpegOnPath,
   formatDownloadError,
-  hasExplicitFFmpeg,
-  isMP4Export,
-  resolveFFmpegForCLI,
   resolveTarget,
   verifyArchive,
 } = require('./download-ffmpeg.js');
@@ -99,62 +95,6 @@ test('builds a complete manifest from official release metadata', () => {
   const incomplete = fakeReleaseMetadata();
   incomplete.assets.pop();
   assert.throws(() => buildManifest(incomplete), /no verified size and SHA-256/);
-});
-
-test('detects MP4 exports that require the ffmpeg installation prompt', () => {
-  assert.strictEqual(isMP4Export(['export', '--format', 'mp4', '--input', 'a.pagx']), true);
-  assert.strictEqual(isMP4Export(['export', '--input', 'a.pagx', '--output', 'a.MP4']), true);
-  assert.strictEqual(isMP4Export(['export', '--output', 'a.mp4', '--format', 'svg']), false);
-  assert.strictEqual(isMP4Export(['export', '--format=mp4']), true);
-  assert.strictEqual(isMP4Export(['export', '--format', 'mp4', '--help']), false);
-  assert.strictEqual(isMP4Export(['render', '--format', 'mp4']), false);
-  assert.strictEqual(isMP4Export(['export', '--input', 'a.pagx']), false);
-});
-
-test('recognizes explicit paths and existing PATH executables', () => {
-  const root = tempDirectory();
-  try {
-    assert.strictEqual(hasExplicitFFmpeg([], { FFMPEG_BIN: '/tmp/ffmpeg' }), true);
-    assert.strictEqual(hasExplicitFFmpeg(['--ffmpeg', '/tmp/ffmpeg'], {}), true);
-    assert.strictEqual(hasExplicitFFmpeg([], {}), false);
-    const executable = path.join(root, process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg');
-    fs.writeFileSync(executable, 'fake');
-    if (process.platform !== 'win32') fs.chmodSync(executable, 0o755);
-    assert.strictEqual(findFFmpegOnPath({ PATH: root }), executable);
-    assert.strictEqual(findFFmpegOnPath({ PATH: path.join(root, 'missing') }), null);
-  } finally {
-    fs.rmSync(root, { recursive: true, force: true });
-  }
-});
-
-test('prefers the downloaded ffmpeg over PATH and honors explicit overrides', () => {
-  const root = tempDirectory();
-  try {
-    const target = resolveTarget();
-    const pathDir = path.join(root, 'path');
-    fs.mkdirSync(pathDir, { recursive: true });
-    const pathFFmpeg = path.join(pathDir, target.executableName);
-    fs.writeFileSync(pathFFmpeg, 'PATH ffmpeg');
-
-    const cacheRoot = path.join(root, 'cache');
-    const cachedFFmpeg = path.join(cacheRoot, 'v1.0.0', target.name, 'bin', target.executableName);
-    fs.mkdirSync(path.dirname(cachedFFmpeg), { recursive: true });
-    fs.writeFileSync(cachedFFmpeg, 'cached ffmpeg');
-    if (target.platform !== 'win32') {
-      fs.chmodSync(pathFFmpeg, 0o755);
-      fs.chmodSync(cachedFFmpeg, 0o755);
-    }
-
-    const options = { cacheRoot, env: { PATH: pathDir } };
-    assert.strictEqual(resolveFFmpegForCLI([], options), cachedFFmpeg);
-    assert.strictEqual(resolveFFmpegForCLI(['--ffmpeg', '/custom/ffmpeg'], options), null);
-    assert.strictEqual(resolveFFmpegForCLI([], { ...options, env: { FFMPEG_BIN: '/custom/ffmpeg' } }), null);
-
-    options.cacheRoot = path.join(root, 'empty-cache');
-    assert.strictEqual(resolveFFmpegForCLI([], options), pathFFmpeg);
-  } finally {
-    fs.rmSync(root, { recursive: true, force: true });
-  }
 });
 
 test('validates archive size and hash against the pinned manifest', () => {

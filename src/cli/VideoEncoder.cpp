@@ -31,18 +31,23 @@
 #include <unistd.h>
 #include <cerrno>
 #endif
+#ifdef __APPLE__
+#include <mach-o/dyld.h>
+#endif
 #include <algorithm>
 #include <cctype>
 #include <chrono>
 #include <cstdlib>
 #include <cstring>
 #include <filesystem>
+#include <fstream>
 #include <limits>
 #include <random>
 #include <system_error>
 #include <thread>
 #include <utility>
 #include "cli/CliUtils.h"
+#include "nlohmann/json.hpp"
 
 namespace pagx::cli {
 
@@ -78,6 +83,121 @@ std::vector<std::string> FFmpegNames() {
 #else
   return {"ffmpeg"};
 #endif
+}
+
+std::string EnvironmentValue(const char* name) {
+  const auto* value = std::getenv(name);
+  return value != nullptr ? value : "";
+}
+
+std::filesystem::path CurrentExecutablePath() {
+#ifdef _WIN32
+  wchar_t buffer[32768] = {};
+  auto length = GetModuleFileNameW(nullptr, buffer, 32768);
+  if (length == 0 || length >= 32768) {
+    return {};
+  }
+  return std::filesystem::path(std::wstring(buffer, length));
+#elif defined(__APPLE__)
+  char buffer[4096] = {};
+  uint32_t size = sizeof(buffer);
+  if (_NSGetExecutablePath(buffer, &size) != 0) {
+    return {};
+  }
+  return std::filesystem::path(std::string(buffer, size));
+#else
+  std::error_code error = {};
+  auto path = std::filesystem::read_symlink("/proc/self/exe", error);
+  return error ? std::filesystem::path() : path;
+#endif
+}
+
+std::filesystem::path PackagedManifestPath() {
+  auto overridePath = EnvironmentValue("PAGX_FFMPEG_MANIFEST_PATH");
+  if (!overridePath.empty()) {
+    return overridePath;
+  }
+  auto executable = CurrentExecutablePath();
+  if (executable.empty()) {
+    return {};
+  }
+  return executable.parent_path().parent_path().parent_path() / "ffmpeg-manifest.json";
+}
+
+std::filesystem::path ManagedCacheRoot() {
+  auto overrideRoot = EnvironmentValue("PAGX_FFMPEG_CACHE_DIR");
+  if (!overrideRoot.empty()) {
+    std::error_code error = {};
+    auto absolute = std::filesystem::absolute(overrideRoot, error);
+    return error ? std::filesystem::path() : absolute;
+  }
+#ifdef _WIN32
+  auto localAppData = EnvironmentValue("LOCALAPPDATA");
+  if (!localAppData.empty()) {
+    return std::filesystem::path(localAppData) / "pagx" / "ffmpeg";
+  }
+  auto home = EnvironmentValue("USERPROFILE");
+  if (home.empty()) {
+    home = EnvironmentValue("HOME");
+  }
+  if (home.empty()) {
+    return {};
+  }
+  return std::filesystem::path(home) / "AppData" / "Local" / "pagx" / "ffmpeg";
+#else
+  auto home = EnvironmentValue("HOME");
+  if (home.empty()) {
+    return {};
+  }
+#ifdef __APPLE__
+  return std::filesystem::path(home) / "Library" / "Caches" / "pagx" / "ffmpeg";
+#else
+  auto cacheHome = EnvironmentValue("XDG_CACHE_HOME");
+  auto root =
+      cacheHome.empty() ? std::filesystem::path(home) / ".cache" : std::filesystem::path(cacheHome);
+  return root / "pagx" / "ffmpeg";
+#endif
+#endif
+}
+
+std::string ManagedTargetName() {
+#ifdef _WIN32
+  const char* platform = "win32";
+#elif defined(__APPLE__)
+  const char* platform = "darwin";
+#else
+  const char* platform = "linux";
+#endif
+#if defined(__x86_64__) || defined(_M_X64)
+  return std::string(platform) + "-x64";
+#elif defined(__aarch64__) || defined(__arm64__) || defined(_M_ARM64)
+  return std::string(platform) + "-arm64";
+#else
+  return "";
+#endif
+}
+
+std::string FindManagedFFmpeg() {
+  auto manifestPath = PackagedManifestPath();
+  auto target = ManagedTargetName();
+  auto cacheRoot = ManagedCacheRoot();
+  if (manifestPath.empty() || target.empty() || cacheRoot.empty()) {
+    return {};
+  }
+  std::ifstream input(manifestPath);
+  if (!input) {
+    return {};
+  }
+  auto manifest = nlohmann::json::parse(input, nullptr, false);
+  if (manifest.is_discarded() || !manifest.contains("release") ||
+      !manifest["release"].is_string() || !manifest.contains("assets") ||
+      !manifest["assets"].is_object() || !manifest["assets"].contains(target) ||
+      !manifest["assets"][target].is_object()) {
+    return {};
+  }
+  auto candidate =
+      cacheRoot / manifest["release"].get<std::string>() / target / "bin" / FFmpegNames().front();
+  return IsExecutableFile(candidate) ? candidate.u8string() : std::string();
 }
 
 bool NeedsQuoting(const std::string& value) {
@@ -313,8 +433,8 @@ const VideoFormatSpec* FindVideoFormat(const std::string& format) {
 }
 
 bool BuildFFmpegCommandLine(const std::string& ffmpegPath, const VideoFormatSpec& format,
-                            const VideoEncodeOptions& options, std::vector<std::string>* arguments,
-                            std::string* errorMsg) {
+                            const VideoEncodeOptions& options, const std::string& outputPath,
+                            std::vector<std::string>* arguments, std::string* errorMsg) {
   if (arguments == nullptr) {
     SetError(errorMsg, "the argument list is null");
     return false;
@@ -347,7 +467,7 @@ bool BuildFFmpegCommandLine(const std::string& ffmpegPath, const VideoFormatSpec
     SetError(errorMsg, "the crf must be within 0-" + std::to_string(VideoEncoder::MAX_CRF));
     return false;
   }
-  if (options.outputFile.empty()) {
+  if (outputPath.empty()) {
     SetError(errorMsg, "the output path is empty");
     return false;
   }
@@ -381,8 +501,7 @@ bool BuildFFmpegCommandLine(const std::string& ffmpegPath, const VideoFormatSpec
   args.insert(args.end(), {"-colorspace", "bt709", "-color_primaries", "bt709", "-color_trc",
                            "bt709", "-color_range", "tv"});
   args.insert(args.end(), options.extraArgs.begin(), options.extraArgs.end());
-  args.insert(args.end(), {"-movflags", "+faststart", "-f", format.container,
-                           options.outputFile + kPartSuffix});
+  args.insert(args.end(), {"-movflags", "+faststart", "-f", format.container, outputPath});
   return true;
 }
 
@@ -477,6 +596,12 @@ FFmpegLocation FindFFmpeg(const std::string& explicitPath) {
     location.source = "FFMPEG_BIN";
     return location;
   }
+  auto managedPath = FindManagedFFmpeg();
+  if (!managedPath.empty()) {
+    location.path = std::move(managedPath);
+    location.source = "managed cache";
+    return location;
+  }
   const char* pathEnv = std::getenv("PATH");
 #ifdef _WIN32
   constexpr char kListSeparator = ';';
@@ -509,7 +634,7 @@ FFmpegLocation FindFFmpeg(const std::string& explicitPath) {
       }
     }
   }
-  location.error = "ffmpeg was not found in PATH";
+  location.error = "ffmpeg was not found in the managed cache or PATH";
   return location;
 }
 
@@ -552,18 +677,19 @@ std::unique_ptr<VideoEncoder> VideoEncoder::Start(const std::string& ffmpegPath,
                                                   const VideoFormatSpec& format,
                                                   const VideoEncodeOptions& options,
                                                   std::string* errorMsg) {
-  std::vector<std::string> arguments = {};
-  if (!BuildFFmpegCommandLine(ffmpegPath, format, options, &arguments, errorMsg)) {
-    return nullptr;
-  }
   std::string partFile = {};
   std::string stagingDirectory = {};
   if (!CreateStagingFile(options.outputFile, &partFile, &stagingDirectory, errorMsg)) {
     return nullptr;
   }
-  arguments.back() = partFile;
   std::unique_ptr<VideoEncoder> encoder(
       new VideoEncoder(options, std::move(partFile), std::move(stagingDirectory)));
+  std::vector<std::string> arguments = {};
+  if (!BuildFFmpegCommandLine(ffmpegPath, format, options, encoder->partFile, &arguments,
+                              errorMsg)) {
+    encoder->abort();
+    return nullptr;
+  }
   if (!encoder->spawnChild(arguments, errorMsg)) {
     auto cleanupError = encoder->abort();
     if (!cleanupError.empty()) {

@@ -1130,6 +1130,7 @@ if (PAG_BUILD_CLI)
     target_include_directories(pagx-cli PRIVATE
             src/cli
             ${PAG_INCLUDES}
+            ${TGFX_DIR}/third_party/json/include
             ${CMAKE_CURRENT_BINARY_DIR}/generated)
     target_compile_options(pagx-cli PRIVATE ${PAG_COMPILE_OPTIONS})
     target_compile_definitions(pagx-cli PRIVATE PAGX_CLI_VERSION="${PAGX_CLI_VERSION}")

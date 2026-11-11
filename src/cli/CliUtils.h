@@ -25,6 +25,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <memory>
+#include <ostream>
 #include <string>
 #include <vector>
 #include "pagx/FontConfig.h"
@@ -35,6 +36,9 @@
 #include "tgfx/core/Typeface.h"
 
 namespace pagx::cli {
+
+/** Returns an error stream prefixed with "<command>: error: " for one diagnostic message. */
+std::ostream& CommandError(const std::string& command);
 
 inline size_t FindLastPathSeparator(const std::string& path) {
   auto slash = path.rfind('/');
