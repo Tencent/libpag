@@ -24,6 +24,7 @@
 #include "pagx/utils/Base64.h"
 #include "pagx/utils/ImageMime.h"
 #include "pagx/utils/MemZipWriter.h"
+#include "pagx/utils/StringUtils.h"
 
 namespace pagx {
 
@@ -36,15 +37,6 @@ constexpr size_t MAX_REPORTED_REFERENCES = 16;
 // Most filesystems cap a single file name at 255 bytes. Truncating the stem keeps room for the
 // extension and for the "_<n>" suffix that resolves name collisions.
 constexpr size_t MAX_ENTRY_STEM_LENGTH = 128;
-
-std::string ToLowerAscii(std::string value) {
-  for (char& c : value) {
-    if (c >= 'A' && c <= 'Z') {
-      c = static_cast<char>(c - 'A' + 'a');
-    }
-  }
-  return value;
-}
 
 // Windows resolves these names as devices before looking at the extension, so an entry such as
 // "con.png" or "COM1.png" cannot be created or opened there even though the archive is valid.
@@ -281,7 +273,8 @@ std::shared_ptr<Data> PAGXArchiveWriter::Finish(std::string_view documentXML,
     return nullptr;
   }
   for (const auto& entry : _entries) {
-    if (!writer.write(entry.first, entry.second->bytes(), entry.second->size(), errorMsg)) {
+    if (!writer.write(entry.first, entry.second->bytes(), entry.second->size(), errorMsg,
+                      Z_NO_COMPRESSION)) {
       return nullptr;
     }
   }
@@ -294,11 +287,13 @@ std::shared_ptr<Data> PAGXArchiveWriter::Finish(std::string_view documentXML,
 std::string PAGXArchiveWriter::allocatePath(const std::string& baseName,
                                             const std::string& extension) {
   std::string stem = baseName.empty() ? "img_" + std::to_string(_nextImageIndex++) : baseName;
-  if (stem.size() > MAX_ENTRY_STEM_LENGTH) {
-    stem.resize(MAX_ENTRY_STEM_LENGTH);
-  }
+  // Device names are at most four bytes, so deciding before the truncation keeps the prefix edge
+  // from pushing the stem past the length limit above.
   if (IsWindowsDeviceName(stem)) {
     stem = "img_" + stem;
+  }
+  if (stem.size() > MAX_ENTRY_STEM_LENGTH) {
+    stem.resize(MAX_ENTRY_STEM_LENGTH);
   }
   std::string prefix = "images/" + stem;
   std::string path = prefix + "." + extension;

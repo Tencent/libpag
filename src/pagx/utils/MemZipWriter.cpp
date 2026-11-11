@@ -23,10 +23,11 @@ namespace pagx {
 
 namespace {
 
-bool AddZipEntry(zipFile zf, const char* name, const void* data, unsigned size) {
+bool AddZipEntry(zipFile zf, const char* name, const void* data, unsigned size,
+                 int compressionLevel) {
   zip_fileinfo zi = {};
   if (zipOpenNewFileInZip(zf, name, &zi, nullptr, 0, nullptr, 0, nullptr, Z_DEFLATED,
-                          Z_DEFAULT_COMPRESSION) != ZIP_OK) {
+                          compressionLevel) != ZIP_OK) {
     return false;
   }
   if (zipWriteInFileInZip(zf, data, size) != ZIP_OK) {
@@ -50,7 +51,7 @@ MemZipWriter::~MemZipWriter() {
 }
 
 bool MemZipWriter::write(const std::string& entryPath, const void* bytes, size_t size,
-                         std::string* errorMsg) {
+                         std::string* errorMsg, int compressionLevel) {
   if (_zip == nullptr) {
     if (errorMsg) {
       *errorMsg = "MemZipWriter: archive not open.";
@@ -63,7 +64,7 @@ bool MemZipWriter::write(const std::string& entryPath, const void* bytes, size_t
     }
     return false;
   }
-  if (!AddZipEntry(_zip, entryPath.c_str(), bytes, static_cast<unsigned>(size))) {
+  if (!AddZipEntry(_zip, entryPath.c_str(), bytes, static_cast<unsigned>(size), compressionLevel)) {
     if (errorMsg) {
       *errorMsg = "MemZipWriter: failed to add entry: " + entryPath;
     }

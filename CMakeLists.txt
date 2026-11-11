@@ -312,7 +312,6 @@ if (PAG_BUILD_PAGX)
     file(GLOB_RECURSE PAGX_RUNTIME_SOURCES CONFIGURE_DEPENDS src/pagx/runtime/*.cpp)
     list(APPEND PAGX_CORE_SOURCES ${PAGX_RUNTIME_SOURCES})
     file(GLOB_RECURSE PAGX_UTILS_SOURCES CONFIGURE_DEPENDS src/pagx/utils/*.*)
-    list(FILTER PAGX_UTILS_SOURCES EXCLUDE REGEX "src/pagx/utils/MemZip\\.cpp$")
     file(GLOB_RECURSE PAGX_XML_SOURCES CONFIGURE_DEPENDS src/pagx/xml/*.*)
     # SVG transform/path parsers and CSS class rules are shared with pagx HTML import.
     list(APPEND PAGX_CORE_SOURCES
@@ -381,7 +380,6 @@ if (PAG_BUILD_PAGX)
     # PAGX export can always produce an in-memory ZIP (PAGXExporter::ToData), so minizip is part
     # of every PAGX build rather than only the HTML/PPT exporters.
     set(MINIZIP_DIR ${TGFX_DIR}/third_party/zlib/contrib/minizip)
-    list(APPEND PAG_FILES src/pagx/utils/MemZip.cpp)
     list(APPEND PAG_FILES ${MINIZIP_DIR}/zip.c ${MINIZIP_DIR}/ioapi.c)
     list(APPEND PAG_INCLUDES ${MINIZIP_DIR})
 

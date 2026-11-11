@@ -16,6 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include <chrono>
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
@@ -521,16 +522,19 @@ PAGX_TEST(PAGXExporterTest, ToDataSkipsEmojiUsedOnlyBySkippedGlyphs) {
   font->glyphs.push_back(glyph);
 
   pagx::PAGXExporter::Options fullOptions;
-  auto full = pagx::PAGXExporter::ToData(*doc, fullOptions);
+  std::string error;
+  auto full = pagx::PAGXExporter::ToData(*doc, fullOptions, &error);
   ASSERT_NE(full, nullptr);
+  EXPECT_TRUE(error.empty());
   std::unordered_map<std::string, std::string> fullEntries;
   ASSERT_TRUE(ReadZip(full, &fullEntries));
   EXPECT_NE(fullEntries.find("images/emoji_wave.png"), fullEntries.end());
 
   pagx::PAGXExporter::Options skipOptions;
   skipOptions.skipGlyphData = true;
-  auto skipped = pagx::PAGXExporter::ToData(*doc, skipOptions);
+  auto skipped = pagx::PAGXExporter::ToData(*doc, skipOptions, &error);
   ASSERT_NE(skipped, nullptr);
+  EXPECT_TRUE(error.empty());
   std::unordered_map<std::string, std::string> skippedEntries;
   ASSERT_TRUE(ReadZip(skipped, &skippedEntries));
   ASSERT_EQ(skippedEntries.size(), 1u);
@@ -540,8 +544,10 @@ PAGX_TEST(PAGXExporterTest, ToDataSkipsEmojiUsedOnlyBySkippedGlyphs) {
 
 PAGX_TEST(PAGXExporterTest, ToDataWritesOnlyDocumentForEmptyInput) {
   auto empty = pagx::PAGXDocument::Make(10, 10);
-  auto zip = pagx::PAGXExporter::ToData(*empty);
+  std::string error;
+  auto zip = pagx::PAGXExporter::ToData(*empty, {}, &error);
   ASSERT_NE(zip, nullptr);
+  EXPECT_TRUE(error.empty());
   std::unordered_map<std::string, std::string> entries;
   ASSERT_TRUE(ReadZip(zip, &entries));
   ASSERT_EQ(entries.size(), 1u);
@@ -565,16 +571,20 @@ PAGX_TEST(PAGXExporterTest, ToDataRoundTripsThroughDisk) {
   auto* image = AddImage(doc.get(), "img_round", "", MakeImageData());
   AddPatternLayer(doc.get(), image, 64.0f);
 
-  auto zip = pagx::PAGXExporter::ToData(*doc);
+  std::string zipError;
+  auto zip = pagx::PAGXExporter::ToData(*doc, {}, &zipError);
   ASSERT_NE(zip, nullptr);
+  EXPECT_TRUE(zipError.empty());
   std::unordered_map<std::string, std::string> entries;
   ASSERT_TRUE(ReadZip(zip, &entries));
   ASSERT_NE(entries.find("document.pagx"), entries.end());
   ASSERT_NE(entries.find("images/img_round.png"), entries.end());
 
-  auto directory = std::filesystem::temp_directory_path() / "pagx-exporter-roundtrip";
-  std::error_code error;
-  std::filesystem::remove_all(directory, error);
+  // A per-run directory keeps parallel or interrupted runs from deleting each other's files.
+  auto suffix = std::to_string(std::chrono::steady_clock::now().time_since_epoch().count());
+  auto directory = std::filesystem::temp_directory_path() / ("pagx-exporter-roundtrip-" + suffix);
+  std::error_code fileError;
+  std::filesystem::remove_all(directory, fileError);
   ASSERT_TRUE(WriteEntriesToDisk(entries, directory));
 
   auto reloaded = pagx::PAGXImporter::FromFile((directory / "document.pagx").string());
@@ -582,7 +592,10 @@ PAGX_TEST(PAGXExporterTest, ToDataRoundTripsThroughDisk) {
   auto* reloadedImage = reloaded->findNode<pagx::Image>("img_round");
   ASSERT_NE(reloadedImage, nullptr);
   auto imagePath = directory / "images" / "img_round.png";
-  EXPECT_EQ(reloadedImage->filePath, imagePath.string());
+  // The importer builds the path by string concatenation, so compare normalized paths instead of
+  // the raw separators, which differ on Windows.
+  EXPECT_EQ(std::filesystem::path(reloadedImage->filePath).lexically_normal(),
+            imagePath.lexically_normal());
   // Reading and decoding from disk proves the archive is usable from a working directory other
   // than the extraction directory, not just that the XML mentions a path.
   EXPECT_EQ(ReadFileBytes(imagePath), entries["images/img_round.png"]);
@@ -592,7 +605,7 @@ PAGX_TEST(PAGXExporterTest, ToDataRoundTripsThroughDisk) {
   EXPECT_EQ(codec->height(), 8);
   EXPECT_GT(CountOpaquePixels(reloaded, 64), 0u);
 
-  std::filesystem::remove_all(directory, error);
+  std::filesystem::remove_all(directory, fileError);
 }
 
 PAGX_TEST(PAGXExporterTest, ToDataDoesNotModifyDocumentAndIsDeterministic) {
@@ -602,15 +615,16 @@ PAGX_TEST(PAGXExporterTest, ToDataDoesNotModifyDocumentAndIsDeterministic) {
   AddPatternLayer(doc.get(), image);
   auto xmlBefore = pagx::PAGXExporter::ToXML(*doc);
 
-  auto first = pagx::PAGXExporter::ToData(*doc);
+  std::string error;
+  auto first = pagx::PAGXExporter::ToData(*doc, {}, &error);
   ASSERT_NE(first, nullptr);
-  auto second = pagx::PAGXExporter::ToData(*doc);
+  EXPECT_TRUE(error.empty());
+  auto second = pagx::PAGXExporter::ToData(*doc, {}, &error);
   ASSERT_NE(second, nullptr);
+  EXPECT_TRUE(error.empty());
+  EXPECT_EQ(BytesOf(first), BytesOf(second));
   std::unordered_map<std::string, std::string> firstEntries;
-  std::unordered_map<std::string, std::string> secondEntries;
   ASSERT_TRUE(ReadZip(first, &firstEntries));
-  ASSERT_TRUE(ReadZip(second, &secondEntries));
-  EXPECT_EQ(firstEntries, secondEntries);
 
   EXPECT_EQ(image->id, "img_alpha");
   EXPECT_EQ(image->filePath, "hash:abc");
