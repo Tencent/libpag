@@ -6406,6 +6406,34 @@ PAGX_TEST(PAGXSVGTest, SVGExport_ReLayoutsAfterConstraintEdit) {
   EXPECT_NE(after.find(" x=\"240\""), std::string::npos);
 }
 
+// ST37: fonts owned by an external composition must participate in the WOFF2 pre-scan even though
+// they are not in the root document's node list.
+PAGX_TEST(PAGXSVGTest, SVGExport_EmbedsFontsFromExternalDocument) {
+  auto external = pagx::PAGXDocument::Make(100, 100);
+  auto* externalFont = MakeSquareGlyphFont(external.get());
+  auto* externalText = MakeSquareGlyphText(external.get(), externalFont, {20, 40});
+  auto* externalLayer = external->makeNode<pagx::Layer>();
+  externalLayer->contents = {externalText, MakeSolidFillSVG(external.get(), 1, 0, 0)};
+  external->layers.push_back(externalLayer);
+
+  auto root = pagx::PAGXDocument::Make(100, 100);
+  auto* wrapper = root->makeNode<pagx::Composition>();
+  wrapper->width = 100;
+  wrapper->height = 100;
+  wrapper->layers = external->layers;
+  auto* host = root->makeNode<pagx::Layer>();
+  host->composition = wrapper;
+  host->externalDoc = external;
+  root->layers.push_back(host);
+
+  pagx::SVGExportOptions options = {};
+  options.convertTextToPath = false;
+  options.embedFontsAsWoff2 = true;
+  auto svg = pagx::SVGExporter::ToSVG(*root, options);
+  EXPECT_NE(svg.find("@font-face"), std::string::npos);
+  EXPECT_NE(svg.find("<text"), std::string::npos);
+}
+
 // A Group's alpha has to survive until the painter that draws its geometry, even when that painter
 // sits outside the Group.
 PAGX_TEST(PAGXSVGTest, SVGExport_GroupAlphaReachesOuterPainter) {

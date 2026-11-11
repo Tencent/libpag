@@ -4144,6 +4144,28 @@ static bool CanBakeTextPaths(const std::vector<Element*>& elements) {
   return true;
 }
 
+static void CollectDocumentFonts(const PAGXDocument* doc, std::vector<Font*>* fonts,
+                                 std::unordered_set<const PAGXDocument*>* visited) {
+  if (doc == nullptr || !visited->insert(doc).second) {
+    return;
+  }
+  for (const auto& node : doc->nodes) {
+    if (node == nullptr) {
+      continue;
+    }
+    if (node->nodeType() == NodeType::Font) {
+      fonts->push_back(static_cast<Font*>(node.get()));
+      continue;
+    }
+    if (node->nodeType() == NodeType::Layer) {
+      auto* layer = static_cast<Layer*>(node.get());
+      if (layer->externalDoc != nullptr) {
+        CollectDocumentFonts(layer->externalDoc.get(), fonts, visited);
+      }
+    }
+  }
+}
+
 void SVGWriter::writeLayer(SVGBuilder& out, const Layer* layer) {
   // An animated visibility channel turns the layer into a lasting SMIL host, so the static invisible
   // state must not elide the element that carries the animation. A hidden layer is skipped
@@ -4534,11 +4556,14 @@ std::string SVGExporter::ToSVG(PAGXDocument& doc, const Options& options,
   // is consumed by writeText / writeTextAsFont below to decide whether to emit <text> with
   // PUA Unicode characters (WOFF2 path) or the SVG <path> outline path.
   if (options.embedFontsAsWoff2 && !convertTextToPath) {
-    for (auto& nodePtr : doc.nodes) {
-      if (nodePtr->nodeType() != NodeType::Font) {
+    std::vector<Font*> fonts = {};
+    std::unordered_set<const PAGXDocument*> visitedDocs = {};
+    CollectDocumentFonts(&doc, &fonts, &visitedDocs);
+    std::unordered_set<const Font*> seenFonts = {};
+    for (auto* font : fonts) {
+      if (font == nullptr || !seenFonts.insert(font).second) {
         continue;
       }
-      auto* font = static_cast<Font*>(nodePtr.get());
       if (font->glyphs.empty() || !font->glyphs[0]) {
         continue;
       }
