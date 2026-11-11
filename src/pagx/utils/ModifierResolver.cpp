@@ -47,15 +47,6 @@
 
 namespace pagx {
 
-// std::pow(negative, non-integer) returns NaN, which would propagate through
-// the downstream geometry when a Repeater uses a negative scale with a
-// fractional offset. Raise the magnitude and reapply the sign so a negative
-// base keeps producing a negative result.
-static float SignedPow(float base, float exp) {
-  float sign = base < 0.0f ? -1.0f : 1.0f;
-  return sign * std::pow(std::abs(base), exp);
-}
-
 //==============================================================================
 // Geometry helpers: build pagx::PathData from primitive shapes and from a
 // resolved tgfx::Path round-trip.
@@ -522,21 +513,6 @@ static tgfx::PathOp MergeModeToPathOp(MergePathMode mode) {
 // slot's position, then rewrites `shapeSlots` to reference only that surviving
 // slot. Used by TrimPath (Continuous) and MergePath which fuse all in-scope
 // shapes into one resolved geometry.
-static void CollapseShapeSlotsToSinglePath(std::vector<Element*>& output,
-                                           std::vector<size_t>& shapeSlots, Element* replacement) {
-  size_t firstSlot = shapeSlots.front();
-  output[firstSlot] = replacement;
-  // Erase right-to-left so earlier indices remain valid; shapeSlots is built
-  // in ascending order during traversal.
-  for (auto it = shapeSlots.rbegin(); it != shapeSlots.rend(); ++it) {
-    if (*it != firstSlot) {
-      output.erase(output.begin() + static_cast<long>(*it));
-    }
-  }
-  shapeSlots.clear();
-  shapeSlots.push_back(firstSlot);
-}
-
 //==============================================================================
 // Repeater expansion. Each generated copy reuses the source element pointer; the
 // transform is folded into a fresh wrapping Group.
@@ -831,7 +807,11 @@ std::vector<Element*> ModifierResolver::resolve(const std::vector<Element*>& ele
           combined.addPath(PrimitiveToTGFXPath(output[shapeSlots[i]]), op);
         }
         auto* path = makePathFromData(MakePathDataFromTGFX(_doc, combined));
-        CollapseShapeSlotsToSinglePath(output, shapeSlots, path);
+        // tgfx's MergePath clears accumulated geometry and painters before adding the merged
+        // shape. Rebuild the scope so painters emitted before the merge cannot paint the result.
+        output.clear();
+        output.push_back(path);
+        shapeSlots.assign(1, 0);
         // tgfx boolean ops (Skia path-ops) emit geometry oriented for even-odd
         // coverage, not winding: e.g. a Difference hole keeps the inner contour
         // wound the same way as the outer one and relies on the path's even-odd
@@ -885,8 +865,11 @@ std::vector<Element*> ModifierResolver::resolve(const std::vector<Element*>& ele
         generated.reserve(static_cast<size_t>(maxCount));
         for (int i = 0; i < maxCount; ++i) {
           float progress = static_cast<float>(i) + rep->offset;
-          float sx = SignedPow(rep->scale.x, progress);
-          float sy = SignedPow(rep->scale.y, progress);
+          float sx = std::pow(rep->scale.x, progress);
+          float sy = std::pow(rep->scale.y, progress);
+          if (!std::isfinite(sx) || !std::isfinite(sy)) {
+            continue;
+          }
           float rotation = rep->rotation * progress;
           float tx = rep->position.x * progress;
           float ty = rep->position.y * progress;
@@ -902,13 +885,10 @@ std::vector<Element*> ModifierResolver::resolve(const std::vector<Element*>& ele
           generated.push_back(g);
         }
 
-        // Drawing order:
-        //   BelowOriginal -> [c0, c1, ..., cN-1]: c0 drawn first (bottom),
-        //     cN-1 drawn last (top). The original (smallest progress) sits at
-        //     the bottom of the stack, copies layered above.
-        //   AboveOriginal -> [cN-1, ..., c1, c0]: c0 drawn last (top). The
-        //     original sits on top of the stack.
-        if (rep->order == RepeaterOrder::AboveOriginal) {
+        // tgfx's Repeater walks copies in reverse for BelowOriginal and forward for
+        // AboveOriginal. Later elements paint on top, so BelowOriginal must emit [cN-1..c0] to
+        // leave the original (c0) on top, while AboveOriginal emits [c0..cN-1].
+        if (rep->order == RepeaterOrder::BelowOriginal) {
           std::reverse(generated.begin(), generated.end());
         }
 

@@ -2188,7 +2188,7 @@ PAGX_TEST(PAGXSVGTest, SVGExport_RepeaterFractionalCopies) {
 }
 
 PAGX_TEST(PAGXSVGTest, SVGExport_RepeaterNegativeScaleFractionalOffset) {
-  // Triggers SignedPow's sign-preservation on a negative base with non-integer exponent.
+  // A negative scale with a fractional progress is NaN in tgfx, so every copy is invisible.
   auto doc = pagx::PAGXDocument::Make(400, 200);
   auto* layer = doc->makeNode<pagx::Layer>();
   auto* rect = doc->makeNode<pagx::Rectangle>();
@@ -2205,7 +2205,7 @@ PAGX_TEST(PAGXSVGTest, SVGExport_RepeaterNegativeScaleFractionalOffset) {
   doc->layers.push_back(layer);
 
   auto svg = pagx::SVGExporter::ToSVG(*doc);
-  EXPECT_NE(svg.find("<rect"), std::string::npos);
+  EXPECT_EQ(svg.find("<rect"), std::string::npos);
 }
 
 PAGX_TEST(PAGXSVGTest, SVGExport_PathWithRenderScale) {
@@ -3959,7 +3959,7 @@ PAGX_TEST(PAGXSVGTest, SVGExport_RepeaterClampsExcessiveCopies) {
 }
 
 PAGX_TEST(PAGXSVGTest, SVGExport_RepeaterNegativeScale) {
-  // Negative scale exercises SignedPow's negative branch.
+  // A half-step offset makes every progress fractional; tgfx produces NaN scales and no output.
   auto doc = pagx::PAGXDocument::Make(400, 200);
   auto* layer = doc->makeNode<pagx::Layer>();
   auto* rect = doc->makeNode<pagx::Rectangle>();

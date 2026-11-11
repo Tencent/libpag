@@ -31,9 +31,11 @@
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/Layer.h"
+#include "pagx/nodes/MergePath.h"
 #include "pagx/nodes/PathData.h"
 #include "pagx/nodes/RangeSelector.h"
 #include "pagx/nodes/Rectangle.h"
+#include "pagx/nodes/Repeater.h"
 #include "pagx/nodes/SolidColor.h"
 #include "pagx/nodes/Stroke.h"
 #include "pagx/nodes/Text.h"
@@ -3607,6 +3609,59 @@ PAGX_TEST(PAGXUtilsTest, ModifierResolver_KeepsTextModifierForNestedText) {
   EXPECT_EQ(resolved[0]->nodeType(), pagx::NodeType::Group);
   EXPECT_EQ(resolved[1]->nodeType(), pagx::NodeType::TextModifier);
   EXPECT_FALSE(resolver.CanBakeTextModifiers(elements));
+}
+
+// MergePath follows tgfx: it discards every painter accumulated before it, so an earlier Fill
+// must not paint the merged geometry.
+PAGX_TEST(PAGXUtilsTest, ModifierResolver_MergeClearsPreviousPainters) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto* first = doc->makeNode<pagx::Rectangle>();
+  auto* fill = doc->makeNode<pagx::Fill>();
+  auto* second = doc->makeNode<pagx::Rectangle>();
+  auto* merge = doc->makeNode<pagx::MergePath>();
+  auto* stroke = doc->makeNode<pagx::Stroke>();
+
+  std::vector<pagx::Element*> elements = {first, fill, second, merge, stroke};
+  pagx::ModifierResolver resolver(doc.get());
+  auto resolved = resolver.resolve(elements);
+  ASSERT_EQ(resolved.size(), 2u);
+  EXPECT_EQ(resolved[0]->nodeType(), pagx::NodeType::Path);
+  EXPECT_EQ(resolved[1]->nodeType(), pagx::NodeType::Stroke);
+}
+
+PAGX_TEST(PAGXUtilsTest, ModifierResolver_RepeaterOrderAndNegativeScale) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto* rect = doc->makeNode<pagx::Rectangle>();
+  auto* fill = doc->makeNode<pagx::Fill>();
+  auto* repeater = doc->makeNode<pagx::Repeater>();
+  repeater->copies = 3;
+  repeater->position = {10, 0};
+  std::vector<pagx::Element*> elements = {rect, fill, repeater};
+  pagx::ModifierResolver resolver(doc.get());
+
+  repeater->order = pagx::RepeaterOrder::BelowOriginal;
+  auto resolved = resolver.resolve(elements);
+  ASSERT_EQ(resolved.size(), 3u);
+  EXPECT_FLOAT_EQ(static_cast<pagx::Group*>(resolved.front())->position.x, 20.0f);
+  EXPECT_FLOAT_EQ(static_cast<pagx::Group*>(resolved.back())->position.x, 0.0f);
+
+  repeater->order = pagx::RepeaterOrder::AboveOriginal;
+  resolved = resolver.resolve(elements);
+  ASSERT_EQ(resolved.size(), 3u);
+  EXPECT_FLOAT_EQ(static_cast<pagx::Group*>(resolved.front())->position.x, 0.0f);
+  EXPECT_FLOAT_EQ(static_cast<pagx::Group*>(resolved.back())->position.x, 20.0f);
+
+  repeater->copies = 1;
+  repeater->offset = 0.5f;
+  repeater->scale = {-1.2f, 1.0f};
+  resolved = resolver.resolve(elements);
+  EXPECT_TRUE(resolved.empty());
+
+  repeater->copies = 2;
+  repeater->offset = 0.0f;
+  repeater->scale = {-2.0f, 1.0f};
+  resolved = resolver.resolve(elements);
+  EXPECT_EQ(resolved.size(), 2u);
 }
 
 // With seed 0 AE always makes the first slot pick the table index for the character count; for four
