@@ -462,6 +462,27 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
 
   auto fillWillBePairedWithStroke = ComputeFillStrokePairing(elements, targetPlacement);
 
+  // The runtime applies a modifier wherever it sits in the list, so a TrimPath written after the
+  // painter still trims the shape that painter flushes. Collect a lone one up front; two or more
+  // keep the positional rule, where "which shape owns it" is ambiguous.
+  const TrimPath* leadingTrim = nullptr;
+  {
+    int trimCount = 0;
+    for (auto* element : elements) {
+      if (element != nullptr && element->nodeType() == NodeType::TrimPath) {
+        leadingTrim = static_cast<const TrimPath*>(element);
+        ++trimCount;
+      }
+    }
+    if (trimCount != 1) {
+      leadingTrim = nullptr;
+    }
+  }
+  if (leadingTrim != nullptr) {
+    state.hasTrim = true;
+    state.curTrim = leadingTrim;
+  }
+
   for (size_t elemIndex = 0; elemIndex < elements.size(); elemIndex++) {
     auto* element = elements[elemIndex];
     auto type = element->nodeType();
