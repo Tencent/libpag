@@ -90,6 +90,14 @@ int StartAsyncVideoExportTest() {
   }
   firstFrame = started.frame;
   sawPending = firstFrame->status() == pagx::VideoExportFrameStatus::Pending;
+  if (sawPending) {
+    std::vector<uint8_t> pendingPixels(24, 0xCD);
+    auto beforeRead = pendingPixels;
+    if (firstFrame->readPixels(pendingPixels.data(), 12) || exporter->currentFrame() != 0 ||
+        pendingPixels != beforeRead) {
+      return Fail("Pending readPixels modified pixels or committed the frame index");
+    }
+  }
   return 0;
 }
 
