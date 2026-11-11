@@ -4427,8 +4427,8 @@ CLI_TEST(PAGXCliTest, VideoCommandLine_RejectsInvalidOptions) {
   options = DefaultVideoOptions();
   options.outputFile.clear();
   errorMsg.clear();
-  EXPECT_FALSE(pagx::cli::BuildFFmpegCommandLine(
-      "ffmpeg", *format, options, options.outputFile + ".part", &arguments, &errorMsg));
+  EXPECT_FALSE(
+      pagx::cli::BuildFFmpegCommandLine("ffmpeg", *format, options, "", &arguments, &errorMsg));
   EXPECT_NE(errorMsg.find("output path"), std::string::npos);
 
   errorMsg.clear();
