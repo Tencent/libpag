@@ -1322,7 +1322,19 @@ Group* SVGParserContext::convertText(const std::shared_ptr<DOMNode>& element,
       if (elementFill.empty()) {
         elementFill = "#000000";
       }
-      if (elementFill != firstFill && IsSolidTextPaint(firstFill)) {
+      // The run's paint wins whenever it says something the element-level paint cannot: a
+      // different colour, or the same colour with a different opacity (the element-level
+      // addFillStroke would otherwise swallow the tspan's fill-opacity).
+      float elementFillOpacity = 1.0f;
+      std::string elementOpacityAttr = getAttribute(element, "fill-opacity");
+      if (elementOpacityAttr.empty()) {
+        elementOpacityAttr = inheritedStyle.fillOpacity;
+      }
+      if (!elementOpacityAttr.empty()) {
+        elementFillOpacity = std::strtof(elementOpacityAttr.c_str(), nullptr);
+      }
+      bool paintDiffers = elementFill != firstFill || firstFillOpacity != elementFillOpacity;
+      if (paintDiffers && IsSolidTextPaint(firstFill)) {
         groupFill = firstFill;
         groupFillOpacity = firstFillOpacity;
       }

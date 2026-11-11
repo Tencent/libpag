@@ -5563,6 +5563,20 @@ PAGX_TEST(PAGXSVGTest, SVGImport_TextMixedPositioning) {
  * text_tspan_fill_opacity.svg: the run-level paint carries fill-opacity, otherwise a translucent
  * tspan would render opaque.
  */
+/**
+ * text_same_fill_opacity.svg: the run keeps the element's colour but halves its opacity. The
+ * element-level fill would paint it opaque, so the run's paint has to win even when the colour
+ * matches.
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_TextSameFillDifferentOpacity) {
+  auto doc = pagx::SVGImporter::Parse(
+      ProjectPath::Absolute("resources/svg/text/text_same_fill_opacity.svg"));
+  ASSERT_NE(doc, nullptr);
+  auto xml = pagx::PAGXExporter::ToXML(*doc);
+  EXPECT_NE(xml.find("#FF0000"), std::string::npos) << xml;
+  EXPECT_NE(xml.find("alpha=\"0.5\""), std::string::npos) << xml;
+}
+
 PAGX_TEST(PAGXSVGTest, SVGImport_TextFillOpacity) {
   auto doc = pagx::SVGImporter::Parse(
       ProjectPath::Absolute("resources/svg/text/text_tspan_fill_opacity.svg"));
