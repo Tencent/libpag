@@ -83,6 +83,7 @@ void ContentView::resetView() {
 
 void ContentView::sizeChangedDelayHandle() {
   resizeTimer->stop();
+  contentResizing = false;
   if (sizeChanged) {
     return;
   }
@@ -93,11 +94,26 @@ void ContentView::sizeChangedDelayHandle() {
   }
 }
 
+void ContentView::beginContentResize() {
+  // The timer doubles as the end marker of the content resize: it fires once the geometry stopped
+  // changing, and also covers the case where the item already had the preferred size and no
+  // geometry change follows, so the mode can never outlive the fitting of the new content.
+  resizeTimer->start(400);
+  contentResizing = true;
+}
+
 void ContentView::geometryChange(const QRectF& newGeometry, const QRectF& oldGeometry) {
   if (newGeometry == oldGeometry) {
     return;
   }
   QQuickItem::geometryChange(newGeometry, oldGeometry);
+  if (contentResizing) {
+    // The intermediate geometries produced while the window is fitted to newly loaded content are
+    // not worth debouncing: waiting for the timer keeps the previous texture stretched onto every
+    // one of them, which is visible as a wrong aspect ratio right after a file is opened.
+    sizeChanged = true;
+    triggerFlush();
+  }
   resizeTimer->start(400);
 }
 

@@ -81,6 +81,14 @@ class ContentView : public QQuickItem {
   virtual void releaseDrawable();
   virtual void geometryChange(const QRectF& newGeometry, const QRectF& oldGeometry) override;
   void itemChange(ItemChange change, const ItemChangeData& value) override;
+
+  /// Marks the start of a content-driven resize, normally right before the view is resized to fit
+  /// newly loaded content. While such a resize is settling, every geometry change refreshes the
+  /// drawable surface size on the next flush instead of waiting for the resize debounce, so the
+  /// first frame is rendered at the new size rather than stretching the previous texture. The mode
+  /// ends once the geometry stays unchanged for the debounce interval.
+  void beginContentResize();
+
   // Called at the end of sizeChangedDelayHandle(). Subclasses may override to perform
   // additional work after a resize debounce, such as marking render state dirty.
   virtual void onSizeChangedDelayHandled() {
@@ -90,6 +98,7 @@ class ContentView : public QQuickItem {
   std::unique_ptr<RenderThread> renderThread = nullptr;
   std::unique_ptr<QTimer> resizeTimer = nullptr;
   std::atomic_bool sizeChanged = false;
+  bool contentResizing = false;
 };
 
 }  // namespace pag

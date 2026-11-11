@@ -67,13 +67,14 @@ void PAGXView::initDrawable() {
 }
 
 void PAGXView::onRequestSizeChanged() {
-  resizeTimer->stop();
+  beginContentResize();
   sizeChanged = true;
   viewModel->markNeedsRender();
   triggerFlush();
 }
 
 void PAGXView::onPreferredSizeChanged() {
+  beginContentResize();
   setSize(viewModel->getPreferredSize());
 }
 
