@@ -70,6 +70,12 @@ NODE_EXEMPTIONS = {
     "NoiseFilter": JS_AFTER_STATIC + "（t=0 只有底色、没有噪点）",
 }
 
+# A blur along one axis only: filter:blur() is isotropic, so a blurX-only or blurY-only animation
+# cannot be reproduced in CSS. Measured 0.96-0.97 against the reference, the same ceiling the style
+# family's single-axis blur hits, so it joins the JS pass.
+for _channel in ("blurX", "blurY"):
+    CHANNEL_EXEMPTIONS[("BlurFilter", _channel)] = JS_PENDING + "（CSS 模糊各向同性，只能做两轴同值）"
+
 # A pipeline filter's geometry (dx / dy / stdDeviation) and its shadowOnly switch are attributes on
 # the SVG filter primitives, not CSS properties: measured, keyframes that set dx / stdDeviation are
 # ignored (zero pixels change between the first and last frame), while flood-color does animate.
@@ -356,6 +362,11 @@ def check(anim, exported, index, cases):
     for node, channels in exported.items():
         for channel in channels:
             if node == "Path" or (node, channel) in index:
+                continue
+            # An exempt channel needs no case even when the exporter still maps it: the mapping can
+            # stay useful for the exact case (a blur with both axes equal), the gap is only that CSS
+            # cannot express the single-axis form.
+            if (node, channel) in CHANNEL_EXEMPTIONS:
                 continue
             if channel not in anim.get(node, ()):
                 warnings.append("stale mapping (no such channel): %s.%s" % (node, channel))

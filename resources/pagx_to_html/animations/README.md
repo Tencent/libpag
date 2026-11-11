@@ -257,7 +257,7 @@ offsetX/offsetY/shadowOnly` 与 `DropShadowFilter.shadowOnly` 列入 `CHANNEL_EX
 
 | 标签 | 含义 | 条目 | 覆盖 |
 |------|------|-----:|------|
-| `js-pending` | CSS 无法表达，JS 逐帧重绘可做 | 19 | SVG 滤镜几何 6、样式参数 11、`ColorStop.offset` 1、光栅化渐变 2 |
+| `js-pending` | CSS 无法表达，JS 逐帧重绘可做 | 22 | SVG 滤镜几何 6、单轴模糊 2（`BlurFilter`）、样式参数 11、`ColorStop.offset` 1、光栅化渐变 2 |
 | `js-after-static` | 静态还没画出该效果，补齐后再谈逐帧 | 9 | 噪声节点 2、玻璃参数 7 |
 | `renderer-gap` | 渲染器不应用该通道，导出侧（含 JS）无解 | 10 | `TextPath` |
 | `no-op` | 数值不改变画面，无需实现 | 1 | `Layer.scale.z` |
@@ -295,6 +295,9 @@ offsetX/offsetY/shadowOnly` 与 `DropShadowFilter.shadowOnly` 列入 `CHANNEL_EX
 | `style/17_glassstyle_depth` ~ `22_glassstyle_splay` | 6 个玻璃参数 | 0.97 | `js-after-static` |
 
 恢复方式：从提交历史取回 fixture，并删掉脚本里对应的豁免条目即可。
+
+单轴模糊（`BlurFilter.blurX` / `blurY` 各自单独动画）同样归 `js-pending`：CSS 的 `filter:blur()` 各向同性，
+实测只能到 0.96–0.97，对应的两条用例已删除；绑定本身保留，因为**两轴同值**时 CSS 表达是准确的。
 
 其余样式通道已列入 `CHANNEL_EXEMPTIONS`：`DropShadowStyle` / `InnerShadowStyle` /
 `BackgroundBlurStyle` 的模糊与几何参数标 `js-pending`（CSS 模糊各向同性，实测只能到 0.96；内阴影几何在滤镜原语上），
