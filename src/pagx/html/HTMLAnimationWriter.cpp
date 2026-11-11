@@ -1954,22 +1954,32 @@ void EmitTransformCssAtFrame(const DomTargetBundle& bundle, const BundleChannelS
     }
     float rx = EvalFloatChannel(chSet.layerRotXCh, t, hostLayer->rotationX);
     float ry = EvalFloatChannel(chSet.layerRotYCh, t, hostLayer->rotationY);
-    if (!FloatNearlyZero(rx) || chSet.layerRotXCh != nullptr) {
-      append("rotateX(" + CssFloatToString(rx) + "deg)");
+    // These have to come from the channels too: a 3D layer that also animates its in-plane rotation
+    // (or skew / scale) used to keep the authored value here, so the spin simply vanished from the
+    // transform - a 13.5 degree rotation was rendered as none.
+    float rz = EvalFloatChannel(chSet.rotCh, t, hostLayer->rotationZ);
+    // Composition order matters: the runtime builds Rz * Ry * Rx (measured: rotateZ, rotateY,
+    // rotateX scores 0.9993 on composite/02 while every other order lands at 0.92-0.97).
+    if (chSet.rotCh != nullptr || !FloatNearlyZero(rz)) {
+      append("rotateZ(" + CssFloatToString(rz) + "deg)");
     }
     if (!FloatNearlyZero(ry) || chSet.layerRotYCh != nullptr) {
       append("rotateY(" + CssFloatToString(ry) + "deg)");
     }
-    if (!FloatNearlyZero(hostLayer->rotationZ)) {
-      append("rotateZ(" + CssFloatToString(hostLayer->rotationZ) + "deg)");
+    if (!FloatNearlyZero(rx) || chSet.layerRotXCh != nullptr) {
+      append("rotateX(" + CssFloatToString(rx) + "deg)");
     }
-    if (!FloatNearlyZero(hostLayer->skewX) || !FloatNearlyZero(hostLayer->skewY)) {
-      append("skew(" + CssFloatToString(hostLayer->skewX) + "deg, " +
-             CssFloatToString(hostLayer->skewY) + "deg)");
+    float skewX = EvalFloatChannel(chSet.layerSkewXCh, t, hostLayer->skewX);
+    float skewY = EvalFloatChannel(chSet.layerSkewYCh, t, hostLayer->skewY);
+    if (chSet.layerSkewXCh != nullptr || chSet.layerSkewYCh != nullptr || !FloatNearlyZero(skewX) ||
+        !FloatNearlyZero(skewY)) {
+      append("skew(" + CssFloatToString(skewX) + "deg, " + CssFloatToString(skewY) + "deg)");
     }
-    if (!FloatNearlyZero(hostLayer->scaleX - 1.0f) || !FloatNearlyZero(hostLayer->scaleY - 1.0f)) {
-      append("scale(" + CssFloatToString(hostLayer->scaleX) + ", " +
-             CssFloatToString(hostLayer->scaleY) + ")");
+    float scaleX = EvalFloatChannel(chSet.scaleXCh, t, hostLayer->scaleX);
+    float scaleY = EvalFloatChannel(chSet.scaleYCh, t, hostLayer->scaleY);
+    if (chSet.scaleXCh != nullptr || chSet.scaleYCh != nullptr || !FloatNearlyZero(scaleX - 1.0f) ||
+        !FloatNearlyZero(scaleY - 1.0f)) {
+      append("scale(" + CssFloatToString(scaleX) + ", " + CssFloatToString(scaleY) + ")");
     }
     if (hasAnchor) {
       append("translate3d(" + CssFloatToString(-anchorX) + "px, " + CssFloatToString(-anchorY) +
