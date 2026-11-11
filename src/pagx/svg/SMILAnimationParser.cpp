@@ -1655,7 +1655,25 @@ static void AddBaseValueKeyframes(Channel* channel, ChannelValueType valueType, 
     AppendKeyframe(channel, valueType, 0, baseValue, KeyframeInterpolationType::Hold, {}, {});
   }
   if (!fillFreeze && endFrame > 0) {
-    AppendKeyframe(channel, valueType, endFrame + 1, baseValue, KeyframeInterpolationType::Hold, {},
+    // An additive channel stores deltas, so after the animation ends it must fall back to the
+    // identity delta; writing the static base here would make the runtime compose base + base.
+    KeyValue endValue = baseValue;
+    if (additive) {
+      switch (valueType) {
+        case ChannelValueType::Float:
+          endValue = 0.0f;
+          break;
+        case ChannelValueType::Color:
+          endValue = Color{0.0f, 0.0f, 0.0f, 0.0f};
+          break;
+        case ChannelValueType::Matrix:
+          endValue = Matrix::Identity();
+          break;
+        default:
+          break;
+      }
+    }
+    AppendKeyframe(channel, valueType, endFrame + 1, endValue, KeyframeInterpolationType::Hold, {},
                    {});
   }
   if (beginFrames > 0 || (!fillFreeze && endFrame > 0)) {
