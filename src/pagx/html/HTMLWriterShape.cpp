@@ -1450,6 +1450,22 @@ bool HTMLWriter::canCSS(const std::vector<GeoInfo>& geos, const Fill* fill, cons
   if (hasTrim || hasMerge || geos.size() != 1 || stroke) {
     return false;
   }
+  // A gradient the animation pass drives needs its SVG definition: the CSS `background` shorthand is
+  // one opaque string, so an animated centre / radius / stop colour has nowhere to land (the radial
+  // half of composite/07 silently lost both its position and its colour animation that way).
+  if (fill != nullptr && fill->color != nullptr) {
+    if (_ctx->animation.gradientIds.count(fill->color) > 0) {
+      return false;
+    }
+    if (fill->color->nodeType() == NodeType::LinearGradient ||
+        fill->color->nodeType() == NodeType::RadialGradient) {
+      for (auto* stop : static_cast<const Gradient*>(fill->color)->colorStops) {
+        if (stop != nullptr && _ctx->animation.colorStopIds.count(stop) > 0) {
+          return false;
+        }
+      }
+    }
+  }
   if (!geos[0].modifiedPathData.empty()) {
     return false;
   }
