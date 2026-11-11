@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ContentCache.h"
+#include "rendering/filters/utils/Filter3DFactory.h"
 #include "rendering/graphics/Picture.h"
 
 namespace pag {
@@ -30,7 +31,7 @@ void ContentCache::update() {
   staticTimeRanges = OffsetTimeRanges(staticTimeRanges, -layer->startTime);
   _contentStatic = !HasVaryingTimeRange(&staticTimeRanges, 0, layer->duration);
   _hasFilters = (!layer->effects.empty() || !layer->layerStyles.empty() || layer->motionBlur ||
-                 layer->transform3D);
+                 Has3DTransform(layer));
   // 理论上当图层的matrix带了缩放时也不能缓存，会导致图层样式也会跟着缩放。但目前投影等滤镜的效果看起来区别不明显，性能优化考虑暂时忽略。
   _cacheFilters = _hasFilters && checkCacheFilters();
 
@@ -66,7 +67,7 @@ bool ContentCache::checkCacheFilters() {
   }
 
   // 理论上当图层的matrix带了缩放时也不能缓存，会导致图层样式也会跟着缩放。但目前投影等滤镜的效果看起来区别不明显，性能优化考虑暂时忽略。
-  return layer->masks.empty() && !layer->motionBlur && !layer->transform3D &&
+  return layer->masks.empty() && !layer->motionBlur && !Has3DTransform(layer) &&
          processVisibleAreaOnly && !varyingLayerStyle && !varyingEffect;
 }
 
@@ -75,7 +76,7 @@ bool ContentCache::checkCacheEnabled() {
   if (layer->cachePolicy != CachePolicy::Auto) {
     cacheEnabled = layer->cachePolicy == CachePolicy::Enable;
   } else if (!layer->effects.empty() || !layer->layerStyles.empty() || layer->motionBlur ||
-             layer->transform3D) {
+             Has3DTransform(layer)) {
     // 滤镜不缓存到纹理内，但含有滤镜每帧的输入都要求是纹理，开启纹理缓存的性能会更高。
     cacheEnabled = true;
   } else {

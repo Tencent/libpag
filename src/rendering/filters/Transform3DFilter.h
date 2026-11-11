@@ -18,51 +18,57 @@
 
 #pragma once
 
-#include <cstdint>
-#include <memory>
-#include <unordered_map>
-#include <unordered_set>
 #include "pag/file.h"
-#include "pag/pag.h"
-#include "rendering/caches/RenderCache.h"
 #include "rendering/filters/RuntimeFilter.h"
-#include "rendering/filters/utils/Matrix3D.h"
+#include "tgfx/core/Matrix3D.h"
 
 namespace pag {
 
-struct Transform3DResources : public FilterResources {
-  /**
-   * Holds the depth state shared by all the 3D layers of one composition. The layers of a
-   * composition are drawn in separate render passes, so the depth texture has to live across them
-   * to resolve the occlusion between layers.
-   */
-  struct CompositionState {
-    std::shared_ptr<tgfx::Texture> depthTexture = nullptr;
-    int depthTextureWidth = 0;
-    int depthTextureHeight = 0;
-    // The frame sequence in which the composition was drawn last, and whether it was ever drawn.
-    uint64_t frameSequence = 0;
-    bool frameInitialized = false;
-    // The layers already drawn in the current draw pass of the composition.
-    std::unordered_set<ID> renderedLayers = {};
-  };
+/** Window depth coefficients retained at binary64 precision until GPU encoding. */
+struct Transform3DDepthPlane {
+  double x = 0;
+  double y = 0;
+  double z = 0;
+};
 
-  std::unordered_map<ID, CompositionState> compositions = {};
+struct Transform3DContext {
+  int width = 0;
+  int height = 0;
+  tgfx::Matrix3D viewProjection = {};
 };
 
 class Transform3DFilter : public RuntimeFilter {
  public:
-  /**
-   * Appends the 3D transform of the specified layer to the input image. Returns nullptr if the
-   * layer cannot be rendered with 3D.
-   */
+  /** 为当前合成选择活动相机，并创建可供所有图层共享的视图投影。 */
+  static std::shared_ptr<Transform3DContext> MakeContext(VectorComposition* composition,
+                                                         Frame frame);
+
+  /** 使用指定活动相机创建视图投影，空相机表示默认相机。 */
+  static std::shared_ptr<Transform3DContext> MakeContext(int width, int height, CameraLayer* camera,
+                                                         Frame frame);
+
+  /** 在像素空间累乘图层及其完整父链的变换。 */
+  static tgfx::Matrix3D BuildModelMatrix(Layer* layer, Frame frame);
+
+  /** 返回包含透视和像素视口映射的二维单应矩阵。 */
+  static tgfx::Matrix ProjectedMatrix(Layer* layer, Frame frame, const Transform3DContext& context);
+
+  /** 返回投影平面的窗口深度方程，退化平面返回 false。 */
+  static bool DepthPlane(Layer* layer, Frame frame, const Transform3DContext& context,
+                         const tgfx::Matrix& extraMatrix, Transform3DDepthPlane* plane);
+
+  /** 将内容边界投影并裁剪到视锥和合成区域。 */
+  static void TransformBounds(tgfx::Rect* bounds, Layer* layer, Frame frame,
+                              const Transform3DContext& context);
+
+  /** 应用三维投影，输入或矩阵无效时返回 nullptr，不退回未变换的二维内容。 */
   static std::shared_ptr<tgfx::Image> Apply(const std::shared_ptr<tgfx::Image>& input,
                                             RenderCache* cache, Layer* layer, Frame layerFrame,
                                             const tgfx::Rect& contentBounds,
-                                            const tgfx::Point& sourceScale, tgfx::Point* offset);
+                                            const tgfx::Point& sourceScale,
+                                            const Transform3DContext& context, tgfx::Point* offset);
 
-  Transform3DFilter(RenderCache* cache, ID compositionID, ID layerID, int width, int height,
-                    int opacity, const Matrix3D& matrix);
+  Transform3DFilter(RenderCache* cache, int width, int height, const tgfx::Matrix3D& matrix);
 
   bool onDraw(tgfx::CommandEncoder* encoder,
               const std::vector<std::shared_ptr<tgfx::Texture>>& inputTextures,
@@ -71,47 +77,22 @@ class Transform3DFilter : public RuntimeFilter {
 
  protected:
   DEFINE_RUNTIME_FILTER_TYPE
-
   tgfx::Rect filterBounds(const tgfx::Rect& srcRect) const override;
-
   std::string onBuildVertexShader() const override;
-
   std::string onBuildFragmentShader() const override;
-
   std::vector<tgfx::Attribute> vertexAttributes() const override;
-
   std::vector<tgfx::BindingEntry> uniformBlocks() const override;
-
   std::vector<float> computeVertices(const tgfx::Texture* source, const tgfx::Texture* target,
                                      const tgfx::Point& offset) const override;
-
   void onUpdateUniforms(tgfx::RenderPass* renderPass, tgfx::GPU* gpu,
                         const std::vector<std::shared_ptr<tgfx::Texture>>& inputTextures,
                         const tgfx::Point& offset) const override;
 
-  void onConfigurePipeline(tgfx::RenderPipelineDescriptor* descriptor) const override;
-
-  std::unique_ptr<FilterResources> onCreateFilterResources() const override;
-
-  void onConfigureRenderPass(tgfx::RenderPassDescriptor* renderPassDesc, FilterResources* resources,
-                             tgfx::GPU* gpu,
-                             const std::shared_ptr<tgfx::Texture>& outputTexture) const override;
-
  private:
-  Transform3DResources::CompositionState* getOrCreateCompositionState(
-      Transform3DResources* resources, tgfx::GPU* gpu) const;
-
-  bool prepareFrameState(Transform3DResources* resources,
-                         Transform3DResources::CompositionState* state) const;
-
-  void purgeIdleCompositions(Transform3DResources* resources, uint64_t frameSequence) const;
-
-  float opacity = 1.0f;
-  ID compositionID = 0;
-  ID layerID = 0;
   int width = 0;
   int height = 0;
-  Matrix3D matrix = {};
+  tgfx::Matrix3D matrix = {};
+  std::shared_ptr<tgfx::GPUBuffer> uniformBuffer = nullptr;
 };
 
 }  // namespace pag

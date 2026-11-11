@@ -23,7 +23,9 @@
 #include "rendering/caches/CompositionCache.h"
 #include "rendering/caches/LayerCache.h"
 #include "rendering/caches/RenderCache.h"
+#include "rendering/filters/utils/Filter3DFactory.h"
 #include "rendering/graphics/Recorder.h"
+#include "rendering/graphics/Transform3DScene.h"
 #include "rendering/layers/PAGStage.h"
 #include "rendering/renderers/LayerRenderer.h"
 #include "rendering/utils/LockGuard.h"
@@ -396,6 +398,9 @@ bool PAGComposition::gotoTime(int64_t layerTime) {
       changed = true;
     }
   }
+  if (changed) {
+    cached3DGraphic = nullptr;
+  }
   return changed;
 }
 
@@ -420,21 +425,52 @@ void PAGComposition::draw(Recorder* recorder) {
   if (hasClip()) {
     recorder->saveClip(0, 0, static_cast<float>(_width), static_cast<float>(_height));
   }
-  auto count = static_cast<int>(layers.size());
-  for (int i = 0; i < count; i++) {
-    auto& childLayer = layers[i];
+  if (cached3DGraphic != nullptr && cached3DContentVersion == contentVersion) {
+    recorder->drawGraphic(cached3DGraphic);
+    if (hasClip()) {
+      recorder->restore();
+    }
+    return;
+  }
+  cached3DGraphic = nullptr;
+  std::shared_ptr<Transform3DContext> context;
+  for (const auto& child : layers) {
+    if (child->layerVisible && child->frameVisible() && Has3DTransform(child->layer)) {
+      context = child->createTransform3DContext();
+      break;
+    }
+  }
+  Transform3DSceneBuilder scene(_width, _height);
+  for (auto& childLayer : layers) {
     if (!childLayer->layerVisible) {
       continue;
     }
-    DrawChildLayer(recorder, childLayer.get());
+    auto filter = childLayer->cacheFilters()
+                      ? nullptr
+                      : FilterModifier::Make(childLayer->layer, childLayer->contentFrame +
+                                                                    childLayer->layer->startTime);
+    if (filter != nullptr) {
+      filter->transform3DContext = context;
+    }
+    Recorder childRecorder;
+    DrawChildLayer(&childRecorder, childLayer.get(), filter);
+    scene.addLayer(childRecorder.makeGraphic(), childLayer->layer,
+                   childLayer->contentFrame + childLayer->layer->startTime, context,
+                   ToTGFX(childLayer->layerMatrix));
   }
+  auto graphic = scene.makeGraphic();
+  if (context != nullptr) {
+    cached3DGraphic = graphic;
+    cached3DContentVersion = contentVersion;
+  }
+  recorder->drawGraphic(std::move(graphic));
   if (hasClip()) {
     recorder->restore();
   }
 }
 
-void PAGComposition::DrawChildLayer(Recorder* recorder, PAGLayer* childLayer) {
-  auto filterModifier = childLayer->cacheFilters() ? nullptr : FilterModifier::Make(childLayer);
+void PAGComposition::DrawChildLayer(Recorder* recorder, PAGLayer* childLayer,
+                                    std::shared_ptr<FilterModifier> filterModifier) {
   auto trackMatte = TrackMatteRenderer::Make(childLayer);
   Transform extraTransform = {ToTGFX(childLayer->layerMatrix), childLayer->layerAlpha};
   LayerRenderer::DrawLayer(recorder, childLayer->layer,
@@ -483,7 +519,7 @@ void PAGComposition::MeasureChildLayer(tgfx::Rect* bounds, PAGLayer* childLayer)
                                       &extraTransform);
   }
   auto layerFrame = childLayer->contentFrame + childLayer->layer->startTime;
-  auto filterModifier = FilterModifier::Make(childLayer->layer, layerFrame);
+  auto filterModifier = FilterModifier::Make(childLayer);
   Transform extraTransform = {ToTGFX(childLayer->layerMatrix), childLayer->layerAlpha};
   LayerRenderer::MeasureLayerBounds(bounds, childLayer->layer, layerFrame, filterModifier,
                                     trackMatteBounds.get(), childLayer, &extraTransform);
@@ -517,10 +553,15 @@ bool PAGComposition::GetTrackMatteLayerAtPoint(PAGLayer* childLayer, float x, fl
   auto trackMatteLayer = childLayer->_trackMatteLayer.get();
   if (trackMatteLayer->getTransform(&trackMatteTransform)) {
     tgfx::Point local = {x, y};
-    MapPointInverted(trackMatteTransform.matrix, &local);
-    tgfx::Rect trackMatteBounds = {};
-    trackMatteLayer->measureBounds(&trackMatteBounds);
-    contains = trackMatteBounds.contains(local.x, local.y);
+    if (Has3DTransform(trackMatteLayer->layer)) {
+      tgfx::Rect projectedBounds;
+      MeasureChildLayer(&projectedBounds, trackMatteLayer);
+      contains = projectedBounds.contains(x, y);
+    } else if (MapPointInverted(trackMatteTransform.matrix, &local)) {
+      tgfx::Rect trackMatteBounds;
+      trackMatteLayer->measureBounds(&trackMatteBounds);
+      contains = trackMatteBounds.contains(local.x, local.y);
+    }
     if (contains) {
       results->push_back(childLayer->_trackMatteLayer);
     }
@@ -538,7 +579,28 @@ bool PAGComposition::GetChildLayerAtPoint(PAGLayer* childLayer, float x, float y
     return false;
   }
   tgfx::Point localPoint = {x, y};
-  MapPointInverted(layerTransform.matrix, &localPoint);
+  if (Has3DTransform(childLayer->layer)) {
+    tgfx::Rect projectedBounds;
+    MeasureChildLayer(&projectedBounds, childLayer);
+    if (!projectedBounds.contains(x, y)) {
+      return false;
+    }
+    if (!childLayer->layer->effects.empty() || !childLayer->layer->layerStyles.empty()) {
+      return true;
+    }
+    auto context = childLayer->createTransform3DContext();
+    if (context == nullptr) {
+      return false;
+    }
+    auto projected = Transform3DFilter::ProjectedMatrix(
+        childLayer->layer, childLayer->contentFrame + childLayer->layer->startTime, *context);
+    projected.postConcat(ToTGFX(childLayer->layerMatrix));
+    if (!MapPointInverted(projected, &localPoint)) {
+      return false;
+    }
+  } else if (!MapPointInverted(layerTransform.matrix, &localPoint)) {
+    return false;
+  }
   auto mask = childLayer->layerCache->getMasks(childLayer->contentFrame);
   if (mask) {
     auto maskBounds = mask->getBounds();

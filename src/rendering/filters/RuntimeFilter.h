@@ -37,6 +37,19 @@ struct FilterResources {
   std::shared_ptr<tgfx::Sampler> sampler = nullptr;
 
   virtual ~FilterResources() = default;
+
+  /** 返回直接持有的临时 GPU 资源名义字节数，不含 Context 已计账的资源。 */
+  virtual size_t memoryUsage() const {
+    return 0;
+  }
+
+  /** 在绘制帧结束时回收空闲的临时 GPU 资源。 */
+  virtual void onFrameEnd() {
+  }
+
+  /** 在非绘制查询结束时回收查询所需的临时 GPU 资源。 */
+  virtual void onQueryEnd() {
+  }
 };
 
 class RenderCache;

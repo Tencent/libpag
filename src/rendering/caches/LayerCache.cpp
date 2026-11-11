@@ -132,9 +132,6 @@ bool LayerCache::contentVisible(Frame contentFrame) {
   if (contentFrame < 0 || contentFrame >= layer->duration) {
     return false;
   }
-  if (layer->transform3D && !Has3DSupport()) {
-    return false;
-  }
   auto layerTransform = getTransform(contentFrame);
   return layerTransform->visible();
 }
@@ -162,7 +159,7 @@ void LayerCache::updateStaticTimeRanges() {
     auto timeRanges = getTrackMatteStaticTimeRanges();
     MergeTimeRanges(&staticTimeRanges, &timeRanges);
   }
-  if (!layer->layerStyles.empty() || !layer->effects.empty() || layer->transform3D) {
+  if (!layer->layerStyles.empty() || !layer->effects.empty() || Has3DTransform(layer)) {
     auto timeRanges = getFilterStaticTimeRanges();
     MergeTimeRanges(&staticTimeRanges, &timeRanges);
   }
@@ -206,6 +203,26 @@ std::vector<TimeRange> LayerCache::getFilterStaticTimeRanges() {
   }
   for (auto& effect : layer->effects) {
     effect->excludeVaryingRanges(&timeRanges);
+  }
+  if (Has3DTransform(layer)) {
+    for (auto camera : layer->containingComposition->layers) {
+      if (camera->type() != LayerType::Camera) {
+        continue;
+      }
+      camera->excludeVaryingRanges(&timeRanges);
+      SplitTimeRangesAt(&timeRanges, camera->startTime);
+      SplitTimeRangesAt(&timeRanges, camera->startTime + camera->duration);
+      auto parent = camera->parent;
+      while (parent != nullptr) {
+        if (parent->transform != nullptr) {
+          parent->transform->excludeVaryingRanges(&timeRanges);
+        }
+        if (parent->transform3D != nullptr) {
+          parent->transform3D->excludeVaryingRanges(&timeRanges);
+        }
+        parent = parent->parent;
+      }
+    }
   }
   return OffsetTimeRanges(timeRanges, -layer->startTime);
 }

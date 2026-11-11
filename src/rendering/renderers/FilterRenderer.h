@@ -27,6 +27,7 @@ namespace pag {
 struct FilterList {
   Layer* layer = nullptr;
   Frame layerFrame = 0;
+  std::shared_ptr<Transform3DContext> transform3DContext;
   tgfx::Matrix layerMatrix = tgfx::Matrix::I();
   float scaleFactorLimit = FLT_MAX;
   bool processVisibleAreaOnly = true;
