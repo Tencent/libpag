@@ -3367,11 +3367,11 @@ std::string RangeGlyphDecls(const RangeSelectorGlyph& glyph, double factor) {
     if (hasSkew) {
       bool hasAxis = !FloatNearlyZero(modifier->skewAxis);
       if (hasAxis) {
-        transform += " rotate(" + CssFloatToString(modifier->skewAxis) + "deg)";
+        transform += " rotate(" + CssFloatToString(-modifier->skewAxis) + "deg)";
       }
       transform += " skewX(" + CssFloatToString(-modifier->skew * f) + "deg)";
       if (hasAxis) {
-        transform += " rotate(" + CssFloatToString(-modifier->skewAxis) + "deg)";
+        transform += " rotate(" + CssFloatToString(modifier->skewAxis) + "deg)";
       }
     }
     transform +=
@@ -3427,11 +3427,11 @@ std::string ModifierGlyphDecls(const RangeSelectorGlyph& glyph, const BundleChan
     if (hasSkew) {
       bool hasAxis = !FloatNearlyZero(skewAxis);
       if (hasAxis) {
-        transform += " rotate(" + CssFloatToString(skewAxis) + "deg)";
+        transform += " rotate(" + CssFloatToString(-skewAxis) + "deg)";
       }
       transform += " skewX(" + CssFloatToString(-skew * absF) + "deg)";
       if (hasAxis) {
-        transform += " rotate(" + CssFloatToString(-skewAxis) + "deg)";
+        transform += " rotate(" + CssFloatToString(skewAxis) + "deg)";
       }
     }
     transform +=
