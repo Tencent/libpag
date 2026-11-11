@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <optional>
 #include <string>
 #include <vector>
 #include "pagx/PAGXDocument.h"
@@ -27,6 +28,28 @@ namespace pagx {
 class FontConfig;
 
 /**
+ * Controls how content SVG cannot represent natively is handled. Replaces the deprecated
+ * `bakeUnsupported` flag. VectorOnly forbids new effect bitmaps but keeps authored images and
+ * bitmap glyphs; PreserveAppearance may bake a complete isolated region; BestEffort reports every
+ * approximation through the warnings sink.
+ */
+enum class SVGStaticExportPolicy {
+  VectorOnly,
+  PreserveAppearance,
+  BestEffort,
+};
+
+/**
+ * Controls text emission. Fidelity uses the layout-resolved glyph data (WOFF2 / outline / bitmap),
+ * while Native keeps readable text that the target may reshape. Replaces the deprecated
+ * `convertTextToPath` flag.
+ */
+enum class SVGTextExportMode {
+  Native,
+  Fidelity,
+};
+
+/**
  * Export options for SVGExporter.
  */
 struct SVGExportOptions {
@@ -34,6 +57,18 @@ struct SVGExportOptions {
    * Indentation spaces for the output SVG. The default value is 2.
    */
   int indent = 2;
+
+  /**
+   * The static export policy. When unset, the deprecated `bakeUnsupported` flag is mapped for
+   * backward compatibility. Setting this field takes precedence.
+   */
+  std::optional<SVGStaticExportPolicy> staticPolicy = std::nullopt;
+
+  /**
+   * The text export mode. When unset, the deprecated `convertTextToPath` flag is mapped for
+   * backward compatibility. Setting this field takes precedence.
+   */
+  std::optional<SVGTextExportMode> textMode = std::nullopt;
 
   /**
    * Whether to include the XML declaration (<?xml ...?>) at the top. The default value is true.

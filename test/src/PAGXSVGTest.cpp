@@ -2455,6 +2455,48 @@ PAGX_TEST(PAGXSVGTest, SVGExport_BakeUnsupportedRastersConicGradient) {
   EXPECT_EQ(svg.find("<radialGradient"), std::string::npos);
 }
 
+// S6: staticPolicy is authoritative over the deprecated bakeUnsupported flag.
+PAGX_TEST(PAGXSVGTest, SVGExport_StaticPolicyOverridesDeprecatedFlag) {
+  auto makeDoc = []() {
+    auto doc = pagx::PAGXDocument::Make(200, 200);
+    auto* layer = doc->makeNode<pagx::Layer>();
+    auto* rect = doc->makeNode<pagx::Rectangle>();
+    rect->position = {100, 100};
+    rect->size = {180, 180};
+    auto* grad = doc->makeNode<pagx::ConicGradient>();
+    grad->center = {100, 100};
+    auto* first = doc->makeNode<pagx::ColorStop>();
+    first->offset = 0.0f;
+    first->color = {1, 0, 0, 1};
+    auto* second = doc->makeNode<pagx::ColorStop>();
+    second->offset = 1.0f;
+    second->color = {0, 0, 1, 1};
+    grad->colorStops = {first, second};
+    auto* fill = doc->makeNode<pagx::Fill>();
+    fill->color = grad;
+    layer->contents = {rect, fill};
+    doc->layers.push_back(layer);
+    return doc;
+  };
+
+  auto vectorDoc = makeDoc();
+  pagx::SVGExportOptions vectorOnly = {};
+  vectorOnly.bakeUnsupported = true;
+  vectorOnly.staticPolicy = pagx::SVGStaticExportPolicy::VectorOnly;
+  std::vector<std::string> warnings;
+  auto vectorSvg = pagx::SVGExporter::ToSVG(*vectorDoc, vectorOnly, &warnings);
+  EXPECT_EQ(vectorSvg.find("data:image/png;base64,"), std::string::npos);
+  EXPECT_NE(vectorSvg.find("<radialGradient"), std::string::npos);
+  EXPECT_FALSE(warnings.empty());
+
+  auto preserveDoc = makeDoc();
+  pagx::SVGExportOptions preserve = {};
+  preserve.bakeUnsupported = false;
+  preserve.staticPolicy = pagx::SVGStaticExportPolicy::PreserveAppearance;
+  auto preserveSvg = pagx::SVGExporter::ToSVG(*preserveDoc, preserve);
+  EXPECT_NE(preserveSvg.find("data:image/png;base64,"), std::string::npos);
+}
+
 PAGX_TEST(PAGXSVGTest, SVGExport_BakeUnsupportedRastersDiamondGradient) {
   auto doc = pagx::PAGXDocument::Make(200, 200);
   auto* layer = doc->makeNode<pagx::Layer>();
@@ -6297,6 +6339,36 @@ PAGX_TEST(PAGXSVGTest, SVGExport_SingularGroupKeepsEmptyGeometry) {
   bool keepsSingularTransform =
       svg.find("matrix(0,0,0,0") != std::string::npos || svg.find("scale(0") != std::string::npos;
   EXPECT_TRUE(keepsSingularTransform) << svg;
+}
+
+// S6: textMode is authoritative over the deprecated convertTextToPath flag.
+PAGX_TEST(PAGXSVGTest, SVGExport_TextModeOverridesDeprecatedFlag) {
+  auto makeDoc = []() {
+    auto doc = pagx::PAGXDocument::Make(100, 100);
+    auto* font = MakeSquareGlyphFont(doc.get());
+    auto* text = MakeSquareGlyphText(doc.get(), font, {20, 40});
+    text->text = "A";
+    auto* layer = doc->makeNode<pagx::Layer>();
+    layer->contents = {text, MakeSolidFillSVG(doc.get(), 1, 0, 0)};
+    doc->layers.push_back(layer);
+    return doc;
+  };
+
+  auto fidelityDoc = makeDoc();
+  pagx::SVGExportOptions fidelity = {};
+  fidelity.convertTextToPath = false;
+  fidelity.textMode = pagx::SVGTextExportMode::Fidelity;
+  auto fidelitySvg = pagx::SVGExporter::ToSVG(*fidelityDoc, fidelity);
+  EXPECT_EQ(fidelitySvg.find("<text"), std::string::npos);
+  EXPECT_NE(fidelitySvg.find("<path"), std::string::npos);
+
+  auto nativeDoc = makeDoc();
+  pagx::SVGExportOptions native = {};
+  native.convertTextToPath = true;
+  native.textMode = pagx::SVGTextExportMode::Native;
+  auto nativeSvg = pagx::SVGExporter::ToSVG(*nativeDoc, native);
+  EXPECT_NE(nativeSvg.find("<text"), std::string::npos);
+  EXPECT_NE(nativeSvg.find("@font-face"), std::string::npos);
 }
 
 // A Group's alpha has to survive until the painter that draws its geometry, even when that painter

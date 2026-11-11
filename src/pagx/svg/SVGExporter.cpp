@@ -4462,6 +4462,14 @@ std::string SVGExporter::ToSVG(PAGXDocument& doc, const Options& options,
   if (!doc.isLayoutApplied()) {
     doc.applyLayout(options.fontConfig);
   }
+  bool bakeUnsupported = options.bakeUnsupported;
+  if (options.staticPolicy.has_value()) {
+    bakeUnsupported = *options.staticPolicy != SVGStaticExportPolicy::VectorOnly;
+  }
+  bool convertTextToPath = options.convertTextToPath;
+  if (options.textMode.has_value()) {
+    convertTextToPath = *options.textMode == SVGTextExportMode::Fidelity;
+  }
   // Clamp rasterScale to a sane range. 0 / negative would silently produce a zero-pixel surface
   // (the bake then fails and the exporter falls through to the vector path, contradicting
   // bakeUnsupported=true). The upper bound keeps `static_cast<int>(ceilf(width * rasterScale))`
@@ -4496,7 +4504,7 @@ std::string SVGExporter::ToSVG(PAGXDocument& doc, const Options& options,
   // resource directory the HTML exporter writes alongside the document. The id-keyed mapping
   // is consumed by writeText / writeTextAsFont below to decide whether to emit <text> with
   // PUA Unicode characters (WOFF2 path) or the SVG <path> outline path.
-  if (options.embedFontsAsWoff2 && options.convertTextToPath == false) {
+  if (options.embedFontsAsWoff2 && !convertTextToPath) {
     for (auto& nodePtr : doc.nodes) {
       if (nodePtr->nodeType() != NodeType::Font) {
         continue;
@@ -4535,8 +4543,8 @@ std::string SVGExporter::ToSVG(PAGXDocument& doc, const Options& options,
         "dropping them removes Polystar / TrimPath / Repeater content from the output.");
   }
 
-  SVGWriter writer(&defs, &context, options.indent, options.convertTextToPath, layoutContext.get(),
-                   &doc, options.bakeUnsupported, safeRasterScale, warnings, animationPlan.get());
+  SVGWriter writer(&defs, &context, options.indent, convertTextToPath, layoutContext.get(), &doc,
+                   bakeUnsupported, safeRasterScale, warnings, animationPlan.get());
 
   if (options.xmlDeclaration) {
     svg.appendDeclaration();
