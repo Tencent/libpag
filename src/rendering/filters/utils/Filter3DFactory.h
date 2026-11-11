@@ -18,10 +18,15 @@
 
 #pragma once
 
-#include "rendering/caches/RenderCache.h"
-#include "rendering/renderers/FilterRenderer.h"
+#include "tgfx/core/Image.h"
+#include "tgfx/core/Point.h"
+#include "tgfx/core/Rect.h"
+#include "tgfx/gpu/GPU.h"
 
 namespace pag {
+class Layer;
+class RenderCache;
+struct FilterList;
 
 std::shared_ptr<tgfx::Image> Apply3DEffects(std::shared_ptr<tgfx::Image> input, RenderCache* cache,
                                             const FilterList* filterList,
@@ -29,6 +34,13 @@ std::shared_ptr<tgfx::Image> Apply3DEffects(std::shared_ptr<tgfx::Image> input, 
                                             const tgfx::Point& sourceScale,
                                             tgfx::Rect* filterBounds, tgfx::Point* offset);
 
-bool Has3DSupport();
+/** 判断 GPU 是否支持三维投影与逐像素透明合成所需的格式和资源限制。 */
+bool Has3DSupport(const tgfx::GPU* gpu);
+
+/** 将三维内容采样比例限制在 GPU 纹理范围内，无效输入返回零。 */
+float Clamp3DScale(const tgfx::GPU* gpu, float width, float height, float scale);
+
+/** 检查图层自身或父链是否包含三维变换。 */
+bool Has3DTransform(const Layer* layer);
 
 }  // namespace pag

@@ -49,14 +49,6 @@ class RenderCache : public Performance {
     return _uniqueID;
   }
 
-  /**
-   * Returns a sequence number that increases every time beginFrame() is called. Render filters that
-   * need to accumulate GPU state across layers within a frame use it to detect frame boundaries.
-   */
-  uint64_t frameSequence() const {
-    return _frameSequence;
-  }
-
   void beginFrame();
 
   void attachToContext(tgfx::Context* current, bool forDrawing = true);
@@ -77,12 +69,8 @@ class RenderCache : public Performance {
     _sequenceCacheInvalidated = false;
   }
 
-  /**
-   * Returns the total memory usage of this cache.
-   */
-  size_t memoryUsage() const {
-    return graphicsMemory;
-  }
+  /** 返回快照和滤镜直接持有资源的名义字节总数，不含 Context 的资源缓存。 */
+  size_t memoryUsage() const;
 
   /**
    * Returns the GPU context associated with this cache.
@@ -137,11 +125,14 @@ class RenderCache : public Performance {
   Snapshot* getSnapshot(ID assetID) const;
 
   /**
-   * Returns a snapshot cache of specified Picture. If there is no associated cache available,
-   * a new cache will be created by the Picture. Returns null if the Picture fails to make a
-   * new snapshot.
+   * 返回指定 Picture 的有效快照。仅在绘制帧内允许新建快照；非绘制查询只读复用匹配的已有
+   * 快照，不改变缓存或 LRU。
+   * 没有可用快照且不能新建或创建失败时返回 nullptr。
    */
   Snapshot* getSnapshot(const Picture* picture);
+
+  /** 按显式采样比例只读查询有效快照，绘制帧内允许遵守显存预算与 LRU 回收的新建和更新。 */
+  Snapshot* getSnapshot(const Picture* picture, float scaleFactor, float minScaleFactor);
 
   /**
    * Frees the snapshot cache associated with specified asset ID immediately.
@@ -191,7 +182,6 @@ class RenderCache : public Performance {
 
  private:
   ID _uniqueID = 0;
-  uint64_t _frameSequence = 0;
   PAGStage* stage = nullptr;
   uint32_t contextID = 0;
   tgfx::Context* context = nullptr;

@@ -32,6 +32,7 @@
 #include "rendering/filters/MotionBlurFilter.h"
 #include "rendering/filters/MotionTileFilter.h"
 #include "rendering/filters/RadialBlurFilter.h"
+#include "rendering/filters/Transform3DFilter.h"
 #include "rendering/filters/gaussianblur/GaussianBlurFilter.h"
 #include "rendering/filters/glow/GlowFilter.h"
 #include "rendering/filters/utils/Filter3DFactory.h"
@@ -40,7 +41,7 @@
 namespace pag {
 
 static float GetScaleFactorLimit(Layer* layer) {
-  if (layer->transform3D != nullptr) {
+  if (Has3DTransform(layer)) {
     return FLT_MAX;
   }
   auto scaleFactorLimit = layer->type() == LayerType::Image ? 1.0f : FLT_MAX;
@@ -77,6 +78,11 @@ std::unique_ptr<FilterList> FilterRenderer::MakeFilterList(const FilterModifier*
   auto layerFrame = modifier->layerFrame;
   filterList->layer = layer;
   filterList->layerFrame = layerFrame;
+  filterList->transform3DContext = modifier->transform3DContext;
+  if (Has3DTransform(layer) && filterList->transform3DContext == nullptr) {
+    filterList->transform3DContext =
+        Transform3DFilter::MakeContext(layer->containingComposition, layerFrame);
+  }
   auto contentFrame = layerFrame - layer->startTime;
   filterList->layerMatrix = LayerCache::Get(layer)->getTransform(contentFrame)->matrix;
   filterList->scaleFactorLimit = GetScaleFactorLimit(filterList->layer);
@@ -131,7 +137,17 @@ void TransformFilterBounds(tgfx::Rect* filterBounds, const FilterList* filterLis
     filterBounds->roundOut();
   }
 
-  if (filterList->layer->motionBlur && !filterList->layer->transform3D) {
+  if (Has3DTransform(filterList->layer)) {
+    auto context = filterList->transform3DContext;
+    if (context == nullptr) {
+      filterBounds->setEmpty();
+      return;
+    }
+    Transform3DFilter::TransformBounds(filterBounds, filterList->layer, filterList->layerFrame,
+                                       *context);
+  }
+
+  if (filterList->layer->motionBlur && !Has3DTransform(filterList->layer)) {
     MotionBlurFilter::TransformBounds(filterBounds, filterList->layer, filterList->layerFrame);
   }
 
@@ -159,6 +175,11 @@ tgfx::Rect GetClipBounds(Canvas* canvas, const FilterList* filterList,
                          const tgfx::Rect& contentBounds) {
   auto clip = canvas->getTotalClip();
   if (clip.isInverseFillType()) {
+    if (Has3DTransform(filterList->layer)) {
+      auto context = filterList->transform3DContext;
+      return context == nullptr ? tgfx::Rect::MakeEmpty()
+                                : tgfx::Rect::MakeWH(context->width, context->height);
+    }
     return contentBounds;
   }
   auto matrix = canvas->getMatrix();
@@ -179,7 +200,7 @@ static std::shared_ptr<tgfx::Image> ApplyMotionBlur(std::shared_ptr<tgfx::Image>
                                                     const tgfx::Rect& clipBounds,
                                                     tgfx::Rect* filterBounds, tgfx::Point* offset) {
   offset->set(0, 0);
-  if (filterList->layer->motionBlur && !filterList->layer->transform3D) {
+  if (filterList->layer->motionBlur && !Has3DTransform(filterList->layer)) {
     if (MotionBlurFilter::ShouldSkipFilter(filterList->layer, filterList->layerFrame)) {
       return input;
     }
@@ -281,7 +302,7 @@ static bool NeedToSkipClipBounds(const FilterList* filterList) {
       return true;
     }
   }
-  if (filterList->layer->transform3D) {
+  if (Has3DTransform(filterList->layer)) {
     return true;
   }
   return false;
@@ -308,20 +329,20 @@ std::shared_ptr<tgfx::Image> FilterRenderer::ApplyFilters(
   output = ApplyEffects(output, cache, filterList, clipBounds, contentScale, clipStartIndex,
                         &filterBounds, &offset);
   if (!output) {
-    return input;
+    return Has3DTransform(filterList->layer) ? nullptr : input;
   }
   *outputOffset += offset;
 
   output =
       Apply3DEffects(output, cache, filterList, clipBounds, contentScale, &filterBounds, &offset);
   if (!output) {
-    return input;
+    return Has3DTransform(filterList->layer) ? nullptr : input;
   }
   *outputOffset += offset;
 
   output = ApplyMotionBlur(output, cache, filterList, clipBounds, &filterBounds, &offset);
   if (!output) {
-    return input;
+    return Has3DTransform(filterList->layer) ? nullptr : input;
   }
   *outputOffset += offset;
   return output;
@@ -379,9 +400,23 @@ void FilterRenderer::DrawWithFilter(Canvas* parentCanvas, const FilterModifier* 
   auto contentScale = GetContentScale(parentCanvas, filterList->scaleFactorLimit,
                                       GetScaleFactor(filterList.get(), contentBounds));
 
+  if (Has3DTransform(filterList->layer)) {
+    auto context = filterList->transform3DContext;
+    if (context == nullptr) {
+      return;
+    }
+    auto gpu = cache->getContext()->gpu();
+    contentScale = Clamp3DScale(
+        gpu, std::max(contentBounds.width(), static_cast<float>(context->width)),
+        std::max(contentBounds.height(), static_cast<float>(context->height)), contentScale);
+    if (!Has3DSupport(gpu) || contentScale <= 0) {
+      return;
+    }
+  }
+
   int clipStartIndex = GetClipStartIndex(filterList->effects);
   bool skipClipBounds = NeedToSkipClipBounds(filterList.get());
-  if (filterList->layer->motionBlur && !filterList->layer->transform3D) {
+  if (filterList->layer->motionBlur && !Has3DTransform(filterList->layer)) {
     // MotionBlur Fragment Shader中需要用到裁切区域外的像素，
     // 因此默认先把裁切区域过一次TransformBounds
     MotionBlurFilter::TransformBounds(&clipBounds, filterList->layer, filterList->layerFrame);
@@ -410,11 +445,17 @@ void FilterRenderer::DrawWithFilter(Canvas* parentCanvas, const FilterModifier* 
   inputBounds.scale(sourceScale.x, sourceScale.y);
   auto input = CreatePictureImage(sourcePicture, &totalOffset, &inputBounds);
   if (input == nullptr) {
-    return content->draw(parentCanvas);
+    if (!Has3DTransform(filterList->layer)) {
+      content->draw(parentCanvas);
+    }
+    return;
   }
 
   auto output = ApplyFilters(input, cache, filterList.get(), sourceScale, filterBounds, clipBounds,
                              clipStartIndex, &offset);
+  if (output == nullptr) {
+    return;
+  }
   totalOffset += offset;
 
   parentCanvas->save();

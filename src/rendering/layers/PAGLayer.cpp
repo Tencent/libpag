@@ -16,12 +16,15 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include <limits>
 #include "base/utils/MatrixUtil.h"
 #include "base/utils/TimeUtil.h"
 #include "base/utils/UniqueID.h"
 #include "pag/pag.h"
 #include "rendering/caches/LayerCache.h"
 #include "rendering/caches/RenderCache.h"
+#include "rendering/filters/Transform3DFilter.h"
+#include "rendering/filters/utils/Filter3DFactory.h"
 #include "rendering/layers/PAGStage.h"
 #include "rendering/renderers/TrackMatteRenderer.h"
 #include "rendering/utils/LockGuard.h"
@@ -364,15 +367,27 @@ std::shared_ptr<PAGLayer> PAGLayer::trackMatteLayer() const {
 }
 
 Point PAGLayer::globalToLocalPoint(float stageX, float stageY) {
-  Matrix totalMatrix = Matrix::I();
+  auto invalid = std::numeric_limits<float>::quiet_NaN();
+  tgfx::Matrix totalMatrix = tgfx::Matrix::I();
   auto pagLayer = this;
   while (pagLayer) {
-    auto matrix = pagLayer->getTotalMatrixInternal();
+    auto matrix = ToTGFX(pagLayer->getTotalMatrixInternal());
+    if (pagLayer != this && Has3DTransform(pagLayer->layer)) {
+      auto context = pagLayer->createTransform3DContext();
+      if (context == nullptr) {
+        return {invalid, invalid};
+      }
+      matrix = Transform3DFilter::ProjectedMatrix(
+          pagLayer->layer, pagLayer->contentFrame + pagLayer->layer->startTime, *context);
+      matrix.postConcat(ToTGFX(pagLayer->layerMatrix));
+    }
     totalMatrix.postConcat(matrix);
     pagLayer = pagLayer->_parent;
   }
   Point localPoint = {stageX, stageY};
-  MapPointInverted(ToTGFX(totalMatrix), ToTGFX(&localPoint));
+  if (!totalMatrix.isFinite() || !MapPointInverted(totalMatrix, ToTGFX(&localPoint))) {
+    return {invalid, invalid};
+  }
   return localPoint;
 }
 
@@ -568,6 +583,29 @@ std::shared_ptr<File> PAGLayer::getFile() const {
 
 bool PAGLayer::frameVisible() const {
   return contentFrame >= 0 && contentFrame < frameDuration();
+}
+
+std::shared_ptr<Transform3DContext> PAGLayer::createTransform3DContext() const {
+  auto parent = _parent;
+  if (parent == nullptr && trackMatteOwner != nullptr) {
+    parent = trackMatteOwner->_parent;
+  }
+  if (parent == nullptr) {
+    return Transform3DFilter::MakeContext(layer->containingComposition,
+                                          layer->startTime + contentFrame);
+  }
+  CameraLayer* camera = nullptr;
+  Frame frame = 0;
+  for (auto item = parent->layers.rbegin(); item != parent->layers.rend(); ++item) {
+    auto candidate = item->get();
+    if (candidate->layerVisible && candidate->layerType() == LayerType::Camera &&
+        candidate->frameVisible()) {
+      camera = static_cast<CameraLayer*>(candidate->layer);
+      frame = candidate->contentFrame + camera->startTime;
+      break;
+    }
+  }
+  return Transform3DFilter::MakeContext(parent->_width, parent->_height, camera, frame);
 }
 
 }  // namespace pag

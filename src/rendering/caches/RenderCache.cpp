@@ -23,6 +23,7 @@
 #include "rendering/caches/ImageContentCache.h"
 #include "rendering/caches/LayerCache.h"
 #include "rendering/editing/ImageReplacement.h"
+#include "rendering/filters/RuntimeFilter.h"
 #include "rendering/renderers/FilterRenderer.h"
 #include "rendering/sequences/SequenceImageProxy.h"
 #include "rendering/sequences/SequenceInfo.h"
@@ -43,6 +44,14 @@ RenderCache::RenderCache(PAGStage* stage) : _uniqueID(UniqueID::Next()), stage(s
 
 RenderCache::~RenderCache() {
   releaseAll();
+}
+
+size_t RenderCache::memoryUsage() const {
+  auto memory = graphicsMemory;
+  for (const auto& item : filterResourcesMap) {
+    memory += item.second->memoryUsage();
+  }
+  return memory;
 }
 
 uint32_t RenderCache::getContentVersion() const {
@@ -217,7 +226,6 @@ void RenderCache::setSnapshotEnabled(bool value) {
 }
 
 void RenderCache::beginFrame() {
-  _frameSequence++;
   usedAssets = {};
   usedStaticSequences = {};
   usedSequences = {};
@@ -259,6 +267,18 @@ void RenderCache::releaseAll() {
 
 void RenderCache::detachFromContext() {
   if (!isDrawingFrame) {
+#ifdef TGFX_USE_OPENGL
+    auto previousMemory = memoryUsage();
+#endif
+    for (auto& item : filterResourcesMap) {
+      item.second->onQueryEnd();
+    }
+#ifdef TGFX_USE_OPENGL
+    if (context != nullptr && memoryUsage() < previousMemory) {
+      // 最后一次查询可能无后续提交，空编码器可清理 GL 释放队列；其他后端创建时可能消费等待信号。
+      context->gpu()->createCommandEncoder();
+    }
+#endif
     context = nullptr;
     return;
   }
@@ -266,11 +286,14 @@ void RenderCache::detachFromContext() {
   clearExpiredSequences();
   clearExpiredDecodedImages();
   clearExpiredSnapshots();
+  for (auto& item : filterResourcesMap) {
+    item.second->onFrameEnd();
+  }
   if (!timestamps.empty()) {
     // Always purge recycled resources that haven't been used in 1 frame.
     context->purgeResourcesNotUsedSince(timestamps.back());
   }
-  if (context->memoryUsage() + graphicsMemory > PURGEABLE_GRAPHICS_MEMORY &&
+  if (context->memoryUsage() + memoryUsage() > PURGEABLE_GRAPHICS_MEMORY &&
       timestamps.size() == PURGEABLE_EXPIRED_FRAME) {
     // Purge all types of resources that haven't been used in 10 frames when the total memory usage
     // is over 20M.
@@ -298,10 +321,24 @@ Snapshot* RenderCache::getSnapshot(const Picture* picture) {
   if (!_snapshotEnabled) {
     return nullptr;
   }
-  usedAssets.insert(picture->assetID);
   auto maxScaleFactor = stage->getAssetMaxScale(picture->assetID);
   auto scaleFactor = picture->getScaleFactor(maxScaleFactor);
+  return getSnapshot(picture, scaleFactor, stage->getAssetMinScale(picture->assetID));
+}
+
+Snapshot* RenderCache::getSnapshot(const Picture* picture, float scaleFactor,
+                                   float minScaleFactor) {
+  if (!_snapshotEnabled) {
+    return nullptr;
+  }
   auto snapshot = getSnapshot(picture->assetID);
+  if (!isDrawingFrame) {
+    return snapshot != nullptr && snapshot->makerKey == picture->uniqueKey &&
+                   fabsf(snapshot->scaleFactor() - scaleFactor) <= SCALE_FACTOR_PRECISION
+               ? snapshot
+               : nullptr;
+  }
+  usedAssets.insert(picture->assetID);
   if (snapshot && (snapshot->makerKey != picture->uniqueKey ||
                    fabsf(snapshot->scaleFactor() - scaleFactor) > SCALE_FACTOR_PRECISION)) {
     removeSnapshot(picture->assetID);
@@ -312,10 +349,9 @@ Snapshot* RenderCache::getSnapshot(const Picture* picture) {
     return snapshot;
   }
 
-  if (scaleFactor < SCALE_FACTOR_PRECISION || graphicsMemory >= MAX_GRAPHICS_MEMORY) {
+  if (scaleFactor < SCALE_FACTOR_PRECISION || memoryUsage() >= MAX_GRAPHICS_MEMORY) {
     return nullptr;
   }
-  auto minScaleFactor = stage->getAssetMinScale(picture->assetID);
   bool enableMipmap = minScaleFactor / scaleFactor < MIPMAP_ENABLED_THRESHOLD;
   auto newSnapshot = picture->makeSnapshot(this, scaleFactor, enableMipmap);
   if (newSnapshot == nullptr) {
@@ -369,6 +405,7 @@ void RenderCache::clearAllSnapshots() {
 void RenderCache::clearExpiredSnapshots() {
   std::vector<Snapshot*> expiredSnapshots;
   size_t releaseMemory = 0;
+  auto totalMemory = memoryUsage();
   for (auto snapshotIter = snapshotLRU.rbegin(); snapshotIter != snapshotLRU.rend();
        snapshotIter++) {
     auto* snapshot = *snapshotIter;
@@ -379,7 +416,7 @@ void RenderCache::clearExpiredSnapshots() {
     }
     snapshot->idleFrames++;
     if (snapshot->idleFrames < PURGEABLE_EXPIRED_FRAME &&
-        graphicsMemory - releaseMemory < PURGEABLE_GRAPHICS_MEMORY) {
+        totalMemory - releaseMemory < PURGEABLE_GRAPHICS_MEMORY) {
       // 总显存占用未超过20M且所有缓存均未超过10帧未使用，跳过清理。
       continue;
     }

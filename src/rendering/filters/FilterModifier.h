@@ -24,6 +24,7 @@
 #include "rendering/graphics/Modifier.h"
 
 namespace pag {
+struct Transform3DContext;
 class FilterModifier : public Modifier {
  public:
   /**
@@ -65,5 +66,6 @@ class FilterModifier : public Modifier {
 
   Layer* layer = nullptr;
   Frame layerFrame = 0;
+  std::shared_ptr<Transform3DContext> transform3DContext;
 };
 }  // namespace pag

@@ -19,6 +19,7 @@
 #include "FilterModifier.h"
 #include "rendering/caches/LayerCache.h"
 #include "rendering/caches/RenderCache.h"
+#include "rendering/filters/utils/Filter3DFactory.h"
 #include "rendering/renderers/FilterRenderer.h"
 
 namespace pag {
@@ -28,6 +29,9 @@ std::shared_ptr<FilterModifier> FilterModifier::Make(PAGLayer* pagLayer) {
     return nullptr;
   }
   auto modifier = Make(pagLayer->layer, pagLayer->layer->startTime + pagLayer->contentFrame);
+  if (modifier != nullptr && Has3DTransform(pagLayer->layer)) {
+    modifier->transform3DContext = pagLayer->createTransform3DContext();
+  }
   return modifier;
 }
 
@@ -35,7 +39,7 @@ std::shared_ptr<FilterModifier> FilterModifier::Make(Layer* layer, Frame layerFr
   if (layer == nullptr || layerFrame < layer->startTime ||
       layerFrame >= layer->startTime + layer->duration ||
       (!layer->motionBlur && layer->effects.empty() && layer->layerStyles.empty() &&
-       !layer->transform3D)) {
+       !Has3DTransform(layer))) {
     return nullptr;
   }
   auto modifier = std::shared_ptr<FilterModifier>(new FilterModifier());
