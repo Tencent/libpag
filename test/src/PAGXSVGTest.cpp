@@ -6278,6 +6278,27 @@ PAGX_TEST(PAGXSVGTest, SVGExport_RepeatedExportKeepsNodeCountStable) {
   EXPECT_EQ(firstSvg, secondSvg);
 }
 
+// ST45: a singular group stays empty instead of being inverse-recovered; the export keeps the
+// degenerate transform and produces valid SVG.
+PAGX_TEST(PAGXSVGTest, SVGExport_SingularGroupKeepsEmptyGeometry) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* group = doc->makeNode<pagx::Group>();
+  group->scale = {0, 0};
+  auto* rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {50, 50};
+  rect->size = {40, 40};
+  group->elements = {rect, MakeSolidFillSVG(doc.get(), 1, 0, 0)};
+  layer->contents = {group};
+  doc->layers.push_back(layer);
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("<svg"), std::string::npos);
+  bool keepsSingularTransform =
+      svg.find("matrix(0,0,0,0") != std::string::npos || svg.find("scale(0") != std::string::npos;
+  EXPECT_TRUE(keepsSingularTransform) << svg;
+}
+
 // A Group's alpha has to survive until the painter that draws its geometry, even when that painter
 // sits outside the Group.
 PAGX_TEST(PAGXSVGTest, SVGExport_GroupAlphaReachesOuterPainter) {
