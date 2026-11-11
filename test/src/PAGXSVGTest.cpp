@@ -6122,6 +6122,39 @@ PAGX_TEST(PAGXSVGTest, SVGExport_TextModifierAppliesPerGlyphRange) {
   EXPECT_NEAR(pixel[3], 255, 4);
 }
 
+// ST22: a TextPath over pre-shaped glyph runs is emitted as vector outlines with the final glyph
+// matrices instead of rasterizing the whole layer.
+PAGX_TEST(PAGXSVGTest, SVGExport_TextPathEmitsPlacedGlyphs) {
+  auto doc = pagx::PAGXDocument::Make(200, 100);
+  auto* font = MakeSquareGlyphFont(doc.get());
+  auto* text = doc->makeNode<pagx::Text>();
+  text->position = {0, 40};
+  text->fontSize = 100;
+  auto* run = doc->makeNode<pagx::GlyphRun>();
+  run->font = font;
+  run->fontSize = 100;
+  run->glyphs = {1, 1, 1};
+  run->positions = {{0, 0}, {20, 0}, {40, 0}};
+  text->glyphRuns.push_back(run);
+
+  auto* textPath = doc->makeNode<pagx::TextPath>();
+  textPath->path = doc->makeNode<pagx::PathData>();
+  *textPath->path = pagx::PathDataFromSVGString("M0 0 L100 0");
+  textPath->firstMargin = 10;
+  auto* layer = doc->makeNode<pagx::Layer>();
+  layer->contents = {text, textPath, MakeSolidFillSVG(doc.get(), 0, 0, 1)};
+  doc->layers.push_back(layer);
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_EQ(svg.find("data:image/png"), std::string::npos);
+  EXPECT_EQ(svg.find("<text"), std::string::npos);
+  size_t pathCount = 0;
+  for (size_t pos = svg.find("<path"); pos != std::string::npos; pos = svg.find("<path", pos + 1)) {
+    ++pathCount;
+  }
+  EXPECT_EQ(pathCount, 3u);
+}
+
 // A Group's alpha has to survive until the painter that draws its geometry, even when that painter
 // sits outside the Group.
 PAGX_TEST(PAGXSVGTest, SVGExport_GroupAlphaReachesOuterPainter) {

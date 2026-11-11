@@ -83,6 +83,7 @@
 #include "pagx/utils/StringParser.h"
 #include "pagx/utils/StrokeGeometryUtils.h"
 #include "pagx/utils/TextPaintUtils.h"
+#include "pagx/utils/TextPathUtils.h"
 #include "pagx/utils/TextUtils.h"
 #include "pagx/utils/Woff2FontGenerator.h"
 #include "pagx/xml/XMLBuilder.h"
@@ -569,6 +570,8 @@ class SVGWriter {
     // Paint overrides accumulated from TextModifiers for this Text. Empty means the text has no
     // override and can use the regular native/font/path emission.
     std::vector<GlyphPaintStyle> glyphStyles = {};
+    // Final glyph matrices produced by TextPath. Empty means the text follows its own layout.
+    std::vector<GlyphTransformOverride> glyphTransforms = {};
   };
 
   // Layer / element writing
@@ -608,7 +611,8 @@ class SVGWriter {
                        float alpha);
   void writeTextWithGlyphStyles(SVGBuilder& out, const Text* text, const FillStrokeInfo& fs,
                                 const Matrix& m, float alpha,
-                                const std::vector<GlyphPaintStyle>& styles);
+                                const std::vector<GlyphPaintStyle>& styles,
+                                const std::vector<GlyphTransformOverride>& transforms);
   void writeStyledGlyphRun(SVGBuilder& out, const std::vector<GlyphDrawItem>& items, size_t start,
                            size_t end, const GlyphPaintStyle& style, const FillStrokeInfo& fs,
                            float alpha);
@@ -2695,13 +2699,14 @@ static void EmitGlyphItemImages(SVGBuilder& out, const std::vector<GlyphDrawItem
 
 void SVGWriter::writeTextWithGlyphStyles(SVGBuilder& out, const Text* text,
                                          const FillStrokeInfo& fs, const Matrix& m, float alpha,
-                                         const std::vector<GlyphPaintStyle>& styles) {
+                                         const std::vector<GlyphPaintStyle>& styles,
+                                         const std::vector<GlyphTransformOverride>& transforms) {
   auto renderPos = text->renderPosition();
   if (fs.textBox) {
     renderPos.x += fs.textBox->padding.left;
     renderPos.y += fs.textBox->padding.top;
   }
-  auto items = ComputeGlyphDrawItems(*text, renderPos.x, renderPos.y);
+  auto items = ComputeGlyphDrawItems(*text, renderPos.x, renderPos.y, transforms);
   if (items.empty() || styles.empty()) {
     return;
   }
@@ -3784,9 +3789,16 @@ void SVGWriter::emitGeometryWithFs(SVGBuilder& out, const AccumulatedGeometry& e
       break;
     case NodeType::Text: {
       auto* text = static_cast<const Text*>(entry.element);
-      if (!entry.glyphStyles.empty() && !text->glyphRuns.empty() &&
+      bool hasTransforms = !entry.glyphTransforms.empty();
+      if ((!entry.glyphStyles.empty() || hasTransforms) && !text->glyphRuns.empty() &&
           !_animWriter.HasPainterAnimates(localFs.fill, localFs.stroke)) {
-        writeTextWithGlyphStyles(out, text, localFs, entry.transform, alpha, entry.glyphStyles);
+        std::vector<GlyphPaintStyle> styles = entry.glyphStyles;
+        auto glyphCount = TextGlyphCount(*text);
+        if (styles.size() != glyphCount) {
+          styles.assign(glyphCount, {});
+        }
+        writeTextWithGlyphStyles(out, text, localFs, entry.transform, alpha, styles,
+                                 entry.glyphTransforms);
         break;
       }
       // Any Text that carries GlyphRun elements is treated as the authoritative
@@ -3954,6 +3966,39 @@ void SVGWriter::processVectorScope(SVGBuilder& out, const std::vector<Element*>&
         }
         break;
       }
+      case NodeType::TextPath: {
+        auto* textPath = static_cast<const TextPath*>(element);
+        for (size_t i = scopeStart; i < accumulator.size(); ++i) {
+          auto& entry = accumulator[i];
+          if (entry.element->nodeType() != NodeType::Text) {
+            continue;
+          }
+          auto* text = static_cast<const Text*>(entry.element);
+          auto origin = text->renderPosition();
+          if (entry.textBox != nullptr) {
+            origin.x += entry.textBox->padding.left;
+            origin.y += entry.textBox->padding.top;
+          }
+          auto placements =
+              ComputeGlyphPlacements(*text, origin.x, origin.y, entry.glyphTransforms);
+          std::vector<TextPathGlyphInput> inputs = {};
+          inputs.reserve(placements.size());
+          for (const auto& placement : placements) {
+            inputs.push_back({placement.transform, placement.anchor, placement.advance});
+          }
+          std::vector<Matrix> outputs = {};
+          if (!ApplyTextPathToGlyphs(*textPath, inputs, &outputs)) {
+            continue;
+          }
+          entry.glyphTransforms.resize(TextGlyphCount(*text));
+          for (size_t j = 0; j < placements.size(); j++) {
+            auto& transform = entry.glyphTransforms[placements[j].glyphIndex];
+            transform.transform = outputs[j];
+            transform.valid = true;
+          }
+        }
+        break;
+      }
       case NodeType::Group: {
         auto* group = static_cast<const Group*>(element);
         Matrix groupMatrix = transform * BuildGroupMatrix(group);
@@ -4003,6 +4048,64 @@ void SVGWriter::writeLayerContents(SVGBuilder& out, const Layer* layer, const Ma
                 acceptAnyPlacement);
 }
 
+static bool TextHasDrawableGlyphs(const Text* text) {
+  for (const auto* run : text->glyphRuns) {
+    if (run->font == nullptr || run->font->unitsPerEm <= 0 || run->glyphs.empty()) {
+      continue;
+    }
+    return true;
+  }
+  return false;
+}
+
+static bool ContainsTextDeep(const std::vector<Element*>& elements) {
+  for (const auto* element : elements) {
+    if (element == nullptr) {
+      continue;
+    }
+    if (element->nodeType() == NodeType::Text) {
+      return true;
+    }
+    if (element->nodeType() == NodeType::Group &&
+        ContainsTextDeep(static_cast<const Group*>(element)->elements)) {
+      return true;
+    }
+    if (element->nodeType() == NodeType::TextBox &&
+        !static_cast<const TextBox*>(element)->elements.empty()) {
+      return true;
+    }
+  }
+  return false;
+}
+
+static bool CanBakeTextPaths(const std::vector<Element*>& elements) {
+  for (const auto* element : elements) {
+    if (element == nullptr) {
+      continue;
+    }
+    switch (element->nodeType()) {
+      case NodeType::Text:
+        if (!TextHasDrawableGlyphs(static_cast<const Text*>(element))) {
+          return false;
+        }
+        break;
+      case NodeType::Group:
+        if (ContainsTextDeep(static_cast<const Group*>(element)->elements)) {
+          return false;
+        }
+        break;
+      case NodeType::TextBox:
+        if (!static_cast<const TextBox*>(element)->elements.empty()) {
+          return false;
+        }
+        break;
+      default:
+        break;
+    }
+  }
+  return true;
+}
+
 void SVGWriter::writeLayer(SVGBuilder& out, const Layer* layer) {
   // An animated visibility channel turns the layer into a lasting SMIL host, so the static invisible
   // state must not elide the element that carries the animation. A hidden layer is skipped
@@ -4026,6 +4129,11 @@ void SVGWriter::writeLayer(SVGBuilder& out, const Layer* layer) {
   // bakes the per-character transform into the glyphs, so the layer can stay vector.
   if (features.hasTextModifier && _resolver.CanBakeTextModifiers(layer->contents)) {
     features.hasTextModifier = false;
+  }
+  // TextPath is resolvable for layers whose text already carries drawable glyph data: the exporter
+  // computes the final glyph matrices with the same tgfx algorithm.
+  if (features.hasTextPath && CanBakeTextPaths(layer->contents)) {
+    features.hasTextPath = false;
   }
   // Rasterizing an animated layer would freeze it into a single frame, so animated layers always
   // stay on the vector path and report the degradation instead.

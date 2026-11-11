@@ -50,6 +50,7 @@
 #include "pagx/utils/RasterUtils.h"
 #include "pagx/utils/StrokeGeometryUtils.h"
 #include "pagx/utils/TextPaintUtils.h"
+#include "pagx/utils/TextPathUtils.h"
 #include "pagx/utils/TextSelectorUtils.h"
 #include "pagx/utils/TextUtils.h"
 #include "renderer/LayerBuilder.h"
@@ -2375,6 +2376,284 @@ PAGX_TEST(PAGXUtilsTest, TextPaintUtils_UsesScopeGlyphIndex) {
   pagx::ApplyTextModifierPaint(*red, 0, 2, &styles);
   EXPECT_FLOAT_EQ(styles[0].fillColor.alpha, 1.0f);
   EXPECT_FLOAT_EQ(styles[1].fillColor.alpha, 0.0f);
+}
+
+// ---------------------------------------------------------------------------
+// TextPath TP01—TP16
+// ---------------------------------------------------------------------------
+
+static pagx::TextPath* MakeTextPathNode(pagx::PAGXDocument* doc, const char* pathData) {
+  auto* textPath = doc->makeNode<pagx::TextPath>();
+  textPath->path = doc->makeNode<pagx::PathData>();
+  *textPath->path = pagx::PathDataFromSVGString(pathData);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  layer->contents.push_back(textPath);
+  doc->layers.push_back(layer);
+  return textPath;
+}
+
+static std::vector<pagx::TextPathGlyphInput> MakeThreeGlyphs() {
+  return {{pagx::Matrix::Translate(0, 10), {10, 0}, 20},
+          {pagx::Matrix::Translate(20, 10), {10, 0}, 20},
+          {pagx::Matrix::Translate(40, 10), {10, 0}, 20}};
+}
+
+static float MappedX(const pagx::Matrix& m, float x, float y) {
+  return m.a * x + m.c * y + m.tx;
+}
+
+static float MappedY(const pagx::Matrix& m, float x, float y) {
+  return m.b * x + m.d * y + m.ty;
+}
+
+PAGX_TEST(PAGXUtilsTest, TextPath_NormalStartMargin) {
+  auto doc = pagx::PAGXDocument::Make(300, 200);
+  auto* textPath = MakeTextPathNode(doc.get(), "M0 0 L100 0");
+  textPath->firstMargin = 10;
+  doc->applyLayout();
+  std::vector<pagx::Matrix> out;
+  ASSERT_TRUE(pagx::ApplyTextPathToGlyphs(*textPath, MakeThreeGlyphs(), &out));
+  ASSERT_EQ(out.size(), 3u);
+  EXPECT_NEAR(MappedX(out[0], 10, 0), 20, 1e-4);
+  EXPECT_NEAR(MappedX(out[1], 10, 0), 40, 1e-4);
+  EXPECT_NEAR(MappedX(out[2], 10, 0), 60, 1e-4);
+  EXPECT_NEAR(MappedY(out[0], 10, 0), 10, 1e-4);
+  textPath->firstMargin = -20;
+  ASSERT_TRUE(pagx::ApplyTextPathToGlyphs(*textPath, MakeThreeGlyphs(), &out));
+  EXPECT_NEAR(MappedX(out[0], 10, 0), -10, 1e-4);
+  EXPECT_NEAR(MappedX(out[2], 10, 0), 30, 1e-4);
+}
+
+PAGX_TEST(PAGXUtilsTest, TextPath_NormalIgnoresLastMargin) {
+  auto doc = pagx::PAGXDocument::Make(300, 200);
+  auto* textPath = MakeTextPathNode(doc.get(), "M0 0 L100 0");
+  textPath->firstMargin = 10;
+  textPath->lastMargin = -10;
+  doc->applyLayout();
+  std::vector<pagx::Matrix> out;
+  ASSERT_TRUE(pagx::ApplyTextPathToGlyphs(*textPath, MakeThreeGlyphs(), &out));
+  ASSERT_EQ(out.size(), 3u);
+  EXPECT_NEAR(MappedX(out[0], 10, 0), 20, 1e-4);
+  EXPECT_NEAR(MappedX(out[1], 10, 0), 40, 1e-4);
+  EXPECT_NEAR(MappedX(out[2], 10, 0), 60, 1e-4);
+}
+
+PAGX_TEST(PAGXUtilsTest, TextPath_NormalVerticalAndPerpendicular) {
+  auto doc = pagx::PAGXDocument::Make(300, 200);
+  auto* textPath = MakeTextPathNode(doc.get(), "M0 0 L0 100");
+  textPath->perpendicular = true;
+  doc->applyLayout();
+  std::vector<pagx::Matrix> out;
+  ASSERT_TRUE(pagx::ApplyTextPathToGlyphs(*textPath, MakeThreeGlyphs(), &out));
+  ASSERT_EQ(out.size(), 3u);
+  EXPECT_NEAR(MappedX(out[0], 10, 0), -10, 1e-4);
+  EXPECT_NEAR(MappedY(out[0], 10, 0), 10, 1e-4);
+  EXPECT_NEAR(MappedY(out[2], 10, 0), 50, 1e-4);
+  EXPECT_NEAR(out[0].a, 0, 1e-4);
+  EXPECT_NEAR(out[0].b, 1, 1e-4);
+  EXPECT_NEAR(out[0].c, -1, 1e-4);
+  EXPECT_NEAR(out[0].d, 0, 1e-4);
+  textPath->perpendicular = false;
+  ASSERT_TRUE(pagx::ApplyTextPathToGlyphs(*textPath, MakeThreeGlyphs(), &out));
+  EXPECT_NEAR(MappedX(out[0], 10, 0), -10, 1e-4);
+  EXPECT_NEAR(MappedY(out[0], 10, 0), 10, 1e-4);
+  EXPECT_NEAR(out[0].a, 1, 1e-4);
+  EXPECT_NEAR(out[0].d, 1, 1e-4);
+}
+
+PAGX_TEST(PAGXUtilsTest, TextPath_ReversedDistances) {
+  auto doc = pagx::PAGXDocument::Make(300, 200);
+  auto* textPath = MakeTextPathNode(doc.get(), "M0 0 L100 0");
+  textPath->reversed = true;
+  doc->applyLayout();
+  std::vector<pagx::Matrix> out;
+  ASSERT_TRUE(pagx::ApplyTextPathToGlyphs(*textPath, MakeThreeGlyphs(), &out));
+  ASSERT_EQ(out.size(), 3u);
+  EXPECT_NEAR(MappedX(out[0], 10, 0), 90, 1e-4);
+  EXPECT_NEAR(MappedX(out[1], 10, 0), 70, 1e-4);
+  EXPECT_NEAR(MappedX(out[2], 10, 0), 50, 1e-4);
+}
+
+PAGX_TEST(PAGXUtilsTest, TextPath_ReversedPathUsesPathDirection) {
+  auto doc = pagx::PAGXDocument::Make(300, 200);
+  auto* textPath = MakeTextPathNode(doc.get(), "M100 0 L0 0");
+  doc->applyLayout();
+  std::vector<pagx::Matrix> out;
+  ASSERT_TRUE(pagx::ApplyTextPathToGlyphs(*textPath, MakeThreeGlyphs(), &out));
+  ASSERT_EQ(out.size(), 3u);
+  EXPECT_NEAR(MappedX(out[0], 10, 0), 90, 1e-4);
+  EXPECT_NEAR(MappedY(out[0], 10, 0), -10, 1e-4);
+  EXPECT_NEAR(MappedX(out[2], 10, 0), 50, 1e-4);
+}
+
+PAGX_TEST(PAGXUtilsTest, TextPath_UsesAnchorAndBaselineOrigin) {
+  auto doc = pagx::PAGXDocument::Make(300, 200);
+  auto* textPath = MakeTextPathNode(doc.get(), "M0 0 L100 0");
+  textPath->baselineOrigin = {5, 0};
+  textPath->baselineAngle = 90;
+  textPath->perpendicular = true;
+  doc->applyLayout();
+  std::vector<pagx::TextPathGlyphInput> glyphs = {{pagx::Matrix::Translate(0, 0), {15, 30}, 20}};
+  std::vector<pagx::Matrix> out;
+  ASSERT_TRUE(pagx::ApplyTextPathToGlyphs(*textPath, glyphs, &out));
+  ASSERT_EQ(out.size(), 1u);
+  EXPECT_NEAR(MappedX(out[0], 15, 30), 30, 1e-4);
+  EXPECT_NEAR(MappedY(out[0], 15, 30), -10, 1e-4);
+  EXPECT_NEAR(out[0].a, 0, 1e-4);
+  EXPECT_NEAR(out[0].b, -1, 1e-4);
+}
+
+PAGX_TEST(PAGXUtilsTest, TextPath_ForceAlignmentSpacing) {
+  auto doc = pagx::PAGXDocument::Make(300, 200);
+  auto* textPath = MakeTextPathNode(doc.get(), "M0 0 L200 0");
+  textPath->forceAlignment = true;
+  doc->applyLayout();
+  std::vector<pagx::Matrix> out;
+  ASSERT_TRUE(pagx::ApplyTextPathToGlyphs(*textPath, MakeThreeGlyphs(), &out));
+  ASSERT_EQ(out.size(), 3u);
+  EXPECT_NEAR(MappedX(out[0], 10, 0), 10, 1e-4);
+  EXPECT_NEAR(MappedX(out[1], 10, 0), 100, 1e-4);
+  EXPECT_NEAR(MappedX(out[2], 10, 0), 190, 1e-4);
+  EXPECT_NEAR(MappedY(out[0], 10, 0), 0, 1e-4);
+}
+
+PAGX_TEST(PAGXUtilsTest, TextPath_ForceMarginSigns) {
+  auto doc = pagx::PAGXDocument::Make(300, 200);
+  auto* textPath = MakeTextPathNode(doc.get(), "M0 0 L100 0");
+  textPath->forceAlignment = true;
+  textPath->firstMargin = 10;
+  textPath->lastMargin = -10;
+  doc->applyLayout();
+  std::vector<pagx::Matrix> out;
+  ASSERT_TRUE(pagx::ApplyTextPathToGlyphs(*textPath, MakeThreeGlyphs(), &out));
+  ASSERT_EQ(out.size(), 3u);
+  EXPECT_NEAR(MappedX(out[0], 10, 0), 20, 1e-4);
+  EXPECT_NEAR(MappedX(out[1], 10, 0), 50, 1e-4);
+  EXPECT_NEAR(MappedX(out[2], 10, 0), 80, 1e-4);
+}
+
+PAGX_TEST(PAGXUtilsTest, TextPath_OpenPathExtendsAndKeepsNegativeSpacing) {
+  auto doc = pagx::PAGXDocument::Make(300, 200);
+  auto* textPath = MakeTextPathNode(doc.get(), "M0 0 L100 0");
+  textPath->forceAlignment = true;
+  textPath->firstMargin = 80;
+  textPath->lastMargin = -80;
+  doc->applyLayout();
+  std::vector<pagx::Matrix> out;
+  ASSERT_TRUE(pagx::ApplyTextPathToGlyphs(*textPath, MakeThreeGlyphs(), &out));
+  ASSERT_EQ(out.size(), 3u);
+  EXPECT_NEAR(MappedX(out[0], 10, 0), 90, 1e-4);
+  EXPECT_NEAR(MappedX(out[1], 10, 0), 50, 1e-4);
+  EXPECT_NEAR(MappedX(out[2], 10, 0), 10, 1e-4);
+}
+
+PAGX_TEST(PAGXUtilsTest, TextPath_ForceUsesPerGlyphAdvance) {
+  auto doc = pagx::PAGXDocument::Make(300, 200);
+  auto* textPath = MakeTextPathNode(doc.get(), "M0 0 L200 0");
+  textPath->forceAlignment = true;
+  doc->applyLayout();
+  std::vector<pagx::TextPathGlyphInput> glyphs = {{pagx::Matrix::Translate(0, 10), {10, 0}, 20},
+                                                  {pagx::Matrix::Translate(20, 10), {20, 0}, 40},
+                                                  {pagx::Matrix::Translate(40, 10), {30, 0}, 60}};
+  std::vector<pagx::Matrix> out;
+  ASSERT_TRUE(pagx::ApplyTextPathToGlyphs(*textPath, glyphs, &out));
+  ASSERT_EQ(out.size(), 3u);
+  EXPECT_NEAR(MappedX(out[0], 10, 0), 10, 1e-4);
+  EXPECT_NEAR(MappedX(out[1], 20, 0), 80, 1e-4);
+  EXPECT_NEAR(MappedX(out[2], 30, 0), 170, 1e-4);
+}
+
+PAGX_TEST(PAGXUtilsTest, TextPath_SingleGlyphForce) {
+  auto doc = pagx::PAGXDocument::Make(300, 200);
+  auto* textPath = MakeTextPathNode(doc.get(), "M0 0 L100 0");
+  textPath->forceAlignment = true;
+  textPath->firstMargin = 10;
+  doc->applyLayout();
+  std::vector<pagx::TextPathGlyphInput> glyphs = {{pagx::Matrix::Translate(0, 10), {10, 0}, 20}};
+  std::vector<pagx::Matrix> out;
+  ASSERT_TRUE(pagx::ApplyTextPathToGlyphs(*textPath, glyphs, &out));
+  ASSERT_EQ(out.size(), 1u);
+  EXPECT_NEAR(MappedX(out[0], 10, 0), 20, 1e-4);
+}
+
+PAGX_TEST(PAGXUtilsTest, TextPath_ClosedPathWrapAndEndTangent) {
+  auto doc = pagx::PAGXDocument::Make(300, 200);
+  auto* textPath = MakeTextPathNode(doc.get(), "M0 0 L50 0 L50 50 L0 50 Z");
+  textPath->firstMargin = -20;
+  doc->applyLayout();
+  std::vector<pagx::TextPathGlyphInput> glyphs = {{pagx::Matrix::Translate(0, 0), {10, 0}, 20}};
+  std::vector<pagx::Matrix> out;
+  ASSERT_TRUE(pagx::ApplyTextPathToGlyphs(*textPath, glyphs, &out));
+  EXPECT_NEAR(MappedX(out[0], 10, 0), 0, 1e-4);
+  EXPECT_NEAR(MappedY(out[0], 10, 0), 10, 1e-4);
+  textPath->firstMargin = 200;
+  ASSERT_TRUE(pagx::ApplyTextPathToGlyphs(*textPath, glyphs, &out));
+  EXPECT_NEAR(MappedX(out[0], 10, 0), 10, 1e-4);
+  EXPECT_NEAR(MappedY(out[0], 10, 0), 0, 1e-4);
+}
+
+PAGX_TEST(PAGXUtilsTest, TextPath_ReversedClosedPathWrapsAgain) {
+  auto doc = pagx::PAGXDocument::Make(300, 200);
+  auto* textPath = MakeTextPathNode(doc.get(), "M0 0 L50 0 L50 50 L0 50 Z");
+  textPath->reversed = true;
+  textPath->firstMargin = -20;
+  doc->applyLayout();
+  std::vector<pagx::TextPathGlyphInput> glyphs = {{pagx::Matrix::Translate(0, 0), {10, 0}, 20}};
+  std::vector<pagx::Matrix> out;
+  ASSERT_TRUE(pagx::ApplyTextPathToGlyphs(*textPath, glyphs, &out));
+  EXPECT_NEAR(MappedX(out[0], 10, 0), 10, 1e-4);
+  textPath->firstMargin = 200;
+  ASSERT_TRUE(pagx::ApplyTextPathToGlyphs(*textPath, glyphs, &out));
+  EXPECT_NEAR(MappedX(out[0], 10, 0), 0, 1e-4);
+  EXPECT_NEAR(MappedY(out[0], 10, 0), 10, 1e-4);
+}
+
+PAGX_TEST(PAGXUtilsTest, TextPath_MeasuresFirstContourOnly) {
+  auto doc = pagx::PAGXDocument::Make(300, 200);
+  auto* textPath = MakeTextPathNode(doc.get(), "M0 0 L100 0 M200 200 L200 400");
+  textPath->firstMargin = 110;
+  doc->applyLayout();
+  std::vector<pagx::TextPathGlyphInput> glyphs = {{pagx::Matrix::Translate(0, 0), {0, 0}, 20}};
+  std::vector<pagx::Matrix> out;
+  ASSERT_TRUE(pagx::ApplyTextPathToGlyphs(*textPath, glyphs, &out));
+  EXPECT_NEAR(MappedX(out[0], 0, 0), 110, 1e-4);
+  EXPECT_NEAR(MappedY(out[0], 0, 0), 0, 1e-4);
+}
+
+PAGX_TEST(PAGXUtilsTest, TextPath_LayoutScalesPathNotAdvance) {
+  auto doc = pagx::PAGXDocument::Make(300, 200);
+  auto* textPath = MakeTextPathNode(doc.get(), "M0 0 L100 0");
+  textPath->width = 200;
+  textPath->left = 30;
+  textPath->top = 40;
+  textPath->forceAlignment = true;
+  doc->applyLayout();
+  std::vector<pagx::Matrix> out;
+  ASSERT_TRUE(pagx::ApplyTextPathToGlyphs(*textPath, MakeThreeGlyphs(), &out));
+  ASSERT_EQ(out.size(), 3u);
+  EXPECT_NEAR(MappedX(out[0], 10, 0), 40, 1e-4);
+  EXPECT_NEAR(MappedX(out[1], 10, 0), 130, 1e-4);
+  EXPECT_NEAR(MappedX(out[2], 10, 0), 220, 1e-4);
+  EXPECT_NEAR(MappedY(out[0], 10, 0), 40, 1e-4);
+}
+
+PAGX_TEST(PAGXUtilsTest, TextPath_ForceIgnoresBaselineAndKeepsLinearPart) {
+  auto doc = pagx::PAGXDocument::Make(300, 200);
+  auto* textPath = MakeTextPathNode(doc.get(), "M0 0 L200 0");
+  textPath->forceAlignment = true;
+  textPath->baselineOrigin = {70, 80};
+  textPath->baselineAngle = 45;
+  doc->applyLayout();
+  auto glyphs = MakeThreeGlyphs();
+  glyphs[0].transform = pagx::Matrix::Rotate(90);
+  std::vector<pagx::Matrix> out;
+  ASSERT_TRUE(pagx::ApplyTextPathToGlyphs(*textPath, glyphs, &out));
+  ASSERT_EQ(out.size(), 3u);
+  EXPECT_NEAR(MappedX(out[0], 10, 0), 10, 1e-4);
+  EXPECT_NEAR(out[0].a, 0, 1e-4);
+  EXPECT_NEAR(out[0].b, 1, 1e-4);
+  EXPECT_NEAR(out[0].c, -1, 1e-4);
+  EXPECT_NEAR(out[0].d, 0, 1e-4);
 }
 
 // ---------------------------------------------------------------------------

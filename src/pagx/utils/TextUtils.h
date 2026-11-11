@@ -35,6 +35,7 @@ namespace pagx {
 
 class Image;
 class PathData;
+class Glyph;
 
 struct GlyphPath {
   Matrix transform;
@@ -140,12 +141,48 @@ struct GlyphDrawItem {
 };
 
 /**
+ * Optional per-glyph matrix override produced by a TextPath modifier. `valid` distinguishes an
+ * unmodified glyph from one whose final matrix happens to be the identity.
+ */
+struct GlyphTransformOverride {
+  Matrix transform = {};
+  bool valid = false;
+};
+
+/**
+ * A glyph's placement in the Text's local space, including the advance and local anchor needed by
+ * TextPath layout. Blank glyphs are included so advances and selector indices stay aligned.
+ */
+struct GlyphPlacement {
+  const Glyph* glyph = nullptr;
+  Matrix transform = {};
+  Point anchor = {};
+  float advance = 0;
+  size_t glyphIndex = 0;
+};
+
+/**
+ * Walks every valid glyph of `text` in source order, applying the optional per-glyph matrix
+ * overrides. `textPosX`/`textPosY` are the Text's render origin.
+ */
+std::vector<GlyphPlacement> ComputeGlyphPlacements(
+    const Text& text, float textPosX, float textPosY,
+    const std::vector<GlyphTransformOverride>& transforms = {});
+
+/**
  * Converts text glyph runs into an ordered list of glyph drawables. Unlike
  * ComputeGlyphPathsAndImages (which returns two separate lists), this preserves the relative order
  * of vector and bitmap glyphs within each run.
  * textPosX/textPosY are the base position for glyph placement.
  */
 std::vector<GlyphDrawItem> ComputeGlyphDrawItems(const Text& text, float textPosX, float textPosY);
+
+/**
+ * Same as above, but uses the per-glyph matrix overrides for glyphs whose `valid` flag is set.
+ */
+std::vector<GlyphDrawItem> ComputeGlyphDrawItems(
+    const Text& text, float textPosX, float textPosY,
+    const std::vector<GlyphTransformOverride>& transforms);
 
 /**
  * Computes the bounding box of a Text's pre-shaped GlyphRuns in the Text's local coordinate space

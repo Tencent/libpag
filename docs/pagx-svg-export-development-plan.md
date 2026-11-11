@@ -675,6 +675,7 @@ ToSVG严格失败返回空结果、ToFile返回false、CLI非零；warnings=null
 | 本轮 ST6 链 + ST7 backdrop（2026-11-10） | 阴影滤镜内联 `feMerge` 并推进 `currentSource`，后续滤镜读到阴影输出；`BackgroundBlurStyle` / `GlassStyle` 在预扫描阶段显式告警；顺带修好嵌套 mask writer 丢失 warnings 的问题；`PAGXSVGTest` 189 / 189 | S3 文字、S4 几何、S5 资源、S6 API 未开始 |
 | 本轮 ST28（2026-11-11） | `LayoutNode::resolvedLayoutSize()` 逐轴读取布局产物；`EffectiveTextBoxWidth/Height` 对容器盒优先 resolved（含合法 0），对 modifier-only 盒保留 author 测量输入但百分比/双边必须先分配；`TextBox::updateLayout` 让空 modifier-only 子盒参与约束分配。新增 8 个单测与 2 个 SVG 回归；`PAGXUtilsTest` 233 / 233、`PAGXSVGTest` 202 / 203、全量 2866 / 2868 | 唯一 SVG 失败是既有 `SVGExport_GroupAlphaRoundTripPixels` 尚未接受截图基线（本分支新增用例，非 ST28 改动）；另一失败为既有 `PAGXTest.SVGToPAGXAll` 基线差异；未做像素门禁，RTL / 竖排 / rich text 排版未覆盖 |
 | 本轮 ST21（2026-11-11） | 几何通道与 paint 通道分离：几何仍烘进 Text 克隆，paint 通道生成 identity 几何的 paint-only modifier；SVG 导出按 scope glyph index 累积 `GlyphPaintStyle`，按连续样式发射 base/overlay（overlay 纯色 SrcOver、alpha=weight），stroke 走 `BlendStrokeWidth`；`CanBakeTextModifiers` 放行可表达的 paint modifier，不再整层栅格化。新增 TextPaintUtils 单测 4 个、SVG 结构/像素回归 7 个；`PAGXUtilsTest` 237 / 237、`PAGXSVGTest` 208 / 209、`PAGX*:PPT*` 860 / 861 | 仅既有未接受基线与 `PAGXTest.SVGToPAGXAll` 失败；容器 TextBox 内的 paint modifier 仍走 bake；bitmap/vector 极端交错与 AA 边缘未做像素门禁 |
+| 本轮 ST22（2026-11-11） | 新增 `TextPathUtils`，按 tgfx::TextPath 逐语句实现 normal/force、signed margin、reverse、closed wrap、open tangent、perpendicular 与 layout scale；SVG 导出把最终 glyph 矩阵存进局部 `glyphTransforms` 并发射轮廓，`CanBakeTextPaths` 放行可画的 glyphRuns。TP01—TP16 共 16 个数值测试；另加 SVG 结构回归；`PAGXUtilsTest` 253 / 253、`PAGXSVGTest` 209 / 210、四套件 1085 / 1087 | 两处失败均为既有基线（GroupAlphaRoundTrip / SVGToPAGXAll）；curve / 尖角 / TextModifier 前后组合的像素对照未做；native Text / TextBox 内 TextPath 仍走 bake |
 
 ### 4.8 S3 文字待办清单（下一批入口）
 
@@ -703,7 +704,7 @@ ST20 已收口：新增 `TextSelectorEvaluator`（`src/pagx/utils/TextSelectorUt
 
 ST21 已收口（2026-11-11）：几何通道仍由 `ModifierResolver` 烘进 Text 克隆，paint 通道改由 identity 几何的 paint-only modifier 承载；SVG 导出在 scope 内按 glyph index 累积 `GlyphPaintStyle`，同一连续样式 run 先发 base（weight<1，原 shader）再发 overlay（weight>0，纯色 SrcOver，fill/stroke-opacity=weight×painterAlpha×styleAlpha），stroke 宽度用 `BlendStrokeWidth`。像素 roundtrip 已覆盖 weight 0.5×r1、0.5×r0.5、1×r0.5、红绿累积与逐 glyph range；结构覆盖 full override 去 base、stroke overlay、无栅格化。仍待补：容器 TextBox 内 paint modifier、bitmap/vector 极端交错、AA 边缘像素门禁。
 
-ST22 当前仍有输出缺口：按第2.8.2节复用tgfx沿线求值并以TP01—TP16的数字标准验收；现有PNG回退只记为当前表示，不能证明上述矢量语义已实现。
+ST22 已收口（2026-11-11）：新增 `TextPathUtils`，按 tgfx::TextPath 的 normal / force 分支实现 baseline 投影、signed first/last margin、reversed、闭合正模回绕、开放端沿切线延伸、perpendicular 旋转与 layout k/T；SVG 导出把最终矩阵存入 `AccumulatedGeometry::glyphTransforms` 并输出轮廓，`CanBakeTextPaths` 仅在目标 Text 有可画 GlyphRun 时跳过栅格化。TP01—TP16 的 anchor/矩阵数值测试全部通过，另加一个 SVG 结构用例。仍待补：曲线/尖角/TextModifier 前后次序与 tgfx 的像素对照，以及 native Text / TextBox 内 TextPath（当前仍走 bake）。
 
 ST28必须保留：TextBox确实继承Group→LayoutNode的width/height，Native是Exporter分支不是节点字段。入口和双边/百分比/author/内容测量的优先级已在第2.8.3节写定，包含容器有效0与modifier-only unbounded的区别；不删除此条、不新增width/Native字段。
 
