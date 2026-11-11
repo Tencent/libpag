@@ -55,7 +55,7 @@ struct ExportOptions {
   // Sampling options shared with the render command. Zero frame rate means "use the document
   // animation frame rate"; a non-positive duration means "the longest full playback period".
   // State machines require an explicit positive duration.
-  int frameRate = 0;
+  VideoFrameRate frameRate = {};
   float duration = -1.0f;
   float scale = 1.0f;
   // Video containers carry no alpha, so the background is drawn by default and must be opaque.
@@ -129,9 +129,10 @@ constexpr const char* kPPTUsage = R"(PPT options:
 
 constexpr const char* kMP4Usage =
     R"(MP4 options (requires an external ffmpeg executable: --ffmpeg, $FFMPEG_BIN, or PATH):
-  --fps <n>                   Sampling frame rate (default: the integer document animation
+  --fps <n|num/den>           Sampling frame rate (default: the integer document animation
                               frame rate, falling back to 60); valid range: 1-120;
-                              mixed/non-integer document rates require an explicit value
+                              use 30000/1001 for NTSC; mixed/non-integer document rates
+                              require an explicit value
   --duration <seconds>        Sequence length (default: the longest full playback period;
                               static documents produce one frame; state machines require
                               an explicit value)
@@ -182,13 +183,12 @@ static int ParseVideoOption(int argc, char* argv[], int* index, ExportOptions* o
   std::string arg = argv[i];
   *matched = true;
   if (arg == "--fps" && i + 1 < argc) {
-    long value = 0;
     ++i;
-    if (!ParseIntOption(argv[i], 1, 120, &value)) {
-      std::cerr << "pagx export: error: invalid fps '" << argv[i] << "', must be 1-120\n";
+    if (!ParseVideoFrameRate(argv[i], &options->frameRate)) {
+      std::cerr << "pagx export: error: invalid fps '" << argv[i]
+                << "', must be 1-120 or a ratio such as 30000/1001\n";
       return 1;
     }
-    options->frameRate = static_cast<int>(value);
     options->firstVideoOnlyOption = "--fps";
   } else if (arg == "--duration" && i + 1 < argc) {
     ++i;
@@ -215,7 +215,7 @@ static int ParseVideoOption(int argc, char* argv[], int* index, ExportOptions* o
   } else if (arg == "--crf" && i + 1 < argc) {
     long value = 0;
     ++i;
-    if (!ParseIntOption(argv[i], 0, 51, &value)) {
+    if (!ParseIntOption(argv[i], 0, VideoEncoder::MAX_CRF, &value)) {
       std::cerr << "pagx export: error: invalid crf '" << argv[i] << "', must be 0-51\n";
       return 1;
     }
@@ -350,8 +350,12 @@ static void LimitOutputToTextureSize(const PAGXDocument& document, VideoExportOp
       document.height <= 0) {
     return;
   }
-  auto requestedWidth = std::ceil(static_cast<double>(document.width) * options->scale);
-  auto requestedHeight = std::ceil(static_cast<double>(document.height) * options->scale);
+  int requestedWidth = 0;
+  int requestedHeight = 0;
+  if (!VideoExporter::ComputeOutputDimensions(document.width, document.height, options->scale,
+                                              false, &requestedWidth, &requestedHeight)) {
+    return;
+  }
   auto device = pag::Devices::MakeDefault();
   if (device == nullptr) {
     return;
@@ -367,7 +371,7 @@ static void LimitOutputToTextureSize(const PAGXDocument& document, VideoExportOp
   device->unlock();
   // Keep the final even-size adjustment within the device limit as well.
   auto maxOutputSize =
-      options->alignToEvenSize ? maxTextureSize - maxTextureSize % 2 : maxTextureSize;
+      options->padToEvenSize ? maxTextureSize - maxTextureSize % 2 : maxTextureSize;
   if (maxOutputSize <= 0 || (requestedWidth <= maxOutputSize && requestedHeight <= maxOutputSize)) {
     return;
   }
@@ -377,9 +381,14 @@ static void LimitOutputToTextureSize(const PAGXDocument& document, VideoExportOp
             << " exceeds maxTextureDimension2D (" << maxTextureSize << "), downscaling\n";
   auto adjustedScale = static_cast<float>(limitedScale);
   // Match ardot's ceil + clamp boundary behavior without letting float rounding exceed the limit.
-  while (adjustedScale > 0.0f &&
-         (std::ceil(static_cast<double>(document.width) * adjustedScale) > maxOutputSize ||
-          std::ceil(static_cast<double>(document.height) * adjustedScale) > maxOutputSize)) {
+  while (adjustedScale > 0.0f) {
+    int adjustedWidth = 0;
+    int adjustedHeight = 0;
+    auto validSize = VideoExporter::ComputeOutputDimensions(
+        document.width, document.height, adjustedScale, false, &adjustedWidth, &adjustedHeight);
+    if (validSize && adjustedWidth <= maxOutputSize && adjustedHeight <= maxOutputSize) {
+      break;
+    }
     adjustedScale = std::nextafter(adjustedScale, 0.0f);
   }
   options->scale = adjustedScale;
@@ -409,19 +418,20 @@ static VideoExportOptions BuildVideoExportOptions(const ExportOptions& options,
   videoOptions.frameRate = options.frameRate;
   videoOptions.duration = options.duration;
   videoOptions.scale = options.scale;
-  videoOptions.hasBackground = format.requiresOpaque;
   videoOptions.background =
       Color{options.bgRed, options.bgGreen, options.bgBlue, options.bgAlpha, ColorSpace::SRGB};
-  videoOptions.alignToEvenSize = true;
+  videoOptions.padToEvenSize = format.requiresEvenDimensions;
   return videoOptions;
 }
 
 static void PrintSizeNotice(const PAGXDocument& document, const VideoExportOptions& videoOptions,
                             const VideoExporter& exporter, const VideoFormatSpec& format) {
-  auto requestedWidth =
-      static_cast<int>(std::ceil(static_cast<double>(document.width) * videoOptions.scale));
-  auto requestedHeight =
-      static_cast<int>(std::ceil(static_cast<double>(document.height) * videoOptions.scale));
+  int requestedWidth = 0;
+  int requestedHeight = 0;
+  if (!VideoExporter::ComputeOutputDimensions(document.width, document.height, videoOptions.scale,
+                                              false, &requestedWidth, &requestedHeight)) {
+    return;
+  }
   if (requestedWidth != exporter.width() || requestedHeight != exporter.height()) {
     std::cerr << "pagx export: " << requestedWidth << "x" << requestedHeight << " rounded up to "
               << exporter.width() << "x" << exporter.height() << " for the " << format.pixelFormat
@@ -504,10 +514,11 @@ static int ExportToMP4(const ExportOptions& options, const VideoFormatSpec& form
   }
 
   auto encoderName = encodeOptions.encoder.empty() ? format.defaultEncoder : encodeOptions.encoder;
-  auto durationSeconds = static_cast<float>(static_cast<double>(frameCount) / frameRate);
+  auto durationSeconds =
+      static_cast<float>(static_cast<double>(frameCount) / frameRate.framesPerSecond());
   std::cout << "pagx export: wrote " << options.outputFile << " (" << width << "x" << height << ", "
-            << frameRate << " fps, " << durationSeconds << "s, " << frameCount << " frames, "
-            << encoderName << ")\n";
+            << frameRate.toString() << " fps, " << durationSeconds << "s, " << frameCount
+            << " frames, " << encoderName << ")\n";
   return 0;
 }
 

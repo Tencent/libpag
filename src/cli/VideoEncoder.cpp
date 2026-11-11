@@ -42,24 +42,16 @@ namespace pagx::cli {
 
 namespace {
 
-constexpr int kMaxCrf = 51;
-
 const char* const kPartSuffix = ".part";
 
 const VideoFormatSpec kVideoFormats[] = {
-    {"mp4", "mp4", "libx264", "yuv420p", true},
+    {"mp4", "mp4", "libx264", "yuv420p", true, true},
 };
 
 void SetError(std::string* errorMsg, const std::string& text) {
   if (errorMsg != nullptr) {
     *errorMsg = text;
   }
-}
-
-// 4:2:0 subsamples chroma by two in both directions, so an odd width or height cannot be encoded
-// by those pixel formats at all.
-bool NeedsEvenDimensions(const std::string& pixelFormat) {
-  return pixelFormat == "yuv420p" || pixelFormat == "yuva420p" || pixelFormat == "yuv420p10le";
 }
 
 bool IsExecutableFile(const std::string& path) {
@@ -190,19 +182,24 @@ bool BuildFFmpegCommandLine(const std::string& ffmpegPath, const VideoFormatSpec
     SetError(errorMsg, "the output size must be positive");
     return false;
   }
-  if (NeedsEvenDimensions(format.pixelFormat) &&
-      ((options.width % 2) != 0 || (options.height % 2) != 0)) {
+  if (format.requiresEvenDimensions && ((options.width % 2) != 0 || (options.height % 2) != 0)) {
     SetError(errorMsg, "the " + format.pixelFormat + " pixel format requires an even width and " +
                            "height, got " + std::to_string(options.width) + "x" +
                            std::to_string(options.height));
     return false;
   }
-  if (options.frameRate <= 0) {
+  if (options.frameRate.numerator <= 0 || options.frameRate.denominator <= 0) {
     SetError(errorMsg, "the frame rate must be positive");
     return false;
   }
-  if (options.crf > kMaxCrf) {
-    SetError(errorMsg, "the crf must be within 0-" + std::to_string(kMaxCrf));
+  auto frameRate = options.frameRate.normalized();
+  if (frameRate.numerator > std::numeric_limits<int>::max() ||
+      frameRate.denominator > std::numeric_limits<int>::max()) {
+    SetError(errorMsg, "the frame rate is not representable by ffmpeg");
+    return false;
+  }
+  if (options.crf > VideoEncoder::MAX_CRF) {
+    SetError(errorMsg, "the crf must be within 0-" + std::to_string(VideoEncoder::MAX_CRF));
     return false;
   }
   if (options.outputFile.empty()) {
@@ -217,7 +214,7 @@ bool BuildFFmpegCommandLine(const std::string& ffmpegPath, const VideoFormatSpec
   args.insert(args.end(), {"-f", "rawvideo", "-pixel_format", "rgba"});
   args.insert(args.end(), {"-video_size",
                            std::to_string(options.width) + "x" + std::to_string(options.height)});
-  args.insert(args.end(), {"-framerate", std::to_string(options.frameRate), "-i", "pipe:0"});
+  args.insert(args.end(), {"-framerate", frameRate.toString(), "-i", "pipe:0"});
   args.emplace_back("-an");
   args.insert(args.end(),
               {"-c:v", options.encoder.empty() ? format.defaultEncoder : options.encoder});

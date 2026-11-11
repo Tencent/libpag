@@ -21,6 +21,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <numeric>
 #include <string>
 #include <vector>
 #include "pagx/types/Color.h"
@@ -39,6 +40,57 @@ class PAGSurface;
 class PAGTimeline;
 class PAGXDocument;
 
+/** A rational sampling rate in frames per second. Zero numerator with denominator 1 means auto. */
+struct VideoFrameRate {
+  /** Creates a frame rate from a numerator and denominator. */
+  constexpr VideoFrameRate(int64_t numeratorValue = 0, int64_t denominatorValue = 1)
+      : numerator(numeratorValue), denominator(denominatorValue) {
+  }
+
+  /** Returns the numeric frame rate, or zero when the denominator is zero. */
+  double framesPerSecond() const {
+    return denominator == 0 ? 0.0
+                            : static_cast<double>(numerator) / static_cast<double>(denominator);
+  }
+
+  /**
+   * Checks an exact positive rational range without floating-point rounding or multiplication
+   * overflow.
+   */
+  bool isWithin(int minValue, int maxValue) const {
+    if (numerator <= 0 || denominator <= 0) {
+      return false;
+    }
+    auto quotient = numerator / denominator;
+    auto remainder = numerator % denominator;
+    return quotient >= minValue && quotient <= maxValue &&
+           (quotient != maxValue || remainder == 0);
+  }
+
+  /** Returns the equivalent ratio reduced by its greatest common divisor. */
+  VideoFrameRate normalized() const {
+    auto divisor = std::gcd(numerator, denominator);
+    if (divisor == 0) {
+      return *this;
+    }
+    return {numerator / divisor, denominator / divisor};
+  }
+
+  /** Returns an integer or numerator/denominator representation suitable for ffmpeg. */
+  std::string toString() const {
+    if (denominator == 1) {
+      return std::to_string(numerator);
+    }
+    return std::to_string(numerator) + "/" + std::to_string(denominator);
+  }
+
+  /** Frame-rate numerator. Zero is the automatic sentinel only when denominator is 1. */
+  int64_t numerator = 0;
+
+  /** Frame-rate denominator. Explicit rates must use a positive denominator. */
+  int64_t denominator = 1;
+};
+
 /**
  * Export options for VideoExporter.
  *
@@ -47,13 +99,13 @@ class PAGXDocument;
  */
 struct VideoExportOptions {
   /**
-   * Sampling frame rate in frames per second. Zero means "use the document animation frame rate",
-   * falling back to 60 when the document does not declare one. A non-integer document frame rate is
-   * rejected in this mode instead of being silently rounded. All declared top-level animation
-   * frame rates must also match in this mode. Otherwise the value must be in [1, 120]; Make()
-   * rejects anything outside that range and negative values.
+   * Sampling frame rate in frames per second. The default {0, 1} uses the document animation frame
+   * rate, falling back to 60 when the document does not declare one. A non-integer document frame
+   * rate is rejected in this mode instead of being guessed or rounded; use an explicit ratio such
+   * as {30000, 1001} for NTSC content. All declared top-level animation frame rates must match in
+   * automatic mode. Explicit rates must be in [1, 120] with a positive denominator.
    */
-  int frameRate = 0;
+  VideoFrameRate frameRate = {0, 1};
 
   /**
    * Sequence length in seconds. Values <= 0 mean "use the longest mounted animation's playback
@@ -73,27 +125,19 @@ struct VideoExportOptions {
   float scale = 1.0f;
 
   /**
-   * Whether to draw an opaque background under the content. Defaults to false, which keeps the
-   * frames transparent.
-   *
-   * Whether an opaque background is required is decided by the output container, not here: H.264
-   * carries no alpha, while VP9 does. Frames are always premultiplied RGBA, so an opaque
-   * background (alpha == 255) makes premultiplication a no-op and lets the host pass the pixels
-   * through unchanged.
+   * Background color drawn under the content when alpha is greater than zero. Defaults to fully
+   * transparent. Whether an opaque background is required is decided by the output container, not
+   * here. Frames are always premultiplied RGBA, so an opaque background makes premultiplication a
+   * no-op and lets the host pass the pixels through unchanged.
    */
-  bool hasBackground = false;
+  Color background = {0.0f, 0.0f, 0.0f, 0.0f, ColorSpace::SRGB};
 
   /**
-   * Background color drawn under the content when hasBackground is true. Ignored otherwise.
+   * Whether to pad the output width and height up to even numbers. This is a layout capability;
+   * the host decides whether its selected pixel format requires it. Defaults to false, which keeps
+   * `ceil(documentSize * scale)`.
    */
-  Color background = {};
-
-  /**
-   * Whether to round the output width and height up to even numbers. Codecs that subsample chroma
-   * 4:2:0 (H.264 yuv420p and friends) cannot encode an odd dimension, so hosts writing into such a
-   * container must request it. Defaults to false, which keeps `ceil(documentSize * scale)`.
-   */
-  bool alignToEvenSize = false;
+  bool padToEvenSize = false;
 };
 
 /**
@@ -126,12 +170,19 @@ class VideoExporter {
  public:
   using Options = VideoExportOptions;
 
+  static constexpr int MIN_FRAME_RATE = 1;
+  static constexpr int MAX_FRAME_RATE = 120;
+
   /**
    * Creates an exporter bound to the given document. Top-level animations and state machines are
    * sampled in declaration order, and timelines mounted on nested compositions advance with the
    * scene. Top-level animation ids must be non-empty and unique. A document without active
    * timelines produces one static frame by default, or repeats its static scene when duration is
    * positive. A document containing a state machine requires an explicit positive duration.
+   *
+   * After Make() succeeds, the source document and all reachable external composition documents
+   * must remain unmodified until the exporter is destroyed. Create a new exporter after changing
+   * their contents, dimensions, frame rates, or timeline structure.
    *
    * @param document the source document, which is retained for the lifetime of the returned
    *                 exporter. Must be non-null.
@@ -147,20 +198,39 @@ class VideoExporter {
 
   ~VideoExporter();
 
+  VideoExporter(const VideoExporter&) = delete;
+  VideoExporter& operator=(const VideoExporter&) = delete;
+  VideoExporter(VideoExporter&&) = delete;
+  VideoExporter& operator=(VideoExporter&&) = delete;
+
   /**
-   * Returns the output width in pixels, which is `ceil(documentWidth * scale)`.
+   * Computes output dimensions from document dimensions, scale and padding. Returns false for
+   * non-finite or non-positive inputs and dimensions that do not fit in an int.
+   *
+   * @param documentWidth source width in document coordinates.
+   * @param documentHeight source height in document coordinates.
+   * @param scale positive finite output scale.
+   * @param padToEvenSize whether to pad each computed dimension up to an even number.
+   * @param width receives the computed width on success.
+   * @param height receives the computed height on success.
+   */
+  static bool ComputeOutputDimensions(float documentWidth, float documentHeight, float scale,
+                                      bool padToEvenSize, int* width, int* height);
+
+  /**
+   * Returns the output width in pixels, which is `ceil(documentWidth * scale)` plus optional padding.
    */
   int width() const;
 
   /**
-   * Returns the output height in pixels, which is `ceil(documentHeight * scale)`.
+   * Returns the output height in pixels, including optional even-size padding.
    */
   int height() const;
 
   /**
-   * Returns the sampling frame rate in frames per second.
+   * Returns the resolved sampling frame rate as a rational value.
    */
-  int frameRate() const;
+  VideoFrameRate frameRate() const;
 
   /**
    * Returns the total number of frames in the sequence.
@@ -213,21 +283,22 @@ class VideoExporter {
                            bool includeInFrameRate, PlaybackPlan* plan, std::string* errorMsg);
   static bool CollectNestedPlayback(PAGComposition* composition, PlaybackPlan* plan,
                                     std::string* errorMsg);
-  static bool ResolveSampling(const Options& options, const PlaybackPlan& plan, int* frameRate,
-                              int64_t* frameCount, std::string* errorMsg);
+  static bool ResolveSampling(const Options& options, const PlaybackPlan& plan,
+                              VideoFrameRate* frameRate, int64_t* frameCount,
+                              std::string* errorMsg);
 
   std::shared_ptr<PAGScene> scene = {};
   std::shared_ptr<PAGSurface> surface = {};
   std::vector<std::shared_ptr<PAGTimeline>> timelines = {};
   std::shared_ptr<tgfx::Bitmap> bitmap = {};
   std::shared_ptr<tgfx::Pixmap> pixmap = {};
-  int width_ = 0;
-  int height_ = 0;
-  int frameRate_ = 60;
-  int64_t frameCount_ = 0;
-  int64_t currentFrame_ = 0;
-  int64_t previousTimeUs_ = 0;
-  bool reuseStaticFrame_ = false;
+  int outputWidth = 0;
+  int outputHeight = 0;
+  VideoFrameRate samplingFrameRate = {60, 1};
+  int64_t totalFrames = 0;
+  int64_t nextFrameIndex = 0;
+  int64_t previousFrameTimeUs = 0;
+  bool reuseStaticFrame = false;
 };
 
 }  // namespace pagx

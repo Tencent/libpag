@@ -23,6 +23,7 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include "pagx/VideoExporter.h"
 
 namespace pagx::cli {
 
@@ -42,6 +43,8 @@ struct VideoFormatSpec {
   std::string pixelFormat = {};
   /** Whether frames must be opaque. H.264 cannot carry alpha, so the mp4 entry sets this true. */
   bool requiresOpaque = true;
+  /** Whether the selected pixel format requires even output dimensions. */
+  bool requiresEvenDimensions = true;
 };
 
 /** Returns the spec for a --format value, or nullptr when the format is not a video container. */
@@ -54,7 +57,7 @@ const VideoFormatSpec* FindVideoFormat(const std::string& format);
 struct VideoEncodeOptions {
   int width = 0;
   int height = 0;
-  int frameRate = 0;
+  VideoFrameRate frameRate = {};
   /** Constant rate factor, 0-51 with lower meaning better quality. Negative omits -crf, for
    *  encoders that have no CRF option such as h264_videotoolbox. */
   int crf = 20;
@@ -109,6 +112,8 @@ FFmpegLocation FindFFmpeg(const std::string& explicitPath);
  */
 class VideoEncoder {
  public:
+  static constexpr int MAX_CRF = 51;
+
   /**
    * Starts ffmpeg for `format`. Returns nullptr and fills `errorMsg` when the command line cannot
    * be built or the child process cannot be spawned.

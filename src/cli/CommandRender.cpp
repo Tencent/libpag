@@ -82,7 +82,7 @@ struct RenderOptions {
   std::string framesDir = {};
   // Sampling frame rate for --frames-dir. Zero uses one consistent integer document rate; mixed or
   // non-integer document rates must be overridden explicitly.
-  int frameRate = 0;
+  VideoFrameRate frameRate = {};
   // Sequence length in seconds for --frames-dir. Negative means the longest full playback period,
   // or one frame for a static document. State machines require an explicit positive duration.
   float duration = -1.0f;
@@ -104,9 +104,9 @@ static void PrintRenderUsage() {
       << "  --frames-dir <dir>        Render the animations as an image sequence into <dir>, "
          "reusing\n"
       << "                            one scene for every frame\n"
-      << "  --fps <n>                 Sampling frame rate for --frames-dir (default: the integer\n"
+      << "  --fps <n|num/den>         Sampling frame rate for --frames-dir (default: the integer\n"
       << "                            document's animation frame rate; mixed/non-integer document\n"
-      << "                            rates require an explicit --fps)\n"
+      << "                            rates require an explicit --fps; use 30000/1001 for NTSC)\n"
       << "  --duration <seconds>      Sequence length for --frames-dir (default: the longest\n"
       << "                            full playback period; static documents produce one frame;\n"
       << "                            state machines require an explicit value)\n"
@@ -157,13 +157,12 @@ static int ParseRenderOptions(int argc, char* argv[], RenderOptions* options) {
     } else if (arg == "--frames-dir" && i + 1 < argc) {
       options->framesDir = argv[++i];
     } else if (arg == "--fps" && i + 1 < argc) {
-      long value = 0;
       ++i;
-      if (!ParseIntOption(argv[i], 1, 120, &value)) {
-        std::cerr << "pagx render: invalid fps '" << argv[i] << "', must be 1-120\n";
+      if (!ParseVideoFrameRate(argv[i], &options->frameRate)) {
+        std::cerr << "pagx render: invalid fps '" << argv[i]
+                  << "', must be 1-120 or a ratio such as 30000/1001\n";
         return 1;
       }
-      options->frameRate = static_cast<int>(value);
     } else if (arg == "--duration" && i + 1 < argc) {
       ++i;
       if (!ParseFloatOption(argv[i], 0.0f, false, &options->duration)) {
@@ -266,7 +265,7 @@ static int ParseRenderOptions(int argc, char* argv[], RenderOptions* options) {
                    "--output\n";
       return 1;
     }
-  } else if (options->frameRate != 0 || options->duration > 0.0f) {
+  } else if (options->frameRate.numerator != 0 || options->duration > 0.0f) {
     std::cerr << "pagx render: --fps and --duration require --frames-dir\n";
     return 1;
   }
@@ -573,7 +572,6 @@ static int RenderFrameSequence(const RenderOptions& options) {
   videoOptions.frameRate = options.frameRate;
   videoOptions.duration = options.duration;
   videoOptions.scale = options.scale;
-  videoOptions.hasBackground = options.hasBackground;
   if (options.hasBackground) {
     videoOptions.background =
         Color{options.bgRed, options.bgGreen, options.bgBlue, options.bgAlpha, ColorSpace::SRGB};
@@ -605,9 +603,9 @@ static int RenderFrameSequence(const RenderOptions& options) {
   }
 
   float durationSeconds =
-      static_cast<float>(static_cast<double>(frameCount) / exporter->frameRate());
+      static_cast<float>(static_cast<double>(frameCount) / exporter->frameRate().framesPerSecond());
   std::cout << "pagx render: wrote " << frameCount << " frames to " << options.framesDir << " ("
-            << width << "x" << height << ", " << exporter->frameRate() << " fps, "
+            << width << "x" << height << ", " << exporter->frameRate().toString() << " fps, "
             << durationSeconds << "s)\n";
   return 0;
 }

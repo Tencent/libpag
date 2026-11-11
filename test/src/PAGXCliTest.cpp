@@ -4253,6 +4253,16 @@ CLI_TEST(PAGXCliTest, VideoFormat_OnlyMp4IsSupported) {
   EXPECT_EQ(pagx::cli::FindVideoFormat(""), nullptr);
 }
 
+CLI_TEST(PAGXCliTest, VideoFrameRateParsing_ChecksExactRationalLimits) {
+  pagx::VideoFrameRate frameRate = {};
+  ASSERT_TRUE(pagx::cli::ParseVideoFrameRate("30000/1001", &frameRate));
+  EXPECT_EQ(frameRate.numerator, 30000);
+  EXPECT_EQ(frameRate.denominator, 1001);
+  EXPECT_FALSE(
+      pagx::cli::ParseVideoFrameRate("999999999999999999/1000000000000000000", &frameRate));
+  EXPECT_FALSE(pagx::cli::ParseVideoFrameRate("120000000000000001/1000000000000000", &frameRate));
+}
+
 CLI_TEST(PAGXCliTest, VideoCommandLine_BuildsRawvideoPipeline) {
   std::string errorMsg;
   auto arguments = BuildMp4CommandLine(DefaultVideoOptions(), &errorMsg);
@@ -4278,6 +4288,22 @@ CLI_TEST(PAGXCliTest, VideoCommandLine_BuildsRawvideoPipeline) {
   EXPECT_NE(filter.find("in_color_matrix=bt709"), std::string::npos);
   EXPECT_NE(filter.find("out_range=tv"), std::string::npos);
   EXPECT_NE(filter.find("format=yuv420p"), std::string::npos);
+}
+
+CLI_TEST(PAGXCliTest, VideoCommandLine_NormalizesFrameRateForFFmpeg) {
+  auto options = DefaultVideoOptions();
+  options.frameRate = {30000000000000000LL, 1000000000000000LL};
+  std::string errorMsg;
+  auto arguments = BuildMp4CommandLine(options, &errorMsg);
+  EXPECT_TRUE(HasArgumentSequence(arguments, {"-framerate", "30", "-i", "pipe:0"}));
+
+  options.frameRate = {30000000000000001LL, 1000000000000000LL};
+  std::vector<std::string> rejectedArguments = {};
+  auto* format = pagx::cli::FindVideoFormat("mp4");
+  ASSERT_NE(format, nullptr);
+  EXPECT_FALSE(
+      pagx::cli::BuildFFmpegCommandLine("ffmpeg", *format, options, &rejectedArguments, &errorMsg));
+  EXPECT_NE(errorMsg.find("not representable"), std::string::npos);
 }
 
 CLI_TEST(PAGXCliTest, VideoCommandLine_RejectsInvalidOptions) {
@@ -4717,10 +4743,23 @@ CLI_TEST(PAGXCliTest, Export_Mp4DryRunPrintsTheCommandLineAndWritesNothing) {
   EXPECT_FALSE(std::filesystem::exists(outputPath + ".part"));
 }
 
-CLI_TEST(PAGXCliTest, Export_Mp4RoundsAnOddSizeUpToEven) {
-  if (pagx::cli::FindFFmpeg("").path.empty()) {
-    GTEST_SKIP() << "ffmpeg is not available";
+CLI_TEST(PAGXCliTest, Export_Mp4DryRunPreservesFractionalFrameRate) {
+  auto inputPath = TestResourcePath("render_animated_timelines.pagx");
+  auto outputPath = TempDir() + "/export_fractional_fps.mp4";
+  std::string output;
+  int ret = 0;
+  {
+    StreamCapture capturedOut(std::cout);
+    ret = CallRun(pagx::cli::RunExport, {"export", "--input", inputPath, "--output", outputPath,
+                                         "--fps", "30000/1001", "--dry-run"});
+    output = capturedOut.str();
   }
+  EXPECT_EQ(ret, 0);
+  EXPECT_NE(output.find("-framerate 30000/1001"), std::string::npos);
+  EXPECT_FALSE(std::filesystem::exists(outputPath));
+}
+
+CLI_TEST(PAGXCliTest, Export_Mp4RoundsAnOddSizeUpToEven) {
   auto inputPath = TestResourcePath("render_animated_timelines.pagx");
   auto outputPath = TempDir() + "/export_odd_size.mp4";
   std::string output;

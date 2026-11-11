@@ -38,9 +38,7 @@ namespace pagx {
 
 namespace {
 
-constexpr int kMaxFrameRate = 120;
-
-constexpr int kDefaultFrameRate = 60;
+constexpr int DefaultFrameRate = 60;
 
 void SetError(std::string* errorMsg, const std::string& text) {
   if (errorMsg != nullptr) {
@@ -48,14 +46,14 @@ void SetError(std::string* errorMsg, const std::string& text) {
   }
 }
 
-bool ComputeOutputDimension(float documentSize, float scale, bool alignToEvenSize, int* dimension) {
+bool ComputeOutputDimension(float documentSize, float scale, bool padToEvenSize, int* dimension) {
   auto scaledSize = std::ceil(static_cast<double>(documentSize) * scale);
   if (!std::isfinite(scaledSize) || scaledSize <= 0.0 ||
       scaledSize > static_cast<double>(std::numeric_limits<int>::max() - 1)) {
     return false;
   }
   auto value = static_cast<int>(scaledSize);
-  if (alignToEvenSize) {
+  if (padToEvenSize) {
     value += value % 2;
   }
   *dimension = value;
@@ -87,9 +85,14 @@ bool ValidateOptions(const std::shared_ptr<PAGXDocument>& document,
     SetError(errorMsg, "the document is null");
     return false;
   }
-  if (options.frameRate < 0 || options.frameRate > kMaxFrameRate) {
-    SetError(errorMsg, "the frame rate must be within 0-" + std::to_string(kMaxFrameRate) +
-                           ", got " + std::to_string(options.frameRate));
+  const auto& rate = options.frameRate;
+  auto automaticFrameRate = rate.numerator == 0 && rate.denominator == 1;
+  if (!automaticFrameRate &&
+      !rate.isWithin(VideoExporter::MIN_FRAME_RATE, VideoExporter::MAX_FRAME_RATE)) {
+    SetError(errorMsg, "the frame rate must be auto {0, 1} or within " +
+                           std::to_string(VideoExporter::MIN_FRAME_RATE) + "-" +
+                           std::to_string(VideoExporter::MAX_FRAME_RATE) + ", got " +
+                           rate.toString());
     return false;
   }
   if (!std::isfinite(options.duration)) {
@@ -129,6 +132,15 @@ bool CreateResources(int width, int height, std::shared_ptr<PAGSurface>* surface
 VideoExporter::VideoExporter() = default;
 
 VideoExporter::~VideoExporter() = default;
+
+bool VideoExporter::ComputeOutputDimensions(float documentWidth, float documentHeight, float scale,
+                                            bool padToEvenSize, int* width, int* height) {
+  if (width == nullptr || height == nullptr) {
+    return false;
+  }
+  return ComputeOutputDimension(documentWidth, scale, padToEvenSize, width) &&
+         ComputeOutputDimension(documentHeight, scale, padToEvenSize, height);
+}
 
 bool VideoExporter::AddAnimation(const std::shared_ptr<PAGAnimation>& animation, int64_t offsetUs,
                                  bool includeInFrameRate, PlaybackPlan* plan,
@@ -242,29 +254,32 @@ bool VideoExporter::ResolvePlaybackPlan(const std::shared_ptr<PAGScene>& scene,
 }
 
 bool VideoExporter::ResolveSampling(const Options& options, const PlaybackPlan& plan,
-                                    int* frameRate, int64_t* frameCount, std::string* errorMsg) {
-  if (options.frameRate == 0 && plan.hasMixedFrameRates) {
+                                    VideoFrameRate* frameRate, int64_t* frameCount,
+                                    std::string* errorMsg) {
+  auto automaticFrameRate = options.frameRate.numerator == 0;
+  if (automaticFrameRate && plan.hasMixedFrameRates) {
     SetError(errorMsg, "animations have mixed frame rates; set an explicit sampling frame rate");
     return false;
   }
   *frameRate = options.frameRate;
-  if (*frameRate == 0 && plan.documentFrameRate > 0.0f) {
-    if (plan.documentFrameRate > kMaxFrameRate) {
+  if (automaticFrameRate && plan.documentFrameRate > 0.0f) {
+    if (plan.documentFrameRate > MAX_FRAME_RATE) {
       SetError(errorMsg, "the document frame rate must be finite and no greater than " +
-                             std::to_string(kMaxFrameRate));
+                             std::to_string(MAX_FRAME_RATE));
       return false;
     }
     if (std::floor(plan.documentFrameRate) != plan.documentFrameRate) {
       SetError(errorMsg,
-               "the document frame rate must be an integer when frameRate is zero; set "
+               "the document frame rate must be an integer in automatic mode; set "
                "an explicit sampling frame rate");
       return false;
     }
-    *frameRate = static_cast<int>(plan.documentFrameRate);
+    *frameRate = {static_cast<int64_t>(plan.documentFrameRate), 1};
   }
-  if (*frameRate <= 0) {
-    *frameRate = kDefaultFrameRate;
+  if (automaticFrameRate && frameRate->numerator == 0) {
+    *frameRate = {DefaultFrameRate, 1};
   }
+  auto samplingRate = frameRate->framesPerSecond();
 
   float durationSeconds = options.duration;
   if (durationSeconds <= 0.0f) {
@@ -273,7 +288,7 @@ bool VideoExporter::ResolveSampling(const Options& options, const PlaybackPlan& 
       return false;
     }
     if (!plan.hasDynamicContent) {
-      durationSeconds = 1.0f / static_cast<float>(*frameRate);
+      durationSeconds = 1.0f / static_cast<float>(samplingRate);
     } else {
       if (plan.longestDurationUs <= 0) {
         SetError(errorMsg, "the document's animations have no duration, pass a duration");
@@ -282,7 +297,7 @@ bool VideoExporter::ResolveSampling(const Options& options, const PlaybackPlan& 
       durationSeconds = static_cast<float>(static_cast<double>(plan.longestDurationUs) / 1000000.0);
     }
   }
-  auto frameCountValue = static_cast<double>(durationSeconds) * *frameRate;
+  auto frameCountValue = static_cast<double>(durationSeconds) * samplingRate;
   if (!std::isfinite(frameCountValue) ||
       frameCountValue >= static_cast<double>(std::numeric_limits<int64_t>::max())) {
     SetError(errorMsg, "the requested frame count is too large");
@@ -293,7 +308,7 @@ bool VideoExporter::ResolveSampling(const Options& options, const PlaybackPlan& 
     SetError(errorMsg, "the requested sequence is empty");
     return false;
   }
-  auto lastFrameTimeUs = static_cast<double>(*frameCount - 1) * 1000000.0 / *frameRate;
+  auto lastFrameTimeUs = static_cast<double>(*frameCount - 1) * 1000000.0 / samplingRate;
   if (lastFrameTimeUs >= static_cast<double>(std::numeric_limits<int64_t>::max())) {
     SetError(errorMsg, "the requested sequence is too long");
     return false;
@@ -315,15 +330,15 @@ std::shared_ptr<VideoExporter> VideoExporter::Make(std::shared_ptr<PAGXDocument>
   if (!ResolvePlaybackPlan(scene, document, &plan, errorMsg)) {
     return nullptr;
   }
-  int frameRate = 0;
+  VideoFrameRate frameRate = {};
   int64_t frameCount = 0;
   if (!ResolveSampling(options, plan, &frameRate, &frameCount, errorMsg)) {
     return nullptr;
   }
   int width = 0;
   int height = 0;
-  if (!ComputeOutputDimension(document->width, options.scale, options.alignToEvenSize, &width) ||
-      !ComputeOutputDimension(document->height, options.scale, options.alignToEvenSize, &height)) {
+  if (!ComputeOutputDimensions(document->width, document->height, options.scale,
+                               options.padToEvenSize, &width, &height)) {
     SetError(errorMsg, "the output dimensions must be finite, positive, and fit in an int");
     return nullptr;
   }
@@ -335,7 +350,7 @@ std::shared_ptr<VideoExporter> VideoExporter::Make(std::shared_ptr<PAGXDocument>
 
   auto* displayOptions = scene->getDisplayOptions();
   displayOptions->setZoomScale(options.scale);
-  if (options.hasBackground) {
+  if (options.background.alpha > 0.0f) {
     displayOptions->setBackgroundColor(options.background);
   }
 
@@ -345,45 +360,45 @@ std::shared_ptr<VideoExporter> VideoExporter::Make(std::shared_ptr<PAGXDocument>
   exporter->timelines = std::move(plan.timelines);
   exporter->bitmap = std::move(bitmap);
   exporter->pixmap = std::make_shared<tgfx::Pixmap>(*exporter->bitmap);
-  exporter->width_ = width;
-  exporter->height_ = height;
-  exporter->frameRate_ = frameRate;
-  exporter->frameCount_ = frameCount;
-  exporter->reuseStaticFrame_ = !plan.hasDynamicContent;
+  exporter->outputWidth = width;
+  exporter->outputHeight = height;
+  exporter->samplingFrameRate = frameRate;
+  exporter->totalFrames = frameCount;
+  exporter->reuseStaticFrame = !plan.hasDynamicContent;
   return exporter;
 }
 
 int VideoExporter::width() const {
-  return width_;
+  return outputWidth;
 }
 
 int VideoExporter::height() const {
-  return height_;
+  return outputHeight;
 }
 
-int VideoExporter::frameRate() const {
-  return frameRate_;
+VideoFrameRate VideoExporter::frameRate() const {
+  return samplingFrameRate;
 }
 
 int64_t VideoExporter::frameCount() const {
-  return frameCount_;
+  return totalFrames;
 }
 
 int64_t VideoExporter::currentFrame() const {
-  return currentFrame_;
+  return nextFrameIndex;
 }
 
 bool VideoExporter::nextFrame() {
-  if (scene == nullptr || currentFrame_ >= frameCount_) {
+  if (scene == nullptr || nextFrameIndex >= totalFrames) {
     return false;
   }
-  if (reuseStaticFrame_ && currentFrame_ > 0) {
-    currentFrame_++;
+  if (reuseStaticFrame && nextFrameIndex > 0) {
+    nextFrameIndex++;
     return true;
   }
-  auto timeUs = static_cast<int64_t>(std::llround(static_cast<double>(currentFrame_) * 1000000.0 /
-                                                  static_cast<double>(frameRate_)));
-  auto deltaUs = timeUs - previousTimeUs_;
+  auto timeUs = static_cast<int64_t>(std::llround(static_cast<double>(nextFrameIndex) * 1000000.0 /
+                                                  samplingFrameRate.framesPerSecond()));
+  auto deltaUs = timeUs - previousFrameTimeUs;
   for (const auto& timeline : timelines) {
     if (timeline->type() == TimelineType::Animation) {
       auto animation = std::static_pointer_cast<PAGAnimation>(timeline);
@@ -397,28 +412,22 @@ bool VideoExporter::nextFrame() {
   // by the delta between consecutive frames even though the top-level animations above are seeked
   // to an absolute time.
   scene->advanceAndApply(deltaUs);
-  previousTimeUs_ = timeUs;
+  previousFrameTimeUs = timeUs;
   if (!scene->draw(surface)) {
     return false;
   }
   if (!surface->readPixels(pixmap->writablePixels(), pixmap->rowBytes())) {
     return false;
   }
-  currentFrame_++;
+  nextFrameIndex++;
   return true;
 }
 
 const uint8_t* VideoExporter::pixels() const {
-  if (pixmap == nullptr) {
-    return nullptr;
-  }
-  return static_cast<const uint8_t*>(pixmap->writablePixels());
+  return static_cast<const uint8_t*>(pixmap->pixels());
 }
 
 size_t VideoExporter::rowBytes() const {
-  if (pixmap == nullptr) {
-    return 0;
-  }
   return pixmap->rowBytes();
 }
 
