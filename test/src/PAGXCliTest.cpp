@@ -51,6 +51,7 @@
 #include "cli/CommandResolve.h"
 #include "cli/CommandVerify.h"
 #include "cli/VideoEncoder.h"
+#include "cli/VideoFrameSource.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/PAGXExporter.h"
 #include "pagx/PAGXImporter.h"
