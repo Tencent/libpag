@@ -362,6 +362,15 @@ float EvalFloatChannel(const Channel* ch, Frame frame, float fallback) {
   return v != nullptr ? *v : fallback;
 }
 
+std::string EvalStringChannel(const Channel* ch, Frame frame, const std::string& fallback) {
+  if (ch == nullptr) {
+    return fallback;
+  }
+  KeyValue kv = ch->evaluateAt(frame);
+  const auto* v = std::get_if<std::string>(&kv);
+  return v != nullptr ? *v : fallback;
+}
+
 Color EvalColorChannel(const Channel* ch, Frame frame, const Color& fallback) {
   if (ch == nullptr) {
     return fallback;
@@ -768,6 +777,11 @@ enum class TargetChannelRole {
   // step rather than a font weight (measured: `font-weight: bold` renders identically to regular in
   // this pipeline). The width scales with the font size, not the family.
   TextFauxBold,
+  // Synthetic italic shears the glyphs around the baseline; fontFamily / fontStyle swap the face
+  // outright (a hold key, so they land as a step).
+  TextFauxItalic,
+  TextFontFamily,
+  TextFontStyle,
   // TextModifier channels: every glyph the modifier reaches gets its own rule, like a selector.
   ModifierPosX,
   ModifierPosY,
@@ -939,6 +953,9 @@ constexpr ChannelBindingRule kChannelBindingTable[] = {
     {NodeType::Text, "x", TargetChannelRole::TextAnchorX},
     {NodeType::Text, "y", TargetChannelRole::TextAnchorY},
     {NodeType::Text, "fauxBold", TargetChannelRole::TextFauxBold},
+    {NodeType::Text, "fauxItalic", TargetChannelRole::TextFauxItalic},
+    {NodeType::Text, "fontFamily", TargetChannelRole::TextFontFamily},
+    {NodeType::Text, "fontStyle", TargetChannelRole::TextFontStyle},
     {NodeType::TextBox, "alpha", TargetChannelRole::Opacity},
     {NodeType::TextBox, "position.x", TargetChannelRole::GroupPosX},
     {NodeType::TextBox, "position.y", TargetChannelRole::GroupPosY},
@@ -1049,6 +1066,9 @@ struct BundleChannelSet {
   const Channel* shadowSpreadCh = nullptr;
   // Synthetic bold on a Text node: a stroke width, scaled by the font size.
   const Channel* fauxBoldCh = nullptr;
+  const Channel* fauxItalicCh = nullptr;
+  const Channel* fontFamilyCh = nullptr;
+  const Channel* fontStyleCh = nullptr;
   // TextModifier channels; `modifierTarget` is the modifier they belong to.
   const Node* modifierTarget = nullptr;
   const Channel* modPosXCh = nullptr;
@@ -1340,6 +1360,15 @@ bool BindChannelToBundleSet(
       return true;
     case TargetChannelRole::TextFauxBold:
       out.fauxBoldCh = ch;
+      return true;
+    case TargetChannelRole::TextFauxItalic:
+      out.fauxItalicCh = ch;
+      return true;
+    case TargetChannelRole::TextFontFamily:
+      out.fontFamilyCh = ch;
+      return true;
+    case TargetChannelRole::TextFontStyle:
+      out.fontStyleCh = ch;
       return true;
     case TargetChannelRole::ModifierPosX:
       out.modPosXCh = ch;
@@ -2598,9 +2627,31 @@ std::string EvaluateKeyframeCssDecls(const DomTargetBundle& bundle, const Bundle
     return decls;
   }
   EmitShadowStyleCssAtFrame(bundle, chSet, t, decls);
-  if (chSet.fauxBoldCh != nullptr && bundle.primaryHost != nullptr &&
-      bundle.primaryHost->nodeType() == NodeType::Text) {
-    auto* text = static_cast<const Text*>(bundle.primaryHost);
+  const Text* animatedText =
+      (bundle.primaryHost != nullptr && bundle.primaryHost->nodeType() == NodeType::Text)
+          ? static_cast<const Text*>(bundle.primaryHost)
+          : nullptr;
+  if (animatedText != nullptr && chSet.fauxItalicCh != nullptr) {
+    // A synthetic italic shears the glyph around the baseline; `font-style: italic` would swap the
+    // face instead (measured 0.84 vs 0.93), and the angle is size independent.
+    bool italic = EvalBoolChannel(chSet.fauxItalicCh, t, animatedText->fauxItalic);
+    AppendCssDecl(decls, "transform", italic ? "skewX(-6.5deg)" : "skewX(0deg)");
+    AppendCssDecl(decls, "transform-origin", "left bottom");
+  }
+  if (animatedText != nullptr && chSet.fontFamilyCh != nullptr) {
+    std::string family = EvalStringChannel(chSet.fontFamilyCh, t, animatedText->fontFamily);
+    AppendCssDecl(decls, "font-family", "'" + family + "'");
+  }
+  if (animatedText != nullptr && chSet.fontStyleCh != nullptr) {
+    std::string style = EvalStringChannel(chSet.fontStyleCh, t, animatedText->fontStyle);
+    bool bold = style.find("Bold") != std::string::npos;
+    bool italic =
+        style.find("Italic") != std::string::npos || style.find("Oblique") != std::string::npos;
+    AppendCssDecl(decls, "font-weight", bold ? "700" : "400");
+    AppendCssDecl(decls, "font-style", italic ? "italic" : "normal");
+  }
+  if (animatedText != nullptr && chSet.fauxBoldCh != nullptr) {
+    auto* text = animatedText;
     bool bold = EvalBoolChannel(chSet.fauxBoldCh, t, text->fauxBold);
     // 0.09em: the middle of the flat 0.08-0.10 band measured across Arial / Times / Courier at
     // 40px and 80px. Plain `font-weight: bold` renders identically to regular here, so the outline

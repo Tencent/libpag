@@ -1,7 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Tests: A fontStyle channel switches the same family from Regular to Bold.
+<!-- Tests: A fontStyle channel switches the face weight/slant; the three texts start from different
+styles so the switch is visible on each.
      Target: Text  Channel: fontStyle  Type: string
-     Expect: gap
+     Expect: supported
+     Three typical texts (Arial 72 / Times New Roman 44 / Courier New 28) drive the same channel,
+     so a rule that only holds for one family or one size cannot pass.
+     Known-gap: font-style-step（映射到 font-weight/font-style，0.953）
      Ref: - -->
 <pagx width="320" height="200">
   <Layer left="0" right="0" top="0" bottom="0">
@@ -9,17 +13,35 @@
     <Fill color="#F8FAFC"/>
   </Layer>
   <Layer left="0" right="0" top="0" bottom="0">
-    <Text id="word" text="Ag" fontFamily="Arial" fontStyle="Regular" fontSize="80"
-          letterSpacing="0" position="60,130"/>
+    <Text id="big" text="Ag" fontFamily="Arial" fontStyle="Regular" fontSize="72"
+          letterSpacing="0" position="20,80"/>
+    <Text id="mid" text="Ag" fontFamily="Times New Roman" fontStyle="Regular" fontSize="44"
+          letterSpacing="0" position="190,70"/>
+    <Text id="small" text="Ag" fontFamily="Courier New" fontStyle="Regular" fontSize="28"
+          letterSpacing="0" position="190,140"/>
     <Fill color="#BE123C"/>
   </Layer>
   <Animations>
     <Animation id="textAnim" duration="60" frameRate="60" loop="once">
-      <Object target="word">
+      <Object target="big">
         <Channel name="fontStyle" type="string">
           <Key time="0" value="Regular" interpolation="hold"/>
           <Key time="30" value="Bold" interpolation="hold"/>
           <Key time="60" value="Bold"/>
+        </Channel>
+      </Object>
+      <Object target="mid">
+        <Channel name="fontStyle" type="string">
+          <Key time="0" value="Italic" interpolation="hold"/>
+          <Key time="30" value="Bold" interpolation="hold"/>
+          <Key time="60" value="Bold"/>
+        </Channel>
+      </Object>
+      <Object target="small">
+        <Channel name="fontStyle" type="string">
+          <Key time="0" value="Regular" interpolation="hold"/>
+          <Key time="30" value="Italic" interpolation="hold"/>
+          <Key time="60" value="Italic"/>
         </Channel>
       </Object>
     </Animation>
