@@ -689,6 +689,7 @@ ToSVG严格失败返回空结果、ToFile返回false、CLI非零；warnings=null
 | 本轮 ST12/ST23 部分（2026-11-11） | MergePath 递归收集前置 Group 内的 shape 并按 group matrix 合并，随后清空整个 scope；空合并仍保留一个空 Path 以维持后续 modifier 的 shape slot；新增 group 合并回归 | Text 参与 Merge、跨 Group painter 语义与 Append overlap 像素未覆盖 |
 | 本轮 ST11 部分（2026-11-11） | Path 的 `StrokeAlign::Inside` 用 2× stroke + 同路径 clipPath 实现，只保留内侧一半；新增结构回归 | Outside / adaptive dash / 奇数 dash×cap / fit 原 bounds 未做 |
 | 本轮 ST42/ST45 部分（2026-11-11） | PathData bounds 控制点保守性测试；singular Group 的 Fill+Stroke 组合结构回归 | layout-fit-coverage 分离与 Painter 前后 singular 像素未覆盖 |
+| 本轮 ST8 部分（2026-11-11） | `CollectRichTextRuns` 携带 Group 累积 alpha，TextBox 的 line tspan / tab tspan / embedded glyphRun 都乘上 run alpha；新增嵌套 Group alpha 回归 | per-run transform、foreground 双遍、混合 vector/bitmap 的完整顺序仍未做 |
 
 ### 4.8 S3 文字待办清单（下一批入口）
 

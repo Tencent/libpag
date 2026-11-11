@@ -659,6 +659,7 @@ class PPTWriter {
     const Text* text = nullptr;
     const Fill* fill = nullptr;
     const Stroke* stroke = nullptr;
+    float alpha = 1.0f;
   };
 
   // One entry in the PAGX-authoritative line list consumed by

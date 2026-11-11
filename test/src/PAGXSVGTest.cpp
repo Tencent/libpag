@@ -6619,6 +6619,30 @@ PAGX_TEST(PAGXSVGTest, SVGExport_PathInsideStrokeUsesClip) {
   EXPECT_NE(svg.find("<clipPath"), std::string::npos);
 }
 
+// ST8: a TextBox run nested in a Group keeps that Group's alpha on its painter.
+PAGX_TEST(PAGXSVGTest, SVGExport_TextBoxRunKeepsGroupAlpha) {
+  auto doc = pagx::PAGXDocument::Make(200, 100);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* box = doc->makeNode<pagx::TextBox>();
+  box->width = 180;
+  box->height = 80;
+  auto* group = doc->makeNode<pagx::Group>();
+  group->alpha = 0.5f;
+  auto* text = doc->makeNode<pagx::Text>();
+  text->text = "Hi";
+  text->fontFamily = "Arial";
+  text->fontSize = 20;
+  group->elements = {text, MakeSolidFillSVG(doc.get(), 0, 0, 0)};
+  box->elements = {group};
+  layer->contents = {box};
+  doc->layers.push_back(layer);
+
+  pagx::SVGExportOptions options = {};
+  options.convertTextToPath = false;
+  auto svg = pagx::SVGExporter::ToSVG(*doc, options);
+  EXPECT_NE(svg.find("fill-opacity=\"0.5\""), std::string::npos);
+}
+
 // A Group's alpha has to survive until the painter that draws its geometry, even when that painter
 // sits outside the Group.
 PAGX_TEST(PAGXSVGTest, SVGExport_GroupAlphaReachesOuterPainter) {

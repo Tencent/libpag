@@ -3544,6 +3544,7 @@ struct SVGRichTextRun {
   const Text* text = nullptr;
   const Fill* fill = nullptr;
   const Stroke* stroke = nullptr;
+  float alpha = 1.0f;
 };
 
 struct SVGLineEntry {
@@ -3566,6 +3567,7 @@ struct SVGGlyphRunEmission {
   const Stroke* stroke = nullptr;
   float originX = 0;
   float originY = 0;
+  float alpha = 1.0f;
 };
 
 }  // namespace
@@ -3575,7 +3577,7 @@ void SVGWriter::writeTextBoxGroup(SVGBuilder& out, const TextBox* textBox,
                                   float alpha) {
   auto topLevelFs = CollectFillStroke(elements);
   std::vector<SVGRichTextRun> runs;
-  CollectRichTextRuns(elements, topLevelFs.fill, topLevelFs.stroke, runs);
+  CollectRichTextRuns(elements, topLevelFs.fill, topLevelFs.stroke, 1.0f, runs);
   if (runs.empty()) {
     return;
   }
@@ -3648,7 +3650,7 @@ void SVGWriter::writeTextBoxGroup(SVGBuilder& out, const TextBox* textBox,
         // GlyphRun positions are offsets from the run origin, which the outline walker re-adds,
         // so the Text's own position is the origin to pass in.
         auto origin = run.text->renderPosition();
-        if (WriteGlyphGeometry(out, run.text, origin.x, origin.y, runFs, alpha,
+        if (WriteGlyphGeometry(out, run.text, origin.x, origin.y, runFs, alpha * run.alpha,
                                MatrixToSVGTransform(transform))) {
           continue;
         }
@@ -3657,7 +3659,7 @@ void SVGWriter::writeTextBoxGroup(SVGBuilder& out, const TextBox* textBox,
                    "dropped.");
         continue;
       }
-      writeTextWithLayout(out, run.text, runFs, layoutResult, transform, alpha);
+      writeTextWithLayout(out, run.text, runFs, layoutResult, transform, alpha * run.alpha);
     }
     return;
   }
@@ -3770,6 +3772,7 @@ void SVGWriter::writeTextBoxGroup(SVGBuilder& out, const TextBox* textBox,
         }
         emission.originX = origin.x;
         emission.originY = origin.y;
+        emission.alpha = run.alpha;
         glyphRunsOnLine.push_back(emission);
         ++i;
         continue;
@@ -3783,8 +3786,8 @@ void SVGWriter::writeTextBoxGroup(SVGBuilder& out, const TextBox* textBox,
       if (lineText.find('\t') == std::string::npos) {
         out.openElement("tspan");
         WriteSharedTextAttrs(out, run.text, TextAnchor::Start);
-        applyPainters(out, runFs, {}, alpha);
-        finishTextElement(out, runFs, alpha, lineText);
+        applyPainters(out, runFs, {}, alpha * run.alpha);
+        finishTextElement(out, runFs, alpha * run.alpha, lineText);
         ++i;
         continue;
       }
@@ -3812,8 +3815,8 @@ void SVGWriter::writeTextBoxGroup(SVGBuilder& out, const TextBox* textBox,
           out.addRequiredAttribute("x", segmentX);
         }
         WriteSharedTextAttrs(out, run.text, TextAnchor::Start);
-        applyPainters(out, runFs, {}, alpha);
-        finishTextElement(out, runFs, alpha, segment);
+        applyPainters(out, runFs, {}, alpha * run.alpha);
+        finishTextElement(out, runFs, alpha * run.alpha, segment);
         if (tabPos == std::string::npos) {
           break;
         }
@@ -3828,8 +3831,8 @@ void SVGWriter::writeTextBoxGroup(SVGBuilder& out, const TextBox* textBox,
       FillStrokeInfo runFs = {};
       runFs.fill = emission.fill;
       runFs.stroke = emission.stroke;
-      if (!WriteGlyphGeometry(out, emission.text, emission.originX, emission.originY, runFs, alpha,
-                              svgTransform)) {
+      if (!WriteGlyphGeometry(out, emission.text, emission.originX, emission.originY, runFs,
+                              alpha * emission.alpha, svgTransform)) {
         addWarning("TextBox '" + textBox->id +
                    "' has a run with GlyphRun data but no usable glyph outline; the run is "
                    "dropped.");
@@ -3847,7 +3850,8 @@ void SVGWriter::writeTextBoxGroup(SVGBuilder& out, const TextBox* textBox,
     runFs.fill = runs[r].fill ? runs[r].fill : topLevelFs.fill;
     runFs.stroke = runs[r].stroke ? runs[r].stroke : topLevelFs.stroke;
     auto origin = runs[r].text->renderPosition();
-    if (!WriteGlyphGeometry(out, runs[r].text, origin.x, origin.y, runFs, alpha, svgTransform)) {
+    if (!WriteGlyphGeometry(out, runs[r].text, origin.x, origin.y, runFs, alpha * runs[r].alpha,
+                            svgTransform)) {
       addWarning("TextBox '" + textBox->id +
                  "' has a run with GlyphRun data but no usable glyph outline; the run is "
                  "dropped.");
