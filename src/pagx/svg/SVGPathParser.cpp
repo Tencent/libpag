@@ -65,6 +65,48 @@ std::string PathDataToSVGString(const PathData& pathData) {
   return result;
 }
 
+std::string TGFXPathToSVGString(const tgfx::Path& path) {
+  std::string result;
+  for (const auto& segment : path) {
+    switch (segment.verb) {
+      case tgfx::PathVerb::Move:
+        result +=
+            "M" + FloatToString(segment.points[0].x) + " " + FloatToString(segment.points[0].y);
+        break;
+      case tgfx::PathVerb::Line:
+        result +=
+            "L" + FloatToString(segment.points[1].x) + " " + FloatToString(segment.points[1].y);
+        break;
+      case tgfx::PathVerb::Quad:
+        result += "Q" + FloatToString(segment.points[1].x) + " " +
+                  FloatToString(segment.points[1].y) + " " + FloatToString(segment.points[2].x) +
+                  " " + FloatToString(segment.points[2].y);
+        break;
+      case tgfx::PathVerb::Conic: {
+        auto quads = tgfx::Path::ConvertConicToQuads(segment.points[0], segment.points[1],
+                                                     segment.points[2], segment.conicWeight, 1);
+        for (size_t i = 1; i + 1 < quads.size(); i += 2) {
+          result += "Q" + FloatToString(quads[i].x) + " " + FloatToString(quads[i].y) + " " +
+                    FloatToString(quads[i + 1].x) + " " + FloatToString(quads[i + 1].y);
+        }
+        break;
+      }
+      case tgfx::PathVerb::Cubic:
+        result += "C" + FloatToString(segment.points[1].x) + " " +
+                  FloatToString(segment.points[1].y) + " " + FloatToString(segment.points[2].x) +
+                  " " + FloatToString(segment.points[2].y) + " " +
+                  FloatToString(segment.points[3].x) + " " + FloatToString(segment.points[3].y);
+        break;
+      case tgfx::PathVerb::Close:
+        result += "Z";
+        break;
+      case tgfx::PathVerb::Done:
+        break;
+    }
+  }
+  return result;
+}
+
 static void SkipWhitespaceAndCommas(const char*& ptr, const char* end) {
   while (ptr < end && (std::isspace(*ptr) || *ptr == ',')) {
     ++ptr;

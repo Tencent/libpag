@@ -88,12 +88,16 @@
 #include "pagx/utils/Woff2FontGenerator.h"
 #include "pagx/xml/XMLBuilder.h"
 #include "renderer/LayerBuilder.h"
+#include "renderer/ToTGFX.h"
+#include "tgfx/core/PathEffect.h"
 
 namespace pagx {
 
 using pag::FloatNearlyEqual;
 using pag::FloatNearlyZero;
 using SVGBuilder = XMLBuilder;
+
+static std::vector<float> BuildStrokeDashPattern(const Stroke* stroke);
 
 // SVGBuilder is provided by pagx/xml/XMLBuilder.h (aliased above as SVGBuilder = XMLBuilder)
 
@@ -250,8 +254,10 @@ static void ApplyStrokeShapeAttributes(SVGBuilder& out, const Stroke* stroke) {
     out.addAttribute("stroke-miterlimit", FloatToString(stroke->miterLimit));
   }
   if (!stroke->dashes.empty()) {
-    out.addAttribute("stroke-dasharray",
-                     JoinFloats(stroke->dashes.data(), stroke->dashes.size(), ','));
+    auto dashes = BuildStrokeDashPattern(stroke);
+    if (!dashes.empty()) {
+      out.addAttribute("stroke-dasharray", JoinFloats(dashes.data(), dashes.size(), ','));
+    }
   }
   if (stroke->dashOffset != 0.0f) {
     out.addAttribute("stroke-dashoffset", FloatToString(stroke->dashOffset));
@@ -619,6 +625,10 @@ class SVGWriter {
                                 const Matrix& m, float alpha,
                                 const std::vector<GlyphPaintStyle>& styles,
                                 const std::vector<GlyphTransformOverride>& transforms);
+  void writeTextWithGlyphStylesAt(SVGBuilder& out, const Text* text, float originX, float originY,
+                                  const FillStrokeInfo& fs, const Matrix& m, float alpha,
+                                  const std::vector<GlyphPaintStyle>& styles,
+                                  const std::vector<GlyphTransformOverride>& transforms);
   void writeStyledGlyphRun(SVGBuilder& out, const std::vector<GlyphDrawItem>& items, size_t start,
                            size_t end, const GlyphPaintStyle& style, const FillStrokeInfo& fs,
                            float alpha);
@@ -2465,6 +2475,33 @@ void SVGWriter::writeEllipse(SVGBuilder& out, const Ellipse* ellipse, const Fill
   finishShapeElement(out, fs, alpha);
 }
 
+static std::vector<float> BuildStrokeDashPattern(const Stroke* stroke) {
+  std::vector<float> pattern = stroke->dashes;
+  if (pattern.empty()) {
+    return pattern;
+  }
+  if (pattern.size() % 2 != 0) {
+    pattern.insert(pattern.end(), stroke->dashes.begin(), stroke->dashes.end());
+  }
+  if (stroke->cap != LineCap::Square) {
+    return pattern;
+  }
+  float addedPaintLength = 0.0f;
+  std::vector<float> simplified = {};
+  for (size_t i = 0; i + 1 < pattern.size(); i += 2) {
+    float painted = pattern[i];
+    float unpainted = pattern[i + 1];
+    if (unpainted <= stroke->width) {
+      addedPaintLength += painted + unpainted;
+    } else {
+      simplified.push_back(painted + addedPaintLength);
+      simplified.push_back(unpainted);
+      addedPaintLength = 0.0f;
+    }
+  }
+  return simplified;
+}
+
 void SVGWriter::writePath(SVGBuilder& out, const Path* path, const FillStrokeInfo& fs,
                           const Matrix& m, float alpha) {
   if (!path->data || path->data->isEmpty()) {
@@ -2498,27 +2535,73 @@ void SVGWriter::writePath(SVGBuilder& out, const Path* path, const FillStrokeInf
     Matrix bakeMatrix = Matrix::Translate(renderPos.x, renderPos.y) * Matrix::Scale(scale, scale);
     baked.transform(bakeMatrix);
   }
-  const PathData& emitted = needsBaking ? baked : *path->data;
-  std::string pathData = PathDataToSVGString(emitted);
+  PathData& emitted = needsBaking ? baked : *path->data;
+  std::string originalPathData = PathDataToSVGString(emitted);
+  std::string pathData = originalPathData;
 
   FillStrokeInfo localFs = fs;
-  std::optional<Stroke> insideStroke = std::nullopt;
+  std::optional<Stroke> adjustedStroke = std::nullopt;
   bool clipInside = fs.stroke != nullptr && fs.stroke->align == StrokeAlign::Inside;
+  bool maskOutside = fs.stroke != nullptr && fs.stroke->align == StrokeAlign::Outside;
+  bool adaptiveDash = fs.stroke != nullptr && fs.stroke->dashAdaptive && !fs.stroke->dashes.empty();
   std::string clipId;
+  std::string maskId;
+  if (clipInside || maskOutside || adaptiveDash) {
+    adjustedStroke.emplace(*fs.stroke);
+    localFs.stroke = &*adjustedStroke;
+  }
   if (clipInside) {
     // SVG has no stroke-alignment property. Double the stroke and clip it to the fill region so
     // only the inner half survives.
-    insideStroke.emplace(*fs.stroke);
-    insideStroke->width *= 2.0f;
-    localFs.stroke = &*insideStroke;
+    adjustedStroke->width *= 2.0f;
     clipId = generateId("strokeClip");
     _defs->openElement("clipPath");
     _defs->addAttribute("id", clipId);
     _defs->closeElementStart();
     _defs->openElement("path");
-    _defs->addAttribute("d", pathData);
+    _defs->addAttribute("d", originalPathData);
     _defs->closeElementSelfClosing();
     _defs->closeElement();
+  }
+  if (maskOutside) {
+    // The outside half is the doubled stroke minus the fill region.
+    adjustedStroke->width *= 2.0f;
+    auto bounds = emitted.getBounds();
+    float pad = std::max(fs.stroke->width, 1.0f) * 2.0f;
+    maskId = generateId("strokeMask");
+    _defs->openElement("mask");
+    _defs->addAttribute("id", maskId);
+    _defs->addAttribute("maskUnits", "userSpaceOnUse");
+    _defs->addRequiredAttribute("x", bounds.x - pad);
+    _defs->addRequiredAttribute("y", bounds.y - pad);
+    _defs->addRequiredAttribute("width", bounds.width + pad * 2.0f);
+    _defs->addRequiredAttribute("height", bounds.height + pad * 2.0f);
+    _defs->closeElementStart();
+    _defs->openElement("rect");
+    _defs->addRequiredAttribute("x", bounds.x - pad);
+    _defs->addRequiredAttribute("y", bounds.y - pad);
+    _defs->addRequiredAttribute("width", bounds.width + pad * 2.0f);
+    _defs->addRequiredAttribute("height", bounds.height + pad * 2.0f);
+    _defs->addAttribute("fill", "#FFFFFF");
+    _defs->closeElementSelfClosing();
+    _defs->openElement("path");
+    _defs->addAttribute("d", originalPathData);
+    _defs->addAttribute("fill", "#000000");
+    _defs->closeElementSelfClosing();
+    _defs->closeElement();
+  }
+  if (adaptiveDash) {
+    // SVG has no adaptive dash: bake the effect into the centerline and stroke it without a
+    // dasharray so the pattern stretches to an integer number of repeats on each segment.
+    auto pattern = BuildStrokeDashPattern(fs.stroke);
+    auto tgfxPath = ToTGFX(emitted);
+    auto effect = tgfx::PathEffect::MakeDash(pattern.data(), static_cast<int>(pattern.size()),
+                                             fs.stroke->dashOffset, true);
+    if (!pattern.empty() && effect != nullptr && effect->filterPath(&tgfxPath)) {
+      pathData = TGFXPathToSVGString(tgfxPath);
+      adjustedStroke->dashes.clear();
+      adjustedStroke->dashOffset = 0.0f;
+    }
   }
 
   out.openElement("path");
@@ -2528,6 +2611,9 @@ void SVGWriter::writePath(SVGBuilder& out, const Path* path, const FillStrokeInf
   }
   if (!clipId.empty()) {
     out.addAttribute("clip-path", "url(#" + clipId + ")");
+  }
+  if (!maskId.empty()) {
+    out.addAttribute("mask", "url(#" + maskId + ")");
   }
   out.addAttribute("d", pathData);
   // After baking, getBounds() returns the painted region directly in parent space —
@@ -2769,7 +2855,14 @@ void SVGWriter::writeTextWithGlyphStyles(SVGBuilder& out, const Text* text,
     renderPos.x += fs.textBox->padding.left;
     renderPos.y += fs.textBox->padding.top;
   }
-  auto items = ComputeGlyphDrawItems(*text, renderPos.x, renderPos.y, transforms);
+  writeTextWithGlyphStylesAt(out, text, renderPos.x, renderPos.y, fs, m, alpha, styles, transforms);
+}
+
+void SVGWriter::writeTextWithGlyphStylesAt(SVGBuilder& out, const Text* text, float originX,
+                                           float originY, const FillStrokeInfo& fs, const Matrix& m,
+                                           float alpha, const std::vector<GlyphPaintStyle>& styles,
+                                           const std::vector<GlyphTransformOverride>& transforms) {
+  auto items = ComputeGlyphDrawItems(*text, originX, originY, transforms);
   if (items.empty() || styles.empty()) {
     return;
   }
@@ -3547,9 +3640,43 @@ struct SVGRichTextRun {
   float alpha = 1.0f;
 };
 
+using TextPaintStyleMap = std::unordered_map<const Text*, std::vector<GlyphPaintStyle>>;
+
+// Applies paint-only TextModifiers to the direct Text siblings of a TextBox. The resolver has
+// already baked geometry channels and replaced each paint modifier with an identity clone.
+static void CollectTextBoxPaintStyles(const std::vector<Element*>& elements,
+                                      TextPaintStyleMap* stylesByText) {
+  std::vector<const Text*> texts = {};
+  for (auto* element : elements) {
+    if (element == nullptr) {
+      continue;
+    }
+    if (element->nodeType() == NodeType::Text) {
+      texts.push_back(static_cast<const Text*>(element));
+      continue;
+    }
+    if (element->nodeType() != NodeType::TextModifier) {
+      continue;
+    }
+    auto* modifier = static_cast<const TextModifier*>(element);
+    size_t totalGlyphs = 0;
+    for (const auto* text : texts) {
+      totalGlyphs += TextGlyphCount(*text);
+    }
+    size_t baseIndex = 0;
+    for (const auto* text : texts) {
+      auto count = TextGlyphCount(*text);
+      auto& styles = (*stylesByText)[text];
+      styles.resize(count);
+      ApplyTextModifierPaint(*modifier, baseIndex, totalGlyphs, &styles);
+      baseIndex += count;
+    }
+  }
+}
+
 struct SVGLineEntry {
-  size_t runIndex = 0;
-  // The visual line's start x in TextBox coordinates, already alignment-adjusted by the layout.
+  size_t runIndex =
+      0;  // The visual line's start x in TextBox coordinates, already alignment-adjusted by the layout.
   // TextLayout records the same value for every Text sharing a line, so this is NOT a per-run
   // advance; a run rendered as glyphs takes its origin from getGlyphRuns() positions instead.
   float startX = 0;
@@ -3568,6 +3695,7 @@ struct SVGGlyphRunEmission {
   float originX = 0;
   float originY = 0;
   float alpha = 1.0f;
+  const std::vector<GlyphPaintStyle>* styles = nullptr;
 };
 
 }  // namespace
@@ -3581,6 +3709,8 @@ void SVGWriter::writeTextBoxGroup(SVGBuilder& out, const TextBox* textBox,
   if (runs.empty()) {
     return;
   }
+  TextPaintStyleMap stylesByText = {};
+  CollectTextBoxPaintStyles(elements, &stylesByText);
   std::vector<Text*> mutableTexts;
   mutableTexts.reserve(runs.size());
   for (const auto& run : runs) {
@@ -3650,6 +3780,12 @@ void SVGWriter::writeTextBoxGroup(SVGBuilder& out, const TextBox* textBox,
         // GlyphRun positions are offsets from the run origin, which the outline walker re-adds,
         // so the Text's own position is the origin to pass in.
         auto origin = run.text->renderPosition();
+        auto styleIt = stylesByText.find(run.text);
+        if (styleIt != stylesByText.end()) {
+          writeTextWithGlyphStylesAt(out, run.text, origin.x, origin.y, runFs, transform,
+                                     alpha * run.alpha, styleIt->second, {});
+          continue;
+        }
         if (WriteGlyphGeometry(out, run.text, origin.x, origin.y, runFs, alpha * run.alpha,
                                MatrixToSVGTransform(transform))) {
           continue;
@@ -3773,6 +3909,10 @@ void SVGWriter::writeTextBoxGroup(SVGBuilder& out, const TextBox* textBox,
         emission.originX = origin.x;
         emission.originY = origin.y;
         emission.alpha = run.alpha;
+        auto styleIt = stylesByText.find(run.text);
+        if (styleIt != stylesByText.end()) {
+          emission.styles = &styleIt->second;
+        }
         glyphRunsOnLine.push_back(emission);
         ++i;
         continue;
@@ -3831,8 +3971,11 @@ void SVGWriter::writeTextBoxGroup(SVGBuilder& out, const TextBox* textBox,
       FillStrokeInfo runFs = {};
       runFs.fill = emission.fill;
       runFs.stroke = emission.stroke;
-      if (!WriteGlyphGeometry(out, emission.text, emission.originX, emission.originY, runFs,
-                              alpha * emission.alpha, svgTransform)) {
+      if (emission.styles != nullptr) {
+        writeTextWithGlyphStylesAt(out, emission.text, emission.originX, emission.originY, runFs,
+                                   transform, alpha * emission.alpha, *emission.styles, {});
+      } else if (!WriteGlyphGeometry(out, emission.text, emission.originX, emission.originY, runFs,
+                                     alpha * emission.alpha, svgTransform)) {
         addWarning("TextBox '" + textBox->id +
                    "' has a run with GlyphRun data but no usable glyph outline; the run is "
                    "dropped.");
@@ -3850,6 +3993,12 @@ void SVGWriter::writeTextBoxGroup(SVGBuilder& out, const TextBox* textBox,
     runFs.fill = runs[r].fill ? runs[r].fill : topLevelFs.fill;
     runFs.stroke = runs[r].stroke ? runs[r].stroke : topLevelFs.stroke;
     auto origin = runs[r].text->renderPosition();
+    auto styleIt = stylesByText.find(runs[r].text);
+    if (styleIt != stylesByText.end()) {
+      writeTextWithGlyphStylesAt(out, runs[r].text, origin.x, origin.y, runFs, transform,
+                                 alpha * runs[r].alpha, styleIt->second, {});
+      continue;
+    }
     if (!WriteGlyphGeometry(out, runs[r].text, origin.x, origin.y, runFs, alpha * runs[r].alpha,
                             svgTransform)) {
       addWarning("TextBox '" + textBox->id +

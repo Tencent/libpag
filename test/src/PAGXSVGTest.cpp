@@ -6643,6 +6643,82 @@ PAGX_TEST(PAGXSVGTest, SVGExport_TextBoxRunKeepsGroupAlpha) {
   EXPECT_NE(svg.find("fill-opacity=\"0.5\""), std::string::npos);
 }
 
+// ST21: a paint modifier inside a container TextBox applies to pre-shaped glyph runs instead of
+// forcing the whole box into a PNG.
+PAGX_TEST(PAGXSVGTest, SVGExport_TextBoxPaintModifierStaysVector) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto* font = MakeSquareGlyphFont(doc.get());
+  auto* text = MakeSquareGlyphText(doc.get(), font, {20, 40});
+  text->text = "A";
+  auto* modifier = doc->makeNode<pagx::TextModifier>();
+  modifier->fillColor = pagx::Color{1, 0, 0, 1};
+  auto* box = doc->makeNode<pagx::TextBox>();
+  box->width = 80;
+  box->height = 80;
+  box->elements = {text, modifier, MakeSolidFillSVG(doc.get(), 0, 0, 1)};
+  auto* layer = doc->makeNode<pagx::Layer>();
+  layer->contents = {box};
+  doc->layers.push_back(layer);
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_EQ(svg.find("data:image/png"), std::string::npos);
+  EXPECT_NE(svg.find("fill=\"#FF0000\""), std::string::npos);
+  EXPECT_EQ(svg.find("fill=\"#0000FF\""), std::string::npos);
+}
+
+// ST11: SVG has no adaptive dash; the exporter bakes the effect into the centerline and emits a
+// plain stroke, so no dasharray survives.
+PAGX_TEST(PAGXSVGTest, SVGExport_AdaptiveDashBakesIntoGeometry) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* path = doc->makeNode<pagx::Path>();
+  path->data = doc->makeNode<pagx::PathData>();
+  *path->data = pagx::PathDataFromSVGString("M10 10 L90 10 L90 90 L10 90 Z");
+  auto* stroke = doc->makeNode<pagx::Stroke>();
+  stroke->color = doc->makeNode<pagx::SolidColor>();
+  static_cast<pagx::SolidColor*>(stroke->color)->color = {1, 0, 0, 1};
+  stroke->width = 2.0f;
+  stroke->dashes = {4.0f, 4.0f};
+  stroke->dashAdaptive = true;
+  layer->contents = {path, stroke};
+  doc->layers.push_back(layer);
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_EQ(svg.find("stroke-dasharray"), std::string::npos);
+  auto dPos = svg.find(" d=\"");
+  ASSERT_NE(dPos, std::string::npos);
+  dPos += 4;
+  auto dEnd = svg.find('"', dPos);
+  ASSERT_NE(dEnd, std::string::npos);
+  size_t moveCount = 0;
+  for (size_t pos = dPos; pos < dEnd; pos++) {
+    if (svg[pos] == 'M') {
+      ++moveCount;
+    }
+  }
+  EXPECT_GE(moveCount, 2u);
+}
+
+PAGX_TEST(PAGXSVGTest, SVGExport_PathOutsideStrokeUsesMask) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* path = doc->makeNode<pagx::Path>();
+  path->data = doc->makeNode<pagx::PathData>();
+  *path->data = pagx::PathDataFromSVGString("M10 10 L90 10 L90 90 L10 90 Z");
+  auto* stroke = doc->makeNode<pagx::Stroke>();
+  stroke->color = doc->makeNode<pagx::SolidColor>();
+  static_cast<pagx::SolidColor*>(stroke->color)->color = {1, 0, 0, 1};
+  stroke->width = 2.0f;
+  stroke->align = pagx::StrokeAlign::Outside;
+  layer->contents = {path, stroke};
+  doc->layers.push_back(layer);
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("mask=\"url(#"), std::string::npos);
+  EXPECT_NE(svg.find("<mask"), std::string::npos);
+  EXPECT_NE(svg.find("stroke-width=\"4\""), std::string::npos);
+}
+
 // A Group's alpha has to survive until the painter that draws its geometry, even when that painter
 // sits outside the Group.
 PAGX_TEST(PAGXSVGTest, SVGExport_GroupAlphaReachesOuterPainter) {

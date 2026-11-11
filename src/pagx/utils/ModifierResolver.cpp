@@ -774,11 +774,32 @@ bool ModifierResolver::CanBakeTextModifiers(const std::vector<Element*>& element
           return false;
         }
         break;
-      case NodeType::TextBox:
-        if (!static_cast<const TextBox*>(element)->elements.empty()) {
+      case NodeType::TextBox: {
+        auto* textBox = static_cast<const TextBox*>(element);
+        if (textBox->elements.empty()) {
+          break;
+        }
+        bool hasPaintModifier = false;
+        for (auto* child : textBox->elements) {
+          if (child != nullptr && child->nodeType() == NodeType::TextModifier &&
+              HasPaintChannels(static_cast<const TextModifier*>(child))) {
+            hasPaintModifier = true;
+            break;
+          }
+        }
+        if (hasPaintModifier) {
+          for (auto* child : textBox->elements) {
+            if (child != nullptr && child->nodeType() == NodeType::Text &&
+                static_cast<const Text*>(child)->glyphRuns.empty()) {
+              return false;
+            }
+          }
+        }
+        if (!CanBakeTextModifiers(textBox->elements)) {
           return false;
         }
         break;
+      }
       default:
         break;
     }

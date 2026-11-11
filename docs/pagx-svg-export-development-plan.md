@@ -690,6 +690,8 @@ ToSVG严格失败返回空结果、ToFile返回false、CLI非零；warnings=null
 | 本轮 ST11 部分（2026-11-11） | Path 的 `StrokeAlign::Inside` 用 2× stroke + 同路径 clipPath 实现，只保留内侧一半；新增结构回归 | Outside / adaptive dash / 奇数 dash×cap / fit 原 bounds 未做 |
 | 本轮 ST42/ST45 部分（2026-11-11） | PathData bounds 控制点保守性测试；singular Group 的 Fill+Stroke 组合结构回归 | layout-fit-coverage 分离与 Painter 前后 singular 像素未覆盖 |
 | 本轮 ST8 部分（2026-11-11） | `CollectRichTextRuns` 携带 Group 累积 alpha，TextBox 的 line tspan / tab tspan / embedded glyphRun 都乘上 run alpha；新增嵌套 Group alpha 回归 | per-run transform、foreground 双遍、混合 vector/bitmap 的完整顺序仍未做 |
+| 本轮 ST21 部分（2026-11-11） | 容器 TextBox 的 paint-only modifier 对带 GlyphRun 的 Text 保持矢量：resolver 放行、writeTextBoxGroup 累积逐 glyph 样式并走局部 base/overlay；新增结构回归 | native Text 的 paint modifier 仍走 bake；未做像素对照 |
+| 本轮 ST11 部分（2026-11-11） | Path 的 Inside/Outside stroke align 分别用 clipPath / mask 实现；adaptive dash 通过 tgfx PathEffect 烘进中心线后输出普通 stroke；非 adaptive 的 Square cap dash 也先按 tgfx 规则合并短 gap；新增三类回归 | Rectangle/Ellipse 的 adaptive dash、Text stroke align、dash×Trim 组合未做 |
 
 ### 4.8 S3 文字待办清单（下一批入口）
 
