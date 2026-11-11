@@ -453,6 +453,23 @@ PAGX_TEST(PAGXExporterTest, ToDataPacksBase64DataUriFilePath) {
             std::string(reinterpret_cast<const char*>(kRedPng), sizeof(kRedPng)));
 }
 
+PAGX_TEST(PAGXExporterTest, ToDataReusesOneEntryForSharedDataUriImage) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto* image = AddImage(doc.get(), "", pagx::ImageDataUri(kRedPng, sizeof(kRedPng)));
+  AddPatternLayer(doc.get(), image);
+  AddPatternLayer(doc.get(), image);
+
+  std::string error;
+  auto zip = pagx::PAGXExporter::ToData(*doc, {}, &error);
+  ASSERT_NE(zip, nullptr);
+  EXPECT_TRUE(error.empty());
+  std::unordered_map<std::string, std::string> entries;
+  ASSERT_TRUE(ReadZip(zip, &entries));
+  ASSERT_EQ(entries.size(), 2u);
+  ASSERT_NE(entries.find("images/img_1.png"), entries.end());
+  EXPECT_EQ(CountOccurrences(entries["document.pagx"], "image=\"images/img_1.png\""), 2u);
+}
+
 PAGX_TEST(PAGXExporterTest, ToDataKeepsAbsoluteReferenceSuffixReserved) {
   auto doc = pagx::PAGXDocument::Make(100, 100);
   AddImage(doc.get(), "img_local", "/Users/test/images/photo.png");

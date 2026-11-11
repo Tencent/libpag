@@ -194,6 +194,13 @@ PAGXArchiveWriter::PAGXArchiveWriter(const PAGXDocument& document) {
 }
 
 std::string PAGXArchiveWriter::AddImage(const Image* image) {
+  // One Image can be referenced by many ImagePattern / Glyph nodes, so the cache has to be
+  // consulted before the data URI is decoded: decoding first would make every reference pay for
+  // a full Base64 decode whose result is then thrown away.
+  auto cached = _entryPaths.find(image);
+  if (cached != _entryPaths.end()) {
+    return cached->second;
+  }
   if (image->data != nullptr) {
     return addEntry(image, image->data);
   }
@@ -213,10 +220,6 @@ std::string PAGXArchiveWriter::AddImage(const Image* image) {
 }
 
 std::string PAGXArchiveWriter::addEntry(const Image* image, const std::shared_ptr<Data>& data) {
-  auto cached = _entryPaths.find(image);
-  if (cached != _entryPaths.end()) {
-    return cached->second;
-  }
   std::string baseName;
   if (!image->id.empty()) {
     baseName = SanitizeEntryName(image->id);
