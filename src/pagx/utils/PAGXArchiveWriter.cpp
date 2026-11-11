@@ -207,7 +207,7 @@ std::string PAGXArchiveWriter::AddImage(const Image* image) {
   if (image->filePath.empty()) {
     return {};
   }
-  if (image->filePath.rfind("data:", 0) == 0) {
+  if (IsDataUri(image->filePath)) {
     auto decoded = DecodeBase64DataURI(image->filePath);
     if (decoded != nullptr && decoded->size() > 0) {
       return addEntry(image, decoded);

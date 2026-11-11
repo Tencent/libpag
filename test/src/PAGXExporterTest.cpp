@@ -453,6 +453,25 @@ PAGX_TEST(PAGXExporterTest, ToDataPacksBase64DataUriFilePath) {
             std::string(reinterpret_cast<const char*>(kRedPng), sizeof(kRedPng)));
 }
 
+PAGX_TEST(PAGXExporterTest, ToDataAcceptsMixedCaseDataUriScheme) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto uri = pagx::ImageDataUri(kRedPng, sizeof(kRedPng));
+  uri.replace(0, 4, "DATA");
+  auto* image = AddImage(doc.get(), "img_upper", uri);
+  AddPatternLayer(doc.get(), image);
+
+  std::string error;
+  auto zip = pagx::PAGXExporter::ToData(*doc, {}, &error);
+  ASSERT_NE(zip, nullptr);
+  EXPECT_TRUE(error.empty());
+  std::unordered_map<std::string, std::string> entries;
+  ASSERT_TRUE(ReadZip(zip, &entries));
+  ASSERT_NE(entries.find("images/img_upper.png"), entries.end());
+  const auto& xml = entries["document.pagx"];
+  EXPECT_NE(xml.find("source=\"images/img_upper.png\""), std::string::npos);
+  EXPECT_EQ(xml.find("base64"), std::string::npos);
+}
+
 PAGX_TEST(PAGXExporterTest, ToDataReusesOneEntryForSharedDataUriImage) {
   auto doc = pagx::PAGXDocument::Make(100, 100);
   auto* image = AddImage(doc.get(), "", pagx::ImageDataUri(kRedPng, sizeof(kRedPng)));
