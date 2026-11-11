@@ -522,6 +522,27 @@ static void AppendTypedKeyframes(TypedChannel<T>* base, const TypedChannel<T>* e
     return;
   }
   base->keyframes.insert(base->keyframes.end(), extra->keyframes.begin(), extra->keyframes.end());
+  // The appended segment may start later than keys already in the base track; a track keyed by
+  // timestamp has to stay ordered, otherwise evaluation stops at the first out-of-order pair.
+  std::stable_sort(base->keyframes.begin(), base->keyframes.end(), KeyframeTimeLess<T>);
+}
+
+// Returns the first keyframe that actually animates. A leading hold key at frame 0 is the
+// synthesized "static state before begin" entry: treating it as the animation start makes a
+// begin>0 segment look like it starts at 0, and the handover logic then drops the earlier segment.
+template <typename T>
+static Frame FirstAnimatedFrame(const TypedChannel<T>* channel) {
+  if (channel == nullptr || channel->keyframes.empty()) {
+    return 0;
+  }
+  for (const auto& keyframe : channel->keyframes) {
+    if (keyframe.time <= 0 && keyframe.interpolation == KeyframeInterpolationType::Hold &&
+        &keyframe != &channel->keyframes.back()) {
+      continue;
+    }
+    return keyframe.time;
+  }
+  return channel->keyframes.front().time;
 }
 
 static Frame ChannelStartFrame(const Channel* channel) {
@@ -530,16 +551,13 @@ static Frame ChannelStartFrame(const Channel* channel) {
   }
   switch (channel->valueType()) {
     case ChannelValueType::Float: {
-      auto* ch = static_cast<const TypedChannel<float>*>(channel);
-      return ch->keyframes.empty() ? 0 : ch->keyframes.front().time;
+      return FirstAnimatedFrame(static_cast<const TypedChannel<float>*>(channel));
     }
     case ChannelValueType::Color: {
-      auto* ch = static_cast<const TypedChannel<Color>*>(channel);
-      return ch->keyframes.empty() ? 0 : ch->keyframes.front().time;
+      return FirstAnimatedFrame(static_cast<const TypedChannel<Color>*>(channel));
     }
     case ChannelValueType::Matrix: {
-      auto* ch = static_cast<const TypedChannel<Matrix>*>(channel);
-      return ch->keyframes.empty() ? 0 : ch->keyframes.front().time;
+      return FirstAnimatedFrame(static_cast<const TypedChannel<Matrix>*>(channel));
     }
     case ChannelValueType::Bool: {
       auto* ch = static_cast<const TypedChannel<bool>*>(channel);
