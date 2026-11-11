@@ -1422,6 +1422,10 @@ void HTMLWriter::writeTextModifier(HTMLBuilder& out, const std::vector<GeoInfo>&
             record.fontSize = renderFont;
             record.factor = f;
             record.fromModifier = animatedModifier != nullptr;
+            if (fill && fill->color && fill->color->nodeType() == NodeType::SolidColor) {
+              record.hasBaseFillColor = true;
+              record.baseFillColor = static_cast<const SolidColor*>(fill->color)->color;
+            }
             record.id = glyphId;
             _ctx->animation.rangeSelectorGlyphs.push_back(record);
           }
@@ -1623,7 +1627,31 @@ void HTMLWriter::writeTextModifier(HTMLBuilder& out, const std::vector<GeoInfo>&
           if (text->fauxBold) {
             charStyle += ";font-weight:bold";
           }
+          // A TextModifier channel animates every glyph it reaches; on the span path each glyph is
+          // its own element, so it needs an id and a record just like an SVG <text> would.
+          const TextModifier* spanModifier = nullptr;
+          if (modifier != nullptr && !modifier->id.empty() &&
+              _ctx->animation.animatedModifiers.count(modifier) > 0) {
+            spanModifier = modifier;
+          }
           out.openTag("span");
+          if (spanModifier != nullptr) {
+            std::string spanId = spanModifier->id + "_g" + std::to_string(charIdx);
+            out.addAttr("id", spanId);
+            HTMLWriterContext::AnimationState::RangeSelectorGlyph record = {};
+            record.modifier = spanModifier;
+            record.glyphIndex = charIdx;
+            record.totalGlyphs = text->text.size();
+            record.factor = absF;
+            record.fromModifier = true;
+            record.htmlSpan = true;
+            if (fill && fill->color && fill->color->nodeType() == NodeType::SolidColor) {
+              record.hasBaseFillColor = true;
+              record.baseFillColor = static_cast<const SolidColor*>(fill->color)->color;
+            }
+            record.id = spanId;
+            _ctx->animation.rangeSelectorGlyphs.push_back(record);
+          }
           out.addAttr("style", charStyle);
           out.closeTagWithText(charStr);
           p += len;

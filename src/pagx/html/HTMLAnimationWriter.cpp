@@ -56,6 +56,7 @@
 #include "pagx/runtime/Matrix3DDecompose.h"
 #include "pagx/runtime/MatrixDecompose.h"
 #include "pagx/svg/SVGPathParser.h"
+#include "pagx/utils/ColorSpaceUtils.h"
 #include "pagx/utils/ExporterUtils.h"
 #include "pagx/utils/LayerTransformUtils.h"
 #include "pagx/utils/StringParser.h"
@@ -3365,21 +3366,47 @@ std::string ModifierGlyphDecls(const RangeSelectorGlyph& glyph, const BundleChan
   }
   std::string decls = {};
   AppendCssDecl(decls, "transform", transform);
+  // An HTML span paints its text with `color` (and -webkit-text-stroke for the outline), an SVG
+  // <text> with `fill` / `stroke`.
   if (chSet.modFillColorCh != nullptr) {
-    AppendCssDecl(decls, "fill",
-                  ColorToSVGHex(EvalColorChannel(chSet.modFillColorCh, t,
-                                                 modifier->fillColor.value_or(Color()))));
+    Color tint = EvalColorChannel(chSet.modFillColorCh, t, modifier->fillColor.value_or(Color()));
+    if (glyph.htmlSpan) {
+      // The static span blends the modifier colour into the text's own fill by the glyph factor;
+      // painting the modifier colour alone shifts the whole glyph.
+      Color painted = (glyph.hasBaseFillColor && glyph.factor > 0.0f)
+                          ? LerpColor(glyph.baseFillColor, tint, glyph.factor)
+                          : tint;
+      AppendCssDecl(decls, "color", ColorToRGBA(painted));
+    } else {
+      Color painted = (glyph.hasBaseFillColor && glyph.factor > 0.0f)
+                          ? LerpColor(glyph.baseFillColor, tint, glyph.factor)
+                          : tint;
+      AppendCssDecl(decls, "fill", ColorToSVGHex(painted));
+    }
   }
-  if (chSet.modStrokeColorCh != nullptr) {
-    AppendCssDecl(decls, "stroke",
-                  ColorToSVGHex(EvalColorChannel(chSet.modStrokeColorCh, t,
-                                                 modifier->strokeColor.value_or(Color()))));
-  }
-  if (chSet.modStrokeWidthCh != nullptr) {
-    AppendCssDecl(decls, "stroke-width",
-                  CssFloatToString(EvalFloatChannel(chSet.modStrokeWidthCh, t,
-                                                    modifier->strokeWidth.value_or(0.0f))) +
-                      "px");
+  if (glyph.htmlSpan) {
+    if (chSet.modStrokeColorCh != nullptr) {
+      Color strokeColor =
+          EvalColorChannel(chSet.modStrokeColorCh, t, modifier->strokeColor.value_or(Color()));
+      float width =
+          EvalFloatChannel(chSet.modStrokeWidthCh, t, modifier->strokeWidth.value_or(0.0f));
+      if (width > 0.0f) {
+        AppendCssDecl(decls, "-webkit-text-stroke",
+                      CssFloatToString(width) + "px " + ColorToRGBA(strokeColor));
+      }
+    }
+  } else {
+    if (chSet.modStrokeColorCh != nullptr) {
+      AppendCssDecl(decls, "stroke",
+                    ColorToSVGHex(EvalColorChannel(chSet.modStrokeColorCh, t,
+                                                   modifier->strokeColor.value_or(Color()))));
+    }
+    if (chSet.modStrokeWidthCh != nullptr) {
+      AppendCssDecl(decls, "stroke-width",
+                    CssFloatToString(EvalFloatChannel(chSet.modStrokeWidthCh, t,
+                                                      modifier->strokeWidth.value_or(0.0f))) +
+                        "px");
+    }
   }
   if (alpha < 1.0f) {
     AppendCssDecl(decls, "opacity", CssFloatToString(1.0f + (alpha - 1.0f) * f));
@@ -4191,6 +4218,9 @@ std::string HTMLAnimationSession::emitKeyframesAndWeave(std::string& bodyHtml) {
     auto bundles = GroupObjectsIntoDomBundles(_doc, anim, _ctx, _solidToPainter, _filterToLayer,
                                               _maskPathToLayer);
     MergeBundlesByDomId(bundles);
+    // Identical stops share one rule, even across bundles: a per-glyph fan-out where every glyph
+    // ends up with the same keyframes (a uniform modifier colour, say) must not emit N copies.
+    std::vector<std::pair<std::string, std::string>> emittedRules = {};
     for (const auto& bundle : bundles) {
       auto elements =
           FindBundleElementsForNode(tagIndex.nameById, tagIndexByNode, bundle, mount.scope);
@@ -4285,7 +4315,6 @@ std::string HTMLAnimationSession::emitKeyframesAndWeave(std::string& bodyHtml) {
         }
       }
       std::unordered_map<std::string, std::string> keyframesNameByTag = {};
-      std::vector<std::pair<std::string, std::string>> emittedRules = {};
       for (const auto& element : elements) {
         for (size_t ruleIndex = 0; ruleIndex < ruleSets.size(); ++ruleIndex) {
           const BundleChannelSet& ruleSet = ruleSets[ruleIndex];

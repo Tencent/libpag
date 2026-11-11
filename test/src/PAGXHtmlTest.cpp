@@ -6396,7 +6396,9 @@ CLI_TEST(PAGXHtmlTest, ManyAnimationTargetsEachGetTheirDeclaration) {
   options.extractStyleSheet = false;
   auto html = LoadXMLAndConvert(xml, options);
   ASSERT_FALSE(html.empty());
-  EXPECT_EQ(CountOccurrences(html, "@keyframes "), static_cast<size_t>(kTargets)) << html;
+  // Every target still gets its own declaration, but identical stops share one rule: 40 layers with
+  // the same alpha animation must not emit 40 copies of the same @keyframes.
+  EXPECT_EQ(CountOccurrences(html, "@keyframes "), 1u) << html;
   for (int i = 0; i < kTargets; ++i) {
     auto tag = FindTagContaining(html, "id=\"box" + std::to_string(i) + "\"");
     ASSERT_FALSE(tag.empty()) << i;
