@@ -16,6 +16,11 @@ endif ()
 # PAG_USE_FREETYPE must be ON: tgfx defaults to FreeType on WEB+threads, but the main project
 # forces it OFF for WEB. Playground needs FreeType for HarfBuzz text shaping.
 set(PAG_BUILD_PAGX ON)
+# Links the SVG importer so PAGXDocument::attachInlineImportDocuments() can mount inline <svg>
+# imports as sub-documents. It defaults to OFF in the main project, and a build without it leaves
+# every inline import unmounted: those layers then render as nothing, which would make the viewer
+# disagree with what the engine produces elsewhere.
+set(PAG_BUILD_SVG ON)
 set(PAG_USE_FREETYPE ON)
 set(PAG_USE_JPEG_DECODE ON)
 set(PAG_USE_PNG_DECODE ON)

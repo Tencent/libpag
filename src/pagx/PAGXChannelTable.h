@@ -20,7 +20,7 @@
 
 #include <cstdint>
 #include <vector>
-#include "pagx/nodes/Channel.h"
+#include "pagx/nodes/KeyValue.h"
 #include "pagx/nodes/Node.h"
 
 namespace pagx {
@@ -55,7 +55,8 @@ inline constexpr bool HasFlag(ChannelFlags value, ChannelFlags flag) {
 // string, or a Matrix3D value that is not finite and invertible.
 using ChannelAccessor = bool (*)(Node* node, KeyValue* getOut, const KeyValue* setIn);
 
-// One reflective channel of a node type, addressed by channel name.
+// One reflective channel of a node type, addressed by channel name. The accessor owns the value
+// encoding, so the table only carries the name and the two independent flags.
 struct ChannelDef {
   const char* channel;
   ChannelFlags flags;

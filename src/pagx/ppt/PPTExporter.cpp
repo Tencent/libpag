@@ -988,7 +988,7 @@ std::vector<SlideBuild> BuildSlides(const std::vector<PAGXDocument*>& documents,
   slides.reserve(documents.size());
   int imageBase = 0;
   for (auto* doc : documents) {
-    if (doc == nullptr || doc->hasUnresolvedImports()) {
+    if (doc == nullptr) {
       return {};
     }
     auto errorCount = doc->errors.size();
@@ -998,7 +998,8 @@ std::vector<SlideBuild> BuildSlides(const std::vector<PAGXDocument*>& documents,
     // applyLayout reports structural failures (for example, a cyclic external
     // composition) through the document's error list. Do not silently turn the
     // failed document into an empty slide while returning success for the deck.
-    if (!doc->isLayoutApplied() || doc->errors.size() != errorCount) {
+    if (!doc->isLayoutApplied() || doc->hasUnresolvedImports() ||
+        doc->errors.size() != errorCount) {
       return {};
     }
     SlideBuild slide;

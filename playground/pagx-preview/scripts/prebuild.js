@@ -176,6 +176,11 @@ function buildUpstreamDependencies({ release, mt }) {
     process.exit(1);
   }
 
+  console.log('pagx-preview prebuild: syncing pagx-viewer dependencies...');
+  execSync('npm install --prefer-offline', { cwd: VIEWER_DIR, stdio: 'inherit' });
+  console.log('pagx-preview prebuild: syncing pagx-player dependencies...');
+  execSync('npm install --prefer-offline', { cwd: PLAYER_DIR, stdio: 'inherit' });
+
   // pagx-viewer's wasm build is guarded by a source-hash cache (.pagx-viewer.wasm.md5) that does
   // not distinguish debug from release: after a debug build it will skip recompiling for a
   // release run and reuse the ~100MB debug wasm (full DWARF info). Clean the viewer first on a

@@ -329,6 +329,41 @@ static bool AccessSizeAxis(Node* node, KeyValue* getOut, const KeyValue* setIn) 
   return true;
 }
 
+// Dimension axis access for LayoutNode-derived types. The XML width/height attribute spans two
+// members (absolute + percent, see ReadDimension in the importer) and layout resolves percent
+// over absolute, so a typed write to either member must clear the other: a stale percent would
+// keep overriding a freshly written absolute value (and vice versa), diverging from what a full
+// reparse produces. WidthAxis selects the width or height axis; PercentAxis selects which of the
+// two members the channel addresses (reads still report that member alone).
+template <typename T, bool WidthAxis, bool PercentAxis>
+static bool AccessDimensionAxis(Node* node, KeyValue* getOut, const KeyValue* setIn) {
+  auto* self = static_cast<T*>(node);
+  float& absolute = WidthAxis ? self->width : self->height;
+  float& percent = WidthAxis ? self->percentWidth : self->percentHeight;
+  if (getOut == nullptr && setIn == nullptr) {
+    // Reset: the attribute's default is "unspecified", i.e. both members NaN.
+    absolute = NAN;
+    percent = NAN;
+    return true;
+  }
+  if (getOut != nullptr) {
+    *getOut = PercentAxis ? percent : absolute;
+    return true;
+  }
+  const auto* value = std::get_if<float>(setIn);
+  if (value == nullptr) {
+    return false;
+  }
+  if (PercentAxis) {
+    percent = *value;
+    absolute = NAN;
+  } else {
+    absolute = *value;
+    percent = NAN;
+  }
+  return true;
+}
+
 // Padding sub-component access. Which: 0=left, 1=top, 2=right, 3=bottom.
 template <typename T, auto Field, int Which>
 static bool AccessPaddingComp(Node* node, KeyValue* getOut, const KeyValue* setIn) {
@@ -423,6 +458,13 @@ static bool AccessEnum(Node* node, KeyValue* getOut, const KeyValue* setIn) {
 
 // Convenience macros that turn a (channel, member) pair into a ChannelDef row. They only build the
 // table entries; all access logic lives in the templated generators above.
+//
+// The FIELD_POINT_X/Y, FIELD_SIZE_W/H and FIELD_PADDING_L/T/R/B rows address one composite XML
+// attribute (position="10 20", size=..., padding=...) as dotted sub-channels. The playground
+// player's incremental-apply classifier keeps a mirror of these composite attributes in
+// playground/pagx-player/src/incremental-apply.ts (COMPOSITE_ATTRIBUTES); when a composite channel
+// is added or renamed here, update that table too, or the edit silently falls back to a full
+// reparse instead of an incremental write.
 #define FIELD_FLOAT(T, name, member, cls) \
   { name, cls, &AccessFloat<T, &T::member> }
 #define FIELD_SKEW(T, name, member, cls) \
@@ -461,6 +503,13 @@ static bool AccessEnum(Node* node, KeyValue* getOut, const KeyValue* setIn) {
   { name, cls, &AccessOptionalFloat<T, &T::member> }
 #define FIELD_OPT_COLOR(T, name, member, cls) \
   { name, cls, &AccessOptionalColor<T, &T::member> }
+// The width/height dimension channels and their percent siblings. Both accessors cross-clear the
+// two members (see AccessDimensionAxis), so writing one clears the other: a stale percent would
+// keep overriding a freshly written absolute value, and vice versa.
+#define FIELD_DIMENSION(T, name, cls, WidthAxis) \
+  { name, cls, &AccessDimensionAxis<T, WidthAxis, false> }
+#define FIELD_PERCENT(T, name, cls, WidthAxis) \
+  { name, cls, &AccessDimensionAxis<T, WidthAxis, true> }
 #define FIELD_ENUM(T, name, member, cls, E) \
   { name, cls, &AccessEnum<T, E, &T::member, E##ToString, E##FromString, IsValid##E##String> }
 
@@ -469,10 +518,10 @@ static bool AccessEnum(Node* node, KeyValue* getOut, const KeyValue* setIn) {
 template <typename T>
 static void AppendLayoutNodeFields(std::vector<ChannelDef>& table) {
   std::vector<ChannelDef> shared = {
-      FIELD_FLOAT(T, "width", width, Layout),
-      FIELD_FLOAT(T, "height", height, Layout),
-      FIELD_FLOAT(T, "percentWidth", percentWidth, Layout),
-      FIELD_FLOAT(T, "percentHeight", percentHeight, Layout),
+      FIELD_DIMENSION(T, "width", Layout, true),
+      FIELD_DIMENSION(T, "height", Layout, false),
+      FIELD_PERCENT(T, "percentWidth", Layout, true),
+      FIELD_PERCENT(T, "percentHeight", Layout, false),
       FIELD_FLOAT(T, "left", left, Layout),
       FIELD_FLOAT(T, "right", right, Layout),
       FIELD_FLOAT(T, "top", top, Layout),

@@ -152,13 +152,11 @@ int RunBounds(int argc, char* argv[]) {
   if (document == nullptr) {
     return 1;
   }
-  if (document->hasUnresolvedImports()) {
-    std::cerr << "pagx bounds: error: unresolved import directive, run 'pagx resolve' first\n";
+  if (!PrepareDocumentForRendering(document.get(), nullptr, "pagx bounds")) {
     return 1;
   }
 
   // Build layer tree with mapping.
-  document->applyLayout();
   auto buildResult = LayerBuilder::BuildWithMap(document.get());
   if (buildResult.root == nullptr) {
     std::cerr << "pagx bounds: failed to build layer tree\n";

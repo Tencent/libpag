@@ -37,6 +37,7 @@
 #include "pagx/PAGXExporter.h"
 #include "pagx/PAGXOptimizer.h"
 #include "pagx/SVGImporter.h"
+#include "pagx/utils/ImportFormat.h"
 
 namespace pagx::cli {
 
@@ -60,37 +61,6 @@ void ParseFormatOptions(int argc, char* argv[], ImportFormatOptions* options) {
 //--------------------------------------------------------------------------------------------------
 // Format inference
 //--------------------------------------------------------------------------------------------------
-
-static std::string InferFormatFromContent(const std::string& content) {
-  auto pos = content.find('<');
-  while (pos != std::string::npos) {
-    if (pos + 1 < content.size() && content[pos + 1] != '/' && content[pos + 1] != '!' &&
-        content[pos + 1] != '?') {
-      auto tagEnd = content.find_first_of(" \t\n/>", pos + 1);
-      if (tagEnd != std::string::npos) {
-        auto tagName = content.substr(pos + 1, tagEnd - pos - 1);
-        for (auto& ch : tagName) {
-          ch = static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
-        }
-        if (tagName == "html" || tagName == "body") {
-          return "html";
-        }
-        return tagName;
-      }
-    }
-    pos = content.find('<', pos + 1);
-  }
-  return {};
-}
-
-static std::string NormalizeFormat(const std::string& format, const std::string& fallback) {
-  std::string f = format.empty() ? fallback : format;
-  for (auto& ch : f) {
-    ch = static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
-  }
-  if (f == "htm" || f == "xhtml") f = "html";
-  return f;
-}
 
 //--------------------------------------------------------------------------------------------------
 // html-snapshot bridge
@@ -424,8 +394,23 @@ ImportResult ImportFile(const std::string& filePath, const std::string& format,
   // format to html for URLs (the extension heuristic would otherwise pick up nonsense like
   // "com" from the hostname).
   bool isUrl = IsHttpUrl(filePath);
-  std::string effectiveFormat =
-      isUrl ? NormalizeFormat(format, "html") : NormalizeFormat(format, GetFileExtension(filePath));
+  std::string effectiveFormat = ResolveImportFormat(format, isUrl ? std::string() : filePath, {});
+  if (effectiveFormat.empty() && isUrl) {
+    effectiveFormat = "html";
+  } else if (effectiveFormat.empty()) {
+    std::ifstream input(filePath, std::ios::binary);
+    if (!input) {
+      result.error = "Failed to read import source: " + filePath;
+      return result;
+    }
+    std::ostringstream content;
+    content << input.rdbuf();
+    if (input.bad()) {
+      result.error = "Failed to read import source: " + filePath;
+      return result;
+    }
+    effectiveFormat = ResolveImportFormat(format, filePath, content.str());
+  }
   bool snapshotEnabled = HTMLSnapshotEnabled();
   if (isUrl && !snapshotEnabled) {
     result.error =
@@ -470,7 +455,7 @@ ImportResult ImportString(const std::string& content, const std::string& format,
                           const ImportFormatOptions& formatOptions, float targetWidth,
                           float targetHeight) {
   ImportResult result = {};
-  std::string effectiveFormat = NormalizeFormat(format, InferFormatFromContent(content));
+  std::string effectiveFormat = ResolveImportFormat(format, {}, content);
   if (effectiveFormat == "svg") {
     result.document =
         SVGImporter::ParseString(content, ToSVGOptions(formatOptions, targetWidth, targetHeight));

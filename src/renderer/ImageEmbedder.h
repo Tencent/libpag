@@ -23,9 +23,9 @@
 namespace pagx {
 
 /**
- * ImageEmbedder reads every external-file Image node in a PAGXDocument and inlines the raw
- * bytes via PAGXDocument::loadFileData. Unlike FontEmbedder, it does not require applyLayout()
- * and has no ClearEmbeddedGlyphRuns-style helper — Image embedding has no layout dependency.
+ * ImageEmbedder inlines external-file Image nodes owned by a PAGXDocument. Mounted composition
+ * domains remain unchanged; flatten imports before embedding their images. Unlike FontEmbedder,
+ * it does not require applyLayout() because image embedding has no layout dependency.
  *
  * URL-form paths (containing "://") are silently skipped; production PAGX does not use them.
  *

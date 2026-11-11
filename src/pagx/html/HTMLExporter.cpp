@@ -204,6 +204,9 @@ std::string BuildHTML(PAGXDocument& doc, HTMLOutputMode mode, const HTMLExporter
   if (!doc.isLayoutApplied()) {
     doc.applyLayout();
   }
+  if (!doc.isLayoutApplied() || doc.hasUnresolvedImports()) {
+    return {};
+  }
 
   // Pre-pass: for every compatible PlusDarker Layer, render a cropped backdrop PNG with the layer
   // temporarily hidden. The resulting base64 data URLs are consumed by writeLayer below to emit an
