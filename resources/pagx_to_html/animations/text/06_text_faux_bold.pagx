@@ -4,7 +4,8 @@
      font size rather than be a constant.
      Target: Text  Channel: fauxBold  Type: bool
      Expect: supported
-     Known-gap: faux-bold-stroke（用 -webkit-text-stroke 复刻，0.09em/字号；0.884，剩余差来自 描边居中 vs 运行时单向外扩）
+     Known-gap: faux-bold-stroke（-webkit-text-stroke 复刻，0.09em，0.884；剩余差来自描边居中 vs 单向外扩）
+     Ref: - -->
 <pagx width="320" height="200">
   <Layer left="0" right="0" top="0" bottom="0">
     <Rectangle left="0" right="0" top="0" bottom="0"/>

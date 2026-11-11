@@ -17,6 +17,7 @@ import os
 import re
 import subprocess
 import sys
+import xml.etree.ElementTree as ET
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CHANNEL_SRC = os.path.join(REPO, "src/pagx/PAGXNodeChannel.cpp")
@@ -293,6 +294,19 @@ def render_families(cases):
     return "\n".join(lines)
 
 
+def check_well_formed(cases):
+    """Every fixture must parse: a stray `-->`-eating edit breaks the document silently, and no
+    other gate here reads the body (the header regexes stop at the first line)."""
+    failures = []
+    for case in cases:
+        path = os.path.join(CORPUS, case["file"])
+        try:
+            ET.parse(str(path))
+        except ET.ParseError as error:
+            failures.append("fixture is not well-formed XML: %s (%s)" % (case["file"], error))
+    return failures
+
+
 def check(anim, exported, index, cases):
     """Returns (failures, warnings).
 
@@ -315,6 +329,8 @@ def check(anim, exported, index, cases):
             if (node, channel) in CHANNEL_EXEMPTIONS:
                 continue
             failures.append("animatable channel without a case: %s.%s" % (node, channel))
+
+    failures.extend(check_well_formed(cases))
 
     # A node the registry produces that NODE_ORDER does not list would be skipped by every loop
     # below, which is exactly how the `T` template parameter stayed invisible.
