@@ -6575,6 +6575,50 @@ PAGX_TEST(PAGXSVGTest, SVGExport_TextBoxCJKJustifyUsesTextLength) {
   EXPECT_NE(svg.find("lengthAdjust=\"spacing\""), std::string::npos);
 }
 
+PAGX_TEST(PAGXSVGTest, SVGExport_SingularGroupKeepsFillAndStroke) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* group = doc->makeNode<pagx::Group>();
+  group->scale = {0, 0};
+  auto* rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {50, 50};
+  rect->size = {40, 40};
+  auto* stroke = doc->makeNode<pagx::Stroke>();
+  stroke->color = doc->makeNode<pagx::SolidColor>();
+  static_cast<pagx::SolidColor*>(stroke->color)->color = {0, 0, 1, 1};
+  stroke->width = 2.0f;
+  group->elements = {rect, MakeSolidFillSVG(doc.get(), 1, 0, 0), stroke};
+  layer->contents = {group};
+  doc->layers.push_back(layer);
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("matrix(0,0,0,0"), std::string::npos);
+  EXPECT_NE(svg.find("fill=\"#FF0000\""), std::string::npos);
+  EXPECT_NE(svg.find("stroke=\"#0000FF\""), std::string::npos);
+}
+
+// ST11: SVG has no stroke-alignment property. Inside strokes are doubled and clipped to the fill
+// region so only the inner half is painted.
+PAGX_TEST(PAGXSVGTest, SVGExport_PathInsideStrokeUsesClip) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* path = doc->makeNode<pagx::Path>();
+  path->data = doc->makeNode<pagx::PathData>();
+  *path->data = pagx::PathDataFromSVGString("M10 10 L90 10 L90 90 L10 90 Z");
+  auto* stroke = doc->makeNode<pagx::Stroke>();
+  stroke->color = doc->makeNode<pagx::SolidColor>();
+  static_cast<pagx::SolidColor*>(stroke->color)->color = {1, 0, 0, 1};
+  stroke->width = 2.0f;
+  stroke->align = pagx::StrokeAlign::Inside;
+  layer->contents = {path, stroke};
+  doc->layers.push_back(layer);
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("clip-path=\"url(#"), std::string::npos);
+  EXPECT_NE(svg.find("stroke-width=\"4\""), std::string::npos);
+  EXPECT_NE(svg.find("<clipPath"), std::string::npos);
+}
+
 // A Group's alpha has to survive until the painter that draws its geometry, even when that painter
 // sits outside the Group.
 PAGX_TEST(PAGXSVGTest, SVGExport_GroupAlphaReachesOuterPainter) {

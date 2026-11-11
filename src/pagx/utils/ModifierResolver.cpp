@@ -38,6 +38,7 @@
 #include "pagx/nodes/TextModifier.h"
 #include "pagx/nodes/TrimPath.h"
 #include "pagx/types/MergePathMode.h"
+#include "pagx/utils/ExporterUtils.h"
 #include "pagx/utils/TextSelectorUtils.h"
 #include "pagx/utils/TextUtils.h"
 #include "renderer/ToTGFX.h"
@@ -328,6 +329,41 @@ static tgfx::Path PrimitiveToTGFXPath(const Element* el) {
     return ps->type == PolystarType::Polygon ? PolygonToTGFXPath(ps) : StarToTGFXPath(ps);
   }
   return tgfx::Path();
+}
+
+// Appends every shape accumulated by `el` to `combined`, applying the parent matrix. Groups are
+// traversed so a MergePath can consume geometry nested under earlier Groups, matching tgfx's
+// context-wide clear/merge. Painters and non-shape content are ignored.
+static void AppendGeometryToPath(const Element* el, const tgfx::Matrix& parent,
+                                 tgfx::Path* combined, tgfx::PathOp op, bool* first) {
+  if (el == nullptr) {
+    return;
+  }
+  if (el->nodeType() == NodeType::Group) {
+    auto* group = static_cast<const Group*>(el);
+    auto matrix = parent;
+    matrix.postConcat(ToTGFX(BuildGroupMatrix(group)));
+    for (const auto* child : group->elements) {
+      AppendGeometryToPath(child, matrix, combined, op, first);
+    }
+    return;
+  }
+  auto type = el->nodeType();
+  if (type != NodeType::Rectangle && type != NodeType::Ellipse && type != NodeType::Path &&
+      type != NodeType::Polystar) {
+    return;
+  }
+  auto path = PrimitiveToTGFXPath(el);
+  if (path.isEmpty()) {
+    return;
+  }
+  path.transform(parent);
+  if (*first) {
+    *combined = path;
+    *first = false;
+  } else {
+    combined->addPath(path, op);
+  }
 }
 
 //==============================================================================
@@ -828,18 +864,17 @@ std::vector<Element*> ModifierResolver::resolve(const std::vector<Element*>& ele
       }
       case NodeType::MergePath: {
         auto* mp = static_cast<const MergePath*>(element);
-        if (shapeSlots.empty()) {
+        if (output.empty()) {
           break;
         }
-        tgfx::Path combined = PrimitiveToTGFXPath(output[shapeSlots.front()]);
+        tgfx::Path combined = {};
         auto op = MergeModeToPathOp(mp->mode);
-        for (size_t i = 1; i < shapeSlots.size(); ++i) {
-          combined.addPath(PrimitiveToTGFXPath(output[shapeSlots[i]]), op);
+        bool firstPath = true;
+        for (const auto* element : output) {
+          AppendGeometryToPath(element, tgfx::Matrix::I(), &combined, op, &firstPath);
         }
-        auto* path = makePathFromData(MakePathDataFromTGFX(_doc, combined));
-        // tgfx's MergePath clears accumulated geometry and painters before adding the merged
-        // shape. Rebuild the scope so painters emitted before the merge cannot paint the result.
         output.clear();
+        auto* path = makePathFromData(MakePathDataFromTGFX(_doc, combined));
         output.push_back(path);
         shapeSlots.assign(1, 0);
         // tgfx boolean ops (Skia path-ops) emit geometry oriented for even-odd

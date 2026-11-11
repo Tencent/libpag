@@ -32,6 +32,7 @@
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/Layer.h"
 #include "pagx/nodes/MergePath.h"
+#include "pagx/nodes/Path.h"
 #include "pagx/nodes/PathData.h"
 #include "pagx/nodes/RangeSelector.h"
 #include "pagx/nodes/Rectangle.h"
@@ -2342,6 +2343,43 @@ PAGX_TEST(PAGXUtilsTest, ModifierResolver_MergeDoesNotMutateAuthoredFill) {
   EXPECT_TRUE(foundEvenOddFill);
 }
 
+PAGX_TEST(PAGXUtilsTest, ModifierResolver_MergeIncludesGroupGeometry) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto* group = doc->makeNode<pagx::Group>();
+  auto* first = doc->makeNode<pagx::Rectangle>();
+  first->position = {20, 20};
+  first->size = {20, 20};
+  group->elements = {first};
+  auto* second = doc->makeNode<pagx::Rectangle>();
+  second->position = {120, 120};
+  second->size = {20, 20};
+  auto* merge = doc->makeNode<pagx::MergePath>();
+  merge->mode = pagx::MergePathMode::Union;
+  group->updateSize(nullptr);
+  second->updateSize(nullptr);
+
+  std::vector<pagx::Element*> elements = {group, second, merge};
+  pagx::ModifierResolver resolver(doc.get());
+  auto resolved = resolver.resolve(elements);
+  ASSERT_EQ(resolved.size(), 1u);
+  ASSERT_EQ(resolved[0]->nodeType(), pagx::NodeType::Path);
+  auto bounds = static_cast<pagx::Path*>(resolved[0])->data->getBounds();
+  EXPECT_GT(bounds.width, 100.0f);
+  EXPECT_GT(bounds.height, 100.0f);
+}
+
+// PathData bounds are conservative: quadratic/cubic control points participate even when the
+// curve itself stays close to the endpoints.
+PAGX_TEST(PAGXUtilsTest, PathDataBoundsIncludeControlPoints) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto* data = doc->makeNode<pagx::PathData>();
+  *data = pagx::PathDataFromSVGString("M0 0 Q1000 1000 10 10 C-500 -500 20 20 30 30");
+  auto bounds = data->getBounds();
+  EXPECT_GE(bounds.width, 1000.0f);
+  EXPECT_GE(bounds.height, 1000.0f);
+  EXPECT_LE(bounds.x, -500.0f);
+}
+
 // ---------------------------------------------------------------------------
 // TextModifier paint overrides
 // ---------------------------------------------------------------------------
@@ -3658,6 +3696,8 @@ PAGX_TEST(PAGXUtilsTest, ModifierResolver_MergeClearsPreviousPainters) {
   auto* second = doc->makeNode<pagx::Rectangle>();
   auto* merge = doc->makeNode<pagx::MergePath>();
   auto* stroke = doc->makeNode<pagx::Stroke>();
+  first->updateSize(nullptr);
+  second->updateSize(nullptr);
 
   std::vector<pagx::Element*> elements = {first, fill, second, merge, stroke};
   pagx::ModifierResolver resolver(doc.get());

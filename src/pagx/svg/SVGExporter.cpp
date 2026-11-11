@@ -2498,19 +2498,44 @@ void SVGWriter::writePath(SVGBuilder& out, const Path* path, const FillStrokeInf
     Matrix bakeMatrix = Matrix::Translate(renderPos.x, renderPos.y) * Matrix::Scale(scale, scale);
     baked.transform(bakeMatrix);
   }
+  const PathData& emitted = needsBaking ? baked : *path->data;
+  std::string pathData = PathDataToSVGString(emitted);
+
+  FillStrokeInfo localFs = fs;
+  std::optional<Stroke> insideStroke = std::nullopt;
+  bool clipInside = fs.stroke != nullptr && fs.stroke->align == StrokeAlign::Inside;
+  std::string clipId;
+  if (clipInside) {
+    // SVG has no stroke-alignment property. Double the stroke and clip it to the fill region so
+    // only the inner half survives.
+    insideStroke.emplace(*fs.stroke);
+    insideStroke->width *= 2.0f;
+    localFs.stroke = &*insideStroke;
+    clipId = generateId("strokeClip");
+    _defs->openElement("clipPath");
+    _defs->addAttribute("id", clipId);
+    _defs->closeElementStart();
+    _defs->openElement("path");
+    _defs->addAttribute("d", pathData);
+    _defs->closeElementSelfClosing();
+    _defs->closeElement();
+  }
 
   out.openElement("path");
   std::string transform = MatrixToSVGTransform(m);
   if (!transform.empty()) {
     out.addAttribute("transform", transform);
   }
-  out.addAttribute("d", PathDataToSVGString(needsBaking ? baked : *path->data));
+  if (!clipId.empty()) {
+    out.addAttribute("clip-path", "url(#" + clipId + ")");
+  }
+  out.addAttribute("d", pathData);
   // After baking, getBounds() returns the painted region directly in parent space —
   // which is the contract `applyPainters` expects for fitsToGeometry gradients and
   // ImagePattern shapeBounds. No additional translate / scale arithmetic needed.
   Rect bounds = needsBaking ? baked.getBounds() : path->data->getBounds();
-  applyPainters(out, fs, bounds, alpha);
-  finishShapeElement(out, fs, alpha);
+  applyPainters(out, localFs, bounds, alpha);
+  finishShapeElement(out, localFs, alpha);
 }
 
 // ── writeTextAsPath ─────────────────────────────────────────────────────────

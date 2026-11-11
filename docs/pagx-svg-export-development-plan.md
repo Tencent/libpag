@@ -686,6 +686,9 @@ ToSVG严格失败返回空结果、ToFile返回false、CLI非零；warnings=null
 | 本轮 ST37 部分（2026-11-11） | WOFF2 预扫递归 externalDoc 的 Font 节点并去重，external composition 的内嵌字体不再漏嵌；新增 externalDoc 字体回归 | external Image 资源 / 嵌套外部文档加载失败路径未覆盖 |
 | 本轮 M1 部分（2026-11-11） | `SVGAnimationOptions.selection` 实现 Default（首个声明 Animation）/ Named / All；未被 timeline 驱动的动画用默认 timing；CLI 增加 `--svg-no-animation` / `--svg-animation` / `--svg-all-animations` 与互斥校验；新增三模式回归 | F2 双实例 / external 同名去重、F4 offset/paused 初态、F16 pause scope 仍未做；同 target 同 channel 的多动画 ordered mix 仍 last-wins |
 | 本轮 ST30 部分（2026-11-11） | TextBox Native 路径加 `xml:space="preserve"`，多空格不再被 SVG 折叠；tab 按 layout glyph x 拆 tspan 定位；CJK 无空格行 justify 改用 `textLength` + `lengthAdjust="spacing"`；RTL 段落输出 `direction="rtl"` 并按物理边翻转 text-anchor；新增空白/tab/CJK/RTL 四回归 | RTL 数字与混合标点的像素对照、justify 与 tgfx 的逐行宽度对照未做 |
+| 本轮 ST12/ST23 部分（2026-11-11） | MergePath 递归收集前置 Group 内的 shape 并按 group matrix 合并，随后清空整个 scope；空合并仍保留一个空 Path 以维持后续 modifier 的 shape slot；新增 group 合并回归 | Text 参与 Merge、跨 Group painter 语义与 Append overlap 像素未覆盖 |
+| 本轮 ST11 部分（2026-11-11） | Path 的 `StrokeAlign::Inside` 用 2× stroke + 同路径 clipPath 实现，只保留内侧一半；新增结构回归 | Outside / adaptive dash / 奇数 dash×cap / fit 原 bounds 未做 |
+| 本轮 ST42/ST45 部分（2026-11-11） | PathData bounds 控制点保守性测试；singular Group 的 Fill+Stroke 组合结构回归 | layout-fit-coverage 分离与 Painter 前后 singular 像素未覆盖 |
 
 ### 4.8 S3 文字待办清单（下一批入口）
 
