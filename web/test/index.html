@@ -26,6 +26,41 @@
             state.errors.push('WebGL context lost');
         }
 
+        function nextTick() {
+            if (typeof MessageChannel === 'undefined') {
+                return new Promise((resolve) => setTimeout(resolve, 0));
+            }
+            return new Promise((resolve) => {
+                const channel = new MessageChannel();
+                channel.port1.onmessage = () => {
+                    channel.port1.close();
+                    channel.port2.close();
+                    resolve();
+                };
+                channel.port2.postMessage(null);
+            });
+        }
+
+        async function runAsyncVideoExportTest(module) {
+            let exitCode = module.ccall('StartAsyncVideoExportTest', 'number', [], []);
+            if (exitCode === 0) {
+                const deadline = Date.now() + 10000;
+                let status = module.ccall('PollAsyncVideoExportTest', 'number', [], []);
+                while (status === 0 && Date.now() < deadline) {
+                    await nextTick();
+                    status = module.ccall('PollAsyncVideoExportTest', 'number', [], []);
+                }
+                if (status === 0) throw new Error('Async video frame readback timed out');
+                if (status !== 1) throw new Error(module.ccall('GetAsyncVideoExportTestError', 'string', [], []));
+                exitCode = module.ccall('ConsumeAsyncVideoExportTest', 'number', [], []);
+            }
+            if (exitCode !== 0) {
+                throw new Error(module.ccall('GetAsyncVideoExportTestError', 'string', [], []));
+            }
+            return { exitCode: 0, tests: 1, failed: 0, skipped: 0,
+                comparisons: { compared: 0, versionSkipped: 0, missingBaseline: 0 } };
+        }
+
         try {
             if (!config) throw new Error('Launch this page through run_test.js');
             const response = await fetch('./build-info.json');
@@ -79,11 +114,15 @@
             module._registerSoftwareDecoderFactory(new FFAVC.FFAVCDecoderFactory());
             module._useSoftwareDecoder = true;
             fs.mkdirTree('/test');
-            const exitCode = config.filter
-                ? await module.ccall('RunTest', 'number', ['string'], [config.filter], { async: true })
-                : await module.ccall('RunAllTests', 'number', [], [], { async: true });
-            if (device) await device.queue.onSubmittedWorkDone();
-            state.result = JSON.parse(module.ccall('GetRunResult', 'string', [], []));
+            if (config.asyncVideoExport) {
+                state.result = await runAsyncVideoExportTest(module);
+            } else {
+                const exitCode = config.filter
+                    ? await module.ccall('RunTest', 'number', ['string'], [config.filter], { async: true })
+                    : await module.ccall('RunAllTests', 'number', [], [], { async: true });
+                if (device) await device.queue.onSubmittedWorkDone();
+                state.result = JSON.parse(module.ccall('GetRunResult', 'string', [], []));
+            }
             if (!state.result || state.result.exitCode !== exitCode) {
                 throw new Error('Missing or inconsistent native test result');
             }
