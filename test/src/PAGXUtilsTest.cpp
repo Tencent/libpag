@@ -2304,6 +2304,17 @@ PAGX_TEST(PAGXUtilsTest, EffectiveTextBoxSize_AssignsNestedModifierOnlyBox) {
   EXPECT_FLOAT_EQ(pagx::EffectiveTextBoxHeight(inner), 100.0f);
 }
 
+PAGX_TEST(PAGXUtilsTest, PathDataToSVGString_KeepsFloatPrecision) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto* data = doc->makeNode<pagx::PathData>();
+  *data = pagx::PathDataFromSVGString("M123456.5 0.125 L123457.25 -0.375");
+  auto text = pagx::PathDataToSVGString(*data);
+  EXPECT_NE(text.find("123456.5"), std::string::npos) << text;
+  EXPECT_NE(text.find("123457.25"), std::string::npos);
+  EXPECT_NE(text.find("0.125"), std::string::npos);
+  EXPECT_NE(text.find("-0.375"), std::string::npos);
+}
+
 // ---------------------------------------------------------------------------
 // TextModifier paint overrides
 // ---------------------------------------------------------------------------

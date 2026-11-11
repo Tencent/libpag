@@ -6208,6 +6208,54 @@ PAGX_TEST(PAGXSVGTest, SVGExport_NegativeAxisEllipseKeepsStrokeMicroContour) {
   EXPECT_NE(svg.find("r=\"0.0024"), std::string::npos);
 }
 
+static std::string ExportReversedPathData(bool reversed) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* path = doc->makeNode<pagx::Path>();
+  path->data = doc->makeNode<pagx::PathData>();
+  *path->data = pagx::PathDataFromSVGString("M0 0 L40 0 L40 40 L0 40 Z");
+  path->reversed = reversed;
+  layer->contents = {path, MakeSolidFillSVG(doc.get(), 1, 0, 0)};
+  doc->layers.push_back(layer);
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  auto pos = svg.find(" d=\"");
+  if (pos == std::string::npos) {
+    return {};
+  }
+  pos += 4;
+  auto end = svg.find('"', pos);
+  return end == std::string::npos ? std::string() : svg.substr(pos, end - pos);
+}
+
+// ST11: a reversed contour changes the dash start and direction; SVG/PPT primitives cannot express
+// it, so the resolver bakes it into the path data.
+PAGX_TEST(PAGXSVGTest, SVGExport_ReversedPathChangesContourDirection) {
+  auto forward = ExportReversedPathData(false);
+  auto reversed = ExportReversedPathData(true);
+  EXPECT_FALSE(forward.empty());
+  EXPECT_FALSE(reversed.empty());
+  EXPECT_NE(forward, reversed);
+}
+
+// ST11: tgfx StrokeStyle skips non-positive widths, so SVG must not turn 0 into a hairline.
+PAGX_TEST(PAGXSVGTest, SVGExport_ZeroWidthStrokeIsSkipped) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {50, 50};
+  rect->size = {40, 40};
+  auto* stroke = doc->makeNode<pagx::Stroke>();
+  stroke->color = doc->makeNode<pagx::SolidColor>();
+  static_cast<pagx::SolidColor*>(stroke->color)->color = {1, 0, 0, 1};
+  stroke->width = 0.0f;
+  layer->contents = {rect, stroke};
+  doc->layers.push_back(layer);
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("stroke=\"none\""), std::string::npos);
+  EXPECT_EQ(svg.find("stroke=\"#FF0000\""), std::string::npos);
+}
+
 // A Group's alpha has to survive until the painter that draws its geometry, even when that painter
 // sits outside the Group.
 PAGX_TEST(PAGXSVGTest, SVGExport_GroupAlphaReachesOuterPainter) {

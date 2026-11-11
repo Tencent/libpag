@@ -765,10 +765,28 @@ std::vector<Element*> ModifierResolver::resolve(const std::vector<Element*>& ele
       }
       case NodeType::Rectangle:
       case NodeType::Ellipse:
-      case NodeType::Path:
+      case NodeType::Path: {
+        bool reversed = false;
+        if (type == NodeType::Rectangle) {
+          reversed = static_cast<const Rectangle*>(element)->reversed;
+        } else if (type == NodeType::Ellipse) {
+          reversed = static_cast<const Ellipse*>(element)->reversed;
+        } else {
+          reversed = static_cast<const Path*>(element)->reversed;
+        }
+        if (reversed) {
+          // SVG / PPT primitives cannot express contour direction, and dash phase depends on it.
+          // Bake the reversed primitive into an editable Path while preserving its rendered space.
+          auto tp = PrimitiveToTGFXPath(element);
+          auto* path = makePathFromData(MakePathDataFromTGFX(_doc, tp));
+          shapeSlots.push_back(output.size());
+          output.push_back(path);
+          break;
+        }
         shapeSlots.push_back(output.size());
         output.push_back(element);
         break;
+      }
       case NodeType::Group:
         // Groups pass through unmodified; the writer recurses into them and will
         // re-invoke `resolve` on the inner element list with its own scope. This

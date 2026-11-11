@@ -23,6 +23,8 @@
 #include <cstdlib>
 #include <string>
 #include "base/utils/MathUtil.h"
+#include "pagx/svg/SVGPathParser.h"
+#include "pagx/utils/StringParser.h"
 
 namespace pagx {
 
@@ -33,28 +35,25 @@ std::string PathDataToSVGString(const PathData& pathData) {
   size_t pointIndex = 0;
   const auto& verbs = pathData.verbs();
   const auto& points = pathData.points();
-  result.reserve(verbs.size() * 24);
+  result.reserve(verbs.size() * 32);
 
-  char buf[128] = {};
   for (auto verb : verbs) {
     const Point* pts = points.data() + pointIndex;
     switch (verb) {
       case PathVerb::Move:
-        snprintf(buf, sizeof(buf), "M%g %g", pts[0].x, pts[0].y);
-        result += buf;
+        result += "M" + FloatToString(pts[0].x) + " " + FloatToString(pts[0].y);
         break;
       case PathVerb::Line:
-        snprintf(buf, sizeof(buf), "L%g %g", pts[0].x, pts[0].y);
-        result += buf;
+        result += "L" + FloatToString(pts[0].x) + " " + FloatToString(pts[0].y);
         break;
       case PathVerb::Quad:
-        snprintf(buf, sizeof(buf), "Q%g %g %g %g", pts[0].x, pts[0].y, pts[1].x, pts[1].y);
-        result += buf;
+        result += "Q" + FloatToString(pts[0].x) + " " + FloatToString(pts[0].y) + " " +
+                  FloatToString(pts[1].x) + " " + FloatToString(pts[1].y);
         break;
       case PathVerb::Cubic:
-        snprintf(buf, sizeof(buf), "C%g %g %g %g %g %g", pts[0].x, pts[0].y, pts[1].x, pts[1].y,
-                 pts[2].x, pts[2].y);
-        result += buf;
+        result += "C" + FloatToString(pts[0].x) + " " + FloatToString(pts[0].y) + " " +
+                  FloatToString(pts[1].x) + " " + FloatToString(pts[1].y) + " " +
+                  FloatToString(pts[2].x) + " " + FloatToString(pts[2].y);
         break;
       case PathVerb::Close:
         result += "Z";

@@ -2243,6 +2243,12 @@ void SVGWriter::applyStrokeAttributes(SVGBuilder& out, const Stroke* stroke,
   if (!stroke) {
     return;
   }
+  // tgfx StrokeStyle::apply skips non-positive widths entirely, so an authored 0 must not be
+  // emitted as a hairline.
+  if (stroke->width <= 0.0f) {
+    out.addAttribute("stroke", "none");
+    return;
+  }
   applyPaintColor(out, "stroke", stroke->color, stroke->alpha, stroke->blendMode, shapeBounds,
                   alphaMultiplier, p3Style);
   ApplyStrokeShapeAttributes(out, stroke);
