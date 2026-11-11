@@ -50,6 +50,9 @@ NODE_ORDER = [
 #   no-op            the value cannot change a rendered pixel; nothing to implement
 # A channel listed here still keeps its `Expect: gap` case whenever one exists, so the gap stays
 # measured instead of disappearing from the table.
+# Not a channel but a combination: `TrimPath` on a filled shape trims the path itself, so the filled
+# area shrinks with the window (measured 178px -> 130px on one rectangle). CSS can only dash the
+# stroke, so the fill part waits for the JS pass while the stroke part is supported.
 JS_PENDING = "js-pending：CSS 无法表达，JS 逐帧重绘"
 JS_AFTER_STATIC = "js-after-static：静态尚未画出该效果，补齐后再逐帧动画"
 RENDERER_GAP = "renderer-gap：渲染器不应用该通道，参考帧不动，导出侧（含 JS）无解"
