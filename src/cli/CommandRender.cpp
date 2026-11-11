@@ -160,34 +160,34 @@ static int ParseRenderOptions(int argc, char* argv[], RenderOptions* options) {
       ++i;
       if (!ParseVideoFrameRate(argv[i], &options->frameRate)) {
         CommandError("pagx render")
-            << invalid fps '" << argv[i] << "', must be 1-120 or a ratio such as 30000/1001\n";
+            << "invalid fps '" << argv[i] << "', must be 1-120 or a ratio such as 30000/1001\n";
         return 1;
       }
     } else if (arg == "--duration" && i + 1 < argc) {
       ++i;
       if (!ParseFloatOption(argv[i], 0.0f, false, &options->duration)) {
         CommandError("pagx render")
-            << invalid duration '" << argv[i] << "', must be a positive number of seconds\n";
+            << "invalid duration '" << argv[i] << "', must be a positive number of seconds\n";
         return 1;
       }
     } else if (arg == "--format" && i + 1 < argc) {
       options->format = argv[++i];
       if (options->format != "png" && options->format != "webp" && options->format != "jpg") {
-        CommandError("pagx render") << unsupported format '" << options->format << "'\n ";
-            return 1;
+        CommandError("pagx render") << "unsupported format '" << options->format << "'\n";
+        return 1;
       }
     } else if (arg == "--scale" && i + 1 < argc) {
       ++i;
       if (!ParseFloatOption(argv[i], 0.0f, false, &options->scale)) {
-        CommandError("pagx render") << invalid scale '" << argv[i] << "'\n ";
-            return 1;
+        CommandError("pagx render") << "invalid scale '" << argv[i] << "'\n";
+        return 1;
       }
     } else if (arg == "--time" && i + 1 < argc) {
       ++i;
       if (!ParseFloatOption(argv[i], 0.0f, true, &options->timeSeconds)) {
-        CommandError("pagx render") << invalid time '" << argv[i] << "',
-            must be a non - negative number "
-                << "of seconds\n";
+        CommandError("pagx render")
+            << "invalid time '" << argv[i] << "', must be a non-negative number "
+            << "of seconds\n";
         return 1;
       }
       options->hasTime = true;
@@ -195,24 +195,23 @@ static int ParseRenderOptions(int argc, char* argv[], RenderOptions* options) {
       options->hasCrop = true;
       if (!ParseCrop(argv[++i], &options->cropX, &options->cropY, &options->cropWidth,
                      &options->cropHeight)) {
-        CommandError("pagx render") << invalid crop format, expected x, y, w,
-            h\n ";
-            return 1;
+        CommandError("pagx render") << "invalid crop format, expected x,y,w,h\n";
+        return 1;
       }
     } else if (arg == "--quality" && i + 1 < argc) {
       long value = 0;
       ++i;
       if (!ParseIntOption(argv[i], 0, 100, &value)) {
-        CommandError("pagx render") << invalid quality '" << argv[i] << "', must be 0 - 100\n ";
-                                                                                return 1;
+        CommandError("pagx render") << "invalid quality '" << argv[i] << "', must be 0-100\n";
+        return 1;
       }
       options->quality = static_cast<int>(value);
     } else if (arg == "--background" && i + 1 < argc) {
       options->hasBackground = true;
       if (!ParseHexColor(argv[++i], &options->bgRed, &options->bgGreen, &options->bgBlue,
                          &options->bgAlpha)) {
-        CommandError("pagx render") << invalid color format, expected #RRGGBB or #RRGGBBAA\n ";
-                                                                 return 1;
+        CommandError("pagx render") << "invalid color format, expected #RRGGBB or #RRGGBBAA\n";
+        return 1;
       }
     } else if (arg == "--id" && i + 1 < argc) {
       options->id = argv[++i];
@@ -226,55 +225,54 @@ static int ParseRenderOptions(int argc, char* argv[], RenderOptions* options) {
       PrintRenderUsage();
       return -1;
     } else if (arg[0] == '-') {
-      CommandError("pagx render") << unknown option '" << arg << "'\n ";
-          return 1;
+      CommandError("pagx render") << "unknown option '" << arg << "'\n";
+      return 1;
     } else {
       options->inputFile = arg;
     }
     i++;
   }
   if (!options->id.empty() && !options->xpath.empty()) {
-    CommandError("pagx render") << --id and --xpath are mutually exclusive\n ";
-                                            return 1;
+    CommandError("pagx render") << "--id and --xpath are mutually exclusive\n";
+    return 1;
   }
   if (options->hasTime && (!options->id.empty() || !options->xpath.empty())) {
-    CommandError("pagx render") << --time cannot be combined with-- id / --xpath\n ";
-                                                                         return 1;
+    CommandError("pagx render") << "--time cannot be combined with --id / --xpath\n";
+    return 1;
   }
   if (options->hasTime && options->hasCrop) {
     // The animated render path skips the crop pipeline (it samples the timeline at a single
     // frame and writes the full document bounds), so combining these would silently ignore the
     // crop region. Reject the combination so the user notices instead of getting a full-frame
     // output.
-    CommandError("pagx render") << --time cannot be combined with-- crop\n ";
-                                   return 1;
+    CommandError("pagx render") << "--time cannot be combined with --crop\n";
+    return 1;
   }
   if (!options->framesDir.empty()) {
     if (options->hasTime) {
-      CommandError("pagx render") << --frames - dir cannot be combined with-- time\n ";
-                                         return 1;
+      CommandError("pagx render") << "--frames-dir cannot be combined with --time\n";
+      return 1;
     }
     if (!options->id.empty() || !options->xpath.empty()) {
-      CommandError("pagx render") << --frames - dir cannot be combined with-- id / --xpath\n ";
-                                                                                   return 1;
+      CommandError("pagx render") << "--frames-dir cannot be combined with --id / --xpath\n";
+      return 1;
     }
     if (options->hasCrop) {
-      CommandError("pagx render") << --frames - dir cannot be combined with-- crop\n ";
-                                         return 1;
+      CommandError("pagx render") << "--frames-dir cannot be combined with --crop\n";
+      return 1;
     }
     if (options->hasOutput) {
-      CommandError("pagx render") << --frames - dir writes a sequence, it cannot be combined with
-          "
-          "--output\n";
+      CommandError("pagx render") << "--frames-dir writes a sequence, it cannot be combined with "
+                                     "--output\n";
       return 1;
     }
   } else if (options->frameRate.numerator != 0 || options->duration > 0.0f) {
-    CommandError("pagx render") << --fps and --duration require-- frames - dir\n ";
-                                                 return 1;
+    CommandError("pagx render") << "--fps and --duration require --frames-dir\n";
+    return 1;
   }
   if (options->inputFile.empty()) {
-    CommandError("pagx render") << missing input file\n ";
-        return 1;
+    CommandError("pagx render") << "missing input file\n";
+    return 1;
   }
   if (options->outputFile.empty()) {
     auto dot = options->inputFile.rfind('.');
@@ -342,8 +340,8 @@ static tgfx::Bitmap RenderAnimatedFrame(const std::shared_ptr<PAGXDocument>& doc
                                         const RenderOptions& options) {
   auto scene = PAGScene::Make(document);
   if (scene == nullptr) {
-    CommandError("pagx render") << failed to build animation scene\n ";
-        return {};
+    CommandError("pagx render") << "failed to build animation scene\n";
+    return {};
   }
 
   auto timeUs = static_cast<int64_t>(llround(static_cast<double>(options.timeSeconds) * 1e6));
@@ -363,14 +361,14 @@ static tgfx::Bitmap RenderAnimatedFrame(const std::shared_ptr<PAGXDocument>& doc
   int outputWidth = static_cast<int>(ceilf(document->width * options.scale));
   int outputHeight = static_cast<int>(ceilf(document->height * options.scale));
   if (outputWidth <= 0 || outputHeight <= 0) {
-    CommandError("pagx render") << output dimensions are zero\n ";
-        return {};
+    CommandError("pagx render") << "output dimensions are zero\n";
+    return {};
   }
 
   auto surface = PAGSurface::MakeOffscreen(outputWidth, outputHeight);
   if (surface == nullptr) {
-    CommandError("pagx render") << failed to create surface (" << outputWidth << "x" << outputHeight
-              << ")\n";
+    CommandError("pagx render") << "failed to create surface (" << outputWidth << "x"
+                                << outputHeight << ")\n";
     return {};
   }
 
@@ -382,19 +380,19 @@ static tgfx::Bitmap RenderAnimatedFrame(const std::shared_ptr<PAGXDocument>& doc
   }
 
   if (!scene->draw(surface)) {
-    CommandError("pagx render") << failed to draw animation scene\n ";
-        return {};
+    CommandError("pagx render") << "failed to draw animation scene\n";
+    return {};
   }
 
   tgfx::Bitmap bitmap(outputWidth, outputHeight, false, false);
   if (bitmap.isEmpty()) {
-    CommandError("pagx render") << failed to allocate bitmap\n ";
-        return {};
+    CommandError("pagx render") << "failed to allocate bitmap\n";
+    return {};
   }
   tgfx::Pixmap pixmap(bitmap);
   if (!surface->readPixels(pixmap.writablePixels(), pixmap.rowBytes())) {
-    CommandError("pagx render") << failed to read pixels from surface\n ";
-        return {};
+    CommandError("pagx render") << "failed to read pixels from surface\n";
+    return {};
   }
   return bitmap;
 }
@@ -405,9 +403,8 @@ static tgfx::Bitmap RenderCore(const RenderOptions& options) {
     return {};
   }
   if (document->hasUnresolvedImports()) {
-    CommandError("pagx render") << error : unresolved import directive,
-        run 'pagx resolve' first\n ";
-        return {};
+    CommandError("pagx render") << "unresolved import directive, run 'pagx resolve' first\n";
+    return {};
   }
 
   FontConfig fontConfig = {};
@@ -434,8 +431,8 @@ static tgfx::Bitmap RenderCore(const RenderOptions& options) {
     rootLayer = LayerBuilder::Build(document.get());
   }
   if (rootLayer == nullptr) {
-    CommandError("pagx render") << failed to build layer tree\n ";
-        return {};
+    CommandError("pagx render") << "failed to build layer tree\n";
+    return {};
   }
 
   if (hasTarget) {
@@ -443,31 +440,31 @@ static tgfx::Bitmap RenderCore(const RenderOptions& options) {
     if (!options.id.empty()) {
       auto* node = document->findNode(options.id);
       if (node == nullptr) {
-        CommandError("pagx render") << no node found with id '" << options.id << "'\n ";
-            return {};
+        CommandError("pagx render") << "no node found with id '" << options.id << "'\n";
+        return {};
       }
       if (node->nodeType() != NodeType::Layer) {
-        CommandError("pagx render") << node '" << options.id << "' is not a Layer\n ";
-            return {};
+        CommandError("pagx render") << "node '" << options.id << "' is not a Layer\n";
+        return {};
       }
       targetPagxLayer = static_cast<const Layer*>(node);
     } else {
       xmlDocPtr xmlDoc = xmlReadFile(options.inputFile.c_str(), nullptr, XML_PARSE_NONET);
       if (xmlDoc == nullptr) {
-        CommandError("pagx render") << failed to parse XML from '" << options.inputFile << "'\n ";
-            return {};
+        CommandError("pagx render") << "failed to parse XML from '" << options.inputFile << "'\n";
+        return {};
       }
       targetPagxLayer = EvaluateSingleXPath(xmlDoc, options.xpath, document.get(), "render");
       xmlFreeDoc(xmlDoc);
       if (targetPagxLayer == nullptr) {
-        CommandError("pagx render") << no matching Layer found\n ";
-            return {};
+        CommandError("pagx render") << "no matching Layer found\n";
+        return {};
       }
     }
     targetTgfxLayer = buildResult.getLayer(targetPagxLayer);
     if (targetTgfxLayer == nullptr) {
-      CommandError("pagx render") << target Layer has no rendered layer\n ";
-          return {};
+      CommandError("pagx render") << "target Layer has no rendered layer\n";
+      return {};
     }
   }
 
@@ -505,19 +502,19 @@ static tgfx::Bitmap RenderCore(const RenderOptions& options) {
   int outputWidth = static_cast<int>(ceilf(sourceWidth * options.scale));
   int outputHeight = static_cast<int>(ceilf(sourceHeight * options.scale));
   if (outputWidth <= 0 || outputHeight <= 0) {
-    CommandError("pagx render") << output dimensions are zero\n ";
-        return {};
+    CommandError("pagx render") << "output dimensions are zero\n";
+    return {};
   }
 
   auto device = pag::Devices::MakeDefault();
   if (device == nullptr) {
-    CommandError("pagx render") << failed to create the GPU device\n ";
-        return {};
+    CommandError("pagx render") << "failed to create the GPU device\n";
+    return {};
   }
   auto context = device->lockContext();
   if (context == nullptr) {
-    CommandError("pagx render") << failed to lock the GPU context\n ";
-        return {};
+    CommandError("pagx render") << "failed to lock the GPU context\n";
+    return {};
   }
 
   if (options.hasBackground) {
@@ -528,8 +525,8 @@ static tgfx::Bitmap RenderCore(const RenderOptions& options) {
   auto surface = tgfx::Surface::Make(context, outputWidth, outputHeight);
   if (surface == nullptr) {
     device->unlock();
-    CommandError("pagx render") << failed to create surface (" << outputWidth << "x" << outputHeight
-              << ")\n";
+    CommandError("pagx render") << "failed to create surface (" << outputWidth << "x"
+                                << outputHeight << ")\n";
     return {};
   }
 
@@ -550,15 +547,15 @@ static tgfx::Bitmap RenderCore(const RenderOptions& options) {
   tgfx::Bitmap bitmap(outputWidth, outputHeight, false, false);
   if (bitmap.isEmpty()) {
     device->unlock();
-    CommandError("pagx render") << failed to allocate bitmap\n ";
-        return {};
+    CommandError("pagx render") << "failed to allocate bitmap\n";
+    return {};
   }
   tgfx::Pixmap pixmap(bitmap);
   bool readSuccess = surface->readPixels(pixmap.info(), pixmap.writablePixels());
   device->unlock();
   if (!readSuccess) {
-    CommandError("pagx render") << failed to read pixels from surface\n ";
-        return {};
+    CommandError("pagx render") << "failed to read pixels from surface\n";
+    return {};
   }
   return bitmap;
 }
@@ -583,16 +580,16 @@ static int RenderFrameSequence(const RenderOptions& options) {
   std::string errorMsg = {};
   auto source = VideoFrameSource::Make(document, videoOptions, &errorMsg);
   if (source == nullptr) {
-    CommandError("pagx render") << " << errorMsg << "\n ";
-        return 1;
+    CommandError("pagx render") << "" << errorMsg << "\n";
+    return 1;
   }
   const auto& exporter = source->exporter();
 
   std::error_code createError = {};
   std::filesystem::create_directories(options.framesDir, createError);
   if (createError) {
-    CommandError("pagx render") << failed to create directory '" << options.framesDir << "'\n ";
-        return 1;
+    CommandError("pagx render") << "failed to create directory '" << options.framesDir << "'\n";
+    return 1;
   }
 
   auto width = exporter->width();
@@ -640,12 +637,12 @@ int RunRender(int argc, char* argv[]) {
   auto encodedData =
       tgfx::ImageCodec::Encode(pixmap, GetEncodedFormat(options.format), options.quality);
   if (encodedData == nullptr) {
-    CommandError("pagx render") << failed to encode image\n ";
-        return 1;
+    CommandError("pagx render") << "failed to encode image\n";
+    return 1;
   }
   if (!WriteDataToFile(options.outputFile, encodedData)) {
-    CommandError("pagx render") << failed to write '" << options.outputFile << "'\n ";
-        return 1;
+    CommandError("pagx render") << "failed to write '" << options.outputFile << "'\n";
+    return 1;
   }
   std::cout << "pagx render: wrote " << options.outputFile << " (" << bitmap.width() << "x"
             << bitmap.height() << ")\n";

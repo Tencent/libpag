@@ -4637,8 +4637,7 @@ CLI_TEST(PAGXCliTest, VideoEncoder_ExecutesTheValidatedRelativePath) {
     setenv("PATH", pathDirectory.c_str(), 1);
     std::filesystem::current_path(currentDirectory);
     auto location = pagx::cli::FindFFmpeg("ffmpeg");
-    auto encoder = pagx::cli::VideoEncoder::Start(location.path, *format, options,
-                                                  options.outputFile + ".part", &errorMsg);
+    auto encoder = pagx::cli::VideoEncoder::Start(location.path, *format, options, &errorMsg);
     started = encoder != nullptr;
     if (started) {
       std::vector<uint8_t> frame = {};
@@ -4674,8 +4673,7 @@ CLI_TEST(PAGXCliTest, VideoEncoder_EncodesPaddedFramesWhenFFmpegIsAvailable) {
   std::filesystem::remove(options.outputFile + ".part");
 
   std::string errorMsg;
-  auto encoder = pagx::cli::VideoEncoder::Start(location.path, *format, options,
-                                                options.outputFile + ".part", &errorMsg);
+  auto encoder = pagx::cli::VideoEncoder::Start(location.path, *format, options, &errorMsg);
   ASSERT_NE(encoder, nullptr) << errorMsg;
   std::vector<uint8_t> frame = {};
   for (int index = 0; index < frameCount; ++index) {
@@ -4724,12 +4722,10 @@ CLI_TEST(PAGXCliTest, VideoEncoder_UsesDistinctTemporaryFilesForTheSameOutput) {
   std::filesystem::remove(options.outputFile);
 
   std::string errorMsg;
-  auto first = pagx::cli::VideoEncoder::Start(location.path, *format, options,
-                                              options.outputFile + ".part", &errorMsg);
+  auto first = pagx::cli::VideoEncoder::Start(location.path, *format, options, &errorMsg);
   ASSERT_NE(first, nullptr) << errorMsg;
   errorMsg.clear();
-  auto second = pagx::cli::VideoEncoder::Start(location.path, *format, options,
-                                               options.outputFile + ".part", &errorMsg);
+  auto second = pagx::cli::VideoEncoder::Start(location.path, *format, options, &errorMsg);
   ASSERT_NE(second, nullptr) << errorMsg;
 
   std::vector<uint8_t> frame = {};
@@ -4764,8 +4760,7 @@ CLI_TEST(PAGXCliTest, VideoEncoder_FailurePreservesAnUnrelatedFixedPartFile) {
   }
 
   std::string errorMsg;
-  auto encoder = pagx::cli::VideoEncoder::Start(location.path, *format, options,
-                                                options.outputFile + ".part", &errorMsg);
+  auto encoder = pagx::cli::VideoEncoder::Start(location.path, *format, options, &errorMsg);
   ASSERT_NE(encoder, nullptr) << errorMsg;
   std::vector<uint8_t> frame = {};
   FillVideoFrame(&frame, stride, width, height, 0);
@@ -4801,8 +4796,7 @@ CLI_TEST(PAGXCliTest, VideoEncoder_HandlesAnEarlyClosedPipe) {
   auto* format = pagx::cli::FindVideoFormat("mp4");
   ASSERT_NE(format, nullptr);
   std::string errorMsg;
-  auto encoder = pagx::cli::VideoEncoder::Start(script, *format, options,
-                                                options.outputFile + ".part", &errorMsg);
+  auto encoder = pagx::cli::VideoEncoder::Start(script, *format, options, &errorMsg);
   ASSERT_NE(encoder, nullptr) << errorMsg;
   for (int attempt = 0; attempt < 1000 && !std::filesystem::exists(readyFile); ++attempt) {
     usleep(1000);
@@ -4832,8 +4826,7 @@ CLI_TEST(PAGXCliTest, VideoEncoder_ReportsConsumerExitStatus) {
   auto* format = pagx::cli::FindVideoFormat("mp4");
   ASSERT_NE(format, nullptr);
   std::string errorMsg;
-  auto encoder = pagx::cli::VideoEncoder::Start(script, *format, options,
-                                                options.outputFile + ".part", &errorMsg);
+  auto encoder = pagx::cli::VideoEncoder::Start(script, *format, options, &errorMsg);
   ASSERT_NE(encoder, nullptr) << errorMsg;
   std::vector<uint8_t> frame = {};
   FillVideoFrame(&frame, 320 * 4, 320, 180, 0);
@@ -4861,8 +4854,7 @@ CLI_TEST(PAGXCliTest, VideoEncoder_ReportsExecFailureAndPreservesFixedPartFile) 
   auto missingExecutable = TempDir() + "/missing-ffmpeg";
   std::filesystem::remove(missingExecutable);
   std::string errorMsg = {};
-  auto encoder = pagx::cli::VideoEncoder::Start(missingExecutable, *format, options,
-                                                options.outputFile + ".part", &errorMsg);
+  auto encoder = pagx::cli::VideoEncoder::Start(missingExecutable, *format, options, &errorMsg);
 #ifdef _WIN32
   ASSERT_EQ(encoder, nullptr);
   EXPECT_FALSE(errorMsg.empty());
@@ -4894,8 +4886,7 @@ CLI_TEST(PAGXCliTest, VideoEncoder_DoesNotKillAnExternallyReapedProcess) {
   auto options = DefaultVideoOptions();
   options.outputFile = TempDir() + "/externally_reaped.mp4";
   std::string errorMsg;
-  auto encoder = pagx::cli::VideoEncoder::Start(location.path, *format, options,
-                                                options.outputFile + ".part", &errorMsg);
+  auto encoder = pagx::cli::VideoEncoder::Start(location.path, *format, options, &errorMsg);
   ASSERT_NE(encoder, nullptr) << errorMsg;
   auto processId = encoder->childProcessId();
   ASSERT_GT(processId, 0);
