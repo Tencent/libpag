@@ -154,6 +154,11 @@ bool VideoExportFrameImpl::readPixels(void* dstPixels, size_t dstRowBytes) {
   if (status() != VideoExportFrameStatus::Ready) {
     return false;
   }
+  auto width = cpuPixels != nullptr ? cpuPixels->width() : readback->info().width();
+  if (width <= 0 || dstRowBytes < static_cast<size_t>(width) * 4) {
+    fail("invalid destination row bytes");
+    return false;
+  }
   auto success = false;
   if (cpuPixels != nullptr) {
     auto destination =
