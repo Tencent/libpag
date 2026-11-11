@@ -1659,11 +1659,37 @@ static void AddBaseValueKeyframes(Channel* channel, ChannelValueType valueType, 
 
 // Finds the first element of the given NodeType in a Layer's contents. Returns nullptr when not
 // found.
+namespace {
+
+// Depth-first search for the first element of `type`. A referenced leaf shape can sit inside a
+// Group (a <use> with x/y wraps it to carry the instance offset), so a flat scan of the layer's
+// contents would miss the animation target entirely.
+Element* FindElementOfType(Element* element, NodeType type) {
+  if (element == nullptr) {
+    return nullptr;
+  }
+  if (element->nodeType() == type) {
+    return element;
+  }
+  if (element->nodeType() != NodeType::Group) {
+    return nullptr;
+  }
+  auto* group = static_cast<Group*>(element);
+  for (auto* child : group->elements) {
+    if (auto* found = FindElementOfType(child, type)) {
+      return found;
+    }
+  }
+  return nullptr;
+}
+
+}  // namespace
+
 Element* SMILAnimationParser::findContentNode(const AnimatedNodeInfo& nodeInfo, NodeType type) {
   if (nodeInfo.targetLayer != nullptr) {
     for (auto* el : nodeInfo.targetLayer->contents) {
-      if (el != nullptr && el->nodeType() == type) {
-        return el;
+      if (auto* found = FindElementOfType(el, type)) {
+        return found;
       }
     }
   }
