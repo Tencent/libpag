@@ -20,6 +20,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cerrno>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -68,6 +69,37 @@ inline std::shared_ptr<tgfx::Typeface> ResolveFallbackTypeface(const std::string
   auto family = commaPos != std::string::npos ? specifier.substr(0, commaPos) : specifier;
   auto style = commaPos != std::string::npos ? specifier.substr(commaPos + 1) : std::string();
   return SystemFonts::ResolveTypeface(family, style);
+}
+
+/**
+ * Parses an integer option within the inclusive range, rejecting overflow and trailing characters.
+ * Returns false without modifying value when the input is invalid.
+ */
+inline bool ParseIntOption(const char* text, long minValue, long maxValue, long* value) {
+  char* endPtr = nullptr;
+  errno = 0;
+  auto parsed = strtol(text, &endPtr, 10);
+  if (errno != 0 || endPtr == text || *endPtr != '\0' || parsed < minValue || parsed > maxValue) {
+    return false;
+  }
+  *value = parsed;
+  return true;
+}
+
+/**
+ * Parses a finite floating-point option with an inclusive or exclusive lower bound. Returns false
+ * without modifying value when the input is invalid or overflows.
+ */
+inline bool ParseFloatOption(const char* text, float minValue, bool includeMin, float* value) {
+  char* endPtr = nullptr;
+  errno = 0;
+  auto parsed = strtof(text, &endPtr);
+  if (errno != 0 || endPtr == text || *endPtr != '\0' || !std::isfinite(parsed) ||
+      (includeMin ? parsed < minValue : parsed <= minValue)) {
+    return false;
+  }
+  *value = parsed;
+  return true;
 }
 
 /**

@@ -123,10 +123,10 @@ if (!hasExplicitFFmpeg(args)) {
   const ffmpeg = resolveFFmpegForCLI(args);
   if (ffmpeg) {
     process.env.FFMPEG_BIN = ffmpeg;
-  } else if (isMP4Export(args)) {
+  } else if (isMP4Export(args) && !args.includes('--dry-run')) {
     console.error("pagx: ffmpeg is required for MP4 export but was not found.");
-    console.error("pagx: reinstall the npm package to retry the ffmpeg download:");
-    console.error("  npm install -g @libpag/pagx");
+    console.error("pagx: retry the ffmpeg download without reinstalling the package:");
+    console.error('  npm run download:ffmpeg --prefix "$(npm root -g)/@libpag/pagx"');
     process.exit(1);
   }
 }

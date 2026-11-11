@@ -412,8 +412,17 @@ std::unique_ptr<VideoEncoder> VideoEncoder::Start(const std::string& ffmpegPath,
 }
 
 bool VideoEncoder::spawnChild(const std::vector<std::string>& arguments, std::string* errorMsg) {
-  auto process = std::make_unique<ChildProcess>();
 #ifdef _WIN32
+  return spawnChildWindows(arguments, errorMsg);
+#else
+  return spawnChildPosix(arguments, errorMsg);
+#endif
+}
+
+#ifdef _WIN32
+bool VideoEncoder::spawnChildWindows(const std::vector<std::string>& arguments,
+                                     std::string* errorMsg) {
+  auto process = std::make_unique<ChildProcess>();
   auto applicationName = UTF8ToWide(arguments.front());
   if (applicationName.empty()) {
     SetError(errorMsg, "failed to encode the ffmpeg path as UTF-16");
@@ -469,7 +478,11 @@ bool VideoEncoder::spawnChild(const std::vector<std::string>& arguments, std::st
   process->stdinPipe = writePipe;
   child = std::move(process);
   return true;
+}
 #else
+bool VideoEncoder::spawnChildPosix(const std::vector<std::string>& arguments,
+                                   std::string* errorMsg) {
+  auto process = std::make_unique<ChildProcess>();
   int fds[2] = {-1, -1};
   if (pipe(fds) != 0) {
     SetError(errorMsg,
@@ -517,8 +530,8 @@ bool VideoEncoder::spawnChild(const std::vector<std::string>& arguments, std::st
   process->stdinPipe = fds[1];
   child = std::move(process);
   return true;
-#endif
 }
+#endif
 
 bool VideoEncoder::writeFrame(const uint8_t* pixels, size_t rowBytes, std::string* errorMsg) {
   if (stopped || child == nullptr) {

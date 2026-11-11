@@ -4623,9 +4623,6 @@ CLI_TEST(PAGXCliTest, VideoEncoder_ReportsExecFailureAndPreservesFixedPartFile) 
 }
 
 CLI_TEST(PAGXCliTest, Export_Mp4DryRunAcceptsStaticDocument) {
-  if (pagx::cli::FindFFmpeg("").path.empty()) {
-    GTEST_SKIP() << "ffmpeg is not available";
-  }
   auto inputPath = TempDir() + "/static_input.pagx";
   auto outputPath = TempDir() + "/static_output.mp4";
   {
@@ -4650,10 +4647,25 @@ CLI_TEST(PAGXCliTest, Export_Mp4DryRunAcceptsStaticDocument) {
   EXPECT_FALSE(std::filesystem::exists(outputPath));
 }
 
-CLI_TEST(PAGXCliTest, Export_Mp4DryRunDownscalesToTheGPUTextureLimit) {
-  if (pagx::cli::FindFFmpeg("").path.empty()) {
-    GTEST_SKIP() << "ffmpeg is not available";
+CLI_TEST(PAGXCliTest, Export_Mp4DryRunDoesNotRequireAnExecutable) {
+  auto inputPath = TestResourcePath("render_animated_timelines.pagx");
+  auto outputPath = TempDir() + "/dry_run_without_ffmpeg.mp4";
+  auto missingExecutable = TempDir() + "/missing-ffmpeg";
+  std::filesystem::remove(missingExecutable);
+  std::string output;
+  int ret = 0;
+  {
+    StreamCapture capturedOut(std::cout);
+    ret = CallRun(pagx::cli::RunExport, {"export", "--input", inputPath, "--output", outputPath,
+                                         "--ffmpeg", missingExecutable, "--dry-run"});
+    output = capturedOut.str();
   }
+  EXPECT_EQ(ret, 0);
+  EXPECT_NE(output.find(missingExecutable), std::string::npos);
+  EXPECT_FALSE(std::filesystem::exists(outputPath));
+}
+
+CLI_TEST(PAGXCliTest, Export_Mp4DryRunDownscalesToTheGPUTextureLimit) {
   auto inputPath = TempDir() + "/oversized_input.pagx";
   auto outputPath = TempDir() + "/oversized_output.mp4";
   {
@@ -4684,9 +4696,6 @@ CLI_TEST(PAGXCliTest, Export_Mp4DryRunDownscalesToTheGPUTextureLimit) {
 }
 
 CLI_TEST(PAGXCliTest, Export_Mp4DryRunPrintsTheCommandLineAndWritesNothing) {
-  if (pagx::cli::FindFFmpeg("").path.empty()) {
-    GTEST_SKIP() << "ffmpeg is not available";
-  }
   auto inputPath = TestResourcePath("render_animated_timelines.pagx");
   auto outputPath = TempDir() + "/export_dry_run.mp4";
   std::filesystem::remove(outputPath);

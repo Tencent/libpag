@@ -27,6 +27,11 @@
 #include "pagx/PAGXImporter.h"
 #include "pagx/VideoExporter.h"
 #include "pagx/nodes/Animation.h"
+#include "pagx/nodes/AnimationObject.h"
+#include "pagx/nodes/AnimationState.h"
+#include "pagx/nodes/Channel.h"
+#include "pagx/nodes/StateMachine.h"
+#include "pagx/nodes/StateRegion.h"
 
 namespace pag {
 namespace {
@@ -44,7 +49,8 @@ std::shared_ptr<pagx::PAGXDocument> MakeStaticDocument() {
       "</pagx>\n");
 }
 
-std::shared_ptr<pagx::PAGXDocument> MakeNestedAnimationDocument() {
+std::shared_ptr<pagx::PAGXDocument> MakeNestedAnimationDocument(
+    const std::string& frameRate = "60") {
   return pagx::PAGXImporter::FromXML(
       "<pagx width=\"60\" height=\"60\">\n"
       "  <Resources>\n"
@@ -54,7 +60,9 @@ std::shared_ptr<pagx::PAGXDocument> MakeNestedAnimationDocument() {
       "        <Fill><SolidColor id=\"cardColor\" color=\"#00FF00\"/></Fill>\n"
       "      </Layer>\n"
       "      <Animations>\n"
-      "        <Animation id=\"cardShift\" duration=\"20\" frameRate=\"60\" loop=\"once\">\n"
+      "        <Animation id=\"cardShift\" duration=\"20\" frameRate=\"" +
+      frameRate +
+      "\" loop=\"once\">\n"
       "          <Object target=\"cardColor\">\n"
       "            <Channel name=\"color\" type=\"color\">\n"
       "              <Key time=\"0\" value=\"#00FF00\" interpolation=\"hold\"/>\n"
@@ -69,6 +77,34 @@ std::shared_ptr<pagx::PAGXDocument> MakeNestedAnimationDocument() {
       "    <Timelines><Animation ref=\"@cardShift\"/></Timelines>\n"
       "  </Layer>\n"
       "</pagx>\n");
+}
+
+std::shared_ptr<pagx::PAGXDocument> MakeStateMachineDocument() {
+  auto document = MakeStaticDocument();
+  auto animation = document->makeNode<pagx::Animation>("stateAnimation");
+  animation->duration = 10;
+  animation->frameRate = 10.0f;
+  animation->loop = pagx::LoopMode::Once;
+  auto object = document->makeNode<pagx::AnimationObject>();
+  object->target = "static";
+  animation->objects.push_back(object);
+  auto channel = document->makeNode<pagx::TypedChannel<float>>();
+  channel->name = "x";
+  channel->keyframes.push_back({0, 100.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  channel->keyframes.push_back({10, 200.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  object->channels.push_back(channel);
+
+  auto stateMachine = document->makeNode<pagx::StateMachine>("stateMachine");
+  document->animations.push_back(stateMachine);
+  auto region = document->makeNode<pagx::StateRegion>();
+  region->name = "main";
+  region->initialState = "active";
+  auto state = document->makeNode<pagx::AnimationState>();
+  state->name = "active";
+  state->animationId = animation->id;
+  region->states.push_back(state);
+  stateMachine->regions.push_back(region);
+  return document;
 }
 
 std::shared_ptr<pagx::PAGXDocument> MakeAnimatedDocument(const std::string& loop,
@@ -216,6 +252,47 @@ PAGX_TEST(PAGXVideoExporterTest, DoesNotReuseFramesForNestedAnimations) {
   }
   EXPECT_EQ(exporter->pixels()[centerOffset], 255);  // Red after frame 10.
   EXPECT_EQ(exporter->pixels()[centerOffset + 1], 0);
+}
+
+PAGX_TEST(PAGXVideoExporterTest, MakeUsesNestedAnimationPeriodByDefault) {
+  auto exporter = pagx::VideoExporter::Make(MakeNestedAnimationDocument());
+  ASSERT_TRUE(exporter != nullptr);
+  EXPECT_EQ(exporter->frameRate(), 60);
+  EXPECT_EQ(exporter->frameCount(), 20);
+}
+
+PAGX_TEST(PAGXVideoExporterTest, NestedAnimationDoesNotChangeTopLevelSamplingRate) {
+  auto exporter = pagx::VideoExporter::Make(MakeNestedAnimationDocument("30"));
+  ASSERT_TRUE(exporter != nullptr);
+  EXPECT_EQ(exporter->frameRate(), 60);
+  EXPECT_EQ(exporter->frameCount(), 40);
+}
+
+PAGX_TEST(PAGXVideoExporterTest, MakeRequiresDurationForStateMachine) {
+  std::string errorMsg = {};
+  auto exporter = pagx::VideoExporter::Make(MakeStateMachineDocument(), {}, &errorMsg);
+  EXPECT_EQ(exporter, nullptr);
+  EXPECT_NE(errorMsg.find("explicit duration"), std::string::npos);
+}
+
+PAGX_TEST(PAGXVideoExporterTest, AdvancesTopLevelStateMachine) {
+#ifdef TGFX_USE_WEBGPU
+  GTEST_SKIP() << "VideoExporter currently requires synchronous pixel readback";
+#endif
+  pagx::VideoExportOptions options = {};
+  options.frameRate = 10;
+  options.duration = 1.0f;
+  auto exporter = pagx::VideoExporter::Make(MakeStateMachineDocument(), options);
+  ASSERT_TRUE(exporter != nullptr);
+  ASSERT_TRUE(exporter->nextFrame());
+  auto initialPixel = static_cast<size_t>(50) * exporter->rowBytes() + 180 * 4;
+  EXPECT_EQ(exporter->pixels()[initialPixel + 3], 255);
+  auto frameBytes = exporter->rowBytes() * static_cast<size_t>(exporter->height());
+  std::vector<uint8_t> firstFrame(exporter->pixels(), exporter->pixels() + frameBytes);
+  for (int frame = 1; frame < 10; ++frame) {
+    ASSERT_TRUE(exporter->nextFrame());
+  }
+  EXPECT_NE(std::memcmp(firstFrame.data(), exporter->pixels(), frameBytes), 0);
 }
 
 PAGX_TEST(PAGXVideoExporterTest, MakeUsesTheFullPingPongPeriod) {

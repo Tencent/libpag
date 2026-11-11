@@ -29,6 +29,7 @@
 #include <vector>
 #include "cli/CliUtils.h"
 #include "cli/VideoEncoder.h"
+#include "cli/VideoFrameSource.h"
 #include "pagx/FontConfig.h"
 #include "pagx/HTMLExporter.h"
 #include "pagx/PAGXImporter.h"
@@ -53,6 +54,7 @@ struct ExportOptions {
   bool pptIgnoreGlyphRuns = false;
   // Sampling options shared with the render command. Zero frame rate means "use the document
   // animation frame rate"; a non-positive duration means "the longest full playback period".
+  // State machines require an explicit positive duration.
   int frameRate = 0;
   float duration = -1.0f;
   float scale = 1.0f;
@@ -76,104 +78,195 @@ struct ExportOptions {
   std::string firstVideoOnlyOption = {};
 };
 
+constexpr const char* kCommonUsage = R"(Usage: pagx export [options]
+
+Export a PAGX file to another format.
+
+Options:
+  --input <file>              Input PAGX file (required; repeat to add more slides,
+                              pptx only). Each --input becomes one slide in the deck.
+  --output <file>             Output file (default: <first input>.<format>)
+  --format <format>           Output format (svg, pptx, html, mp4; inferred from --output extension)
+  --text-to-path              Convert text to path geometry (default: native text)
+  --font <path>               Register a font file (repeatable; used by mp4 rendering)
+  --fallback <path|name>      Add a fallback font file or system font name (repeatable;
+                              used by mp4 rendering)
+
+)";
+
+constexpr const char* kSVGUsage = R"(SVG options:
+  --svg-indent <n>            Indentation spaces (default: 2, valid range: 0-16)
+  --svg-no-xml-declaration    Omit the <?xml ...?> declaration
+
+)";
+
+constexpr const char* kPPTUsage = R"(PPT options:
+  --ppt-no-bake-unsupported
+                              Do not bake layers that use features OOXML cannot
+                              represent natively (masks, scrollRect clipping, blend
+                              modes outside of Normal/Multiply/Screen/Darken/Lighten,
+                              wide-gamut color, and BackgroundBlurStyle) into PNG
+                              patches. By default these layers are baked so the slide
+                              matches the tgfx renderer; for unsupported blend modes
+                              and BackgroundBlurStyle the backdrop beneath the layer
+                              is baked too so the composite (or frosted-glass blur)
+                              renders correctly, at the cost of turning native content
+                              under the patch into pixels. Pass this flag to silently
+                              drop those features and emit the layer as editable
+                              shapes instead (mask ignored, scrollRect dropped, blend
+                              falls back to Normal, wide-gamut clamped to sRGB).
+  --ppt-ignore-glyphruns
+                              Ignore the GlyphRun geometry carried by Text nodes and
+                              emit native, editable PowerPoint text derived from the
+                              Text's text attribute instead. By default a Text with
+                              GlyphRun data is rendered as custom glyph paths for exact
+                              fidelity; pass this flag to trade that fidelity for
+                              editable text. Text nodes without GlyphRun data are
+                              unaffected. Opposite of --text-to-path; if both are
+                              given, --text-to-path wins.
+
+)";
+
+constexpr const char* kMP4Usage =
+    R"(MP4 options (requires an external ffmpeg executable: --ffmpeg, $FFMPEG_BIN, or PATH):
+  --fps <n>                   Sampling frame rate (default: the integer document animation
+                              frame rate, falling back to 60); valid range: 1-120;
+                              mixed/non-integer document rates require an explicit value
+  --duration <seconds>        Sequence length (default: the longest full playback period;
+                              static documents produce one frame; state machines require
+                              an explicit value)
+  --scale <float>             Output scale applied to the document size (default: 1.0;
+                              automatically downscaled to the GPU texture limit)
+  --background <color>        Opaque background color as #RRGGBB (default: #FFFFFF);
+                              mp4 cannot carry alpha
+  --crf <0-51>                Constant rate factor (default: 20, lower is better)
+  --no-crf                    Do not pass -crf, for encoders without CRF support
+  --preset <name>             Encoder preset (default: medium)
+  --no-preset                 Do not pass -preset, for encoders without preset support
+  --encoder <name>            Encoder (default: libx264; macOS can explicitly select )"
+    "h264_videotoolbox)\n"
+    R"(  --encoder-args "<args>"      Extra ffmpeg arguments appended after the generated ones
+  --ffmpeg <path>             ffmpeg executable (default: $FFMPEG_BIN, then PATH)
+  --dry-run                   Print the ffmpeg command line instead of encoding
+
+)";
+
+constexpr const char* kExampleUsage = R"(Examples:
+  pagx export --input icon.pagx                    # PAGX to icon.svg
+  pagx export --input icon.pagx --output out.svg   # PAGX to out.svg
+  pagx export --input icon.pagx --output out.pptx  # PAGX to out.pptx
+  pagx export --format svg --input icon.pagx       # force SVG output format
+  pagx export --format pptx --input icon.pagx      # force PPTX output format
+  pagx export --input a.pagx --input b.pagx --output deck.pptx
+                                                   # multi-slide deck (one slide per input)
+  pagx export --input icon.pagx --svg-indent 4     # 4-space indent
+  pagx export --input icon.pagx --text-to-path     # convert text to paths
+  pagx export --input icon.pagx --output out.pptx --ppt-no-bake-unsupported
+                                                   # keep unsupported features editable
+  pagx export --input icon.pagx --output out.pptx --ppt-ignore-glyphruns
+                                                   # emit editable text, ignore GlyphRuns
+  pagx export --input icon.pagx --output icon.html # PAGX to HTML
+  pagx export --input motion.pagx --output out.mp4 --fps 60 --crf 20
+                                                   # animated PAGX to MP4
+  pagx export --input motion.pagx --output out.mp4 --dry-run
+                                                   # print the ffmpeg command line
+)";
+
 static void PrintUsage() {
-  std::cout
-      << "Usage: pagx export [options]\n"
-      << "\n"
-      << "Export a PAGX file to another format.\n"
-      << "\n"
-      << "Options:\n"
-      << "  --input <file>              Input PAGX file (required; repeat to add more slides,\n"
-      << "                              pptx only). Each --input becomes one slide in the deck.\n"
-      << "  --output <file>             Output file (default: <first input>.<format>)\n"
-      << "  --format <format>           Output format (svg, pptx, html, mp4; inferred from "
-         "--output extension)\n"
-      << "  --text-to-path              Convert text to path geometry (default: native text)\n"
-      << "  --font <path>               Register a font file (repeatable; used by mp4 rendering)\n"
-      << "  --fallback <path|name>      Add a fallback font file or system font name (repeatable;\n"
-      << "                              used by mp4 rendering)\n"
-      << "\n"
-      << "SVG options:\n"
-      << "  --svg-indent <n>            Indentation spaces (default: 2, valid range: 0-16)\n"
-      << "  --svg-no-xml-declaration    Omit the <?xml ...?> declaration\n"
-      << "\n"
-      << "PPT options:\n"
-      << "  --ppt-no-bake-unsupported\n"
-      << "                              Do not bake layers that use features OOXML cannot\n"
-      << "                              represent natively (masks, scrollRect clipping, blend\n"
-      << "                              modes outside of Normal/Multiply/Screen/Darken/Lighten,\n"
-      << "                              wide-gamut color, and BackgroundBlurStyle) into PNG\n"
-      << "                              patches. By default these layers are baked so the slide\n"
-      << "                              matches the tgfx renderer; for unsupported blend modes\n"
-      << "                              and BackgroundBlurStyle the backdrop beneath the layer\n"
-      << "                              is baked too so the composite (or frosted-glass blur)\n"
-      << "                              renders correctly, at the cost of turning native content\n"
-      << "                              under the patch into pixels. Pass this flag to silently\n"
-      << "                              drop those features and emit the layer as editable\n"
-      << "                              shapes instead (mask ignored, scrollRect dropped, blend\n"
-      << "                              falls back to Normal, wide-gamut clamped to sRGB).\n"
-      << "  --ppt-ignore-glyphruns\n"
-      << "                              Ignore the GlyphRun geometry carried by Text nodes and\n"
-      << "                              emit native, editable PowerPoint text derived from the\n"
-      << "                              Text's text attribute instead. By default a Text with\n"
-      << "                              GlyphRun data is rendered as custom glyph paths for exact\n"
-      << "                              fidelity; pass this flag to trade that fidelity for\n"
-      << "                              editable text. Text nodes without GlyphRun data are\n"
-      << "                              unaffected. Opposite of --text-to-path; if both are\n"
-      << "                              given, --text-to-path wins.\n"
-      << "\n"
-      << "MP4 options (requires an external ffmpeg executable: --ffmpeg, $FFMPEG_BIN, or PATH):\n"
-      << "  --fps <n>                   Sampling frame rate (default: the integer document "
-         "animation\n"
-      << "                              frame rate, falling back to 60); valid range: 1-120;\n"
-      << "                              mixed/non-integer document rates require an explicit "
-         "value\n"
-      << "  --duration <seconds>        Sequence length (default: the longest full playback "
-         "period;\n"
-      << "                              static documents produce one frame)\n"
-      << "  --scale <float>             Output scale applied to the document size (default: 1.0;\n"
-      << "                              automatically downscaled to the GPU texture limit)\n"
-      << "  --background <color>        Opaque background color as #RRGGBB (default: #FFFFFF);\n"
-      << "                              mp4 cannot carry alpha\n"
-      << "  --crf <0-51>                Constant rate factor (default: 20, lower is better)\n"
-      << "  --no-crf                    Do not pass -crf, for encoders without CRF support\n"
-      << "  --preset <name>             Encoder preset (default: medium)\n"
-      << "  --no-preset                 Do not pass -preset, for encoders without preset support\n"
-      << "  --encoder <name>            Encoder (default: libx264; macOS can explicitly select "
-         "h264_videotoolbox)\n"
-      << "  --encoder-args \"<args>\"      Extra ffmpeg arguments appended after the generated "
-         "ones\n"
-      << "  --ffmpeg <path>             ffmpeg executable (default: $FFMPEG_BIN, then PATH)\n"
-      << "  --dry-run                   Print the ffmpeg command line instead of encoding\n"
-      << "\n"
-      << "Examples:\n"
-      << "  pagx export --input icon.pagx                    # PAGX to icon.svg\n"
-      << "  pagx export --input icon.pagx --output out.svg   # PAGX to out.svg\n"
-      << "  pagx export --input icon.pagx --output out.pptx  # PAGX to out.pptx\n"
-      << "  pagx export --format svg --input icon.pagx       # force SVG output format\n"
-      << "  pagx export --format pptx --input icon.pagx      # force PPTX output format\n"
-      << "  pagx export --input a.pagx --input b.pagx --output deck.pptx\n"
-      << "                                                   # multi-slide deck (one slide per "
-         "input)\n"
-      << "  pagx export --input icon.pagx --svg-indent 4     # 4-space indent\n"
-      << "  pagx export --input icon.pagx --text-to-path     # convert text to paths\n"
-      << "  pagx export --input icon.pagx --output out.pptx --ppt-no-bake-unsupported\n"
-      << "                                                   # keep unsupported features "
-         "editable\n"
-      << "  pagx export --input icon.pagx --output out.pptx --ppt-ignore-glyphruns\n"
-      << "                                                   # emit editable text, ignore "
-         "GlyphRuns\n"
-      << "  pagx export --input icon.pagx --output icon.html # PAGX to HTML\n"
-      << "  pagx export --input motion.pagx --output out.mp4 --fps 60 --crf 20\n"
-      << "                                                   # animated PAGX to MP4\n"
-      << "  pagx export --input motion.pagx --output out.mp4 --dry-run\n"
-      << "                                                   # print the ffmpeg command line\n";
+  std::cout << kCommonUsage << kSVGUsage << kPPTUsage << kMP4Usage << kExampleUsage;
+}
+
+static int ParseVideoOption(int argc, char* argv[], int* index, ExportOptions* options,
+                            bool* matched) {
+  auto& i = *index;
+  std::string arg = argv[i];
+  *matched = true;
+  if (arg == "--fps" && i + 1 < argc) {
+    long value = 0;
+    ++i;
+    if (!ParseIntOption(argv[i], 1, 120, &value)) {
+      std::cerr << "pagx export: error: invalid fps '" << argv[i] << "', must be 1-120\n";
+      return 1;
+    }
+    options->frameRate = static_cast<int>(value);
+    options->firstVideoOnlyOption = "--fps";
+  } else if (arg == "--duration" && i + 1 < argc) {
+    ++i;
+    if (!ParseFloatOption(argv[i], 0.0f, false, &options->duration)) {
+      std::cerr << "pagx export: error: invalid duration '" << argv[i]
+                << "', must be a positive number of seconds\n";
+      return 1;
+    }
+    options->firstVideoOnlyOption = "--duration";
+  } else if (arg == "--scale" && i + 1 < argc) {
+    ++i;
+    if (!ParseFloatOption(argv[i], 0.0f, false, &options->scale)) {
+      std::cerr << "pagx export: error: invalid scale '" << argv[i] << "'\n";
+      return 1;
+    }
+    options->firstVideoOnlyOption = "--scale";
+  } else if (arg == "--background" && i + 1 < argc) {
+    if (!ParseHexColor(argv[++i], &options->bgRed, &options->bgGreen, &options->bgBlue,
+                       &options->bgAlpha)) {
+      std::cerr << "pagx export: error: invalid color format, expected #RRGGBB or #RRGGBBAA\n";
+      return 1;
+    }
+    options->firstVideoOnlyOption = "--background";
+  } else if (arg == "--crf" && i + 1 < argc) {
+    long value = 0;
+    ++i;
+    if (!ParseIntOption(argv[i], 0, 51, &value)) {
+      std::cerr << "pagx export: error: invalid crf '" << argv[i] << "', must be 0-51\n";
+      return 1;
+    }
+    options->crf = static_cast<int>(value);
+    options->firstVideoOnlyOption = "--crf";
+  } else if (arg == "--no-crf") {
+    options->crf = -1;
+    options->firstVideoOnlyOption = "--no-crf";
+  } else if (arg == "--preset" && i + 1 < argc) {
+    options->preset = argv[++i];
+    options->firstVideoOnlyOption = "--preset";
+  } else if (arg == "--no-preset") {
+    options->preset.clear();
+    options->firstVideoOnlyOption = "--no-preset";
+  } else if (arg == "--encoder" && i + 1 < argc) {
+    options->encoder = argv[++i];
+    options->firstVideoOnlyOption = "--encoder";
+  } else if (arg == "--encoder-args" && i + 1 < argc) {
+    std::vector<std::string> extraArgs = {};
+    std::string parseError = {};
+    if (!SplitArguments(argv[++i], &extraArgs, &parseError)) {
+      std::cerr << "pagx export: error: invalid --encoder-args: " << parseError << "\n";
+      return 1;
+    }
+    options->encoderArgs.insert(options->encoderArgs.end(), extraArgs.begin(), extraArgs.end());
+    options->firstVideoOnlyOption = "--encoder-args";
+  } else if (arg == "--ffmpeg" && i + 1 < argc) {
+    options->ffmpegPath = argv[++i];
+    options->firstVideoOnlyOption = "--ffmpeg";
+  } else if (arg == "--dry-run") {
+    options->dryRun = true;
+    options->firstVideoOnlyOption = "--dry-run";
+  } else {
+    *matched = false;
+  }
+  return 0;
 }
 
 static int ParseOptions(int argc, char* argv[], ExportOptions* options) {
   int i = 1;
   while (i < argc) {
     std::string arg = argv[i];
+    bool videoOption = false;
+    auto videoResult = ParseVideoOption(argc, argv, &i, options, &videoOption);
+    if (videoOption) {
+      if (videoResult != 0) {
+        return videoResult;
+      }
+      i++;
+      continue;
+    }
     if (arg == "--input" && i + 1 < argc) {
       options->inputFiles.emplace_back(argv[++i]);
     } else if (arg == "--output" && i + 1 < argc) {
@@ -181,9 +274,9 @@ static int ParseOptions(int argc, char* argv[], ExportOptions* options) {
     } else if (arg == "--format" && i + 1 < argc) {
       options->format = argv[++i];
     } else if (arg == "--svg-indent" && i + 1 < argc) {
-      char* endPtr = nullptr;
-      long value = strtol(argv[++i], &endPtr, 10);
-      if (endPtr == argv[i] || *endPtr != '\0' || value < 0 || value > 16) {
+      long value = 0;
+      ++i;
+      if (!ParseIntOption(argv[i], 0, 16, &value)) {
         std::cerr << "pagx export: error: invalid indent '" << argv[i] << "' (must be 0-16)\n";
         return 1;
       }
@@ -196,78 +289,6 @@ static int ParseOptions(int argc, char* argv[], ExportOptions* options) {
       options->pptBakeUnsupported = false;
     } else if (arg == "--ppt-ignore-glyphruns") {
       options->pptIgnoreGlyphRuns = true;
-    } else if (arg == "--fps" && i + 1 < argc) {
-      char* endPtr = nullptr;
-      long value = strtol(argv[++i], &endPtr, 10);
-      if (endPtr == argv[i] || *endPtr != '\0' || value < 1 || value > 120) {
-        std::cerr << "pagx export: error: invalid fps '" << argv[i] << "', must be 1-120\n";
-        return 1;
-      }
-      options->frameRate = static_cast<int>(value);
-      options->firstVideoOnlyOption = "--fps";
-    } else if (arg == "--duration" && i + 1 < argc) {
-      char* endPtr = nullptr;
-      options->duration = strtof(argv[++i], &endPtr);
-      if (endPtr == argv[i] || *endPtr != '\0' || !std::isfinite(options->duration) ||
-          options->duration <= 0.0f) {
-        std::cerr << "pagx export: error: invalid duration '" << argv[i]
-                  << "', must be a positive number of seconds\n";
-        return 1;
-      }
-      options->firstVideoOnlyOption = "--duration";
-    } else if (arg == "--scale" && i + 1 < argc) {
-      char* endPtr = nullptr;
-      options->scale = strtof(argv[++i], &endPtr);
-      if (endPtr == argv[i] || *endPtr != '\0' || !std::isfinite(options->scale) ||
-          options->scale <= 0.0f) {
-        std::cerr << "pagx export: error: invalid scale '" << argv[i] << "'\n";
-        return 1;
-      }
-      options->firstVideoOnlyOption = "--scale";
-    } else if (arg == "--background" && i + 1 < argc) {
-      if (!ParseHexColor(argv[++i], &options->bgRed, &options->bgGreen, &options->bgBlue,
-                         &options->bgAlpha)) {
-        std::cerr << "pagx export: error: invalid color format, expected #RRGGBB or #RRGGBBAA\n";
-        return 1;
-      }
-      options->firstVideoOnlyOption = "--background";
-    } else if (arg == "--crf" && i + 1 < argc) {
-      char* endPtr = nullptr;
-      errno = 0;
-      long value = strtol(argv[++i], &endPtr, 10);
-      if (errno != 0 || endPtr == argv[i] || *endPtr != '\0' || value < 0 || value > 51) {
-        std::cerr << "pagx export: error: invalid crf '" << argv[i] << "', must be 0-51\n";
-        return 1;
-      }
-      options->crf = static_cast<int>(value);
-      options->firstVideoOnlyOption = "--crf";
-    } else if (arg == "--no-crf") {
-      options->crf = -1;
-      options->firstVideoOnlyOption = "--no-crf";
-    } else if (arg == "--preset" && i + 1 < argc) {
-      options->preset = argv[++i];
-      options->firstVideoOnlyOption = "--preset";
-    } else if (arg == "--no-preset") {
-      options->preset.clear();
-      options->firstVideoOnlyOption = "--no-preset";
-    } else if (arg == "--encoder" && i + 1 < argc) {
-      options->encoder = argv[++i];
-      options->firstVideoOnlyOption = "--encoder";
-    } else if (arg == "--encoder-args" && i + 1 < argc) {
-      std::vector<std::string> extraArgs = {};
-      std::string parseError = {};
-      if (!SplitArguments(argv[++i], &extraArgs, &parseError)) {
-        std::cerr << "pagx export: error: invalid --encoder-args: " << parseError << "\n";
-        return 1;
-      }
-      options->encoderArgs.insert(options->encoderArgs.end(), extraArgs.begin(), extraArgs.end());
-      options->firstVideoOnlyOption = "--encoder-args";
-    } else if (arg == "--ffmpeg" && i + 1 < argc) {
-      options->ffmpegPath = argv[++i];
-      options->firstVideoOnlyOption = "--ffmpeg";
-    } else if (arg == "--dry-run") {
-      options->dryRun = true;
-      options->firstVideoOnlyOption = "--dry-run";
     } else if (arg == "--font" && i + 1 < argc) {
       options->fontFiles.emplace_back(argv[++i]);
     } else if (arg == "--fallback" && i + 1 < argc) {
@@ -364,28 +385,65 @@ static void LimitOutputToTextureSize(const PAGXDocument& document, VideoExportOp
   options->scale = adjustedScale;
 }
 
+static FFmpegLocation ResolveFFmpegForExport(const ExportOptions& options) {
+  if (!options.dryRun) {
+    return FindFFmpeg(options.ffmpegPath);
+  }
+  FFmpegLocation location = {};
+  location.path = options.ffmpegPath;
+  if (location.path.empty()) {
+    const auto* environmentPath = std::getenv("FFMPEG_BIN");
+    if (environmentPath != nullptr) {
+      location.path = environmentPath;
+    }
+  }
+  if (location.path.empty()) {
+    location.path = "ffmpeg";
+  }
+  return location;
+}
+
+static VideoExportOptions BuildVideoExportOptions(const ExportOptions& options,
+                                                  const VideoFormatSpec& format) {
+  VideoExportOptions videoOptions = {};
+  videoOptions.frameRate = options.frameRate;
+  videoOptions.duration = options.duration;
+  videoOptions.scale = options.scale;
+  videoOptions.hasBackground = format.requiresOpaque;
+  videoOptions.background =
+      Color{options.bgRed, options.bgGreen, options.bgBlue, options.bgAlpha, ColorSpace::SRGB};
+  videoOptions.alignToEvenSize = true;
+  return videoOptions;
+}
+
+static void PrintSizeNotice(const PAGXDocument& document, const VideoExportOptions& videoOptions,
+                            const VideoExporter& exporter, const VideoFormatSpec& format) {
+  auto requestedWidth =
+      static_cast<int>(std::ceil(static_cast<double>(document.width) * videoOptions.scale));
+  auto requestedHeight =
+      static_cast<int>(std::ceil(static_cast<double>(document.height) * videoOptions.scale));
+  if (requestedWidth != exporter.width() || requestedHeight != exporter.height()) {
+    std::cerr << "pagx export: " << requestedWidth << "x" << requestedHeight << " rounded up to "
+              << exporter.width() << "x" << exporter.height() << " for the " << format.pixelFormat
+              << " pixel format\n";
+  }
+}
+
+static bool WriteMP4Frame(const VideoFrameView& frame, void* context, std::string* errorMsg) {
+  return static_cast<VideoEncoder*>(context)->writeFrame(frame.pixels, frame.rowBytes, errorMsg);
+}
+
 // Encodes the document's animations into a video file through an external ffmpeg executable. The
 // frames come from VideoExporter one at a time and go straight into ffmpeg's stdin, so the whole
 // sequence is never held in memory and no codec is linked into pagx.
 static int ExportToMP4(const ExportOptions& options, const VideoFormatSpec& format) {
-  auto document = LoadDocument(options.inputFiles.front(), "pagx export");
+  auto document = LoadVideoDocument(options.inputFiles.front(), options.fontFiles,
+                                    options.fallbacks, "pagx export");
   if (document == nullptr) {
     return 1;
   }
-  if (document->hasUnresolvedImports()) {
-    std::cerr << "pagx export: error: unresolved import directive, run 'pagx resolve' first\n";
-    return 1;
-  }
 
-  // Video is really rendered, unlike the vector exporters that carry the document's own geometry,
-  // so the fonts have to be registered before the scene applies layout.
-  FontConfig fontConfig = {};
-  if (!LoadFontConfig(&fontConfig, options.fontFiles, options.fallbacks, "pagx export")) {
-    return 1;
-  }
-  document->applyLayout(&fontConfig);
-
-  auto location = FindFFmpeg(options.ffmpegPath);
+  auto location = ResolveFFmpegForExport(options);
   if (location.path.empty()) {
     std::cerr << "pagx export: error: " << location.error << "\n"
               << "pagx export: install ffmpeg (for example 'brew install ffmpeg'), pass "
@@ -394,34 +452,19 @@ static int ExportToMP4(const ExportOptions& options, const VideoFormatSpec& form
     return 1;
   }
 
-  VideoExportOptions videoOptions = {};
-  videoOptions.frameRate = options.frameRate;
-  videoOptions.duration = options.duration;
-  videoOptions.scale = options.scale;
-  videoOptions.hasBackground = format.requiresOpaque;
-  videoOptions.background =
-      Color{options.bgRed, options.bgGreen, options.bgBlue, options.bgAlpha, ColorSpace::SRGB};
-  // 4:2:0 chroma subsampling cannot represent an odd width or height.
-  videoOptions.alignToEvenSize = true;
+  auto videoOptions = BuildVideoExportOptions(options, format);
   LimitOutputToTextureSize(*document, &videoOptions);
 
   std::string errorMsg = {};
-  auto exporter = VideoExporter::Make(document, videoOptions, &errorMsg);
-  if (exporter == nullptr) {
+  auto source = VideoFrameSource::Make(document, videoOptions, &errorMsg);
+  if (source == nullptr) {
     std::cerr << "pagx export: error: " << errorMsg << "\n";
     return 1;
   }
-
+  const auto& exporter = source->exporter();
   auto width = exporter->width();
   auto height = exporter->height();
-  auto requestedWidth =
-      static_cast<int>(std::ceil(static_cast<double>(document->width) * videoOptions.scale));
-  auto requestedHeight =
-      static_cast<int>(std::ceil(static_cast<double>(document->height) * videoOptions.scale));
-  if (requestedWidth != width || requestedHeight != height) {
-    std::cerr << "pagx export: " << requestedWidth << "x" << requestedHeight << " rounded up to "
-              << width << "x" << height << " for the " << format.pixelFormat << " pixel format\n";
-  }
+  PrintSizeNotice(*document, videoOptions, *exporter, format);
 
   VideoEncodeOptions encodeOptions = {};
   encodeOptions.width = width;
@@ -451,20 +494,8 @@ static int ExportToMP4(const ExportOptions& options, const VideoFormatSpec& form
 
   auto frameRate = exporter->frameRate();
   auto frameCount = exporter->frameCount();
-  int64_t progressStep = std::max<int64_t>(1, frameCount / 10);
-  while (exporter->nextFrame()) {
-    auto frame = exporter->currentFrame() - 1;
-    if (!encoder->writeFrame(exporter->pixels(), exporter->rowBytes(), &errorMsg)) {
-      std::cerr << "pagx export: error: " << errorMsg << "\n";
-      return 1;
-    }
-    if (frame % progressStep == 0) {
-      std::cout << "pagx export: " << (frame * 100 / frameCount) << "% (" << frame << "/"
-                << frameCount << ")" << std::endl;
-    }
-  }
-  if (exporter->currentFrame() < frameCount) {
-    std::cerr << "pagx export: error: failed to render frame " << exporter->currentFrame() << "\n";
+  if (!RunVideoFrames(*source, "pagx export", "pagx export: error: ", WriteMP4Frame, encoder.get(),
+                      &errorMsg)) {
     return 1;
   }
   if (!encoder->finish(&errorMsg)) {

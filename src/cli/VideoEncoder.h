@@ -142,6 +142,8 @@ class VideoEncoder {
   VideoEncoder(const VideoEncodeOptions& options, std::string partFile);
 
   bool spawnChild(const std::vector<std::string>& arguments, std::string* errorMsg);
+  bool spawnChildWindows(const std::vector<std::string>& arguments, std::string* errorMsg);
+  bool spawnChildPosix(const std::vector<std::string>& arguments, std::string* errorMsg);
   bool writeAll(const uint8_t* data, size_t size, std::string* errorMsg);
   void closeStdin();
   bool reapChild(int* exitCode);

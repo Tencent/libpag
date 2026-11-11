@@ -330,6 +330,11 @@ if (require.main === module) {
         console.log(postinstall ? `pagx: ffmpeg is ready at ${executablePath}` : executablePath);
       })
       .catch((error) => {
+        if (postinstall) {
+          console.warn(`pagx: optional ffmpeg download failed; MP4 export is unavailable.\n${formatDownloadError(error)}\n` +
+            'Retry with: npm run download:ffmpeg --prefix "$(npm root -g)/@libpag/pagx"');
+          return;
+        }
         console.error(formatDownloadError(error));
         process.exitCode = 1;
       });

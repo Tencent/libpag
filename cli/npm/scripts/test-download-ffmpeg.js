@@ -243,7 +243,7 @@ test('shares one installation between concurrent callers', async () => {
   }
 });
 
-test('postinstall reports download failures and fails installation', () => {
+test('postinstall warns about download failures without failing installation', () => {
   const root = tempDirectory();
   try {
     const result = spawnSync(process.execPath, [path.join(__dirname, 'download-ffmpeg.js'), '--postinstall'], {
@@ -256,9 +256,29 @@ test('postinstall reports download failures and fails installation', () => {
         PAGX_SKIP_FFMPEG_DOWNLOAD: '0',
       },
     });
+    assert.strictEqual(result.status, 0);
+    assert.match(result.stderr, /optional ffmpeg download failed/);
+    assert.match(result.stderr, /failed to install ffmpeg/);
+    assert.match(result.stderr, /npm run download:ffmpeg/);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('explicit ffmpeg downloads fail when installation fails', () => {
+  const root = tempDirectory();
+  try {
+    const result = spawnSync(process.execPath, [path.join(__dirname, 'download-ffmpeg.js')], {
+      encoding: 'utf8',
+      timeout: 10000,
+      env: {
+        ...process.env,
+        PAGX_FFMPEG_BASE_URL: 'http://127.0.0.1:1',
+        PAGX_FFMPEG_CACHE_DIR: root,
+      },
+    });
     assert.strictEqual(result.status, 1);
     assert.match(result.stderr, /failed to install ffmpeg/);
-    assert.match(result.stderr, /Check your network or proxy settings/);
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }

@@ -33,8 +33,10 @@ class Pixmap;
 namespace pagx {
 
 class PAGAnimation;
+class PAGComposition;
 class PAGScene;
 class PAGSurface;
+class PAGTimeline;
 class PAGXDocument;
 
 /**
@@ -54,10 +56,12 @@ struct VideoExportOptions {
   int frameRate = 0;
 
   /**
-   * Sequence length in seconds. Values <= 0 mean "use the longest top-level animation's playback
-   * period", including both passes of a PingPong animation. A document without animations produces
-   * one static frame by default; a positive duration repeats that frame. Must be finite. The frame
-   * count is derived as `llround(duration * frameRate)`.
+   * Sequence length in seconds. Values <= 0 mean "use the longest mounted animation's playback
+   * period", including both passes of a PingPong animation and any nested evaluation offset. A
+   * document without active timelines produces one static frame by default; a positive duration
+   * repeats that frame. Documents containing a state machine require an explicit positive duration
+   * because state machines have no finite playback period. Must be finite. The frame count is
+   * derived as `llround(duration * frameRate)`.
    */
   float duration = -1.0f;
 
@@ -95,9 +99,9 @@ struct VideoExportOptions {
 /**
  * VideoExporter produces an RGBA frame sequence from a document's animations or static scene. The
  * scene and the offscreen surface are created once and reused for every frame, so the per-frame
- * cost is limited to timeline evaluation, drawing and the pixel readback. Documents with no
- * animation or state-machine definitions draw and read back only the first frame; later frames
- * reuse the same RGBA buffer.
+ * cost is limited to timeline evaluation, drawing and the pixel readback. Documents with no active
+ * top-level or mounted nested timelines draw and read back only the first frame; later frames reuse
+ * the same RGBA buffer.
  *
  * The exporter only renders. Encoding and muxing are the host's responsibility: an external ffmpeg
  * process on native platforms, WebCodecs on the web. No video codec ships inside pagx.
@@ -123,9 +127,11 @@ class VideoExporter {
   using Options = VideoExportOptions;
 
   /**
-   * Creates an exporter bound to the given document. The document's top-level animations are
-   * sampled; their ids must be non-empty and unique. A document without animations produces one
-   * static frame by default, or repeats its static scene when duration is positive.
+   * Creates an exporter bound to the given document. Top-level animations and state machines are
+   * sampled in declaration order, and timelines mounted on nested compositions advance with the
+   * scene. Top-level animation ids must be non-empty and unique. A document without active
+   * timelines produces one static frame by default, or repeats its static scene when duration is
+   * positive. A document containing a state machine requires an explicit positive duration.
    *
    * @param document the source document, which is retained for the lifetime of the returned
    *                 exporter. Must be non-null.
@@ -189,11 +195,30 @@ class VideoExporter {
   size_t rowBytes() const;
 
  private:
+  struct PlaybackPlan {
+    std::vector<std::shared_ptr<PAGTimeline>> timelines = {};
+    int64_t longestDurationUs = 0;
+    float documentFrameRate = 0.0f;
+    bool hasMixedFrameRates = false;
+    bool hasDynamicContent = false;
+    bool hasStateMachine = false;
+  };
+
   VideoExporter();
+
+  static bool ResolvePlaybackPlan(const std::shared_ptr<PAGScene>& scene,
+                                  const std::shared_ptr<PAGXDocument>& document, PlaybackPlan* plan,
+                                  std::string* errorMsg);
+  static bool AddAnimation(const std::shared_ptr<PAGAnimation>& animation, int64_t offsetUs,
+                           bool includeInFrameRate, PlaybackPlan* plan, std::string* errorMsg);
+  static bool CollectNestedPlayback(PAGComposition* composition, PlaybackPlan* plan,
+                                    std::string* errorMsg);
+  static bool ResolveSampling(const Options& options, const PlaybackPlan& plan, int* frameRate,
+                              int64_t* frameCount, std::string* errorMsg);
 
   std::shared_ptr<PAGScene> scene = {};
   std::shared_ptr<PAGSurface> surface = {};
-  std::vector<std::shared_ptr<PAGAnimation>> animations = {};
+  std::vector<std::shared_ptr<PAGTimeline>> timelines = {};
   std::shared_ptr<tgfx::Bitmap> bitmap = {};
   std::shared_ptr<tgfx::Pixmap> pixmap = {};
   int width_ = 0;

@@ -32,6 +32,7 @@
 #include <string>
 #include <vector>
 #include "cli/CliUtils.h"
+#include "cli/VideoFrameSource.h"
 #include "cli/XPathQuery.h"
 #include "pagx/FontConfig.h"
 #include "pagx/PAGDisplayOptions.h"
@@ -83,7 +84,7 @@ struct RenderOptions {
   // non-integer document rates must be overridden explicitly.
   int frameRate = 0;
   // Sequence length in seconds for --frames-dir. Negative means the longest full playback period,
-  // or one frame for a static document.
+  // or one frame for a static document. State machines require an explicit positive duration.
   float duration = -1.0f;
   // Whether --output was given explicitly, so --frames-dir can reject the combination.
   bool hasOutput = false;
@@ -107,7 +108,8 @@ static void PrintRenderUsage() {
       << "                            document's animation frame rate; mixed/non-integer document\n"
       << "                            rates require an explicit --fps)\n"
       << "  --duration <seconds>      Sequence length for --frames-dir (default: the longest\n"
-      << "                            full playback period; static documents produce one frame)\n"
+      << "                            full playback period; static documents produce one frame;\n"
+      << "                            state machines require an explicit value)\n"
       << "  --crop <x,y,w,h>          Crop region in document coordinates\n"
       << "  --id <id>                 Render only the Layer with the specified id\n"
       << "  --xpath <expr>            Render only the Layer matched by XPath expression\n"
@@ -155,18 +157,16 @@ static int ParseRenderOptions(int argc, char* argv[], RenderOptions* options) {
     } else if (arg == "--frames-dir" && i + 1 < argc) {
       options->framesDir = argv[++i];
     } else if (arg == "--fps" && i + 1 < argc) {
-      char* endPtr = nullptr;
-      long value = strtol(argv[++i], &endPtr, 10);
-      if (endPtr == argv[i] || *endPtr != '\0' || value < 1 || value > 120) {
+      long value = 0;
+      ++i;
+      if (!ParseIntOption(argv[i], 1, 120, &value)) {
         std::cerr << "pagx render: invalid fps '" << argv[i] << "', must be 1-120\n";
         return 1;
       }
       options->frameRate = static_cast<int>(value);
     } else if (arg == "--duration" && i + 1 < argc) {
-      char* endPtr = nullptr;
-      options->duration = strtof(argv[++i], &endPtr);
-      if (endPtr == argv[i] || *endPtr != '\0' || !std::isfinite(options->duration) ||
-          options->duration <= 0.0f) {
+      ++i;
+      if (!ParseFloatOption(argv[i], 0.0f, false, &options->duration)) {
         std::cerr << "pagx render: invalid duration '" << argv[i]
                   << "', must be a positive number of seconds\n";
         return 1;
@@ -178,18 +178,14 @@ static int ParseRenderOptions(int argc, char* argv[], RenderOptions* options) {
         return 1;
       }
     } else if (arg == "--scale" && i + 1 < argc) {
-      char* endPtr = nullptr;
-      options->scale = strtof(argv[++i], &endPtr);
-      if (endPtr == argv[i] || *endPtr != '\0' || !std::isfinite(options->scale) ||
-          options->scale <= 0.0f) {
+      ++i;
+      if (!ParseFloatOption(argv[i], 0.0f, false, &options->scale)) {
         std::cerr << "pagx render: invalid scale '" << argv[i] << "'\n";
         return 1;
       }
     } else if (arg == "--time" && i + 1 < argc) {
-      char* endPtr = nullptr;
-      options->timeSeconds = strtof(argv[++i], &endPtr);
-      if (endPtr == argv[i] || *endPtr != '\0' || !std::isfinite(options->timeSeconds) ||
-          options->timeSeconds < 0.0f) {
+      ++i;
+      if (!ParseFloatOption(argv[i], 0.0f, true, &options->timeSeconds)) {
         std::cerr << "pagx render: invalid time '" << argv[i] << "', must be a non-negative number "
                   << "of seconds\n";
         return 1;
@@ -203,14 +199,13 @@ static int ParseRenderOptions(int argc, char* argv[], RenderOptions* options) {
         return 1;
       }
     } else if (arg == "--quality" && i + 1 < argc) {
-      char* endPtr = nullptr;
-      errno = 0;
-      long val = strtol(argv[++i], &endPtr, 10);
-      if (errno != 0 || endPtr == argv[i] || *endPtr != '\0' || val < 0 || val > 100) {
+      long value = 0;
+      ++i;
+      if (!ParseIntOption(argv[i], 0, 100, &value)) {
         std::cerr << "pagx render: invalid quality '" << argv[i] << "', must be 0-100\n";
         return 1;
       }
-      options->quality = static_cast<int>(val);
+      options->quality = static_cast<int>(value);
     } else if (arg == "--background" && i + 1 < argc) {
       options->hasBackground = true;
       if (!ParseHexColor(argv[++i], &options->bgRed, &options->bgGreen, &options->bgBlue,
@@ -305,6 +300,35 @@ static bool WriteDataToFile(const std::string& filePath, const std::shared_ptr<t
   auto written = fwrite(data->data(), 1, data->size(), file);
   fclose(file);
   return written == data->size();
+}
+
+struct ImageFrameContext {
+  int width = 0;
+  int height = 0;
+  tgfx::EncodedFormat format = tgfx::EncodedFormat::PNG;
+  int quality = 100;
+  std::string framesDir = {};
+  std::string extension = {};
+};
+
+static bool WriteImageFrame(const VideoFrameView& frame, void* context, std::string* errorMsg) {
+  auto* output = static_cast<ImageFrameContext*>(context);
+  auto frameInfo = tgfx::ImageInfo::Make(output->width, output->height, tgfx::ColorType::RGBA_8888,
+                                         tgfx::AlphaType::Premultiplied, frame.rowBytes);
+  tgfx::Pixmap pixmap(frameInfo, frame.pixels);
+  auto encodedData = tgfx::ImageCodec::Encode(pixmap, output->format, output->quality);
+  if (encodedData == nullptr) {
+    *errorMsg = "failed to encode frame " + std::to_string(frame.index);
+    return false;
+  }
+  char fileName[32] = {};
+  snprintf(fileName, sizeof(fileName), "f_%04lld.%s", static_cast<long long>(frame.index),
+           output->extension.c_str());
+  if (!WriteDataToFile(output->framesDir + "/" + fileName, encodedData)) {
+    *errorMsg = "failed to write frame " + std::to_string(frame.index);
+    return false;
+  }
+  return true;
 }
 
 // Renders a single animation frame through the runtime animation path. The document's top-level
@@ -539,22 +563,11 @@ static tgfx::Bitmap RenderCore(const RenderOptions& options) {
 // Renders the document's animations as an image sequence into options.framesDir. Frame production
 // is delegated to VideoExporter so that the timeline semantics stay identical to the video path.
 static int RenderFrameSequence(const RenderOptions& options) {
-  auto document = LoadDocument(options.inputFile, "pagx render");
+  auto document =
+      LoadVideoDocument(options.inputFile, options.fontFiles, options.fallbacks, "pagx render");
   if (document == nullptr) {
     return 1;
   }
-  if (document->hasUnresolvedImports()) {
-    std::cerr << "pagx render: error: unresolved import directive, run 'pagx resolve' first\n";
-    return 1;
-  }
-
-  FontConfig fontConfig = {};
-  if (!LoadFontConfig(&fontConfig, options.fontFiles, options.fallbacks, "pagx render")) {
-    return 1;
-  }
-  // Fonts have to be registered before layout runs, and VideoExporter only applies layout when the
-  // document still has none.
-  document->applyLayout(&fontConfig);
 
   VideoExportOptions videoOptions = {};
   videoOptions.frameRate = options.frameRate;
@@ -566,11 +579,12 @@ static int RenderFrameSequence(const RenderOptions& options) {
         Color{options.bgRed, options.bgGreen, options.bgBlue, options.bgAlpha, ColorSpace::SRGB};
   }
   std::string errorMsg = {};
-  auto exporter = VideoExporter::Make(document, videoOptions, &errorMsg);
-  if (exporter == nullptr) {
+  auto source = VideoFrameSource::Make(document, videoOptions, &errorMsg);
+  if (source == nullptr) {
     std::cerr << "pagx render: " << errorMsg << "\n";
     return 1;
   }
+  const auto& exporter = source->exporter();
 
   std::error_code createError = {};
   std::filesystem::create_directories(options.framesDir, createError);
@@ -579,35 +593,14 @@ static int RenderFrameSequence(const RenderOptions& options) {
     return 1;
   }
 
-  auto encodedFormat = GetEncodedFormat(options.format);
   auto width = exporter->width();
   auto height = exporter->height();
   auto frameCount = exporter->frameCount();
-  auto frameInfo = tgfx::ImageInfo::Make(width, height, tgfx::ColorType::RGBA_8888,
-                                         tgfx::AlphaType::Premultiplied, exporter->rowBytes());
-  int64_t progressStep = std::max<int64_t>(1, frameCount / 10);
-  while (exporter->nextFrame()) {
-    auto frame = exporter->currentFrame() - 1;
-    tgfx::Pixmap pixmap(frameInfo, exporter->pixels());
-    auto encodedData = tgfx::ImageCodec::Encode(pixmap, encodedFormat, options.quality);
-    if (encodedData == nullptr) {
-      std::cerr << "pagx render: failed to encode frame " << frame << "\n";
-      return 1;
-    }
-    char fileName[32] = {};
-    snprintf(fileName, sizeof(fileName), "f_%04lld.%s", static_cast<long long>(frame),
-             options.format.c_str());
-    if (!WriteDataToFile(options.framesDir + "/" + fileName, encodedData)) {
-      std::cerr << "pagx render: failed to write frame " << frame << "\n";
-      return 1;
-    }
-    if (frame % progressStep == 0) {
-      std::cout << "pagx render: " << (frame * 100 / frameCount) << "% (" << frame << "/"
-                << frameCount << ")" << std::endl;
-    }
-  }
-  if (exporter->currentFrame() < frameCount) {
-    std::cerr << "pagx render: failed to render frame " << exporter->currentFrame() << "\n";
+  ImageFrameContext frameContext = {
+      width,         height, GetEncodedFormat(options.format), options.quality, options.framesDir,
+      options.format};
+  if (!RunVideoFrames(*source, "pagx render", "pagx render: ", WriteImageFrame, &frameContext,
+                      &errorMsg)) {
     return 1;
   }
 

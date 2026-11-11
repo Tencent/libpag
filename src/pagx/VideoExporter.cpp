@@ -23,9 +23,12 @@
 #include <unordered_set>
 #include <vector>
 #include "pagx/PAGAnimation.h"
+#include "pagx/PAGComposition.h"
 #include "pagx/PAGDisplayOptions.h"
 #include "pagx/PAGScene.h"
+#include "pagx/PAGStateMachine.h"
 #include "pagx/PAGSurface.h"
+#include "pagx/PAGTimeline.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/nodes/Animation.h"
 #include "tgfx/core/Bitmap.h"
@@ -59,13 +62,6 @@ bool ComputeOutputDimension(float documentSize, float scale, bool alignToEvenSiz
   return true;
 }
 
-bool HasTimelineDefinitions(const PAGXDocument& document) {
-  return std::any_of(document.nodes.begin(), document.nodes.end(), [](const auto& node) {
-    return node != nullptr &&
-           (node->nodeType() == NodeType::Animation || node->nodeType() == NodeType::StateMachine);
-  });
-}
-
 bool ValidateDocumentAnimations(const PAGXDocument& document, std::string* errorMsg) {
   std::unordered_set<std::string> animationIds = {};
   for (const auto* node : document.animations) {
@@ -81,27 +77,49 @@ bool ValidateDocumentAnimations(const PAGXDocument& document, std::string* error
       SetError(errorMsg, "duplicate top-level animation id '" + animation->id + "'");
       return false;
     }
-    auto frameRate = animation->frameRate;
-    if (frameRate == 0.0f) {
-      continue;
-    }
-    if (!std::isfinite(frameRate) || frameRate < 0.0f) {
-      SetError(errorMsg, "animation '" + animation->id +
-                             "' has an invalid frame rate; expected a finite non-negative value");
-      return false;
-    }
-    if (animation->duration <= 0) {
-      continue;
-    }
-    auto periodUs = static_cast<double>(animation->duration) / frameRate * 1000000.0;
-    if (animation->loop == LoopMode::PingPong) {
-      periodUs *= 2.0;
-    }
-    if (!std::isfinite(periodUs) ||
-        periodUs >= static_cast<double>(std::numeric_limits<int64_t>::max())) {
-      SetError(errorMsg, "animation '" + animation->id + "' has an overflowing playback period");
-      return false;
-    }
+  }
+  return true;
+}
+
+bool ValidateOptions(const std::shared_ptr<PAGXDocument>& document,
+                     const VideoExportOptions& options, std::string* errorMsg) {
+  if (document == nullptr) {
+    SetError(errorMsg, "the document is null");
+    return false;
+  }
+  if (options.frameRate < 0 || options.frameRate > kMaxFrameRate) {
+    SetError(errorMsg, "the frame rate must be within 0-" + std::to_string(kMaxFrameRate) +
+                           ", got " + std::to_string(options.frameRate));
+    return false;
+  }
+  if (!std::isfinite(options.duration)) {
+    SetError(errorMsg, "the duration must be finite");
+    return false;
+  }
+  if (!(options.scale > 0.0f) || !std::isfinite(options.scale)) {
+    SetError(errorMsg, "the scale must be finite and positive");
+    return false;
+  }
+  if (!(document->width > 0.0f) || !(document->height > 0.0f) || !std::isfinite(document->width) ||
+      !std::isfinite(document->height)) {
+    SetError(errorMsg, "the document dimensions must be finite and positive");
+    return false;
+  }
+  return ValidateDocumentAnimations(*document, errorMsg);
+}
+
+bool CreateResources(int width, int height, std::shared_ptr<PAGSurface>* surface,
+                     std::shared_ptr<tgfx::Bitmap>* bitmap, std::string* errorMsg) {
+  *surface = PAGSurface::MakeOffscreen(width, height);
+  if (*surface == nullptr) {
+    SetError(errorMsg, "failed to create an offscreen surface of " + std::to_string(width) + "x" +
+                           std::to_string(height));
+    return false;
+  }
+  *bitmap = std::make_shared<tgfx::Bitmap>(width, height, false, false);
+  if ((*bitmap)->isEmpty()) {
+    SetError(errorMsg, "failed to allocate the frame bitmap");
+    return false;
   }
   return true;
 }
@@ -112,31 +130,180 @@ VideoExporter::VideoExporter() = default;
 
 VideoExporter::~VideoExporter() = default;
 
+bool VideoExporter::AddAnimation(const std::shared_ptr<PAGAnimation>& animation, int64_t offsetUs,
+                                 bool includeInFrameRate, PlaybackPlan* plan,
+                                 std::string* errorMsg) {
+  if (animation == nullptr || animation->animation == nullptr) {
+    SetError(errorMsg, "failed to instantiate an animation");
+    return false;
+  }
+  const auto* definition = animation->animation;
+  auto animationFrameRate = definition->frameRate;
+  if (!std::isfinite(animationFrameRate) || animationFrameRate < 0.0f) {
+    SetError(errorMsg, "animation '" + definition->id +
+                           "' has an invalid frame rate; expected a finite non-negative value");
+    return false;
+  }
+  int64_t periodUs = 0;
+  if (animationFrameRate > 0.0f && definition->duration > 0) {
+    auto basePeriodUs = static_cast<double>(definition->duration) / animationFrameRate * 1000000.0;
+    if (!std::isfinite(basePeriodUs) ||
+        basePeriodUs >= static_cast<double>(std::numeric_limits<int64_t>::max())) {
+      SetError(errorMsg, "animation '" + definition->id + "' has an overflowing playback period");
+      return false;
+    }
+    periodUs = static_cast<int64_t>(basePeriodUs);
+    if (definition->loop == LoopMode::PingPong) {
+      if (periodUs > std::numeric_limits<int64_t>::max() / 2) {
+        SetError(errorMsg, "animation '" + definition->id + "' has an overflowing playback period");
+        return false;
+      }
+      periodUs *= 2;
+    }
+  }
+  auto effectivePeriodUs = static_cast<double>(periodUs) + static_cast<double>(offsetUs);
+  if (!std::isfinite(effectivePeriodUs) ||
+      effectivePeriodUs >= static_cast<double>(std::numeric_limits<int64_t>::max())) {
+    SetError(errorMsg, "animation '" + definition->id + "' has an overflowing playback period");
+    return false;
+  }
+  if (effectivePeriodUs > 0.0) {
+    plan->longestDurationUs =
+        std::max(plan->longestDurationUs, static_cast<int64_t>(effectivePeriodUs));
+  }
+  if (includeInFrameRate && animationFrameRate > 0.0f) {
+    if (plan->documentFrameRate <= 0.0f) {
+      plan->documentFrameRate = animationFrameRate;
+    } else if (plan->documentFrameRate != animationFrameRate) {
+      plan->hasMixedFrameRates = true;
+    }
+  }
+  plan->hasDynamicContent = true;
+  return true;
+}
+
+bool VideoExporter::CollectNestedPlayback(PAGComposition* composition, PlaybackPlan* plan,
+                                          std::string* errorMsg) {
+  if (composition == nullptr) {
+    return true;
+  }
+  for (const auto& timeline : composition->timelines) {
+    if (timeline == nullptr) {
+      continue;
+    }
+    if (timeline->type() == TimelineType::StateMachine) {
+      plan->hasStateMachine = true;
+      plan->hasDynamicContent = true;
+      continue;
+    }
+    if (!composition->isTimelinePlaying(timeline->getId())) {
+      continue;
+    }
+    auto animation = std::static_pointer_cast<PAGAnimation>(timeline);
+    if (!AddAnimation(animation, animation->evaluationOffsetUs, false, plan, errorMsg)) {
+      return false;
+    }
+  }
+  std::vector<PAGComposition*> childCompositions = {};
+  PAGComposition::CollectChildCompositions(composition, childCompositions);
+  for (auto* child : childCompositions) {
+    if (!CollectNestedPlayback(child, plan, errorMsg)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+bool VideoExporter::ResolvePlaybackPlan(const std::shared_ptr<PAGScene>& scene,
+                                        const std::shared_ptr<PAGXDocument>& document,
+                                        PlaybackPlan* plan, std::string* errorMsg) {
+  for (auto* node : document->animations) {
+    if (node == nullptr) {
+      continue;
+    }
+    if (node->nodeType() == NodeType::Animation) {
+      auto animation = scene->getAnimation(node->id);
+      if (!AddAnimation(animation, 0, true, plan, errorMsg)) {
+        return false;
+      }
+      plan->timelines.emplace_back(std::move(animation));
+    } else if (node->nodeType() == NodeType::StateMachine) {
+      auto stateMachine = scene->getStateMachineTimeline(node->id);
+      if (stateMachine == nullptr) {
+        SetError(errorMsg, "failed to instantiate state machine '" + node->id + "'");
+        return false;
+      }
+      plan->timelines.emplace_back(std::move(stateMachine));
+      plan->hasStateMachine = true;
+      plan->hasDynamicContent = true;
+    }
+  }
+  return CollectNestedPlayback(scene->rootComposition().get(), plan, errorMsg);
+}
+
+bool VideoExporter::ResolveSampling(const Options& options, const PlaybackPlan& plan,
+                                    int* frameRate, int64_t* frameCount, std::string* errorMsg) {
+  if (options.frameRate == 0 && plan.hasMixedFrameRates) {
+    SetError(errorMsg, "animations have mixed frame rates; set an explicit sampling frame rate");
+    return false;
+  }
+  *frameRate = options.frameRate;
+  if (*frameRate == 0 && plan.documentFrameRate > 0.0f) {
+    if (plan.documentFrameRate > kMaxFrameRate) {
+      SetError(errorMsg, "the document frame rate must be finite and no greater than " +
+                             std::to_string(kMaxFrameRate));
+      return false;
+    }
+    if (std::floor(plan.documentFrameRate) != plan.documentFrameRate) {
+      SetError(errorMsg,
+               "the document frame rate must be an integer when frameRate is zero; set "
+               "an explicit sampling frame rate");
+      return false;
+    }
+    *frameRate = static_cast<int>(plan.documentFrameRate);
+  }
+  if (*frameRate <= 0) {
+    *frameRate = kDefaultFrameRate;
+  }
+
+  float durationSeconds = options.duration;
+  if (durationSeconds <= 0.0f) {
+    if (plan.hasStateMachine) {
+      SetError(errorMsg, "documents with state machines require an explicit duration");
+      return false;
+    }
+    if (!plan.hasDynamicContent) {
+      durationSeconds = 1.0f / static_cast<float>(*frameRate);
+    } else {
+      if (plan.longestDurationUs <= 0) {
+        SetError(errorMsg, "the document's animations have no duration, pass a duration");
+        return false;
+      }
+      durationSeconds = static_cast<float>(static_cast<double>(plan.longestDurationUs) / 1000000.0);
+    }
+  }
+  auto frameCountValue = static_cast<double>(durationSeconds) * *frameRate;
+  if (!std::isfinite(frameCountValue) ||
+      frameCountValue >= static_cast<double>(std::numeric_limits<int64_t>::max())) {
+    SetError(errorMsg, "the requested frame count is too large");
+    return false;
+  }
+  *frameCount = static_cast<int64_t>(std::llround(frameCountValue));
+  if (*frameCount <= 0) {
+    SetError(errorMsg, "the requested sequence is empty");
+    return false;
+  }
+  auto lastFrameTimeUs = static_cast<double>(*frameCount - 1) * 1000000.0 / *frameRate;
+  if (lastFrameTimeUs >= static_cast<double>(std::numeric_limits<int64_t>::max())) {
+    SetError(errorMsg, "the requested sequence is too long");
+    return false;
+  }
+  return true;
+}
+
 std::shared_ptr<VideoExporter> VideoExporter::Make(std::shared_ptr<PAGXDocument> document,
                                                    const Options& options, std::string* errorMsg) {
-  if (document == nullptr) {
-    SetError(errorMsg, "the document is null");
-    return nullptr;
-  }
-  if (options.frameRate < 0 || options.frameRate > kMaxFrameRate) {
-    SetError(errorMsg, "the frame rate must be within 0-" + std::to_string(kMaxFrameRate) +
-                           ", got " + std::to_string(options.frameRate));
-    return nullptr;
-  }
-  if (!std::isfinite(options.duration)) {
-    SetError(errorMsg, "the duration must be finite");
-    return nullptr;
-  }
-  if (!(options.scale > 0.0f) || !std::isfinite(options.scale)) {
-    SetError(errorMsg, "the scale must be finite and positive");
-    return nullptr;
-  }
-  if (!(document->width > 0.0f) || !(document->height > 0.0f) || !std::isfinite(document->width) ||
-      !std::isfinite(document->height)) {
-    SetError(errorMsg, "the document dimensions must be finite and positive");
-    return nullptr;
-  }
-  if (!ValidateDocumentAnimations(*document, errorMsg)) {
+  if (!ValidateOptions(document, options, errorMsg)) {
     return nullptr;
   }
   auto scene = PAGScene::Make(document);
@@ -144,105 +311,30 @@ std::shared_ptr<VideoExporter> VideoExporter::Make(std::shared_ptr<PAGXDocument>
     SetError(errorMsg, "failed to build the animation scene");
     return nullptr;
   }
-
-  std::vector<std::shared_ptr<PAGAnimation>> animations = {};
-  int64_t longestDurationUs = 0;
-  float documentFrameRate = 0.0f;
-  bool hasMixedFrameRates = false;
-  for (const auto& id : scene->getAnimationIds()) {
-    auto animation = scene->getAnimation(id);
-    if (animation == nullptr) {
-      continue;
-    }
-    auto animationFrameRate = animation->frameRate();
-    if (animationFrameRate > 0.0f) {
-      if (documentFrameRate <= 0.0f) {
-        documentFrameRate = animationFrameRate;
-      } else if (documentFrameRate != animationFrameRate) {
-        hasMixedFrameRates = true;
-      }
-    }
-    longestDurationUs = std::max(longestDurationUs, animation->playbackPeriod());
-    animations.emplace_back(std::move(animation));
-  }
-  if (options.frameRate == 0 && hasMixedFrameRates) {
-    SetError(errorMsg,
-             "top-level animations have mixed frame rates; set an explicit sampling "
-             "frame rate");
+  PlaybackPlan plan = {};
+  if (!ResolvePlaybackPlan(scene, document, &plan, errorMsg)) {
     return nullptr;
   }
-
-  int frameRate = options.frameRate;
-  if (frameRate == 0 && documentFrameRate > 0.0f) {
-    if (!std::isfinite(documentFrameRate) || documentFrameRate > kMaxFrameRate) {
-      SetError(errorMsg, "the document frame rate must be finite and no greater than " +
-                             std::to_string(kMaxFrameRate));
-      return nullptr;
-    }
-    if (std::floor(documentFrameRate) != documentFrameRate) {
-      SetError(errorMsg,
-               "the document frame rate must be an integer when frameRate is zero; set "
-               "an explicit sampling frame rate");
-      return nullptr;
-    }
-    frameRate = static_cast<int>(documentFrameRate);
-  }
-  if (frameRate <= 0) {
-    frameRate = kDefaultFrameRate;
-  }
-
-  float durationSeconds = options.duration;
-  if (durationSeconds <= 0.0f) {
-    if (animations.empty()) {
-      durationSeconds = 1.0f / static_cast<float>(frameRate);
-    } else {
-      if (longestDurationUs <= 0) {
-        SetError(errorMsg, "the document's animations have no duration, pass a duration");
-        return nullptr;
-      }
-      durationSeconds = static_cast<float>(static_cast<double>(longestDurationUs) / 1000000.0);
-    }
-  }
-  auto frameCountValue = static_cast<double>(durationSeconds) * frameRate;
-  if (!std::isfinite(frameCountValue) ||
-      frameCountValue >= static_cast<double>(std::numeric_limits<int64_t>::max())) {
-    SetError(errorMsg, "the requested frame count is too large");
+  int frameRate = 0;
+  int64_t frameCount = 0;
+  if (!ResolveSampling(options, plan, &frameRate, &frameCount, errorMsg)) {
     return nullptr;
   }
-  auto frameCount = static_cast<int64_t>(std::llround(frameCountValue));
-  if (frameCount <= 0) {
-    SetError(errorMsg, "the requested sequence is empty");
-    return nullptr;
-  }
-  auto lastFrameTimeUs = static_cast<double>(frameCount - 1) * 1000000.0 / frameRate;
-  if (lastFrameTimeUs >= static_cast<double>(std::numeric_limits<int64_t>::max())) {
-    SetError(errorMsg, "the requested sequence is too long");
-    return nullptr;
-  }
-
-  float scale = options.scale;
   int width = 0;
   int height = 0;
-  if (!ComputeOutputDimension(document->width, scale, options.alignToEvenSize, &width) ||
-      !ComputeOutputDimension(document->height, scale, options.alignToEvenSize, &height)) {
+  if (!ComputeOutputDimension(document->width, options.scale, options.alignToEvenSize, &width) ||
+      !ComputeOutputDimension(document->height, options.scale, options.alignToEvenSize, &height)) {
     SetError(errorMsg, "the output dimensions must be finite, positive, and fit in an int");
     return nullptr;
   }
-
-  auto surface = PAGSurface::MakeOffscreen(width, height);
-  if (surface == nullptr) {
-    SetError(errorMsg, "failed to create an offscreen surface of " + std::to_string(width) + "x" +
-                           std::to_string(height));
-    return nullptr;
-  }
-  auto bitmap = std::make_shared<tgfx::Bitmap>(width, height, false, false);
-  if (bitmap->isEmpty()) {
-    SetError(errorMsg, "failed to allocate the frame bitmap");
+  std::shared_ptr<PAGSurface> surface = {};
+  std::shared_ptr<tgfx::Bitmap> bitmap = {};
+  if (!CreateResources(width, height, &surface, &bitmap, errorMsg)) {
     return nullptr;
   }
 
   auto* displayOptions = scene->getDisplayOptions();
-  displayOptions->setZoomScale(scale);
+  displayOptions->setZoomScale(options.scale);
   if (options.hasBackground) {
     displayOptions->setBackgroundColor(options.background);
   }
@@ -250,14 +342,14 @@ std::shared_ptr<VideoExporter> VideoExporter::Make(std::shared_ptr<PAGXDocument>
   auto exporter = std::shared_ptr<VideoExporter>(new VideoExporter());
   exporter->scene = std::move(scene);
   exporter->surface = std::move(surface);
-  exporter->animations = std::move(animations);
+  exporter->timelines = std::move(plan.timelines);
   exporter->bitmap = std::move(bitmap);
   exporter->pixmap = std::make_shared<tgfx::Pixmap>(*exporter->bitmap);
   exporter->width_ = width;
   exporter->height_ = height;
   exporter->frameRate_ = frameRate;
   exporter->frameCount_ = frameCount;
-  exporter->reuseStaticFrame_ = !HasTimelineDefinitions(*document);
+  exporter->reuseStaticFrame_ = !plan.hasDynamicContent;
   return exporter;
 }
 
@@ -291,14 +383,20 @@ bool VideoExporter::nextFrame() {
   }
   auto timeUs = static_cast<int64_t>(std::llround(static_cast<double>(currentFrame_) * 1000000.0 /
                                                   static_cast<double>(frameRate_)));
-  for (const auto& animation : animations) {
-    animation->setCurrentTime(timeUs);
-    animation->apply(1.0f);
+  auto deltaUs = timeUs - previousTimeUs_;
+  for (const auto& timeline : timelines) {
+    if (timeline->type() == TimelineType::Animation) {
+      auto animation = std::static_pointer_cast<PAGAnimation>(timeline);
+      animation->setCurrentTime(timeUs);
+      animation->apply(1.0f);
+    } else {
+      timeline->advanceAndApply(deltaUs);
+    }
   }
   // Timelines mounted on Composition slots only advance incrementally, so the scene must be driven
   // by the delta between consecutive frames even though the top-level animations above are seeked
   // to an absolute time.
-  scene->advanceAndApply(timeUs - previousTimeUs_);
+  scene->advanceAndApply(deltaUs);
   previousTimeUs_ = timeUs;
   if (!scene->draw(surface)) {
     return false;
