@@ -97,7 +97,7 @@ bool NeedsQuoting(const std::string& value) {
 bool ValidateEncoderArguments(const std::vector<std::string>& arguments, std::string* errorMsg) {
   static const char* const allowedOptions[] = {"-b:v", "-maxrate", "-bufsize", "-g",
                                                "-x264-params"};
-  for (size_t index = 0; index < arguments.size(); ++index) {
+  for (size_t index = 0; index < arguments.size();) {
     const auto& argument = arguments[index];
     bool allowed = false;
     for (const auto* option : allowedOptions) {
