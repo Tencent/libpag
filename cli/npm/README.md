@@ -138,8 +138,9 @@ npm run download:ffmpeg --prefix "$(npm root -g)/@libpag/pagx"
 
 The cache location defaults to the platform user cache. `PAGX_FFMPEG_CACHE_DIR` overrides it.
 `PAGX_FFMPEG_BASE_URL` can point to a mirror directory containing the pinned release assets;
-mirrored archives must exactly match the bundled manifest. To use another ffmpeg build, select a
-local executable through `FFMPEG_BIN` or `--ffmpeg` instead of downloading it through PAGX. Set
+mirrored archives must exactly match the bundled manifest. Automatic downloads require HTTPS
+outside loopback, and redirects cannot downgrade HTTPS to HTTP. To use another ffmpeg build, select
+a local executable through `FFMPEG_BIN` or `--ffmpeg` instead of downloading it through PAGX. Set
 `PAGX_SKIP_FFMPEG_DOWNLOAD=1` before installation to skip the optional postinstall download.
 Downloads include the upstream license files. The downloader does not read `HTTP_PROXY` or
 `HTTPS_PROXY`. If direct access fails, point `PAGX_FFMPEG_BASE_URL` to a mirror, retry the download

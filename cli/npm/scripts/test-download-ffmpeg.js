@@ -8,13 +8,20 @@ const http = require('http');
 const { spawnSync } = require('child_process');
 const os = require('os');
 const path = require('path');
+const { pipeline } = require('stream/promises');
+const tar = require('tar');
+const yazl = require('yazl');
 const { buildManifest } = require('./generate-ffmpeg-manifest.js');
 const {
+  accountArchiveEntry,
   downloadFile,
   ensureFFmpeg,
+  extractArchive,
   findCachedFFmpeg,
   formatDownloadError,
   resolveTarget,
+  validateArchiveEntry,
+  validateDownloadURL,
   verifyArchive,
 } = require('./download-ffmpeg.js');
 
@@ -74,6 +81,15 @@ function fakeReleaseMetadata() {
   };
 }
 
+async function createZipArchive(archivePath, entries) {
+  const zip = new yazl.ZipFile();
+  for (const entry of entries) {
+    zip.addBuffer(Buffer.from(entry.contents || ''), entry.name, entry.options || {});
+  }
+  zip.end();
+  await pipeline(zip.outputStream, fs.createWriteStream(archivePath, { flags: 'wx' }));
+}
+
 test('maps every pagx platform and architecture', () => {
   assert.strictEqual(resolveTarget('darwin', 'arm64').assetName, 'ffmpeg-mac-arm64.tar.gz');
   assert.strictEqual(resolveTarget('darwin', 'x64').assetName, 'ffmpeg-mac-x64.tar.gz');
@@ -97,17 +113,17 @@ test('builds a complete manifest from official release metadata', () => {
   assert.throws(() => buildManifest(incomplete), /no verified size and SHA-256/);
 });
 
-test('validates archive size and hash against the pinned manifest', () => {
+test('validates archive size and hash against the pinned manifest', async () => {
   const root = tempDirectory();
   try {
     const archive = Buffer.from('verified archive');
     const archivePath = path.join(root, 'archive');
     fs.writeFileSync(archivePath, archive);
     const artifact = pinnedManifest(archive).assets['darwin-arm64'];
-    verifyArchive(archivePath, artifact);
-    assert.throws(() => verifyArchive(archivePath, { ...artifact, size: artifact.size + 1 }),
+    await verifyArchive(archivePath, artifact);
+    await assert.rejects(verifyArchive(archivePath, { ...artifact, size: artifact.size + 1 }),
       /size mismatch/);
-    assert.throws(() => verifyArchive(archivePath, { ...artifact, sha256: '0'.repeat(64) }),
+    await assert.rejects(verifyArchive(archivePath, { ...artifact, sha256: '0'.repeat(64) }),
       /SHA-256 mismatch/);
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
@@ -137,6 +153,139 @@ test('downloads through local HTTP redirects', async () => {
     await assert.rejects(downloadFile(`http://127.0.0.1:${port}/missing`, path.join(root, 'bad')), /HTTP 404/);
   } finally {
     await new Promise((resolve) => server.close(resolve));
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('enforces HTTPS outside loopback and rejects HTTPS downgrades', () => {
+  assert.throws(() => validateDownloadURL('http://example.test/ffmpeg'), /HTTPS is required/);
+  assert.throws(() => validateDownloadURL('http://127.0.0.1/file', 'https://example.test/ffmpeg'),
+    /HTTPS to HTTP redirect/);
+  assert.doesNotThrow(() => validateDownloadURL('http://127.0.0.1/file'));
+  assert.doesNotThrow(() => validateDownloadURL('http://[::1]/file'));
+});
+
+test('enforces download size limits and the overall deadline', async () => {
+  const root = tempDirectory();
+  const server = http.createServer((request, response) => {
+    if (request.url === '/length') {
+      response.writeHead(200, { 'Content-Length': '100' });
+      response.end('too large');
+    } else if (request.url === '/stream') {
+      response.writeHead(200);
+      response.end('too large');
+    } else if (request.url === '/slow') {
+      response.writeHead(200);
+      let writes = 0;
+      const timer = setInterval(() => {
+        response.write('x');
+        if (++writes === 4) {
+          clearInterval(timer);
+          response.end();
+        }
+      }, 25);
+      response.on('close', () => clearInterval(timer));
+    } else {
+      response.writeHead(404);
+      response.end();
+    }
+  });
+  try {
+    await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+    const base = `http://127.0.0.1:${server.address().port}`;
+    await assert.rejects(downloadFile(`${base}/length`, path.join(root, 'length'), { maxBytes: 4 }),
+      /Content-Length/);
+    await assert.rejects(downloadFile(`${base}/stream`, path.join(root, 'stream'), { maxBytes: 4 }),
+      /byte limit/);
+    assert.strictEqual(fs.existsSync(path.join(root, 'stream')), false);
+    await assert.rejects(downloadFile(`${base}/slow`, path.join(root, 'slow'), { timeoutMs: 50 }),
+      /overall deadline/);
+    assert.strictEqual(fs.existsSync(path.join(root, 'slow')), false);
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('rejects unsafe archive paths and control characters', () => {
+  for (const entry of ['/absolute', '../escape', 'C:\\escape', 'line\nbreak']) {
+    assert.throws(() => validateArchiveEntry(entry), /unsafe/);
+  }
+  assert.strictEqual(validateArchiveEntry('./bin/ffmpeg'), 'bin/ffmpeg');
+});
+
+test('enforces archive entry count and extracted size budgets', () => {
+  assert.throws(() => accountArchiveEntry('large', 64 * 1024 * 1024 + 1, {
+    entries: 0,
+    totalBytes: 0,
+  }), /size limit/);
+  const many = { entries: 128, totalBytes: 0 };
+  assert.throws(() => accountArchiveEntry('extra', 1, many), /entry count/);
+  const large = { entries: 0, totalBytes: 256 * 1024 * 1024 };
+  assert.throws(() => accountArchiveEntry('extra', 1, large), /total extracted size/);
+});
+
+test('extracts regular tar entries and removes special permission bits', async () => {
+  const root = tempDirectory();
+  try {
+    const source = path.join(root, 'source');
+    const executable = path.join(source, 'bin', 'ffmpeg');
+    fs.mkdirSync(path.dirname(executable), { recursive: true });
+    fs.writeFileSync(executable, 'ffmpeg');
+    if (process.platform !== 'win32') fs.chmodSync(executable, 0o4755);
+    const archive = path.join(root, 'safe.tar.gz');
+    await tar.c({ cwd: source, gzip: true, portable: true, file: archive }, ['bin']);
+    const destination = path.join(root, 'extracted');
+    await extractArchive(archive, destination, 'darwin');
+    assert.strictEqual(fs.readFileSync(path.join(destination, 'bin', 'ffmpeg'), 'utf8'), 'ffmpeg');
+    if (process.platform !== 'win32') {
+      assert.strictEqual(fs.statSync(path.join(destination, 'bin', 'ffmpeg')).mode & 0o7000, 0);
+    }
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('rejects symbolic links in real tar archives', async () => {
+  const root = tempDirectory();
+  try {
+    const source = path.join(root, 'source');
+    fs.mkdirSync(path.join(source, 'bin'), { recursive: true });
+    fs.writeFileSync(path.join(source, 'bin', 'ffmpeg'), 'ffmpeg');
+    fs.symlinkSync('ffmpeg', path.join(source, 'bin', 'ffmpeg-link'));
+    const archive = path.join(root, 'link.tar.gz');
+    await tar.c({ cwd: source, gzip: true, portable: true, file: archive }, ['bin']);
+    await assert.rejects(extractArchive(archive, path.join(root, 'extracted'), 'darwin'),
+      /unsafe archive entry type/);
+    fs.unlinkSync(path.join(source, 'bin', 'ffmpeg-link'));
+    fs.linkSync(path.join(source, 'bin', 'ffmpeg'), path.join(source, 'bin', 'ffmpeg-hardlink'));
+    const hardlinkArchive = path.join(root, 'hardlink.tar.gz');
+    await tar.c({ cwd: source, gzip: true, portable: true, file: hardlinkArchive }, ['bin']);
+    await assert.rejects(extractArchive(hardlinkArchive, path.join(root, 'hardlink'), 'darwin'),
+      /unsafe archive entry type/);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('validates real ZIP entries and rejects symlink metadata', async () => {
+  const root = tempDirectory();
+  try {
+    const safeArchive = path.join(root, 'safe.zip');
+    await createZipArchive(safeArchive, [{ name: 'bin/ffmpeg.exe', contents: 'ffmpeg' }]);
+    const destination = path.join(root, 'safe');
+    await extractArchive(safeArchive, destination, 'win32');
+    assert.strictEqual(fs.readFileSync(path.join(destination, 'bin', 'ffmpeg.exe'), 'utf8'), 'ffmpeg');
+
+    const linkArchive = path.join(root, 'link.zip');
+    await createZipArchive(linkArchive, [{
+      name: 'bin/ffmpeg-link',
+      contents: 'ffmpeg.exe',
+      options: { externalFileAttributes: (0o120777 << 16) >>> 0 },
+    }]);
+    await assert.rejects(extractArchive(linkArchive, path.join(root, 'link'), 'win32'),
+      /unsafe ZIP entry type/);
+  } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }
 });
@@ -204,7 +353,7 @@ test('rejects checksum mismatches and cleans the installation lock', async () =>
     };
     await assert.rejects(ensureFFmpeg(options), /SHA-256 mismatch/);
     assert.strictEqual(fs.existsSync(path.join(root, 'v1.0.0', 'darwin-arm64', 'bin', 'ffmpeg')), false);
-    assert.strictEqual(fs.existsSync(path.join(root, 'v1.0.0', 'darwin-arm64.installing')), false);
+    assert.strictEqual(fs.existsSync(path.join(root, 'v1.0.0', 'darwin-arm64.lock')), false);
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }
@@ -226,6 +375,88 @@ test('shares one installation between concurrent callers', async () => {
     const results = await Promise.all([ensureFFmpeg(options), ensureFFmpeg(options)]);
     assert.strictEqual(results[0], results[1]);
     assert.strictEqual(downloads.length, 1);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('takes over a stale installation lock and releases ownership', async () => {
+  const root = tempDirectory();
+  const downloads = [];
+  try {
+    const installDir = path.join(root, 'v1.0.0', 'darwin-arm64');
+    const lockPath = `${installDir}.lock`;
+    fs.mkdirSync(lockPath, { recursive: true });
+    const ownerPath = path.join(lockPath, 'owner');
+    fs.writeFileSync(ownerPath, 'stale-owner');
+    const old = new Date(Date.now() - 10000);
+    fs.utimesSync(ownerPath, old, old);
+    await ensureFFmpeg({
+      platform: 'darwin',
+      arch: 'arm64',
+      cacheRoot: root,
+      baseURL: 'https://example.test',
+      env: {},
+      lockStaleMs: 1000,
+      lockHeartbeatMs: 100,
+      lockTimeoutMs: 2000,
+      ...fakeInstaller({ archive: Buffer.from('verified archive'), downloads }),
+    });
+    assert.strictEqual(downloads.length, 1);
+    assert.strictEqual(fs.existsSync(lockPath), false);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('heartbeats prevent a live installation from becoming stale', async () => {
+  const root = tempDirectory();
+  const downloads = [];
+  try {
+    const options = {
+      platform: 'darwin',
+      arch: 'arm64',
+      cacheRoot: root,
+      baseURL: 'https://example.test',
+      env: {},
+      lockStaleMs: 200,
+      lockHeartbeatMs: 50,
+      lockTimeoutMs: 3000,
+      ...fakeInstaller({ archive: Buffer.from('verified archive'), downloads, waitMs: 600 }),
+    };
+    const results = await Promise.all([ensureFFmpeg(options), ensureFFmpeg(options)]);
+    assert.strictEqual(results[0], results[1]);
+    assert.strictEqual(downloads.length, 1);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('does not publish or release a lock after ownership changes', async () => {
+  const root = tempDirectory();
+  const downloads = [];
+  try {
+    const archive = Buffer.from('verified archive');
+    const installDir = path.join(root, 'v1.0.0', 'darwin-arm64');
+    const lockPath = `${installDir}.lock`;
+    const installer = fakeInstaller({ archive, downloads });
+    const download = installer.downloadFile;
+    installer.downloadFile = async (url, destination) => {
+      await download(url, destination);
+      fs.rmSync(lockPath, { recursive: true, force: true });
+      fs.mkdirSync(lockPath);
+      fs.writeFileSync(path.join(lockPath, 'owner'), 'different-owner');
+    };
+    await assert.rejects(ensureFFmpeg({
+      platform: 'darwin',
+      arch: 'arm64',
+      cacheRoot: root,
+      baseURL: 'https://example.test',
+      env: {},
+      ...installer,
+    }), /no longer owned/);
+    assert.strictEqual(fs.existsSync(path.join(installDir, 'bin', 'ffmpeg')), false);
+    assert.strictEqual(fs.readFileSync(path.join(lockPath, 'owner'), 'utf8'), 'different-owner');
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }
@@ -298,6 +529,20 @@ test('download failures explain manual recovery', () => {
   assert.match(message, /--ffmpeg <path>/);
 });
 
+async function runTestWithTimeout(name, body) {
+  let timer = null;
+  try {
+    await Promise.race([
+      body(),
+      new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new Error(`test timed out: ${name}`)), 15000);
+      }),
+    ]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 (async () => {
   const generatedManifest = path.join(__dirname, '..', 'ffmpeg-manifest.json');
   const hadGeneratedManifest = fs.existsSync(generatedManifest);
@@ -308,7 +553,7 @@ test('download failures explain manual recovery', () => {
   try {
     for (const { name, body } of tests) {
       try {
-        await body();
+        await runTestWithTimeout(name, body);
         console.log(`ok - ${name}`);
       } catch (error) {
         ++failures;
