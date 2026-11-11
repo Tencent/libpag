@@ -115,8 +115,8 @@ Render a PAGX file to an image.
 
 Export an animated PAGX file to H.264 MP4 through an external ffmpeg process. During `npm install`,
 the package's `postinstall` hook downloads the matching pinned build from `libpag/ffmpeg-builder`,
-verifies its size and SHA-256 against the manifest bundled in this package, and caches it. The
-manifest pins the default release for every supported platform; automatic downloads of other
+verifies its size and SHA-256 against the manifest generated at package time and bundled in this
+package, and caches it. The manifest pins the default release for every supported platform; automatic downloads of other
 releases are not supported. A postinstall download failure reports a warning
 without blocking installation of the other commands. Runtime commands prefer `--ffmpeg` and an
 existing `FFMPEG_BIN`, then the downloaded cache, then `PATH`; they never wait for a network

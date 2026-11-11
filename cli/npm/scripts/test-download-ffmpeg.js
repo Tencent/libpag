@@ -8,6 +8,7 @@ const http = require('http');
 const { spawnSync } = require('child_process');
 const os = require('os');
 const path = require('path');
+const { buildManifest } = require('./generate-ffmpeg-manifest.js');
 const {
   downloadFile,
   ensureFFmpeg,
@@ -61,6 +62,22 @@ function fakeInstaller({ archive, verifiedArchive = archive, downloads, waitMs =
   };
 }
 
+function fakeReleaseMetadata() {
+  const targets = [
+    ['darwin', 'arm64'], ['darwin', 'x64'],
+    ['linux', 'arm64'], ['linux', 'x64'],
+    ['win32', 'arm64'], ['win32', 'x64'],
+  ];
+  return {
+    tag_name: 'v1.0.0',
+    assets: targets.map(([platform, arch]) => ({
+      name: resolveTarget(platform, arch).assetName,
+      size: 1,
+      digest: `sha256:${'0'.repeat(64)}`,
+    })),
+  };
+}
+
 test('maps every pagx platform and architecture', () => {
   assert.strictEqual(resolveTarget('darwin', 'arm64').assetName, 'ffmpeg-mac-arm64.tar.gz');
   assert.strictEqual(resolveTarget('darwin', 'x64').assetName, 'ffmpeg-mac-x64.tar.gz');
@@ -70,6 +87,18 @@ test('maps every pagx platform and architecture', () => {
   assert.strictEqual(resolveTarget('win32', 'x64').assetName, 'ffmpeg-win-x64.zip');
   assert.strictEqual(resolveTarget('win32', 'x64').executableName, 'ffmpeg.exe');
   assert.throws(() => resolveTarget('darwin', 'ia32'), /not available/);
+});
+
+test('builds a complete manifest from official release metadata', () => {
+  const manifest = buildManifest(fakeReleaseMetadata());
+  assert.strictEqual(manifest.release, 'v1.0.0');
+  assert.deepStrictEqual(Object.keys(manifest.assets).sort(), [
+    'darwin-arm64', 'darwin-x64', 'linux-arm64', 'linux-x64', 'win32-arm64', 'win32-x64',
+  ]);
+  assert.strictEqual(manifest.assets['darwin-arm64'].sha256, '0'.repeat(64));
+  const incomplete = fakeReleaseMetadata();
+  incomplete.assets.pop();
+  assert.throws(() => buildManifest(incomplete), /no verified size and SHA-256/);
 });
 
 test('detects MP4 exports that require the ffmpeg installation prompt', () => {
@@ -330,14 +359,25 @@ test('download failures explain manual recovery', () => {
 });
 
 (async () => {
+  const generatedManifest = path.join(__dirname, '..', 'ffmpeg-manifest.json');
+  const hadGeneratedManifest = fs.existsSync(generatedManifest);
+  if (!hadGeneratedManifest) {
+    fs.writeFileSync(generatedManifest, `${JSON.stringify(buildManifest(fakeReleaseMetadata()), null, 2)}\n`);
+  }
   let failures = 0;
-  for (const { name, body } of tests) {
-    try {
-      await body();
-      console.log(`ok - ${name}`);
-    } catch (error) {
-      ++failures;
-      console.error(`not ok - ${name}\n${error.stack}`);
+  try {
+    for (const { name, body } of tests) {
+      try {
+        await body();
+        console.log(`ok - ${name}`);
+      } catch (error) {
+        ++failures;
+        console.error(`not ok - ${name}\n${error.stack}`);
+      }
+    }
+  } finally {
+    if (!hadGeneratedManifest && fs.existsSync(generatedManifest)) {
+      fs.unlinkSync(generatedManifest);
     }
   }
   if (failures) process.exitCode = 1;

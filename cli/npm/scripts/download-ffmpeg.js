@@ -9,9 +9,8 @@ const os = require('os');
 const path = require('path');
 const { execFile } = require('child_process');
 const { pipeline } = require('stream/promises');
-const FFMPEG_MANIFEST = require('../ffmpeg-manifest.json');
 
-const DEFAULT_RELEASE = FFMPEG_MANIFEST.release;
+const DEFAULT_RELEASE = 'v1.0.0';
 const DOWNLOAD_TIMEOUT_MS = 30000;
 const LOCK_TIMEOUT_MS = 120000;
 const SUPPORTED_TARGETS = new Set([
@@ -45,6 +44,18 @@ function resolvePinnedArtifact(target, manifest) {
     throw new Error(`the pinned ffmpeg manifest has no valid entry for ${target.name}`);
   }
   return artifact;
+}
+
+function loadPackagedManifest() {
+  const manifestPath = path.join(__dirname, '..', 'ffmpeg-manifest.json');
+  try {
+    return JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+  } catch (error) {
+    if (error.code === 'ENOENT') {
+      throw new Error('the generated ffmpeg manifest is missing; run npm run generate:ffmpeg-manifest before packaging');
+    }
+    throw new Error(`failed to load the generated ffmpeg manifest: ${error.message}`);
+  }
 }
 
 function defaultCacheRoot(env = process.env) {
@@ -252,7 +263,7 @@ async function acquireInstallLock(lockPath, executablePath, platform, options) {
 async function ensureFFmpeg(options = {}) {
   const target = resolveTarget(options.platform, options.arch);
   const env = options.env || process.env;
-  const manifest = options.manifest || FFMPEG_MANIFEST;
+  const manifest = options.manifest || loadPackagedManifest();
   const release = manifest.release;
   if (env.PAGX_FFMPEG_RELEASE && env.PAGX_FFMPEG_RELEASE !== release) {
     throw new Error(`custom ffmpeg releases are not supported; use FFMPEG_BIN or --ffmpeg to select a local build (requested ${env.PAGX_FFMPEG_RELEASE}, packaged ${release})`);

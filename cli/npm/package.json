@@ -32,9 +32,10 @@
     "check:binaries": "node scripts/check-binaries.js",
     "check:preview": "node scripts/check-preview.js",
     "download:ffmpeg": "node scripts/download-ffmpeg.js",
+    "generate:ffmpeg-manifest": "node scripts/generate-ffmpeg-manifest.js",
     "test:ffmpeg": "node scripts/test-download-ffmpeg.js",
     "postinstall": "node scripts/download-ffmpeg.js --postinstall",
-    "prepack": "node scripts/build-html-snapshot.js",
+    "prepack": "node scripts/build-html-snapshot.js && node scripts/generate-ffmpeg-manifest.js",
     "prepublishOnly": "node scripts/check-binaries.js && node scripts/check-preview.js"
   },
   "os": [

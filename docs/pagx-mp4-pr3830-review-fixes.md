@@ -149,7 +149,7 @@
 ### 12：校验和与归档同源，没有独立信任根
 
 - [x] **结论：成立，P0。**
-- 修复：npm 包内加入 `ffmpeg-manifest.json`，固定当前 release、target、资产名、SHA-256 和大小；镜像只能提供字节一致的官方制品。按已确认的产品边界，不支持通过 `PAGX_FFMPEG_RELEASE` 自动下载其他版本，其他构建通过 `FFMPEG_BIN` 或 `--ffmpeg` 指定本地可执行文件。
+- 修复：`prepack` 从官方 Release 生成 `ffmpeg-manifest.json` 并随 npm 包发布（生成物不提交 Git），固定当前 release、target、资产名、SHA-256 和大小；镜像只能提供字节一致的官方制品。按已确认的产品边界，不支持通过 `PAGX_FFMPEG_RELEASE` 自动下载其他版本，其他构建通过 `FFMPEG_BIN` 或 `--ffmpeg` 指定本地可执行文件。
 
 ### 13：允许明文 HTTP 与 HTTPS 降级重定向
 
