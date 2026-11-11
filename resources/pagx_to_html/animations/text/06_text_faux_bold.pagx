@@ -1,8 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Tests: A fauxBold channel thickens the glyph strokes itself, which no static font weight can express.
+<!-- Tests: A fauxBold channel thickens the glyph strokes itself, on two texts with different
+     font family and size (Arial 80 / Times New Roman 40), so the stroke width has to scale with the
+     font size rather than be a constant.
      Target: Text  Channel: fauxBold  Type: bool
-     Expect: gap
-     Ref: - -->
+     Expect: supported
+     Known-gap: faux-bold-stroke（用 -webkit-text-stroke 复刻，0.09em/字号；0.884，剩余差来自 描边居中 vs 运行时单向外扩）
 <pagx width="320" height="200">
   <Layer left="0" right="0" top="0" bottom="0">
     <Rectangle left="0" right="0" top="0" bottom="0"/>
@@ -11,11 +13,20 @@
   <Layer left="0" right="0" top="0" bottom="0">
     <Text id="word" text="Ag" fontFamily="Arial" fontStyle="Regular" fontSize="80"
           letterSpacing="0" position="60,130"/>
+    <Text id="word2" text="Ag" fontFamily="Times New Roman" fontStyle="Regular" fontSize="40"
+          letterSpacing="0" position="210,90"/>
     <Fill color="#BE123C"/>
   </Layer>
   <Animations>
     <Animation id="textAnim" duration="60" frameRate="60" loop="once">
       <Object target="word">
+        <Channel name="fauxBold" type="bool">
+          <Key time="0" value="false" interpolation="hold"/>
+          <Key time="30" value="true" interpolation="hold"/>
+          <Key time="60" value="true"/>
+        </Channel>
+      </Object>
+      <Object target="word2">
         <Channel name="fauxBold" type="bool">
           <Key time="0" value="false" interpolation="hold"/>
           <Key time="30" value="true" interpolation="hold"/>
