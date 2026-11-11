@@ -18,6 +18,7 @@
 
 #include "Transform3DFilter.h"
 #include <array>
+#include <climits>
 #include <cmath>
 #include <cstring>
 #include "base/utils/MathUtil.h"

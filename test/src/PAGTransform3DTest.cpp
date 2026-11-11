@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include <array>
+#include <climits>
 #include <cmath>
 #include <filesystem>
 #include <fstream>
@@ -142,6 +143,7 @@ class DepthEncodingFilter : public Transform3DSceneFilter {
   }
 };
 
+// Packed depth bytes require nearest sampling; interpolating them changes the encoded integer.
 void CheckDepthEncoding(RenderCache* cache, tgfx::Context* context,
                         const Transform3DDepthPlane& plane, int width, int height,
                         const std::vector<tgfx::Point>& points) {
@@ -171,7 +173,8 @@ void CheckDepthEncoding(RenderCache* cache, tgfx::Context* context,
   ASSERT_NE(image, nullptr);
   auto surface = tgfx::Surface::Make(context, width, height);
   ASSERT_NE(surface, nullptr);
-  surface->getCanvas()->drawImage(image);
+  surface->getCanvas()->drawImage(
+      image, tgfx::SamplingOptions(tgfx::FilterMode::Nearest, tgfx::MipmapMode::None));
   tgfx::Bitmap bitmap(width, height, false, false);
   tgfx::Pixmap pixels(bitmap);
   ASSERT_TRUE(surface->readPixels(pixels.info(), pixels.writablePixels()));
@@ -1306,6 +1309,7 @@ PAG_PIXEL_TEST(PAGTransform3DTest, DifferentInputScalesAndSurfaceResize) {
   }
 }
 
+/** Checks discrete projected coverage independently of backend linear-filter rounding. */
 PAG_PIXEL_TEST(PAGTransform3DTest, FractionalViewportPreservesProjection) {
   DeviceLockScope lock;
   ASSERT_TRUE(static_cast<bool>(lock));
@@ -1340,7 +1344,8 @@ PAG_PIXEL_TEST(PAGTransform3DTest, FractionalViewportPreservesProjection) {
     ASSERT_NE(surface, nullptr);
     auto canvas = surface->getCanvas();
     canvas->scale(0.5f / sourceScale, 0.5f / sourceScale);
-    canvas->drawImage(output);
+    canvas->drawImage(output,
+                      tgfx::SamplingOptions(tgfx::FilterMode::Nearest, tgfx::MipmapMode::None));
     auto inside = surface->getColor(31, 16);
     EXPECT_NEAR(inside.red, 1, 1.0f / 255);
     EXPECT_NEAR(inside.alpha, 1, 1.0f / 255);
