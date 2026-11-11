@@ -115,7 +115,7 @@ bool ValidateEncoderArguments(const std::vector<std::string>& arguments, std::st
       SetError(errorMsg, "missing value for --encoder-args option '" + argument + "'");
       return false;
     }
-    ++index;
+    index += 2;
   }
   return true;
 }
