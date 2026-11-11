@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const { execFileSync } = require('child_process');
 const Utils = require("../../third_party/vendor_tools/lib/Utils");
 
 // The version policy is shared with the configure-time check in the root CMakeLists.txt.
@@ -16,6 +17,18 @@ const readVersionPolicy = () => {
 };
 
 const versionPolicy = readVersionPolicy();
+
+// Every argument is passed as a separate argv element so no value is ever re-parsed by a shell.
+// cmd.exe is only involved on Windows, where the emsdk entry points are .bat wrappers.
+const runCommand = (command, args, dir) => {
+    const options = { cwd: dir || process.cwd(), stdio: 'inherit', env: process.env };
+    console.log([command].concat(args).join(' '));
+    if (process.platform === 'win32') {
+        execFileSync('cmd', ['/c', command].concat(args), options);
+    } else {
+        execFileSync(command, args, options);
+    }
+};
 
 const parseVersion = (text) => {
     const match = text.match(/(\d+)\.(\d+)\.(\d+)/);
@@ -48,10 +61,14 @@ if (envVersion) {
 
 const emsdkPath = path.resolve(__dirname, '../emsdk');
 if (!fs.existsSync(emsdkPath)) {
-    Utils.exec(`git clone https://github.com/emscripten-core/emsdk.git ${Utils.escapeSpace(emsdkPath)}`);
+    runCommand('git', ['clone', 'https://github.com/emscripten-core/emsdk.git', emsdkPath]);
 } else {
-    let pullResult = Utils.execSafe(`git -C ${Utils.escapeSpace(emsdkPath)} pull`);
-    process.stdout.write(pullResult);
+    // A failed pull must not abort the build: the existing checkout may already be usable.
+    try {
+        runCommand('git', ['-C', emsdkPath, 'pull']);
+    } catch (error) {
+        process.stdout.write(`git pull failed, keeping the existing emsdk checkout: ${error.message}\n`);
+    }
 }
 const emscriptenPath = path.resolve(emsdkPath, 'upstream/emscripten');
 process.env.PATH = process.platform === 'win32'
@@ -61,8 +78,9 @@ process.env.PATH = process.platform === 'win32'
 // Pin the emscripten version instead of using "latest": the WebGPU backend requires
 // the window declared in web/emsdk-versions.txt (enforced at configure time in the root
 // CMakeLists.txt).
-Utils.exec(`emsdk install ${versionPolicy.PIN}`, emsdkPath);
-Utils.exec(`emsdk activate ${versionPolicy.PIN}`, emsdkPath);
+const emsdkLauncher = process.platform === 'win32' ? 'emsdk.bat' : 'emsdk';
+runCommand(emsdkLauncher, ['install', versionPolicy.PIN], emsdkPath);
+runCommand(emsdkLauncher, ['activate', versionPolicy.PIN], emsdkPath);
 
 const emsdkEnv = process.platform === 'win32' ? "emsdk_env.bat" : "source emsdk_env.sh";
 let result = Utils.execSafe(emsdkEnv, emsdkPath);
