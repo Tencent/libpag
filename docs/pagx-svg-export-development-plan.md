@@ -679,6 +679,7 @@ ToSVG严格失败返回空结果、ToFile返回false、CLI非零；warnings=null
 | 本轮 ST23/ST24（2026-11-11） | MergePath 先清空当前 scope 的 geometry 与 painters 再放入合并 path；Repeater 改用 `powf`，非有限副本跳过，BelowOriginal 反序、AboveOriginal 正序，与 tgfx 的 copy 顺序一致；新增 resolver 级结构测试并修正负 fractional scale 的旧 SignedPow 期望；`PAGXUtilsTest` 255 / 255、SVG+Utils+PPT 720 / 721 | 仅既有 `SVGExport_GroupAlphaRoundTripPixels` 基线失败；Group/Text 参与 Merge 的递归合并与 Repeater 预算未覆盖 |
 | 本轮 ST27（2026-11-11） | Rectangle / Ellipse 的零或负轴按 tgfx 的 5e-3 微轮廓处理：Fill 直接跳过，Stroke 输出微元素以保留 cap/dash；正常轴仍走原 stroke inset 路径；新增 3 个 SVG 结构回归 | 微轮廓的 inside/outside align 与 Trim/dash 的像素对照未做；Path 的退化微轮廓不在本条 |
 | 本轮 ST11 部分 + ST42 部分（2026-11-11） | reversed 的 Rectangle / Ellipse / Path 在 resolver 中烘成带方向的 Path，SVG/PPT 的 dash 起点不再丢方向；`stroke.width <= 0` 显式输出 `stroke="none"`；SVG path 序列化从 `%g` 改为 `FloatToString` 的 9 位 round-trip 精度；新增方向/零宽/大数值精度回归；`PAGXSVGTest` 214 / 215 | 仅既有 GroupAlpha 基线失败；adaptive dash、Path 的 inside/outside align、奇数 dash × cap、layout-fit-coverage 分离与曲线远控制点 bounds 未做 |
+| 本轮 ST16 部分（2026-11-11） | `ModifierResolver` 析构时按构造前 node 数移除本次创建的临时节点；Merge 产生的 even-odd Fill 改为克隆，不再修改作者 Fill；重复 SVG 导出的 node 数与输出字节稳定；四套件 1095 / 1097 | 两处均为既有基线；Repeater 乘性预算、shared PathData 污染与并发导出未覆盖 |
 
 ### 4.8 S3 文字待办清单（下一批入口）
 

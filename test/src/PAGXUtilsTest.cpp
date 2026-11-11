@@ -2315,6 +2315,33 @@ PAGX_TEST(PAGXUtilsTest, PathDataToSVGString_KeepsFloatPrecision) {
   EXPECT_NE(text.find("-0.375"), std::string::npos);
 }
 
+PAGX_TEST(PAGXUtilsTest, ModifierResolver_MergeDoesNotMutateAuthoredFill) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto* first = doc->makeNode<pagx::Rectangle>();
+  first->position = {40, 50};
+  first->size = {40, 40};
+  auto* second = doc->makeNode<pagx::Rectangle>();
+  second->position = {60, 50};
+  second->size = {40, 40};
+  auto* fill = doc->makeNode<pagx::Fill>();
+  fill->fillRule = pagx::FillRule::Winding;
+  auto* merge = doc->makeNode<pagx::MergePath>();
+  merge->mode = pagx::MergePathMode::Difference;
+
+  std::vector<pagx::Element*> elements = {first, second, merge, fill};
+  pagx::ModifierResolver resolver(doc.get());
+  auto resolved = resolver.resolve(elements);
+  EXPECT_EQ(fill->fillRule, pagx::FillRule::Winding);
+  bool foundEvenOddFill = false;
+  for (auto* element : resolved) {
+    if (element->nodeType() == pagx::NodeType::Fill) {
+      foundEvenOddFill = static_cast<pagx::Fill*>(element)->fillRule == pagx::FillRule::EvenOdd;
+      EXPECT_NE(element, fill);
+    }
+  }
+  EXPECT_TRUE(foundEvenOddFill);
+}
+
 // ---------------------------------------------------------------------------
 // TextModifier paint overrides
 // ---------------------------------------------------------------------------

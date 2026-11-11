@@ -20,6 +20,7 @@
 #include <algorithm>
 #include <cmath>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 #include "pagx/nodes/Ellipse.h"
 #include "pagx/nodes/Fill.h"
@@ -46,6 +47,17 @@
 #include "tgfx/core/PathTypes.h"
 
 namespace pagx {
+
+ModifierResolver::~ModifierResolver() {
+  if (_doc == nullptr || _doc->nodes.size() <= _nodeCountBefore) {
+    return;
+  }
+  std::unordered_set<Node*> temporary = {};
+  for (size_t i = _nodeCountBefore; i < _doc->nodes.size(); i++) {
+    temporary.insert(_doc->nodes[i].get());
+  }
+  _doc->removeNodes(temporary);
+}
 
 //==============================================================================
 // Geometry helpers: build pagx::PathData from primitive shapes and from a
@@ -996,10 +1008,15 @@ std::vector<Element*> ModifierResolver::resolve(const std::vector<Element*>& ele
   }
 
   if (scopeNeedsEvenOddFill) {
-    for (auto* el : output) {
-      if (el->nodeType() == NodeType::Fill) {
-        static_cast<Fill*>(el)->fillRule = FillRule::EvenOdd;
+    for (auto*& el : output) {
+      if (el->nodeType() != NodeType::Fill) {
+        continue;
       }
+      auto* clone = _doc->makeNode<Fill>();
+      *clone = *static_cast<const Fill*>(el);
+      clone->id.clear();
+      clone->fillRule = FillRule::EvenOdd;
+      el = clone;
     }
   }
 

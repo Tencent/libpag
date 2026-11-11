@@ -51,8 +51,10 @@ class TrimPath;
  */
 class ModifierResolver {
  public:
-  explicit ModifierResolver(PAGXDocument* doc) : _doc(doc) {
+  explicit ModifierResolver(PAGXDocument* doc) : _doc(doc), _nodeCountBefore(doc->nodes.size()) {
   }
+
+  ~ModifierResolver();
 
   /**
    * Returns a normalized copy of `elements` with all path modifiers baked. Fill, Stroke, Group,
@@ -71,6 +73,7 @@ class ModifierResolver {
 
  private:
   PAGXDocument* _doc;
+  size_t _nodeCountBefore = 0;
 
   Element* makePathFromData(PathData* data) const;
 

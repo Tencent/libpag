@@ -6256,6 +6256,28 @@ PAGX_TEST(PAGXSVGTest, SVGExport_ZeroWidthStrokeIsSkipped) {
   EXPECT_EQ(svg.find("stroke=\"#FF0000\""), std::string::npos);
 }
 
+// ST16: modifier resolution creates temporary nodes; repeated exports must not accumulate them in
+// the document and must stay byte-identical.
+PAGX_TEST(PAGXSVGTest, SVGExport_RepeatedExportKeepsNodeCountStable) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* path = doc->makeNode<pagx::Path>();
+  path->data = doc->makeNode<pagx::PathData>();
+  *path->data = pagx::PathDataFromSVGString("M10 10 L90 10 L90 90 L10 90 Z");
+  auto* trim = doc->makeNode<pagx::TrimPath>();
+  trim->start = 0.0f;
+  trim->end = 0.5f;
+  layer->contents = {path, trim, MakeSolidFillSVG(doc.get(), 1, 0, 0)};
+  doc->layers.push_back(layer);
+
+  auto before = doc->nodes.size();
+  auto firstSvg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_EQ(doc->nodes.size(), before);
+  auto secondSvg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_EQ(doc->nodes.size(), before);
+  EXPECT_EQ(firstSvg, secondSvg);
+}
+
 // A Group's alpha has to survive until the painter that draws its geometry, even when that painter
 // sits outside the Group.
 PAGX_TEST(PAGXSVGTest, SVGExport_GroupAlphaReachesOuterPainter) {
