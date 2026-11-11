@@ -590,6 +590,28 @@ PAGX_TEST(PAGXVideoExporterTest, AsyncAndSyncModesCannotBeMixed) {
   EXPECT_EQ(started.frame->error(), "mixed_mode");
 }
 
+PAGX_TEST(PAGXVideoExporterTest, FailedSynchronousFrameDoesNotLockMode) {
+#ifdef TGFX_USE_WEBGPU
+  GTEST_SKIP() << "Native test does not pump the WebGPU event loop";
+#endif
+  auto calls = std::make_shared<int>(0);
+  // Construction, drawing and synchronous reading query the surface in that order. The read
+  // failure must not prevent the caller from restarting the sequence through the async API.
+  auto surface = MakeObservedHostSurface(200, 200, calls, 2);
+  auto exporter = pagx::VideoExporter::MakeWithSurface(MakeStaticDocument(), std::move(surface));
+  ASSERT_TRUE(exporter != nullptr);
+  EXPECT_FALSE(exporter->nextFrame());
+  EXPECT_NE(exporter->error().find("read"), std::string::npos);
+  EXPECT_EQ(exporter->currentFrame(), 0);
+
+  auto started = exporter->startNextFrame();
+  ASSERT_EQ(started.status, pagx::VideoExportStartStatus::FrameStarted) << started.error;
+  EXPECT_TRUE(exporter->error().empty());
+  std::vector<uint8_t> pixels = {};
+  ASSERT_TRUE(ConsumeAsyncFrame(started.frame, 200, 200, &pixels));
+  EXPECT_EQ(exporter->currentFrame(), 1);
+}
+
 PAGX_TEST(PAGXVideoExporterTest, ReleasingAsyncFrameDoesNotConsumeIt) {
 #ifdef TGFX_USE_WEBGPU
   GTEST_SKIP() << "Native test does not pump the WebGPU event loop";
@@ -619,11 +641,38 @@ PAGX_TEST(PAGXVideoExporterTest, AsyncCopyFailureIsTerminalAndDoesNotCommit) {
   ASSERT_TRUE(WaitAsyncFrame(started.frame));
   std::vector<uint8_t> pixels(16, 0xCD);
   EXPECT_FALSE(started.frame->readPixels(pixels.data(), 0));
+  EXPECT_EQ(pixels, std::vector<uint8_t>(16, 0xCD));
   EXPECT_EQ(started.frame->status(), pagx::VideoExportFrameStatus::Failed);
   EXPECT_EQ(exporter->currentFrame(), 0);
   auto failed = exporter->startNextFrame();
   EXPECT_EQ(failed.status, pagx::VideoExportStartStatus::Failed);
   EXPECT_EQ(failed.frame, nullptr);
+  EXPECT_EQ(exporter->currentFrame(), 0);
+}
+
+PAGX_TEST(PAGXVideoExporterTest, CancelAfterFailureReleasesPendingAndPreservesError) {
+#ifdef TGFX_USE_WEBGPU
+  GTEST_SKIP() << "Native test does not pump the WebGPU event loop";
+#endif
+  auto exporter = pagx::VideoExporter::Make(MakeAnimatedDocument("once"));
+  ASSERT_TRUE(exporter != nullptr);
+  auto started = exporter->startNextFrame();
+  ASSERT_EQ(started.status, pagx::VideoExportStartStatus::FrameStarted);
+  ASSERT_TRUE(WaitAsyncFrame(started.frame));
+  std::vector<uint8_t> pixels(16, 0);
+  ASSERT_FALSE(started.frame->readPixels(pixels.data(), 0));
+  auto originalError = started.frame->error();
+  ASSERT_FALSE(originalError.empty());
+  std::weak_ptr<pagx::VideoExportFrame> frameReference = started.frame;
+
+  exporter->cancel();
+  EXPECT_EQ(exporter->error(), originalError);
+  EXPECT_EQ(started.frame->error(), originalError);
+  started.frame = nullptr;
+  EXPECT_TRUE(frameReference.expired());
+  auto failed = exporter->startNextFrame();
+  EXPECT_EQ(failed.status, pagx::VideoExportStartStatus::Failed);
+  EXPECT_EQ(failed.error, originalError);
   EXPECT_EQ(exporter->currentFrame(), 0);
 }
 
@@ -646,6 +695,11 @@ PAGX_TEST(PAGXVideoExporterTest, AsyncDynamicSequenceEndsAfterLastFrameIsConsume
   auto end = exporter->startNextFrame();
   EXPECT_EQ(end.status, pagx::VideoExportStartStatus::End);
   EXPECT_EQ(end.frame, nullptr);
+  EXPECT_FALSE(exporter->nextFrame());
+  EXPECT_EQ(exporter->error(), "mixed_mode");
+  auto mixed = exporter->startNextFrame();
+  EXPECT_EQ(mixed.status, pagx::VideoExportStartStatus::Failed);
+  EXPECT_EQ(mixed.error, "mixed_mode");
 }
 
 PAGX_TEST(PAGXVideoExporterTest, AsyncFrameDoesNotCreateAnOwnershipCycle) {

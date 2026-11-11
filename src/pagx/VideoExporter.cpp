@@ -351,7 +351,7 @@ bool VideoExporter::drawNextFrame(std::string* errorMsg) {
 }
 
 bool VideoExporter::nextFrame() {
-  if (scene == nullptr || state->failed || state->cancelled || state->currentFrame >= frameCount_) {
+  if (state->failed || state->cancelled) {
     return false;
   }
   if (state->mode == VideoExportMode::Async) {
@@ -362,9 +362,12 @@ bool VideoExporter::nextFrame() {
     }
     return false;
   }
-  state->mode = VideoExportMode::Sync;
+  if (scene == nullptr || state->currentFrame >= frameCount_) {
+    return false;
+  }
   if (reuseStaticFrame_ && state->currentFrame > 0) {
     state->currentFrame++;
+    state->mode = VideoExportMode::Sync;
     state->error.clear();
     return true;
   }
@@ -378,6 +381,7 @@ bool VideoExporter::nextFrame() {
     return false;
   }
   state->currentFrame++;
+  state->mode = VideoExportMode::Sync;
   state->error.clear();
   return true;
 }
@@ -401,7 +405,6 @@ VideoExportStartResult VideoExporter::startNextFrame() {
   if (state->currentFrame >= frameCount_) {
     return {VideoExportStartStatus::End, nullptr, ""};
   }
-  state->mode = VideoExportMode::Async;
   auto frameIndex = state->currentFrame;
   std::shared_ptr<VideoExportFrameImpl> impl = nullptr;
   if (reuseStaticFrame_ && frameIndex > 0) {
@@ -423,17 +426,22 @@ VideoExportStartResult VideoExporter::startNextFrame() {
   }
   auto frame = std::shared_ptr<VideoExportFrame>(new VideoExportFrame(std::move(impl)));
   pendingFrame = frame;
+  state->mode = VideoExportMode::Async;
+  state->error.clear();
   return {VideoExportStartStatus::FrameStarted, std::move(frame), ""};
 }
 
 void VideoExporter::cancel() {
-  if (state->failed || state->cancelled) {
+  if (state->cancelled) {
     return;
   }
+  auto wasFailed = state->failed;
   state->cancelled = true;
-  state->error = "cancelled";
-  if (pendingFrame != nullptr && !pendingFrame->impl->consumed) {
-    pendingFrame->impl->fail(state->error);
+  if (!wasFailed) {
+    state->error = "cancelled";
+    if (pendingFrame != nullptr && !pendingFrame->impl->consumed) {
+      pendingFrame->impl->fail(state->error);
+    }
   }
   pendingFrame = nullptr;
 }
