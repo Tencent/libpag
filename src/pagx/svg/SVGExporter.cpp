@@ -21,6 +21,7 @@
 #include <cctype>
 #include <cmath>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
@@ -98,6 +99,11 @@ namespace pagx {
 using pag::FloatNearlyEqual;
 using pag::FloatNearlyZero;
 using SVGBuilder = XMLBuilder;
+
+static bool ShouldFailSvgFileStage(const char* stage) {
+  const char* value = std::getenv("PAGX_SVG_FAIL_STAGE");
+  return value != nullptr && std::string(value) == stage;
+}
 
 static std::vector<float> BuildStrokeDashPattern(const Stroke* stroke);
 
@@ -520,11 +526,13 @@ class SVGWriter {
             bool convertTextToPath = true, LayoutContext* layoutContext = nullptr,
             PAGXDocument* doc = nullptr, bool bakeUnsupported = true, float rasterScale = 2.0f,
             std::vector<std::string>* warnings = nullptr,
-            const SVGAnimationPlan* animation = nullptr, bool rejectUnsupported = false)
+            const SVGAnimationPlan* animation = nullptr, bool rejectUnsupported = false,
+            std::vector<SVGDiagnostic>* diagnostics = nullptr)
       : _defs(defs), _context(context), _indentSpaces(indentSpaces),
         _convertTextToPath(convertTextToPath), _bakeUnsupported(bakeUnsupported),
         _rejectUnsupported(rejectUnsupported), _rasterScale(rasterScale), _warnings(warnings),
-        _layoutContext(layoutContext), _resolver(doc), _doc(doc), _animWriter(animation, warnings) {
+        _diagnostics(diagnostics), _layoutContext(layoutContext), _resolver(doc), _doc(doc),
+        _animWriter(animation, warnings) {
   }
 
   bool rejected() const {
@@ -543,6 +551,7 @@ class SVGWriter {
   bool _rejected = false;
   float _rasterScale = 2.0f;
   std::vector<std::string>* _warnings = nullptr;
+  std::vector<SVGDiagnostic>* _diagnostics = nullptr;
   LayoutContext* _layoutContext = nullptr;
   ModifierResolver _resolver;
   PAGXDocument* _doc = nullptr;
@@ -572,9 +581,17 @@ class SVGWriter {
     return _context->generateId(prefix);
   }
 
-  void addWarning(std::string message) {
+  void addWarning(std::string message, const char* reasonCode = "unsupported",
+                  SVGDiagnosticAction action = SVGDiagnosticAction::Dropped) {
     if (_warnings != nullptr) {
-      _warnings->push_back(std::move(message));
+      _warnings->push_back(message);
+    }
+    if (_diagnostics != nullptr) {
+      SVGDiagnostic diagnostic = {};
+      diagnostic.reasonCode = reasonCode;
+      diagnostic.message = std::move(message);
+      diagnostic.action = action;
+      _diagnostics->push_back(std::move(diagnostic));
     }
   }
 
@@ -4564,7 +4581,8 @@ void SVGWriter::writeLayer(SVGBuilder& out, const Layer* layer) {
   // silently degrading it.
   if (features.needsRasterization() && _rejectUnsupported) {
     addWarning("layer '" + (layer->id.empty() ? std::string("(unnamed)") : layer->id) +
-               "' uses SVG-unsupported features and was rejected by staticPolicy VectorOnly.");
+                   "' uses SVG-unsupported features and was rejected by staticPolicy VectorOnly.",
+               "unsupported-feature", SVGDiagnosticAction::Rejected);
     _rejected = true;
     return;
   }
@@ -4911,6 +4929,14 @@ std::string SVGExporter::ToSVG(PAGXDocument& doc, const Options& options,
   if (options.exportAnimation) {
     animationPlan = SVGAnimationPlan::Build(&doc, warnings, options.animation);
     if (animationPlan != nullptr && animationPlan->rejected()) {
+      if (options.diagnostics != nullptr) {
+        SVGDiagnostic diagnostic = {};
+        diagnostic.reasonCode = "animation-rejected";
+        diagnostic.message =
+            "animation policy Strict rejected a channel SVG cannot express; nothing is emitted.";
+        diagnostic.action = SVGDiagnosticAction::Rejected;
+        options.diagnostics->push_back(std::move(diagnostic));
+      }
       return {};
     }
   }
@@ -4967,7 +4993,7 @@ std::string SVGExporter::ToSVG(PAGXDocument& doc, const Options& options,
 
   SVGWriter writer(&defs, &context, options.indent, convertTextToPath, layoutContext.get(), &doc,
                    bakeUnsupported, safeRasterScale, warnings, animationPlan.get(),
-                   rejectUnsupported);
+                   rejectUnsupported, options.diagnostics);
 
   if (options.xmlDeclaration) {
     svg.appendDeclaration();
@@ -5051,13 +5077,32 @@ bool SVGExporter::ToFile(PAGXDocument& document, const std::string& filePath,
     if (!file) {
       return false;
     }
+    if (ShouldFailSvgFileStage("write")) {
+      file.close();
+      std::filesystem::remove(tempPath, error);
+      return false;
+    }
     file.write(svgContent.data(), static_cast<std::streamsize>(svgContent.size()));
+    if (ShouldFailSvgFileStage("flush")) {
+      file.close();
+      std::filesystem::remove(tempPath, error);
+      return false;
+    }
     file.flush();
     if (!file.good()) {
       file.close();
       std::filesystem::remove(tempPath, error);
       return false;
     }
+    if (ShouldFailSvgFileStage("close")) {
+      file.close();
+      std::filesystem::remove(tempPath, error);
+      return false;
+    }
+  }
+  if (ShouldFailSvgFileStage("replace")) {
+    std::filesystem::remove(tempPath, error);
+    return false;
   }
   std::filesystem::rename(tempPath, target, error);
   if (error) {

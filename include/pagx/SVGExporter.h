@@ -90,6 +90,30 @@ struct SVGAnimationOptions {
 };
 
 /**
+ * The action taken for a diagnostic entry.
+ */
+enum class SVGDiagnosticAction {
+  Exact,
+  Approximated,
+  Frozen,
+  Dropped,
+  Rejected,
+};
+
+/**
+ * A structured export diagnostic. reasonCode is stable for programmatic handling; the message is
+ * for humans. Empty fields mean the diagnostic is not tied to a specific node/channel.
+ */
+struct SVGDiagnostic {
+  std::string reasonCode = {};
+  std::string instancePath = {};
+  std::string nodeId = {};
+  std::string channelOrOutput = {};
+  std::string message = {};
+  SVGDiagnosticAction action = SVGDiagnosticAction::Dropped;
+};
+
+/**
  * Export options for SVGExporter.
  */
 struct SVGExportOptions {
@@ -133,6 +157,12 @@ struct SVGExportOptions {
    * system fonts via platform-native font lookup.
    */
   FontConfig* fontConfig = nullptr;
+
+  /**
+   * Optional structured diagnostics sink. Entries mirror the warnings that affect output loss or
+   * approximation and additionally carry a stable reason code and the action taken.
+   */
+  std::vector<SVGDiagnostic>* diagnostics = nullptr;
 
   /**
    * Deprecated and ignored: the exporter always resolves path modifiers (TrimPath, RoundCorner,

@@ -17,9 +17,11 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include <cmath>
+#include <cstdlib>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
+#include <iterator>
 #include <set>
 #include "cli/CommandVerify.h"
 #include "pagx/PAGImage.h"
@@ -2487,9 +2489,13 @@ PAGX_TEST(PAGXSVGTest, SVGExport_StaticPolicyOverridesDeprecatedFlag) {
   vectorOnly.bakeUnsupported = true;
   vectorOnly.staticPolicy = pagx::SVGStaticExportPolicy::VectorOnly;
   std::vector<std::string> warnings;
+  std::vector<pagx::SVGDiagnostic> diagnostics;
+  vectorOnly.diagnostics = &diagnostics;
   auto vectorSvg = pagx::SVGExporter::ToSVG(*vectorDoc, vectorOnly, &warnings);
   EXPECT_TRUE(vectorSvg.empty());
   EXPECT_FALSE(warnings.empty());
+  ASSERT_FALSE(diagnostics.empty());
+  EXPECT_EQ(diagnostics.front().action, pagx::SVGDiagnosticAction::Rejected);
 
   auto preserveDoc = makeDoc();
   pagx::SVGExportOptions preserve = {};
@@ -4632,11 +4638,16 @@ PAGX_TEST(PAGXSVGTest, SVGExport_AnimationPolicyStrictRejectsUnsupportedChannel)
   AttachTimeline(doc->layers[0], "anim");
 
   std::vector<std::string> strictWarnings;
+  std::vector<pagx::SVGDiagnostic> strictDiagnostics;
   pagx::SVGExportOptions strict = {};
   strict.animation.policy = pagx::SVGAnimationPolicy::Strict;
+  strict.diagnostics = &strictDiagnostics;
   auto strictSvg = pagx::SVGExporter::ToSVG(*doc, strict, &strictWarnings);
   EXPECT_TRUE(strictSvg.empty());
   EXPECT_FALSE(strictWarnings.empty());
+  ASSERT_FALSE(strictDiagnostics.empty());
+  EXPECT_EQ(strictDiagnostics.front().reasonCode, "animation-rejected");
+  EXPECT_EQ(strictDiagnostics.front().action, pagx::SVGDiagnosticAction::Rejected);
 
   pagx::SVGExportOptions bestEffort = {};
   bestEffort.animation.policy = pagx::SVGAnimationPolicy::BestEffort;
@@ -6858,6 +6869,39 @@ PAGX_TEST(PAGXSVGTest, SVGExport_ImagePatternNearestFilter) {
 
   auto svg = pagx::SVGExporter::ToSVG(*doc);
   EXPECT_NE(svg.find("image-rendering=\"pixelated\""), std::string::npos);
+}
+
+// ST46: ToFile must keep the previous file intact for every injected write/flush/close/replace
+// failure.
+PAGX_TEST(PAGXSVGTest, SVGExport_ToFileFailureKeepsExistingFile) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {50, 50};
+  rect->size = {80, 80};
+  layer->contents = {rect, MakeSolidFillSVG(doc.get(), 1, 0, 0)};
+  doc->layers.push_back(layer);
+
+  auto path = std::filesystem::temp_directory_path() / "pagx_svg_fail_test.svg";
+  {
+    std::ofstream old(path, std::ios::binary | std::ios::trunc);
+    old << "OLD";
+  }
+  const char* stages[] = {"write", "flush", "close", "replace"};
+  for (const char* stage : stages) {
+    setenv("PAGX_SVG_FAIL_STAGE", stage, 1);
+    EXPECT_FALSE(pagx::SVGExporter::ToFile(*doc, path.string()));
+    std::ifstream current(path, std::ios::binary);
+    std::string content((std::istreambuf_iterator<char>(current)),
+                        std::istreambuf_iterator<char>());
+    EXPECT_EQ(content, "OLD") << stage;
+  }
+  unsetenv("PAGX_SVG_FAIL_STAGE");
+  EXPECT_TRUE(pagx::SVGExporter::ToFile(*doc, path.string()));
+  std::ifstream written(path, std::ios::binary);
+  std::string content((std::istreambuf_iterator<char>(written)), std::istreambuf_iterator<char>());
+  EXPECT_NE(content.find("<svg"), std::string::npos);
+  std::filesystem::remove(path);
 }
 
 // A Group's alpha has to survive until the painter that draws its geometry, even when that painter
