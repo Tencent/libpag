@@ -4,7 +4,6 @@
      Target: Text  Channel: fontFamily  Type: string
      Three typical texts (Arial 72 / Times New Roman 44 / Courier New 28) drive the same channel,
      so a rule that only holds for one family or one size cannot pass.
-     Known-gap: font-family-step（hold 跳变，0.898；剩余差为浏览器与运行时 shaping 不同）
      Ref: - -->
 <pagx width="320" height="200">
   <Layer left="0" right="0" top="0" bottom="0">

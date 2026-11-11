@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: TextModifier fillColor overrides the shared fill so the glyphs re-tint without touching the layer fill.
      Target: TextModifier  Channel: fillColor  Type: color
-     Known-gap: modifier-color-blend（span 逐字形换色已通，modifier 色与文本底色的 LerpColor 合成未复刻，0.939 待标定）
      Ref: - -->
 <pagx width="320" height="200">
   <Layer left="0" right="0" top="0" bottom="0">
