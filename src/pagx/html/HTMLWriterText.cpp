@@ -24,6 +24,7 @@
 #include <random>
 #include <string>
 #include "base/utils/MathUtil.h"
+#include "pagx/SystemFonts.h"
 #include "pagx/TextLayout.h"
 #include "pagx/html/FontSignature.h"
 #include "pagx/html/HTMLWriter.h"
@@ -45,6 +46,7 @@
 #include "pagx/types/TrimType.h"
 #include "pagx/utils/ColorSpaceUtils.h"
 #include "pagx/utils/StringParser.h"
+#include "tgfx/core/Font.h"
 #include "tgfx/core/UTF.h"
 
 namespace pagx {
@@ -685,6 +687,85 @@ void SampleArcLengthLUT(const ArcLengthLUT& lut, float arcLength, Point* outPos,
 // HTMLWriter – text methods
 //==============================================================================
 
+// CSS translate() that combines a horizontal anchor percentage with an optional vertical shift.
+static std::string CssTextTranslate(const char* xPercent, float dy) {
+  if (FloatNearlyZero(dy)) {
+    return std::string("translateX(") + xPercent + ")";
+  }
+  return std::string("translate(") + xPercent + "," + CssFloatToString(dy) + "px)";
+}
+
+// CSS line box settings that put browser-rendered text on the same rows as PAGX's own layout.
+struct CssLineBoxAlignment {
+  // False when the family cannot be resolved, in which case the default line box has to be kept.
+  bool hasFont = false;
+  // Distance the browser's baseline sits below PAGX's under the default `line-height: normal`.
+  float baselineDelta = 0;
+  // Line height matching PAGX's line advance, used to keep multi-line spacing identical.
+  float lineHeight = 0;
+  // Line height that puts a single line's baseline exactly on PAGX's baseline row.
+  float singleLineHeight = 0;
+};
+
+// Returns the metrics PAGX lays text out with. The macOS adjustment mirrors the one in
+// TextLayout.cpp: Chromium and Safari raise the ascent of Helvetica, Times and Courier by 15% of
+// (ascent + descent) so their line boxes match the Microsoft counterparts they are substituted for.
+static tgfx::FontMetrics GetTextLayoutMetrics(const tgfx::Font& font) {
+  auto metrics = font.getMetrics();
+#ifdef __APPLE__
+  auto typeface = font.getTypeface();
+  if (typeface != nullptr) {
+    auto family = typeface->fontFamily();
+    if (family == "Helvetica" || family == "Times" || family == "Courier") {
+      float ascent = roundf(fabsf(metrics.ascent));
+      float descent = roundf(metrics.descent);
+      metrics.ascent -= floorf((ascent + descent) * 0.15f + 0.5f);
+    }
+  }
+#endif
+  return metrics;
+}
+
+// A CSS line box centres the font's content area inside the line height and splits the leading
+// around it, while PAGX counts the leading as content and puts the baseline at the ascent, then
+// rounds it to whole pixels. The PAGX side below mirrors TextLayout.cpp's line box model
+// (maxLineHeight = roundf(ascent + descent + leading), baseline = roundf((halfLeading + ascent) *
+// roundingRatio)), so a change there has to be mirrored here.
+static CssLineBoxAlignment ComputeLineBoxAlignment(const std::string& fontFamily,
+                                                   const std::string& fontStyle, float fontSize) {
+  CssLineBoxAlignment result = {};
+  if (fontFamily.empty() || fontSize <= 0.0f) {
+    return result;
+  }
+  auto typeface = SystemFonts::ResolveTypeface(fontFamily, fontStyle);
+  if (typeface == nullptr) {
+    return result;
+  }
+  auto metrics = GetTextLayoutMetrics(tgfx::Font(typeface, fontSize));
+  float ascent = fabsf(metrics.ascent);
+  float leading = std::max(0.0f, metrics.leading);
+  float metricsHeight = ascent + metrics.descent + leading;
+  if (metricsHeight <= 0.0f) {
+    return result;
+  }
+  float lineBox = roundf(metricsHeight);
+  float halfLeading = (lineBox - metricsHeight) / 2;
+  float pagxBaseline = roundf((halfLeading + ascent) * lineBox / metricsHeight);
+  // The browser rounds ascent and descent to whole pixels to size the content area, so the leading
+  // ends up split around a slightly different box than the raw metrics.
+  float cssAscent = roundf(ascent);
+  float cssDescent = roundf(metrics.descent);
+  float contentHeight = cssAscent + cssDescent;
+  float normalLineBox = contentHeight + roundf(leading);
+  float cssBaseline = (normalLineBox - contentHeight) / 2 + cssAscent;
+
+  result.hasFont = true;
+  result.baselineDelta = cssBaseline - pagxBaseline;
+  result.lineHeight = lineBox;
+  result.singleLineHeight = 2 * (pagxBaseline - cssAscent) + contentHeight;
+  return result;
+}
+
 void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
                            const Stroke* stroke, const TextBox* tb, float alpha) {
   if (!text->glyphRuns.empty()) {
@@ -885,6 +966,26 @@ void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
       style += ";line-height:1";
     }
     style += ";white-space:pre";
+    bool singleLine = text->text.find('\n') == std::string::npos;
+    // A CSS line box centres the font's content area inside the line height and splits the leading
+    // around it, while PAGX counts the leading as content and puts the baseline at the ascent (then
+    // rounds it). Placing the span top at PAGX's origin therefore renders the glyphs about
+    // leading/2 lower in a browser. A single line can absorb that by shrinking its line box onto
+    // PAGX's baseline row; a multi-line block keeps PAGX's line advance (its spacing must stay
+    // intact) and is shifted as a whole through `transform`.
+    float baselineShift = 0.0f;
+    if (!usesGlyphRunPosition) {
+      auto alignment =
+          ComputeLineBoxAlignment(text->fontFamily, text->fontStyle, text->renderFontSize());
+      if (alignment.hasFont) {
+        if (singleLine) {
+          style += ";line-height:" + CssFloatToString(alignment.singleLineHeight) + "px";
+        } else {
+          style += ";line-height:" + CssFloatToString(alignment.lineHeight) + "px";
+          baselineShift = -alignment.baselineDelta;
+        }
+      }
+    }
     // Multi-line text with a non-Start anchor needs per-line alignment relative to the anchor
     // point. The single-line path below uses `width:posX*2` (center) or `width:posX` (end)
     // which only positions one line correctly — posX here is glyphRuns[0]'s x, i.e. the
@@ -893,25 +994,27 @@ void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
     // a span whose anchor is the origin, shifted with `transform:translateX`. tgfx centres
     // each line around anchor x=0 in the layer's coordinate space; mirror that by placing
     // the span at `text->position.x` and using translateX(-50%) for Center / -100% for End.
-    bool multiLineAnchor =
-        text->text.find('\n') != std::string::npos && text->textAnchor != TextAnchor::Start;
+    bool multiLineAnchor = !singleLine && text->textAnchor != TextAnchor::Start;
     if (multiLineAnchor) {
       float anchorX = text->position.x;
       if (text->textAnchor == TextAnchor::Center) {
         style += ";left:" + CssFloatToString(anchorX) +
-                 "px;transform:translateX(-50%);text-align:center";
+                 "px;transform:" + CssTextTranslate("-50%", baselineShift) + ";text-align:center";
       } else {
         style += ";left:" + CssFloatToString(anchorX) +
-                 "px;transform:translateX(-100%);text-align:right";
+                 "px;transform:" + CssTextTranslate("-100%", baselineShift) + ";text-align:right";
       }
     } else if (text->textAnchor == TextAnchor::Center) {
-      style +=
-          ";left:" + CssFloatToString(posX) + "px;transform:translateX(-50%);text-align:center";
+      style += ";left:" + CssFloatToString(posX) +
+               "px;transform:" + CssTextTranslate("-50%", baselineShift) + ";text-align:center";
     } else if (text->textAnchor == TextAnchor::End) {
-      style +=
-          ";left:" + CssFloatToString(posX) + "px;transform:translateX(-100%);text-align:right";
+      style += ";left:" + CssFloatToString(posX) +
+               "px;transform:" + CssTextTranslate("-100%", baselineShift) + ";text-align:right";
     } else {
       style += ";left:" + CssFloatToString(posX) + "px";
+      if (!FloatNearlyZero(baselineShift)) {
+        style += ";transform:translateY(" + CssFloatToString(baselineShift) + "px)";
+      }
     }
     if (!text->id.empty()) {
       // The frame list shifts this anchor when the x/y channel is animated.
