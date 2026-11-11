@@ -16,9 +16,9 @@ const {
   formatDownloadError,
   hasExplicitFFmpeg,
   isMP4Export,
-  parseChecksums,
   resolveFFmpegForCLI,
   resolveTarget,
+  verifyArchive,
 } = require('./download-ffmpeg.js');
 
 const tests = [];
@@ -30,12 +30,26 @@ function tempDirectory() {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'pagx-ffmpeg-test-'));
 }
 
-function fakeInstaller({ archive, checksums, downloads, waitMs = 0 }) {
+function pinnedManifest(archive) {
   return {
+    release: 'v1.0.0',
+    assets: {
+      'darwin-arm64': {
+        name: 'ffmpeg-mac-arm64.tar.gz',
+        size: archive.length,
+        sha256: crypto.createHash('sha256').update(archive).digest('hex'),
+      },
+    },
+  };
+}
+
+function fakeInstaller({ archive, verifiedArchive = archive, downloads, waitMs = 0 }) {
+  return {
+    manifest: pinnedManifest(verifiedArchive),
     downloadFile: async (url, destination) => {
       downloads.push(url);
       if (waitMs) await new Promise((resolve) => setTimeout(resolve, waitMs));
-      fs.writeFileSync(destination, url.endsWith('/SHA256SUMS') ? checksums : archive, { flag: 'wx' });
+      fs.writeFileSync(destination, archive, { flag: 'wx' });
     },
     extractArchive: async (_archive, destination, platform) => {
       const name = platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg';
@@ -114,10 +128,21 @@ test('prefers the downloaded ffmpeg over PATH and honors explicit overrides', ()
   }
 });
 
-test('parses SHA256SUMS in text and binary formats', () => {
-  const checksums = parseChecksums(`${'a'.repeat(64)}  ffmpeg-mac-arm64.tar.gz\n${'b'.repeat(64)} *ffmpeg-win-x64.zip\n`);
-  assert.strictEqual(checksums.get('ffmpeg-mac-arm64.tar.gz'), 'a'.repeat(64));
-  assert.strictEqual(checksums.get('ffmpeg-win-x64.zip'), 'b'.repeat(64));
+test('validates archive size and hash against the pinned manifest', () => {
+  const root = tempDirectory();
+  try {
+    const archive = Buffer.from('verified archive');
+    const archivePath = path.join(root, 'archive');
+    fs.writeFileSync(archivePath, archive);
+    const artifact = pinnedManifest(archive).assets['darwin-arm64'];
+    verifyArchive(archivePath, artifact);
+    assert.throws(() => verifyArchive(archivePath, { ...artifact, size: artifact.size + 1 }),
+      /size mismatch/);
+    assert.throws(() => verifyArchive(archivePath, { ...artifact, sha256: '0'.repeat(64) }),
+      /SHA-256 mismatch/);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
 });
 
 test('downloads through local HTTP redirects', async () => {
@@ -150,8 +175,6 @@ test('downloads through local HTTP redirects', async () => {
 test('installs atomically and reuses the cache', async () => {
   const root = tempDirectory();
   const archive = Buffer.from('verified archive');
-  const digest = crypto.createHash('sha256').update(archive).digest('hex');
-  const checksums = `${digest}  ffmpeg-mac-arm64.tar.gz\n`;
   const downloads = [];
   try {
     const options = {
@@ -160,14 +183,14 @@ test('installs atomically and reuses the cache', async () => {
       cacheRoot: root,
       baseURL: 'https://example.test/v2.0.0',
       env: {},
-      ...fakeInstaller({ archive, checksums, downloads }),
+      ...fakeInstaller({ archive, downloads }),
     };
     const executable = await ensureFFmpeg(options);
     assert.strictEqual(executable, path.join(root, 'v1.0.0', 'darwin-arm64', 'bin', 'ffmpeg'));
-    assert.strictEqual(downloads.length, 2);
+    assert.strictEqual(downloads.length, 1);
     assert.strictEqual(await ensureFFmpeg(options), executable);
     assert.strictEqual(findCachedFFmpeg(options), executable);
-    assert.strictEqual(downloads.length, 2);
+    assert.strictEqual(downloads.length, 1);
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }
@@ -176,8 +199,6 @@ test('installs atomically and reuses the cache', async () => {
 test('replaces an interrupted cache installation', async () => {
   const root = tempDirectory();
   const archive = Buffer.from('verified archive');
-  const digest = crypto.createHash('sha256').update(archive).digest('hex');
-  const checksums = `${digest}  ffmpeg-mac-arm64.tar.gz\n`;
   const downloads = [];
   try {
     const damagedInstall = path.join(root, 'v1.0.0', 'darwin-arm64');
@@ -189,10 +210,10 @@ test('replaces an interrupted cache installation', async () => {
       cacheRoot: root,
       baseURL: 'https://example.test',
       env: {},
-      ...fakeInstaller({ archive, checksums, downloads }),
+      ...fakeInstaller({ archive, downloads }),
     });
     assert.strictEqual(fs.readFileSync(executable, 'utf8'), 'fake ffmpeg');
-    assert.strictEqual(downloads.length, 2);
+    assert.strictEqual(downloads.length, 1);
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }
@@ -200,8 +221,8 @@ test('replaces an interrupted cache installation', async () => {
 
 test('rejects checksum mismatches and cleans the installation lock', async () => {
   const root = tempDirectory();
-  const archive = Buffer.from('bad archive');
-  const checksums = `${'0'.repeat(64)}  ffmpeg-mac-arm64.tar.gz\n`;
+  const archive = Buffer.from('invalid archive!');
+  const verifiedArchive = Buffer.from('verified archive');
   const downloads = [];
   try {
     const options = {
@@ -210,7 +231,7 @@ test('rejects checksum mismatches and cleans the installation lock', async () =>
       cacheRoot: root,
       baseURL: 'https://example.test',
       env: {},
-      ...fakeInstaller({ archive, checksums, downloads }),
+      ...fakeInstaller({ archive, verifiedArchive, downloads }),
     };
     await assert.rejects(ensureFFmpeg(options), /SHA-256 mismatch/);
     assert.strictEqual(fs.existsSync(path.join(root, 'v1.0.0', 'darwin-arm64', 'bin', 'ffmpeg')), false);
@@ -223,8 +244,6 @@ test('rejects checksum mismatches and cleans the installation lock', async () =>
 test('shares one installation between concurrent callers', async () => {
   const root = tempDirectory();
   const archive = Buffer.from('verified archive');
-  const digest = crypto.createHash('sha256').update(archive).digest('hex');
-  const checksums = `${digest}  ffmpeg-mac-arm64.tar.gz\n`;
   const downloads = [];
   try {
     const options = {
@@ -233,11 +252,28 @@ test('shares one installation between concurrent callers', async () => {
       cacheRoot: root,
       baseURL: 'https://example.test',
       env: {},
-      ...fakeInstaller({ archive, checksums, downloads, waitMs: 20 }),
+      ...fakeInstaller({ archive, downloads, waitMs: 20 }),
     };
     const results = await Promise.all([ensureFFmpeg(options), ensureFFmpeg(options)]);
     assert.strictEqual(results[0], results[1]);
-    assert.strictEqual(downloads.length, 2);
+    assert.strictEqual(downloads.length, 1);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('rejects custom releases before downloading', async () => {
+  const root = tempDirectory();
+  const downloads = [];
+  try {
+    await assert.rejects(ensureFFmpeg({
+      platform: 'darwin',
+      arch: 'arm64',
+      cacheRoot: root,
+      env: { PAGX_FFMPEG_RELEASE: 'v2.0.0' },
+      ...fakeInstaller({ archive: Buffer.from('verified archive'), downloads }),
+    }), /custom ffmpeg releases are not supported/);
+    assert.strictEqual(downloads.length, 0);
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }

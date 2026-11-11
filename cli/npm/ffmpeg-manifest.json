@@ -1,0 +1,35 @@
+{
+  "release": "v1.0.0",
+  "assets": {
+    "darwin-arm64": {
+      "name": "ffmpeg-mac-arm64.tar.gz",
+      "size": 1622196,
+      "sha256": "2e8222ade1c8b6fe31cf9e6edca5661395f379c0a8b0dea1be17e62f938eae79"
+    },
+    "darwin-x64": {
+      "name": "ffmpeg-mac-x64.tar.gz",
+      "size": 1808313,
+      "sha256": "2458488e5eba90d6e92bc9daa189bf40737afb13900cabc8bae017df2c2a0da9"
+    },
+    "linux-arm64": {
+      "name": "ffmpeg-linux-arm64.tar.gz",
+      "size": 1665514,
+      "sha256": "6d9a96b333b31a7741f8abfa15b41943170045f114ede776daa0d7c5b2f79f89"
+    },
+    "linux-x64": {
+      "name": "ffmpeg-linux-x64.tar.gz",
+      "size": 1782212,
+      "sha256": "a77c72464889a6ae59d4a79c3fc2fbe61715ba3aa43171a889d5869237a1aef9"
+    },
+    "win32-arm64": {
+      "name": "ffmpeg-win-arm64.zip",
+      "size": 1715747,
+      "sha256": "92e941145c324000bf5e86e4ade36ea447288ee6a88aea2b49f161495514ff9b"
+    },
+    "win32-x64": {
+      "name": "ffmpeg-win-x64.zip",
+      "size": 1848947,
+      "sha256": "c17b19bd3e7bbe4ea30eb8b6d93470f4314c3a02c5bddf99d44728376f2b0397"
+    }
+  }
+}

@@ -9,8 +9,9 @@ const os = require('os');
 const path = require('path');
 const { execFile } = require('child_process');
 const { pipeline } = require('stream/promises');
+const FFMPEG_MANIFEST = require('../ffmpeg-manifest.json');
 
-const DEFAULT_RELEASE = 'v1.0.0';
+const DEFAULT_RELEASE = FFMPEG_MANIFEST.release;
 const DOWNLOAD_TIMEOUT_MS = 30000;
 const LOCK_TIMEOUT_MS = 120000;
 const SUPPORTED_TARGETS = new Set([
@@ -34,6 +35,16 @@ function resolveTarget(platform = process.platform, arch = process.arch) {
     executableName: platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg',
     platform,
   };
+}
+
+function resolvePinnedArtifact(target, manifest) {
+  const artifact = manifest.assets && manifest.assets[target.name];
+  if (!artifact || artifact.name !== target.assetName ||
+      !Number.isSafeInteger(artifact.size) || artifact.size < 0 ||
+      !/^[0-9a-f]{64}$/.test(artifact.sha256)) {
+    throw new Error(`the pinned ffmpeg manifest has no valid entry for ${target.name}`);
+  }
+  return artifact;
 }
 
 function defaultCacheRoot(env = process.env) {
@@ -96,9 +107,8 @@ function findCachedFFmpeg(options = {}) {
   try {
     const target = resolveTarget(options.platform, options.arch);
     const env = options.env || process.env;
-    const release = env.PAGX_FFMPEG_RELEASE || DEFAULT_RELEASE;
     const cacheRoot = options.cacheRoot || defaultCacheRoot(env);
-    const executable = path.join(cacheRoot, release, target.name, 'bin', target.executableName);
+    const executable = path.join(cacheRoot, DEFAULT_RELEASE, target.name, 'bin', target.executableName);
     return isExecutable(executable, target.platform) ? executable : null;
   } catch {
     return null;
@@ -107,8 +117,7 @@ function findCachedFFmpeg(options = {}) {
 
 function releaseBaseURL(env = process.env) {
   if (env.PAGX_FFMPEG_BASE_URL) return env.PAGX_FFMPEG_BASE_URL.replace(/\/$/, '');
-  const release = env.PAGX_FFMPEG_RELEASE || DEFAULT_RELEASE;
-  return `https://github.com/libpag/ffmpeg-builder/releases/download/${encodeURIComponent(release)}`;
+  return `https://github.com/libpag/ffmpeg-builder/releases/download/${encodeURIComponent(DEFAULT_RELEASE)}`;
 }
 
 function requestResponse(url, redirects, timeoutMs) {
@@ -156,22 +165,14 @@ async function downloadFile(url, destination, options = {}) {
   }
 }
 
-function parseChecksums(contents) {
-  const checksums = new Map();
-  for (const line of contents.split(/\r?\n/)) {
-    const match = /^([0-9a-fA-F]{64})\s+\*?(.+)$/.exec(line.trim());
-    if (match) checksums.set(path.basename(match[2].trim()), match[1].toLowerCase());
+function verifyArchive(archivePath, artifact) {
+  const actualSize = fs.statSync(archivePath).size;
+  if (actualSize !== artifact.size) {
+    throw new Error(`size mismatch for ${artifact.name}: expected ${artifact.size}, got ${actualSize}`);
   }
-  return checksums;
-}
-
-function verifyArchive(archivePath, checksumsPath, assetName) {
-  const checksums = parseChecksums(fs.readFileSync(checksumsPath, 'utf8'));
-  const expected = checksums.get(assetName);
-  if (!expected) throw new Error(`SHA256SUMS does not contain ${assetName}`);
   const actual = crypto.createHash('sha256').update(fs.readFileSync(archivePath)).digest('hex');
-  if (actual !== expected) {
-    throw new Error(`SHA-256 mismatch for ${assetName}: expected ${expected}, got ${actual}`);
+  if (actual !== artifact.sha256) {
+    throw new Error(`SHA-256 mismatch for ${artifact.name}: expected ${artifact.sha256}, got ${actual}`);
   }
 }
 
@@ -251,7 +252,12 @@ async function acquireInstallLock(lockPath, executablePath, platform, options) {
 async function ensureFFmpeg(options = {}) {
   const target = resolveTarget(options.platform, options.arch);
   const env = options.env || process.env;
-  const release = env.PAGX_FFMPEG_RELEASE || DEFAULT_RELEASE;
+  const manifest = options.manifest || FFMPEG_MANIFEST;
+  const release = manifest.release;
+  if (env.PAGX_FFMPEG_RELEASE && env.PAGX_FFMPEG_RELEASE !== release) {
+    throw new Error(`custom ffmpeg releases are not supported; use FFMPEG_BIN or --ffmpeg to select a local build (requested ${env.PAGX_FFMPEG_RELEASE}, packaged ${release})`);
+  }
+  const artifact = resolvePinnedArtifact(target, manifest);
   const cacheRoot = options.cacheRoot || defaultCacheRoot(env);
   const installDir = path.join(cacheRoot, release, target.name);
   const executablePath = path.join(installDir, 'bin', target.executableName);
@@ -268,14 +274,12 @@ async function ensureFFmpeg(options = {}) {
     if (isExecutable(executablePath, target.platform)) return executablePath;
     fs.mkdirSync(path.dirname(installDir), { recursive: true });
     stagingDir = fs.mkdtempSync(path.join(cacheRoot, `.${target.name}-`));
-    const archivePath = path.join(stagingDir, target.assetName);
-    const checksumsPath = path.join(stagingDir, 'SHA256SUMS');
+    const archivePath = path.join(stagingDir, artifact.name);
     const extractDir = path.join(stagingDir, 'extracted');
     const baseURL = options.baseURL || releaseBaseURL(env);
     const download = options.downloadFile || downloadFile;
-    await download(`${baseURL}/SHA256SUMS`, checksumsPath);
-    await download(`${baseURL}/${target.assetName}`, archivePath);
-    verifyArchive(archivePath, checksumsPath, target.assetName);
+    await download(`${baseURL}/${artifact.name}`, archivePath);
+    verifyArchive(archivePath, artifact);
     const extract = options.extractArchive || extractArchive;
     await extract(archivePath, extractDir, target.platform);
     const extractedExecutable = path.join(extractDir, 'bin', target.executableName);
@@ -316,9 +320,9 @@ module.exports = {
   hasExplicitFFmpeg,
   isExecutable,
   isMP4Export,
-  parseChecksums,
   resolveFFmpegForCLI,
   resolveTarget,
+  verifyArchive,
 };
 
 if (require.main === module) {
