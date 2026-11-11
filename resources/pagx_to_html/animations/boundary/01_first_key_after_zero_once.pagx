@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: when the first key sits at frame 30 the channel holds that value for the frames before it.
      Target: Layer  Channel: alpha  Type: float
-     Expect: supported
      Ref: - -->
 <pagx width="320" height="200">
   <Layer left="0" right="0" top="0" bottom="0">

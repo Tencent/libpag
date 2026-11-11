@@ -4,7 +4,6 @@
      (1.0 -> 0.6667 here) before wrapping, so the CSS period must stay 60 frames instead of being
      stretched to reach the key at 90.
      Target: Layer  Channel: alpha  Type: float
-     Expect: supported
      Ref: - -->
 <pagx width="320" height="200">
   <Layer left="0" right="0" top="0" bottom="0">

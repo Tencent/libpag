@@ -4,7 +4,6 @@
      lost and the path keeps a static dash pattern with no animation driving it.
      Target: TrimPath  Channel: end  Type: float
      Target: Stroke  Channel: width  Type: float
-     Expect: supported
      Ref: - -->
 <pagx width="320" height="200">
   <Layer left="0" right="0" top="0" bottom="0">

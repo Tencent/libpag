@@ -2,7 +2,6 @@
 <!-- Tests: Polystar pointCount grows a pentagon into a nine-sided polygon; the geometry family had no Star case at
      all, so this stands in for every Polystar channel the exporter leaves alone.
      Target: Polystar  Channel: pointCount  Type: float
-     Expect: supported
      Ref: - -->
 <pagx width="320" height="200">
   <Layer left="0" right="0" top="0" bottom="0">

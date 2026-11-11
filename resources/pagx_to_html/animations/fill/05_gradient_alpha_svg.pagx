@@ -4,7 +4,6 @@
      fill. The small swatch in the top-right corner is an unanimated copy of the same gradient, and
      the gradient stays bright, so a black fill on the large triangle is visible at a glance.
      Target: Fill  Channel: alpha  Type: float
-     Expect: supported
      Ref: - -->
 <pagx width="320" height="200">
   <Layer left="0" right="0" top="0" bottom="0">

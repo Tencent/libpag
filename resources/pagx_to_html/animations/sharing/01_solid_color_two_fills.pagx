@@ -3,7 +3,6 @@
      change color together, and this case currently passes for the wrong reason because the runtime
      binds the shared color source to only the last Fill and the export drops the same one.
      Target: SolidColor  Channel: color  Type: color
-     Expect: supported
      Ref: - -->
 <pagx width="320" height="200">
   <Resources>

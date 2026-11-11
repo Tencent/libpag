@@ -2,7 +2,6 @@
 <!-- Tests: a positive evaluationOffset delays a once animation so the color stays green during the
      first five frames after the mount.
      Target: SolidColor  Channel: color  Type: color
-     Expect: supported
      Ref: test/src/PAGXRuntimeTest.cpp:656 -->
 <pagx width="320" height="200">
   <Resources>

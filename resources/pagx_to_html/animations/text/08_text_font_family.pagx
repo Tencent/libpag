@@ -2,7 +2,6 @@
 <!-- Tests: A fontFamily channel swaps the face; each of the three texts crosses a different pair
 (sans to serif, serif to mono, mono back to sans).
      Target: Text  Channel: fontFamily  Type: string
-     Expect: supported
      Three typical texts (Arial 72 / Times New Roman 44 / Courier New 28) drive the same channel,
      so a rule that only holds for one family or one size cannot pass.
      Known-gap: font-family-step（hold 跳变，0.898；剩余差为浏览器与运行时 shaping 不同）

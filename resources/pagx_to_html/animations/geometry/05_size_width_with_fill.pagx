@@ -3,7 +3,6 @@
      the same CSS div, so it must carry both keyframe rules instead of only the first resolved one.
      Target: Rectangle  Channel: size.width  Type: float
      Target: Fill  Channel: color  Type: color
-     Expect: supported
      Ref: - -->
 <pagx width="320" height="200">
   <Layer left="0" right="0" top="0" bottom="0">

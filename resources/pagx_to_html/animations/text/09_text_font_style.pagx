@@ -2,7 +2,6 @@
 <!-- Tests: A fontStyle channel switches the face weight/slant; the three texts start from different
 styles so the switch is visible on each.
      Target: Text  Channel: fontStyle  Type: string
-     Expect: supported
      Three typical texts (Arial 72 / Times New Roman 44 / Courier New 28) drive the same channel,
      so a rule that only holds for one family or one size cannot pass.
      Known-gap: font-style-step（映射到 font-weight/font-style，0.953）

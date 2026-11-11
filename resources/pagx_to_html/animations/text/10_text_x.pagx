@@ -1,15 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: A Text x channel slides the layout anchor, taking the whole word with it.
      Target: Text  Channel: x  Type: float
-     Expect: gap
-     Known-gap: static-text-baseline
-     Note: 文本统一导出为 CSS span。span 的基线来自浏览器行盒（半行距 + 字体 ascent），PAGX 按自身字体
-           度量定位，两者差 1~2px（40px 字号约 1px，80px 约 2px），表现为整块文字整体下移：位置和逐帧
-           位移都对，只是整体偏移，因此本用例停在 0.88~0.90。
-     不要用 SVG <text> 来消除这 1~2px：SVG 的 y 就是基线，确实能到 0.98，但那样 x/y 动画走 SVG、
-           fontSize/letterSpacing 动画必须留在 span（SVG 基线是固定 y，字号变大时字形向上长，而 PAGX
-           基线随字号下移，实测掉到 0.26）。导出路径若由"哪些通道在动"决定，两类通道一复合就冲突，
-           所以统一走 span，宁可接受基线差。修法只能在 span 路径上对齐行盒基线。
      Ref: - -->
 <pagx width="320" height="200">
   <Layer left="0" right="0" top="0" bottom="0">

@@ -3,7 +3,6 @@
      falloff curve changes (easeIn / easeOut / weight), so the per-glyph factor has to be recomputed from
      four selector channels in the same frame.
      Target: Composite  Channel: start,end,offset,easeIn,easeOut,weight,fontSize,letterSpacing,fillColor,fauxBold  Type: mixed
-     Expect: supported
      Ref: - -->
 <pagx width="320" height="200">
   <Layer left="0" right="0" top="0" bottom="0">

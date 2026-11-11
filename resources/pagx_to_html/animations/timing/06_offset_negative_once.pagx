@@ -2,7 +2,6 @@
 <!-- Tests: a negative evaluationOffset skips the green opening and starts red, then the later key
      changes to blue during playback.
      Target: SolidColor  Channel: color  Type: color
-     Expect: supported
      Ref: test/src/PAGXRuntimeTest.cpp:735 -->
 <pagx width="320" height="200">
   <Resources>

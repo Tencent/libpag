@@ -2,7 +2,6 @@
 <!-- Tests: One contour mask whose four corners all move at once, so the clip path has to be rebuilt from
      four animated point channels per frame while the masked content stays static.
      Target: Path  Channel: point1.x,point2.x,point3.y,point4.y  Type: float
-     Expect: supported
      Ref: - -->
 <pagx width="320" height="200">
   <Layer left="0" right="0" top="0" bottom="0">

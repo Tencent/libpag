@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: Group rotation and scale.x / scale.y animate together so the contents both turn and grow.
      Target: Group  Channel: rotation,scale.x,scale.y  Type: float
-     Expect: supported
      Ref: - -->
 <pagx width="320" height="200">
   <Layer left="0" right="0" top="0" bottom="0">

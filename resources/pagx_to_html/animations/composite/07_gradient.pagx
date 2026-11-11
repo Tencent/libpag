@@ -2,7 +2,6 @@
 <!-- Tests: Both gradient fillers move at once: the linear ramp animates both endpoints while its first stop
      re-tints, the radial one animates center.x / center.y / radius while its inner stop re-tints.
      Target: Composite  Channel: startPoint.x,startPoint.y,endPoint.x,endPoint.y,color,center.x,center.y,radius,color  Type: mixed
-     Expect: supported
      Ref: - -->
 <pagx width="320" height="200">
   <Layer left="0" right="0" top="0" bottom="0">

@@ -2,7 +2,6 @@
 <!-- Tests: a key placed past the duration still leaves the channel reachable but the ramp stops
      early at the duration boundary.
      Target: Layer  Channel: alpha  Type: float
-     Expect: supported
      Ref: - -->
 <pagx width="320" height="200">
   <Layer left="0" right="0" top="0" bottom="0">

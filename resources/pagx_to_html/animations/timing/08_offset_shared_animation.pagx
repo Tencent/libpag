@@ -2,7 +2,6 @@
 <!-- Tests: two slots mount the same Composition and Animation with different evaluationOffsets, so
      each instance evaluates the shared keyframes at its own phase.
      Target: Layer  Channel: alpha  Type: float
-     Expect: supported
      Ref: test/src/PAGXTest.cpp:7078 -->
 <pagx width="320" height="200">
   <Resources>

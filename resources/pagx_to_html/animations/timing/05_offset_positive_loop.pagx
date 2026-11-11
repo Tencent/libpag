@@ -2,7 +2,6 @@
 <!-- Tests: a positive evaluationOffset shifts a looping alpha ramp on every cycle, so the second
      cycle starts from the wrapped phase rather than from the first frame.
      Target: Layer  Channel: alpha  Type: float
-     Expect: supported
      Ref: test/src/PAGXTest.cpp:6997 -->
 <pagx width="320" height="200">
   <Resources>

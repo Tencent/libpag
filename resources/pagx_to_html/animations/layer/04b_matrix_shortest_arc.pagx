@@ -3,7 +3,6 @@
      instead of the 340 degree way around. A matrix channel replaces the layer's x/y translation, so
      each key carries its own translate and the box stays on the canvas.
      Target: Layer  Channel: matrix  Type: matrix
-     Expect: supported
      Ref: test/src/PAGXTest.cpp:10289 -->
 <pagx width="320" height="200">
   <Layer left="0" right="0" top="0" bottom="0">

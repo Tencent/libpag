@@ -2,7 +2,6 @@
 <!-- Tests: A RangeSelector weight biases where the ramp's peak sits, moving the strongest displacement across
      the word.
      Target: RangeSelector  Channel: weight  Type: float
-     Expect: supported
      Ref: - -->
 <pagx width="320" height="200">
   <Layer left="0" right="0" top="0" bottom="0">

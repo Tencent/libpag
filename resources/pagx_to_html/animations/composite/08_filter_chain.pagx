@@ -2,7 +2,6 @@
 <!-- Tests: Two filters on one layer animate at once: the blur grows on both axes while the drop shadow moves,
      blurs and re-tints. The two filter functions have to stay in one ordered chain per frame.
      Target: Composite  Channel: blurX,blurY,offsetX,offsetY,color  Type: mixed
-     Expect: supported
      Ref: - -->
 <pagx width="320" height="200">
   <Layer left="0" right="0" top="0" bottom="0">

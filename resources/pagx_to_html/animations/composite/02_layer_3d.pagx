@@ -2,8 +2,7 @@
 <!-- Tests: One Layer carrying rotation.x / rotation.y / rotation.z / z / anchor.x / anchor.y / anchor.z / alpha
      together under a static perspective, so the 3D compose order and the pivot depth are exercised at
      the same time as the projection.
-     Target: Composite  Channel: rotation.x,rotation.y,rotation.z,z,anchor.x,anchor.y,anchor.z,alpha  Type: mixed
-     Expect: supported
+     Target: Composite  Channel: rotation.x,rotation.y,rotation.z,z,anchor.x,anchor.y,anchor.z,alpha,perspective  Type: mixed
      Ref: - -->
 <pagx width="320" height="200">
   <Layer left="0" right="0" top="0" bottom="0">
@@ -34,6 +33,10 @@
         <Channel name="rotation.z" type="float">
           <Key time="0" value="0" interpolation="linear"/>
           <Key time="60" value="15"/>
+        </Channel>
+        <Channel name="perspective" type="float">
+          <Key time="0" value="600" interpolation="linear"/>
+          <Key time="60" value="260"/>
         </Channel>
         <Channel name="z" type="float">
           <Key time="0" value="0" interpolation="linear"/>

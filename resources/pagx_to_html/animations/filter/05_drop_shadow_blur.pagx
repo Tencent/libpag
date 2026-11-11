@@ -2,7 +2,6 @@
 <!-- Tests: DropShadowFilter blurX and blurY grow together with identical keys, turning a hard shadow
      into an evenly blurred one.
      Target: DropShadowFilter  Channel: blurX,blurY  Type: float
-     Expect: supported
      Ref: - -->
 <pagx width="320" height="200">
   <Layer left="0" right="0" top="0" bottom="0">

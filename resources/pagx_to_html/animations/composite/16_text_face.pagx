@@ -2,7 +2,6 @@
 <!-- Tests: Two texts switch face while keeping their own animation: family, style and the two
      synthetic flags all land on the same two elements without interfering.
      Target: Text  Channel: fontFamily,fontStyle,fauxBold,fauxItalic  Type: mixed
-     Expect: supported
      Ref: - -->
 <pagx width="320" height="200">
   <Layer left="0" right="0" top="0" bottom="0">

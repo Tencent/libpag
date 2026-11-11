@@ -3,7 +3,6 @@
      matrix must win, the translate lives inside it), the second animates x / rotation.z next to a static
      matrix3D (that pose must win while alpha still applies).
      Target: Composite  Channel: x,y,matrix,x,rotation.z,alpha,matrix3D  Type: mixed
-     Expect: supported
      Ref: - -->
 <pagx width="320" height="200">
   <Layer left="0" right="0" top="0" bottom="0">

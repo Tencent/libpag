@@ -2,7 +2,6 @@
 <!-- Tests: one animated Fill paints both a rectangle and a text glyph run in the same layer, so the
      animation must reach the geometry and the text paint site alike.
      Target: Fill  Channel: color  Type: color
-     Expect: supported
      Ref: - -->
 <pagx width="320" height="200">
   <Layer left="0" right="0" top="0" bottom="0">

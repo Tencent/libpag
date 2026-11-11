@@ -2,7 +2,6 @@
 <!-- Tests: A fauxBold channel thickens the glyph outlines themselves; no static font weight can
 express it, and the stroke width has to scale with the font size.
      Target: Text  Channel: fauxBold  Type: bool
-     Expect: supported
      Three typical texts (Arial 72 / Times New Roman 44 / Courier New 28) drive the same channel,
      so a rule that only holds for one family or one size cannot pass.
      Known-gap: faux-bold-stroke（-webkit-text-stroke 复刻，0.09em，剩余差来自描边居中 vs 单向外扩）

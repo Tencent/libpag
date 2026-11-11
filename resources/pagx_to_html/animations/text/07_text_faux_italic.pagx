@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: A fauxItalic channel slants the glyphs without swapping the font face.
      Target: Text  Channel: fauxItalic  Type: bool
-     Expect: supported
      Three typical texts (Arial 72 / Times New Roman 44 / Courier New 28) drive the same channel,
      so a rule that only holds for one family or one size cannot pass.
      Known-gap: faux-italic-shear（skewX -6.5deg + transform-origin:left bottom 复刻，0.928）
