@@ -1159,6 +1159,17 @@ if (PAG_BUILD_CLI)
             USES_TERMINAL
             COMMENT "Running HTML browser-fidelity eval over resources/html corpora")
 
+    # D6 SVG browser-fidelity gate: pagx export -> fixed Chromium screenshot -> pagx render
+    # reference -> pixel/SSIM metrics. Playwright's bundled Chromium and Node.js are required.
+    # Cases default to resources/layout/constraint_textbox.pagx; override with SVG_BROWSER_CASES.
+    add_custom_target(SVGBrowserTest
+            COMMAND ${CMAKE_COMMAND} -E env PAGX_BIN=$<TARGET_FILE:pagx-cli>
+            bash ${CMAKE_CURRENT_SOURCE_DIR}/test/run_svg_browser_gate.sh
+            DEPENDS pagx-cli
+            WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+            USES_TERMINAL
+            COMMENT "Running SVG browser-fidelity gate in fixed Chromium")
+
     # PPT visual-fidelity eval target. This is an end-to-end test rather than a
     # gtest binary: PAGX files are rendered natively, exported to PPTX, opened
     # by headless LibreOffice, rasterized, and compared against the native

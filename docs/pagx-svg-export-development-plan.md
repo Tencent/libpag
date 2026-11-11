@@ -75,7 +75,7 @@ R1 的取舍依据：
 | D3 | 默认 Strict | 现为「告警 + 降级」，属 BestEffort；切换 Strict 需先补拒绝路径（M6） |
 | D4 | PreserveAppearance | 等价于现有 `bakeUnsupported = true` |
 | D5 | Fidelity | 等价于 `convertTextToPath = false` + `embedFontsAsWoff2 = true` |
-| D6 | 固定 Chromium + 固定画布 / 背景 / 缩放 / 容差 | 已定（2026-11-11）：Playwright 1.60.0 自带 Chromium；viewport 1400×900、白底、deviceScaleFactor=1；pixelmatch threshold 0.1，SSIM 退化阈值随门禁一起标定。随浏览器门禁一起落地 |
+| D6 | 固定 Chromium + 固定画布 / 背景 / 缩放 / 容差 | 已落地（2026-11-11）：`test/svg_browser_gate.js` + `SVGBrowserTest` 使用 Playwright 自带 Chromium、viewport 1400×900、白底、deviceScaleFactor=1、pixelmatch threshold 0.1；首批 `constraint_textbox` 标定阈值为 pixelDiff 0.05 / meanRgbDelta 8 / SSIM 0.4（文字 AA 差异） |
 | D7 | TemplateStatic | 已落地：`ToSVG` 只读模板字段，不执行动画、StateMachine 或默认 DataBind |
 | D8 | 不启用 MB | B 类保持拒绝与告警，不引入有限场景烘焙 |
 
@@ -698,6 +698,7 @@ ToSVG严格失败返回空结果、ToFile返回false、CLI非零；warnings=null
 | 本轮 S6 部分（2026-11-11） | `SVGAnimationOptions.policy` 实现 Strict / BestEffort：Strict 对 StateMachine、未知 target、不支持通道、无有效通道直接拒绝（ToSVG 返回空），BestEffort 保留可表达子集并告警；CLI 增加 `--svg-animation-policy`；新增 Strict 拒绝回归 | Diagnostics reasonCode / 预算 / D6 浏览器门禁 / 策略基线 / ST32/41/44/46 / C20—C24 仍未做 |
 | 本轮 S6 诊断与文件（2026-11-11） | 新增 `SVGDiagnostic` sink（reasonCode / action / message），Strict 与 VectorOnly 拒绝写 `Rejected`；ToFile 增加 `PAGX_SVG_FAIL_STAGE` 失败注入，覆盖 write/flush/close/replace 并验证旧文件保持不变；新增回归 | reasonCode 尚未覆盖全部站点；budgets、D6 浏览器门禁、策略基线、ST32/41/44 仍未做 |
 | 本轮 S6 预算（2026-11-11） | `SVGBudget.maxGeneratedElements` 接入 Resolver 的乘性展开上限；`maxOutputBytes` 超限时 ToSVG 返回空并写 `budget-exceeded` 诊断；新增预算回归 | rasterPixels / samples / instances 等其余预算字段未实现；D6、策略基线、ST32/41/44、C20—C24 未完成 |
+| 本轮 D6（2026-11-11） | 新增 `test/svg_browser_gate.js` 与 `SVGBrowserTest`：`pagx export` → 固定 Chromium 截图 → `pagx render` 参考 → pixel/SSIM 指标，固定 1400×900 / 白底 / scale 1 / pixelmatch 0.1；支持 `SVG_BROWSER_CASES` 与单例阈值覆盖；`constraint_textbox` 实测 pixelDiff 0.031、RGB 5.29、SSIM 0.416 | 默认阈值按首个文本样本标定为 0.05 / 8 / 0.4，仍需更多语料标定；策略可用性基线 `docs/svg-policy-baseline.md` 未生成 |
 
 ### 4.8 S3 文字待办清单（下一批入口）
 
@@ -745,6 +746,7 @@ cmake --build cmake-build-debug --target PAGFullTest_OpenGL
 ./cmake-build-debug/PAGFullTest_OpenGL --gtest_filter='PAGXSVGTest.*:PAGXTest.*:PAGXCliTest.*'
 ./cmake-build-debug/PAGFullTest_OpenGL
 cmake --build cmake-build-debug --target HTMLTest
+cmake --build cmake-build-debug --target SVGBrowserTest
 ```
 
 共享 tools / TextLayout / ModifierResolver / 资源变化覆盖 PAGX runtime、静态 SVG、PPT / HTML 全量及浏览器门禁，不只编译。测试非零就是失败，不原样重跑碰运气；同工作区不并行不同后端截图。不得跳过基线、手改 version.json 或运行 baseline 更新脚本 / target；截图仅用户主动 `/accept-baseline`。HTML 均值不手改，有意提升按项目规定独立流程处理。
