@@ -20,8 +20,6 @@
 #include <cmath>
 #include <cstdio>
 #include <set>
-#include <unordered_map>
-#include <unordered_set>
 #include <vector>
 #include "pagx/PAGXDefaults.h"
 #include "pagx/PAGXDocument.h"
@@ -82,7 +80,7 @@
 #include "pagx/types/Data.h"
 #include "pagx/utils/Base64.h"
 #include "pagx/utils/ImageMime.h"
-#include "pagx/utils/MemZipWriter.h"
+#include "pagx/utils/PAGXArchiveWriter.h"
 #include "pagx/utils/StringParser.h"
 #include "pagx/xml/XMLBuilder.h"
 
@@ -103,26 +101,8 @@ static std::string ImageDataMimeLabel(const uint8_t* bytes, size_t size) {
 }
 
 //==============================================================================
-// Image packaging
+// Image references
 //==============================================================================
-
-namespace {
-
-struct PAGXPackEntry {
-  std::string path;
-  std::shared_ptr<Data> data;
-};
-
-// Serialization-scoped state for PAGXExporter::ToData. A null context means the caller wants a
-// plain XML document, so every image keeps its external source instead of an archive entry path.
-struct PAGXPackContext {
-  std::unordered_map<const Image*, std::string> entryPaths;
-  std::unordered_set<std::string> usedPaths;
-  size_t nextImageIndex = 1;
-  std::vector<PAGXPackEntry> entries;
-};
-
-}  // namespace
 
 static std::string ImageDataUri(const std::shared_ptr<Data>& data) {
   const auto* bytes = data->bytes();
@@ -131,189 +111,23 @@ static std::string ImageDataUri(const std::shared_ptr<Data>& data) {
          Base64Encode(bytes, size);
 }
 
-// Entry extensions follow the sniffed format; payloads outside the formats an <Image> may carry
-// keep the same PNG fallback that the data URI mime label uses for unrecognized bytes.
-static std::string ImageEntryExtension(const uint8_t* bytes, size_t size) {
-  const char* mime = DetectImageMime(bytes, size);
-  if (mime == nullptr) {
-    return "png";
-  }
-  std::string label(mime);
-  if (label == "image/jpeg") {
-    return "jpg";
-  }
-  if (label == "image/webp") {
-    return "webp";
-  }
-  if (label == "image/gif") {
-    return "gif";
-  }
-  return "png";
-}
-
-// Keeps archive entry names free of directory separators and other characters that would let a
-// document id escape the images/ directory. Only the entry name is sanitized; the document keeps
-// the original id and @id references.
-static std::string SanitizeEntryName(const std::string& name) {
-  std::string sanitized;
-  sanitized.reserve(name.size());
-  for (char c : name) {
-    bool allowed = (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') ||
-                   c == '_' || c == '-';
-    sanitized += allowed ? c : '_';
-  }
-  return sanitized;
-}
-
-static std::string ToLowerAscii(std::string value) {
-  for (char& c : value) {
-    if (c >= 'A' && c <= 'Z') {
-      c = static_cast<char>(c - 'A' + 'a');
-    }
-  }
-  return value;
-}
-
-// Windows resolves these names as devices before looking at the extension, so an entry such as
-// "con.png" or "COM1.png" cannot be created or opened there even though the archive is valid.
-static bool IsWindowsDeviceName(const std::string& stem) {
-  auto lower = ToLowerAscii(stem);
-  if (lower == "con" || lower == "prn" || lower == "aux" || lower == "nul") {
-    return true;
-  }
-  return lower.size() == 4 && lower[3] >= '1' && lower[3] <= '9' &&
-         (lower.rfind("com", 0) == 0 || lower.rfind("lpt", 0) == 0);
-}
-
-// Most filesystems cap a single file name at 255 bytes. Truncating the stem keeps room for the
-// extension and for the "_<n>" suffix that resolves name collisions.
-static constexpr size_t MAX_ENTRY_STEM_LENGTH = 128;
-
-// Reserves a unique path under images/. Comparison keys are ASCII-lowercased so an archive that
-// lands on a case-insensitive filesystem cannot extract one entry over another; the returned path
-// keeps the original case for the XML and the archive itself.
-static std::string AllocateEntryPath(PAGXPackContext* pack, const std::string& baseName,
-                                     const std::string& extension) {
-  std::string stem = baseName.empty() ? "img_" + std::to_string(pack->nextImageIndex++) : baseName;
-  if (stem.size() > MAX_ENTRY_STEM_LENGTH) {
-    stem.resize(MAX_ENTRY_STEM_LENGTH);
-  }
-  if (IsWindowsDeviceName(stem)) {
-    stem = "img_" + stem;
-  }
-  std::string prefix = "images/" + stem;
-  std::string path = prefix + "." + extension;
-  for (size_t suffix = 2; pack->usedPaths.count(ToLowerAscii(path)) > 0; suffix++) {
-    path = prefix + "_" + std::to_string(suffix) + "." + extension;
-  }
-  pack->usedPaths.insert(ToLowerAscii(path));
-  return path;
-}
-
-// Folds a relative resource path into the form a loader would resolve inside the document
-// directory: backslashes become separators, "." segments and repeated separators disappear, and
-// ".." segments cancel the segment before them when possible. Paths that cannot name a file in the
-// archive (absolute paths, URLs, scheme-qualified ids) yield a form that never starts with
-// "images/", so the caller's prefix test drops them.
-static std::string NormalizeRelativePath(const std::string& path) {
-  if (path.empty() || path[0] == '/' || path[0] == '\\') {
-    return {};
-  }
-  std::vector<std::string> segments;
-  std::string segment;
-  for (size_t i = 0; i <= path.size(); i++) {
-    char c = i < path.size() ? path[i] : '/';
-    if (c != '/' && c != '\\') {
-      segment += c;
-      continue;
-    }
-    if (!segment.empty() && segment != ".") {
-      if (segment == ".." && !segments.empty() && segments.back() != "..") {
-        segments.pop_back();
-      } else {
-        segments.push_back(segment);
-      }
-    }
-    segment.clear();
-  }
-  std::string normalized;
-  for (const auto& part : segments) {
-    if (!normalized.empty()) {
-      normalized += '/';
-    }
-    normalized += part;
-  }
-  return normalized;
-}
-
-static constexpr size_t IMAGES_PREFIX_LENGTH = 7;  // strlen("images/")
-
-// Reserves a kept external reference and every directory above it below images/. A reference such
-// as "images/foo.png/photo.png" needs "images/foo.png" to exist as a directory after extraction,
-// so a packed entry must not take that name as a file: a file/directory clash makes the archive
-// fail to extract. The images/ root itself stays available for packed entries.
-static void ReserveKeptPath(const std::string& key, PAGXPackContext* pack) {
-  pack->usedPaths.insert(key);
-  for (auto slash = key.find_last_of('/');
-       slash != std::string::npos && slash >= IMAGES_PREFIX_LENGTH;
-       slash = key.find_last_of('/', slash - 1)) {
-    pack->usedPaths.insert(key.substr(0, slash));
-  }
-}
-
-// Reserves the paths that unresolved images keep referring to, so a packed entry can never be
-// written at a path an unpacked image already points to. Reservation must happen before any entry
-// is allocated, otherwise the entry's data would silently replace that external reference inside
-// the archive.
-static void ReserveKeptImagePaths(const PAGXDocument& doc, PAGXPackContext* pack) {
-  for (const auto& node : doc.nodes) {
-    if (node == nullptr || node->nodeType() != NodeType::Image) {
-      continue;
-    }
-    const auto* image = static_cast<const Image*>(node.get());
-    if (image->data != nullptr || image->filePath.empty()) {
-      continue;
-    }
-    auto key = ToLowerAscii(NormalizeRelativePath(image->filePath));
-    if (key.rfind("images/", 0) == 0) {
-      ReserveKeptPath(key, pack);
-    }
-  }
-}
-
-// Produces the actual image source: the external path in XML mode, or a ZIP entry path once the
-// image data has been added to the archive. Shared by the Image resource `source` and by inline
+// Resolves the `image` attribute value. Without an archive the image keeps its external source;
+// with one the image is replaced by the entry path the archive assigned, so its payload is stored
+// in the archive instead of being inlined. Shared by the Image resource `source` and by inline
 // `image` references; the `@id` form is the caller's decision.
-static std::string GetImageSource(const Image* image, PAGXPackContext* pack) {
-  if (pack == nullptr) {
-    if (!image->filePath.empty()) {
-      return image->filePath;
-    }
-    return image->data != nullptr ? ImageDataUri(image->data) : std::string();
+static std::string ImageSourceForXML(const Image* image, PAGXArchiveWriter* archive) {
+  if (archive != nullptr) {
+    return archive->AddImage(image);
   }
-  if (image->data == nullptr) {
+  if (!image->filePath.empty()) {
     return image->filePath;
   }
-  auto cached = pack->entryPaths.find(image);
-  if (cached != pack->entryPaths.end()) {
-    return cached->second;
-  }
-  std::string baseName;
-  if (!image->id.empty()) {
-    baseName = SanitizeEntryName(image->id);
-  } else if (image->filePath.rfind("emoji:", 0) == 0) {
-    baseName = "emoji_" + SanitizeEntryName(image->filePath.substr(6));
-  }
-  auto path = AllocateEntryPath(pack, baseName,
-                                ImageEntryExtension(image->data->bytes(), image->data->size()));
-  pack->entryPaths[image] = path;
-  pack->entries.push_back({path, image->data});
-  return path;
+  return image->data != nullptr ? ImageDataUri(image->data) : std::string();
 }
 
 // Writes an `image` attribute for ImagePattern / Glyph references. A referenced resource keeps its
 // `@id` form in both export modes; only anonymous images resolve to an inline source.
-static void WriteImageReference(XMLBuilder& xml, const Image* image, PAGXPackContext* pack) {
+static void WriteImageReference(XMLBuilder& xml, const Image* image, PAGXArchiveWriter* archive) {
   if (image == nullptr) {
     return;
   }
@@ -321,7 +135,7 @@ static void WriteImageReference(XMLBuilder& xml, const Image* image, PAGXPackCon
     xml.addAttribute("image", "@" + image->id);
     return;
   }
-  auto source = GetImageSource(image, pack);
+  auto source = ImageSourceForXML(image, archive);
   if (!source.empty()) {
     xml.addAttribute("image", source);
   }
@@ -421,16 +235,16 @@ static bool ShouldSkipPosition(const Point& position, const Point& defaultPos, f
 using Options = PAGXExporter::Options;
 
 static std::string Serialize(const PAGXDocument& doc, const Options& options,
-                             PAGXPackContext* pack);
-static void WriteColorSource(XMLBuilder& xml, const ColorSource* node, PAGXPackContext* pack);
+                             PAGXArchiveWriter* archive);
+static void WriteColorSource(XMLBuilder& xml, const ColorSource* node, PAGXArchiveWriter* archive);
 static void WriteVectorElement(XMLBuilder& xml, const Element* node, const Options& options,
-                               PAGXPackContext* pack);
+                               PAGXArchiveWriter* archive);
 static void WriteLayerStyle(XMLBuilder& xml, const LayerStyle* node);
 static void WriteLayerFilter(XMLBuilder& xml, const LayerFilter* node);
 static void WriteResource(XMLBuilder& xml, const Node* node, const Options& options,
-                          PAGXPackContext* pack);
+                          PAGXArchiveWriter* archive);
 static void WriteLayer(XMLBuilder& xml, const Layer* node, const Options& options,
-                       PAGXPackContext* pack);
+                       PAGXArchiveWriter* archive);
 static void WriteAnimation(XMLBuilder& xml, const Animation* animation);
 
 static void WriteCustomData(XMLBuilder& xml, const Node* node) {
@@ -822,7 +636,7 @@ static void WriteGradientCommon(XMLBuilder& xml, const Gradient* gradient) {
   }
 }
 
-static void WriteColorSource(XMLBuilder& xml, const ColorSource* node, PAGXPackContext* pack) {
+static void WriteColorSource(XMLBuilder& xml, const ColorSource* node, PAGXArchiveWriter* archive) {
   switch (node->nodeType()) {
     case NodeType::SolidColor: {
       auto solid = static_cast<const SolidColor*>(node);
@@ -888,7 +702,7 @@ static void WriteColorSource(XMLBuilder& xml, const ColorSource* node, PAGXPackC
       auto pattern = static_cast<const ImagePattern*>(node);
       xml.openElement("ImagePattern");
       xml.addAttribute("id", pattern->id);
-      WriteImageReference(xml, pattern->image, pack);
+      WriteImageReference(xml, pattern->image, archive);
       if (pattern->tileModeX != Default<ImagePattern>().tileModeX) {
         xml.addAttribute("tileModeX", TileModeToString(pattern->tileModeX));
       }
@@ -921,7 +735,7 @@ static void WriteColorSource(XMLBuilder& xml, const ColorSource* node, PAGXPackC
 //==============================================================================
 
 static void WriteVectorElement(XMLBuilder& xml, const Element* node, const Options& options,
-                               PAGXPackContext* pack) {
+                               PAGXArchiveWriter* archive) {
   switch (node->nodeType()) {
     case NodeType::Rectangle: {
       auto rect = static_cast<const Rectangle*>(node);
@@ -1157,7 +971,7 @@ static void WriteVectorElement(XMLBuilder& xml, const Element* node, const Optio
       WriteCustomData(xml, node);
       if (needsInlineColorSource) {
         xml.closeElementStart();
-        WriteColorSource(xml, fill->color, pack);
+        WriteColorSource(xml, fill->color, archive);
         xml.closeElement();
       } else {
         xml.closeElementSelfClosing();
@@ -1195,7 +1009,7 @@ static void WriteVectorElement(XMLBuilder& xml, const Element* node, const Optio
       WriteCustomData(xml, node);
       if (needsInlineColorSource) {
         xml.closeElementStart();
-        WriteColorSource(xml, stroke->color, pack);
+        WriteColorSource(xml, stroke->color, archive);
         xml.closeElement();
       } else {
         xml.closeElementSelfClosing();
@@ -1388,7 +1202,7 @@ static void WriteVectorElement(XMLBuilder& xml, const Element* node, const Optio
       } else {
         xml.closeElementStart();
         for (const auto& element : textBox->elements) {
-          WriteVectorElement(xml, element, options, pack);
+          WriteVectorElement(xml, element, options, archive);
         }
         xml.closeElement();
       }
@@ -1454,7 +1268,7 @@ static void WriteVectorElement(XMLBuilder& xml, const Element* node, const Optio
       } else {
         xml.closeElementStart();
         for (const auto& element : group->elements) {
-          WriteVectorElement(xml, element, options, pack);
+          WriteVectorElement(xml, element, options, archive);
         }
         xml.closeElement();
       }
@@ -1729,13 +1543,13 @@ static std::string EscapeEnumOption(const std::string& option) {
 }
 
 static void WriteResource(XMLBuilder& xml, const Node* node, const Options& options,
-                          PAGXPackContext* pack) {
+                          PAGXArchiveWriter* archive) {
   switch (node->nodeType()) {
     case NodeType::Image: {
       auto image = static_cast<const Image*>(node);
       xml.openElement("Image");
       xml.addAttribute("id", image->id);
-      auto source = GetImageSource(image, pack);
+      auto source = ImageSourceForXML(image, archive);
       if (!source.empty()) {
         xml.addAttribute("source", source);
       } else {
@@ -1772,7 +1586,7 @@ static void WriteResource(XMLBuilder& xml, const Node* node, const Options& opti
       } else {
         xml.closeElementStart();
         for (const auto& layer : comp->layers) {
-          WriteLayer(xml, layer, options, pack);
+          WriteLayer(xml, layer, options, archive);
         }
         if (!comp->animations.empty()) {
           xml.openElement("Animations");
@@ -1790,7 +1604,7 @@ static void WriteResource(XMLBuilder& xml, const Node* node, const Options& opti
           xml.closeElement();
         }
         for (const auto& bind : comp->dataBinds) {
-          WriteResource(xml, bind, options, pack);
+          WriteResource(xml, bind, options, archive);
         }
         xml.closeElement();
       }
@@ -1823,7 +1637,7 @@ static void WriteResource(XMLBuilder& xml, const Node* node, const Options& opti
             xml.addAttribute("path", PathDataToSVGString(*glyph->path));
           }
           if (glyph->image != nullptr) {
-            WriteImageReference(xml, glyph->image, pack);
+            WriteImageReference(xml, glyph->image, archive);
           }
           if (glyph->offset != Default<Glyph>().offset) {
             xml.addAttribute("offset", PointToString(glyph->offset));
@@ -1842,7 +1656,7 @@ static void WriteResource(XMLBuilder& xml, const Node* node, const Options& opti
     case NodeType::ConicGradient:
     case NodeType::DiamondGradient:
     case NodeType::ImagePattern: {
-      WriteColorSource(xml, static_cast<const ColorSource*>(node), pack);
+      WriteColorSource(xml, static_cast<const ColorSource*>(node), archive);
       break;
     }
     case NodeType::ViewModel: {
@@ -1952,7 +1766,7 @@ static void WriteResource(XMLBuilder& xml, const Node* node, const Options& opti
 //==============================================================================
 
 static void WriteLayer(XMLBuilder& xml, const Layer* node, const Options& options,
-                       PAGXPackContext* pack) {
+                       PAGXArchiveWriter* archive) {
   xml.openElement("Layer");
   xml.addAttribute("id", node->id);
   xml.addAttribute("name", node->name);
@@ -2063,7 +1877,7 @@ static void WriteLayer(XMLBuilder& xml, const Layer* node, const Options& option
 
   // Write VectorElement (contents) directly without container node.
   for (const auto& element : node->contents) {
-    WriteVectorElement(xml, element, options, pack);
+    WriteVectorElement(xml, element, options, archive);
   }
 
   // Write LayerStyle (styles) directly without container node.
@@ -2105,7 +1919,7 @@ static void WriteLayer(XMLBuilder& xml, const Layer* node, const Options& option
 
   // Write child Layers.
   for (const auto& child : node->children) {
-    WriteLayer(xml, child, options, pack);
+    WriteLayer(xml, child, options, archive);
   }
 
   xml.closeElement();
@@ -2121,32 +1935,19 @@ std::string PAGXExporter::ToXML(const PAGXDocument& doc, const Options& options)
 
 std::shared_ptr<Data> PAGXExporter::ToData(const PAGXDocument& doc, const Options& options,
                                            std::string* errorMsg) {
-  PAGXPackContext pack;
-  auto xml = Serialize(doc, options, &pack);
+  PAGXArchiveWriter archive(doc);
+  auto xml = Serialize(doc, options, &archive);
   if (xml.empty()) {
     if (errorMsg != nullptr) {
       *errorMsg = "PAGXExporter: serialization failed.";
     }
     return nullptr;
   }
-
-  MemZipWriter writer;
-  if (!writer.write("document.pagx", xml.data(), xml.size(), errorMsg)) {
-    return nullptr;
-  }
-  for (const auto& entry : pack.entries) {
-    if (!writer.write(entry.path, entry.data->bytes(), entry.data->size(), errorMsg)) {
-      return nullptr;
-    }
-  }
-  return writer.finish(errorMsg);
+  return archive.Finish(xml, errorMsg);
 }
 
 static std::string Serialize(const PAGXDocument& doc, const Options& options,
-                             PAGXPackContext* pack) {
-  if (pack != nullptr) {
-    ReserveKeptImagePaths(doc, pack);
-  }
+                             PAGXArchiveWriter* archive) {
   XMLBuilder xml(true);
   xml.appendDeclaration();
 
@@ -2159,7 +1960,7 @@ static std::string Serialize(const PAGXDocument& doc, const Options& options,
 
   // Write Layers first (for better readability)
   for (const auto& layer : doc.layers) {
-    WriteLayer(xml, layer, options, pack);
+    WriteLayer(xml, layer, options, archive);
   }
   // Write the document-level <Animations> block. doc.animations holds Animation and StateMachine
   // definitions parsed from the document's <Animations> block (in declaration order). Animation and
@@ -2233,7 +2034,7 @@ static std::string Serialize(const PAGXDocument& doc, const Options& options,
     xml.closeElement();
   }
   for (const auto& bind : doc.dataBinds) {
-    WriteResource(xml, bind, options, pack);
+    WriteResource(xml, bind, options, archive);
   }
 
   // Write Resources section at the end (only if there are exportable resources)
@@ -2254,7 +2055,7 @@ static std::string Serialize(const PAGXDocument& doc, const Options& options,
 
     for (const auto& resource : doc.nodes) {
       if (!resource->id.empty() && IsExportableResource(resource.get())) {
-        WriteResource(xml, resource.get(), options, pack);
+        WriteResource(xml, resource.get(), options, archive);
       }
     }
 
