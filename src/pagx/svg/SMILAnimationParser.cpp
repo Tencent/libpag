@@ -656,10 +656,16 @@ static double ActiveDuration(const TimingInfo& info) {
   if (info.durSeconds <= 0) {
     return 0;
   }
-  if (info.repeatCount < 0) {
-    return info.durSeconds;
+  double active = info.repeatCount < 0 ? info.durSeconds : info.durSeconds * info.repeatCount;
+  // An end attribute shortens the active duration: `id.end` must point at the time the target
+  // really stops, not at begin + dur * repeats. The comparison is in document time.
+  if (info.endResolved && info.resolvedEnd >= 0.0) {
+    double limit = info.resolvedEnd - info.resolvedBegin;
+    if (limit >= 0.0 && limit < active) {
+      active = limit;
+    }
   }
-  return info.durSeconds * info.repeatCount;
+  return active;
 }
 
 // Computes the document time a syncbase reference points at, given its (already resolved)
