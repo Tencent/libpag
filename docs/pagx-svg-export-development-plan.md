@@ -75,7 +75,7 @@ R1 的取舍依据：
 | D3 | 默认 Strict | 现为「告警 + 降级」，属 BestEffort；切换 Strict 需先补拒绝路径（M6） |
 | D4 | PreserveAppearance | 等价于现有 `bakeUnsupported = true` |
 | D5 | Fidelity | 等价于 `convertTextToPath = false` + `embedFontsAsWoff2 = true` |
-| D6 | 固定 Chromium + 固定画布 / 背景 / 缩放 / 容差 | 未落地，随浏览器门禁一起做（P7） |
+| D6 | 固定 Chromium + 固定画布 / 背景 / 缩放 / 容差 | 已定（2026-11-11）：Playwright 1.60.0 自带 Chromium；viewport 1400×900、白底、deviceScaleFactor=1；pixelmatch threshold 0.1，SSIM 退化阈值随门禁一起标定。随浏览器门禁一起落地 |
 | D7 | TemplateStatic | 已落地：`ToSVG` 只读模板字段，不执行动画、StateMachine 或默认 DataBind |
 | D8 | 不启用 MB | B 类保持拒绝与告警，不引入有限场景烘焙 |
 
@@ -572,6 +572,8 @@ MB范围包含3D、conic/diamond、noise、backdrop/Glass、复杂shape/text/eff
 
 **M5.3 的源端入口写定：** `src/renderer/TextHolder.cpp:157` 当前flush仍用默认embedded fast path，`src/pagx/TextLayout.cpp:1745` 在全部带GlyphRun时只给bounds；null blob continue又保留旧内容，单参数setTextBlob会清掉原anchors。实际七shaping覆盖时，调用已有 `TextLayout::Layout(elements,params,&context,false)` 强制从有效TextGlyphParams塑形，不修改作者glyphRuns。分类非空成功、有效空结果、资源/塑形失败；有效空（text为空或Hidden全丢）新增明确的tgfx::Text::clearTextBlob()并由TextHolder调用，保持Text对象和position、清空blob/anchors且invalidate，不调用当前会no-op的setTextBlob(nullptr)；失败分支按策略拒绝，不能用旧glyph假成功。非空成功以当前显式anchors按glyph序保留，按新glyph数量截断/补零，再调用setTextBlob(blob,anchors)，默认anchor由新font advance/2求值；不要盲目单参数清空。同步 `third_party/tgfx/include/tgfx/layers/vectors/Text.h`、其Text.cpp、TextHolder与相关测试；该方法是实际调用的空状态入口，不新增PAGX glyph paint字段。验证all-embedded旧字→新字、非空→空→非空、Hidden有效空、不同字体/数量及anchor结合ST21/ST22。clearTextBlob须在对应tgfx源码中实现并重编/更新实际链接依赖，不能只改缓存头文件或靠默认空blob绕过链接/行为错误；源码级验证沿用项目TGFX_DIR路径。入口未完成时对应shaping条目保持Planned/拒绝。
 
+**tgfx 交付方式（2026-11-11 定）：** `third_party/tgfx` 是本仓库忽略的独立依赖。本批在本地源码实现 `clearTextBlob()` 并用 `-DTGFX_DIR=third_party/tgfx` 编译验证；libpag 仓库只提交 TextHolder / 测试侧改动，tgfx 改动另由 tgfx 仓库提交并回填依赖版本。若上游未同步，M5.3 的对应验收保持未完成，不能用 setTextBlob(nullptr) 冒充。
+
 现有滤镜参数增量作为M4.E独立支路保留并回归；新增效果参数依赖S2的有序effect图和M3轨道，不能阻塞无effect的颜色/stop/d/文字基本子集，也不能用“已有P1”证明全部51项效果通道已支持。D8已选禁用，B类保留明确拒绝；MB不会因上述四类展开而自动启用。
 
 连续执行顺序固定为：`Q → M4.0 → M4.1 → M4.2 → M4.3 → M5.0 → M5.1 → M5.2 → M5.3 → M5.4 → M6`。可并行列只说明真实依赖，不要求实施期间反复征求选择；它不是减少范围的理由。
@@ -672,6 +674,7 @@ ToSVG严格失败返回空结果、ToFile返回false、CLI非零；warnings=null
 | 本轮 ST43（2026-11-10） | `resolveModifiers` 不再作为「关闭就丢效果」的开关，修饰器一律解析，false 只产生告警；`PAGXSVGTest` 186 / 186 | — |
 | 本轮 ST6 链 + ST7 backdrop（2026-11-10） | 阴影滤镜内联 `feMerge` 并推进 `currentSource`，后续滤镜读到阴影输出；`BackgroundBlurStyle` / `GlassStyle` 在预扫描阶段显式告警；顺带修好嵌套 mask writer 丢失 warnings 的问题；`PAGXSVGTest` 189 / 189 | S3 文字、S4 几何、S5 资源、S6 API 未开始 |
 | 本轮 ST28（2026-11-11） | `LayoutNode::resolvedLayoutSize()` 逐轴读取布局产物；`EffectiveTextBoxWidth/Height` 对容器盒优先 resolved（含合法 0），对 modifier-only 盒保留 author 测量输入但百分比/双边必须先分配；`TextBox::updateLayout` 让空 modifier-only 子盒参与约束分配。新增 8 个单测与 2 个 SVG 回归；`PAGXUtilsTest` 233 / 233、`PAGXSVGTest` 202 / 203、全量 2866 / 2868 | 唯一 SVG 失败是既有 `SVGExport_GroupAlphaRoundTripPixels` 尚未接受截图基线（本分支新增用例，非 ST28 改动）；另一失败为既有 `PAGXTest.SVGToPAGXAll` 基线差异；未做像素门禁，RTL / 竖排 / rich text 排版未覆盖 |
+| 本轮 ST21（2026-11-11） | 几何通道与 paint 通道分离：几何仍烘进 Text 克隆，paint 通道生成 identity 几何的 paint-only modifier；SVG 导出按 scope glyph index 累积 `GlyphPaintStyle`，按连续样式发射 base/overlay（overlay 纯色 SrcOver、alpha=weight），stroke 走 `BlendStrokeWidth`；`CanBakeTextModifiers` 放行可表达的 paint modifier，不再整层栅格化。新增 TextPaintUtils 单测 4 个、SVG 结构/像素回归 7 个；`PAGXUtilsTest` 237 / 237、`PAGXSVGTest` 208 / 209、`PAGX*:PPT*` 860 / 861 | 仅既有未接受基线与 `PAGXTest.SVGToPAGXAll` 失败；容器 TextBox 内的 paint modifier 仍走 bake；bitmap/vector 极端交错与 AA 边缘未做像素门禁 |
 
 ### 4.8 S3 文字待办清单（下一批入口）
 
@@ -698,7 +701,9 @@ ST9 / ST10 / ST18 / ST29 / ST31 已收口：`writeTextAsFont` 走字形 advance�
 
 ST20 已收口：新增 `TextSelectorEvaluator`（`src/pagx/utils/TextSelectorUtils.h`）实现 RangeSelector 的单位换算（Percentage / Index）、offset 先作用于两端、start > end 交换、六种 shape（Square / RampUp / RampDown / Triangle / Round / Smooth，Triangle 吃 easeIn / easeOut）、randomOrder 的确定性洗牌，以及多选择器按序合并（首个选择器直接取值，Subtract 从 1 起算，逐次 clamp 到 [-1, 1]）。`ModifierResolver` 遇到仅含几何通道的 TextModifier 时，把 position / rotation / scale / skew / anchor 按字符权重烘进前置 Text 的 GlyphRun 通道并丢弃该 modifier；含 alpha / fillColor / strokeColor / strokeWidth 或 skewAxis 的 modifier 仍保留给烘焙路径。SVG 侧用 `ModifierResolver::CanBakeTextModifiers` 让探针跳过这类图层，不再整层栅格化；原生 TextBox 的元素列表也会先经过 resolver。克隆 Text 会清空 id，避免文档里出现两个同 id 节点；`randomSeed == 0` 时额外套用 AE 的首字符固定映射表，保证第一个字符的落点稳定。若 modifier 之后还有 Text 嵌在更早的 Group / TextBox 里，resolver 保留 modifier 并让探针不跳过，避免外层 modifier 打不到嵌套字形而静默丢效果。
 
-ST21/ST22当前仍有输出缺口，但不再把“GlyphRun没有paint通道”当作无实现路线：按第2.8.1节在导出局部GlyphStyle/DrawRecord中承载权重与排他base/overlay；按第2.8.2节复用tgfx沿线求值并以TP01—TP16的数字标准验收。现有PNG回退只记为当前表示，不能证明上述矢量语义已实现。
+ST21 已收口（2026-11-11）：几何通道仍由 `ModifierResolver` 烘进 Text 克隆，paint 通道改由 identity 几何的 paint-only modifier 承载；SVG 导出在 scope 内按 glyph index 累积 `GlyphPaintStyle`，同一连续样式 run 先发 base（weight<1，原 shader）再发 overlay（weight>0，纯色 SrcOver，fill/stroke-opacity=weight×painterAlpha×styleAlpha），stroke 宽度用 `BlendStrokeWidth`。像素 roundtrip 已覆盖 weight 0.5×r1、0.5×r0.5、1×r0.5、红绿累积与逐 glyph range；结构覆盖 full override 去 base、stroke overlay、无栅格化。仍待补：容器 TextBox 内 paint modifier、bitmap/vector 极端交错、AA 边缘像素门禁。
+
+ST22 当前仍有输出缺口：按第2.8.2节复用tgfx沿线求值并以TP01—TP16的数字标准验收；现有PNG回退只记为当前表示，不能证明上述矢量语义已实现。
 
 ST28必须保留：TextBox确实继承Group→LayoutNode的width/height，Native是Exporter分支不是节点字段。入口和双边/百分比/author/内容测量的优先级已在第2.8.3节写定，包含容器有效0与modifier-only unbounded的区别；不删除此条、不新增width/Native字段。
 
@@ -741,7 +746,7 @@ cmake --build cmake-build-debug --target HTMLTest
 | B. 一次性替换 + 升主版本 | 删除旧字段，同步全部调用方与对外文档 | 需要 libpag 主版本号变更 |
 | C. 双轨 + 编译期开关（`PAGX_SVG_EXPORT_API_V2`） | 同时维护两套入口 | 两套分支长期共存，不推荐 |
 
-**建议 A**，等下一个主版本再删除旧字段。唯一例外是 `resolveModifiers=false`：它当前会让 Polystar / TextPath 直接消失，本身是错误输出，可以立即改为「忽略该字段并告警」，不必等主版本。
+**已采纳 A（2026-11-11）**：新增 `staticPolicy` / `textMode` 作为权威字段，旧字段保留并标 deprecated 做映射；`resolveModifiers=false` 立即改为忽略并告警。等下一个主版本再删除旧字段。
 
 ### 4.7 默认策略可用性基线（新增）
 

@@ -66,6 +66,7 @@
 #include "pagx/nodes/Stroke.h"
 #include "pagx/nodes/Text.h"
 #include "pagx/nodes/TextBox.h"
+#include "pagx/nodes/TextModifier.h"
 #include "pagx/nodes/TextPath.h"
 #include "pagx/svg/SVGAnimationPlan.h"
 #include "pagx/svg/SVGAnimationWriter.h"
@@ -81,6 +82,7 @@
 #include "pagx/utils/RasterUtils.h"
 #include "pagx/utils/StringParser.h"
 #include "pagx/utils/StrokeGeometryUtils.h"
+#include "pagx/utils/TextPaintUtils.h"
 #include "pagx/utils/TextUtils.h"
 #include "pagx/utils/Woff2FontGenerator.h"
 #include "pagx/xml/XMLBuilder.h"
@@ -199,6 +201,60 @@ static void AppendP3ColorStyle(std::string& styleStr, const char* property,
   std::string opacityProp = property;
   opacityProp += "-opacity";
   AppendStyleEntry(styleStr, opacityProp.c_str(), FloatToString(effectiveAlpha));
+}
+
+static void AppendRawP3ColorStyle(std::string& styleStr, const char* property, const Color& color,
+                                  const std::string& srgbHex, float opacity) {
+  if (color.colorSpace != ColorSpace::DisplayP3) {
+    return;
+  }
+  AppendStyleEntry(styleStr, property, srgbHex);
+  AppendStyleEntry(styleStr, property, ColorToDisplayP3String(color));
+  std::string opacityProp = property;
+  opacityProp += "-opacity";
+  AppendStyleEntry(styleStr, opacityProp.c_str(), FloatToString(opacity));
+}
+
+// Emits a pure-color paint for a TextModifier overlay. The color's alpha is already folded into
+// `opacity`; the overlay itself always uses SrcOver, so no blend-mode style is written.
+static void ApplyOverlayPaintColor(SVGBuilder& out, const char* property, const Color& color,
+                                   float opacity, std::string* p3Style) {
+  std::string hex = ColorToSVGString(color);
+  out.addAttribute(property, hex);
+  if (opacity < 1.0f) {
+    std::string opacityProp = property;
+    opacityProp += "-opacity";
+    out.addAttribute(opacityProp.c_str(), FloatToString(opacity));
+  }
+  if (p3Style != nullptr) {
+    AppendRawP3ColorStyle(*p3Style, property, color, hex, opacity);
+  }
+}
+
+static void ApplyStrokeShapeAttributes(SVGBuilder& out, const Stroke* stroke) {
+  if (stroke->width != 1.0f) {
+    out.addAttribute("stroke-width", FloatToString(stroke->width));
+  }
+  if (stroke->cap == LineCap::Round) {
+    out.addAttribute("stroke-linecap", "round");
+  } else if (stroke->cap == LineCap::Square) {
+    out.addAttribute("stroke-linecap", "square");
+  }
+  if (stroke->join == LineJoin::Round) {
+    out.addAttribute("stroke-linejoin", "round");
+  } else if (stroke->join == LineJoin::Bevel) {
+    out.addAttribute("stroke-linejoin", "bevel");
+  }
+  if (stroke->join == LineJoin::Miter && stroke->miterLimit != 4.0f) {
+    out.addAttribute("stroke-miterlimit", FloatToString(stroke->miterLimit));
+  }
+  if (!stroke->dashes.empty()) {
+    out.addAttribute("stroke-dasharray",
+                     JoinFloats(stroke->dashes.data(), stroke->dashes.size(), ','));
+  }
+  if (stroke->dashOffset != 0.0f) {
+    out.addAttribute("stroke-dashoffset", FloatToString(stroke->dashOffset));
+  }
 }
 
 static std::string MatrixToSVGTransform(const Matrix& matrix) {
@@ -510,6 +566,9 @@ class SVGWriter {
     float alpha = 1.0f;
     const TextBox* textBox = nullptr;
     std::vector<SVGGroupTransformStep> animatedGroups = {};
+    // Paint overrides accumulated from TextModifiers for this Text. Empty means the text has no
+    // override and can use the regular native/font/path emission.
+    std::vector<GlyphPaintStyle> glyphStyles = {};
   };
 
   // Layer / element writing
@@ -547,6 +606,12 @@ class SVGWriter {
                  float alpha);
   void writeTextAsPath(SVGBuilder& out, const Text* text, const FillStrokeInfo& fs, const Matrix& m,
                        float alpha);
+  void writeTextWithGlyphStyles(SVGBuilder& out, const Text* text, const FillStrokeInfo& fs,
+                                const Matrix& m, float alpha,
+                                const std::vector<GlyphPaintStyle>& styles);
+  void writeStyledGlyphRun(SVGBuilder& out, const std::vector<GlyphDrawItem>& items, size_t start,
+                           size_t end, const GlyphPaintStyle& style, const FillStrokeInfo& fs,
+                           float alpha);
 
   // Emits a glyph run at an explicit origin: one <g> carrying the run's painters, then per-glyph
   // <path> / <image> children. Shared by the standalone Text path and by a TextBox run that carries
@@ -2176,29 +2241,7 @@ void SVGWriter::applyStrokeAttributes(SVGBuilder& out, const Stroke* stroke,
   }
   applyPaintColor(out, "stroke", stroke->color, stroke->alpha, stroke->blendMode, shapeBounds,
                   alphaMultiplier, p3Style);
-  if (stroke->width != 1.0f) {
-    out.addAttribute("stroke-width", FloatToString(stroke->width));
-  }
-  if (stroke->cap == LineCap::Round) {
-    out.addAttribute("stroke-linecap", "round");
-  } else if (stroke->cap == LineCap::Square) {
-    out.addAttribute("stroke-linecap", "square");
-  }
-  if (stroke->join == LineJoin::Round) {
-    out.addAttribute("stroke-linejoin", "round");
-  } else if (stroke->join == LineJoin::Bevel) {
-    out.addAttribute("stroke-linejoin", "bevel");
-  }
-  if (stroke->join == LineJoin::Miter && stroke->miterLimit != 4.0f) {
-    out.addAttribute("stroke-miterlimit", FloatToString(stroke->miterLimit));
-  }
-  if (!stroke->dashes.empty()) {
-    out.addAttribute("stroke-dasharray",
-                     JoinFloats(stroke->dashes.data(), stroke->dashes.size(), ','));
-  }
-  if (stroke->dashOffset != 0.0f) {
-    out.addAttribute("stroke-dashoffset", FloatToString(stroke->dashOffset));
-  }
+  ApplyStrokeShapeAttributes(out, stroke);
 }
 
 void SVGWriter::applyP3Style(SVGBuilder& out, const std::string& p3Style) {
@@ -2572,6 +2615,205 @@ void SVGWriter::writeTextAsPath(SVGBuilder& out, const Text* text, const FillStr
     renderPos.y += fs.textBox->padding.top;
   }
   WriteGlyphGeometry(out, text, renderPos.x, renderPos.y, fs, alpha, MatrixToSVGTransform(m));
+}
+
+static bool ComputeGlyphItemsBounds(const std::vector<GlyphDrawItem>& items, size_t start,
+                                    size_t end, Rect* bounds) {
+  float minX = std::numeric_limits<float>::max();
+  float minY = std::numeric_limits<float>::max();
+  float maxX = std::numeric_limits<float>::lowest();
+  float maxY = std::numeric_limits<float>::lowest();
+  for (size_t i = start; i < end; i++) {
+    if (items[i].pathData == nullptr) {
+      continue;
+    }
+    PathData baked = PathDataFromSVGString("");
+    baked = *items[i].pathData;
+    baked.transform(items[i].transform);
+    auto b = baked.getBounds();
+    minX = std::min(minX, b.x);
+    minY = std::min(minY, b.y);
+    maxX = std::max(maxX, b.x + b.width);
+    maxY = std::max(maxY, b.y + b.height);
+  }
+  if (maxX <= minX || maxY <= minY) {
+    return false;
+  }
+  *bounds = Rect::MakeLTRB(minX, minY, maxX, maxY);
+  return true;
+}
+
+static void EmitGlyphItemPaths(SVGBuilder& out, const std::vector<GlyphDrawItem>& items,
+                               size_t start, size_t end, bool bakeTransforms) {
+  for (size_t i = start; i < end; i++) {
+    const auto& item = items[i];
+    if (item.pathData == nullptr) {
+      continue;
+    }
+    out.openElement("path");
+    if (bakeTransforms) {
+      PathData baked = PathDataFromSVGString("");
+      baked = *item.pathData;
+      baked.transform(item.transform);
+      out.addAttribute("d", PathDataToSVGString(baked));
+    } else {
+      out.addAttribute("transform", MatrixToSVGTransform(item.transform));
+      out.addAttribute("d", PathDataToSVGString(*item.pathData));
+    }
+    out.closeElementSelfClosing();
+  }
+}
+
+static void EmitGlyphItemImages(SVGBuilder& out, const std::vector<GlyphDrawItem>& items,
+                                size_t start, size_t end, float alpha) {
+  for (size_t i = start; i < end; i++) {
+    const auto& item = items[i];
+    if (item.image == nullptr) {
+      continue;
+    }
+    bool mimeRecognized = true;
+    std::string href = GetImageHref(item.image, &mimeRecognized);
+    if (href.empty()) {
+      continue;
+    }
+    int imgW = 0;
+    int imgH = 0;
+    if (!GetImageDimensions(item.image, &imgW, &imgH) || imgW <= 0 || imgH <= 0) {
+      continue;
+    }
+    out.openElement("image");
+    out.addAttribute("href", href);
+    out.addRequiredAttribute("width", static_cast<float>(imgW));
+    out.addRequiredAttribute("height", static_cast<float>(imgH));
+    out.addAttribute("transform", MatrixToSVGTransform(item.transform));
+    if (alpha < 1.0f) {
+      out.addAttribute("opacity", FloatToString(alpha));
+    }
+    out.closeElementSelfClosing();
+  }
+}
+
+void SVGWriter::writeTextWithGlyphStyles(SVGBuilder& out, const Text* text,
+                                         const FillStrokeInfo& fs, const Matrix& m, float alpha,
+                                         const std::vector<GlyphPaintStyle>& styles) {
+  auto renderPos = text->renderPosition();
+  if (fs.textBox) {
+    renderPos.x += fs.textBox->padding.left;
+    renderPos.y += fs.textBox->padding.top;
+  }
+  auto items = ComputeGlyphDrawItems(*text, renderPos.x, renderPos.y);
+  if (items.empty() || styles.empty()) {
+    return;
+  }
+  std::string transform = MatrixToSVGTransform(m);
+  out.openElement("g");
+  if (!transform.empty()) {
+    out.addAttribute("transform", transform);
+  }
+  out.closeElementStart();
+  size_t start = 0;
+  while (start < items.size()) {
+    size_t styleIndex = std::min(items[start].glyphIndex, styles.size() - 1);
+    const auto& style = styles[styleIndex];
+    size_t end = start + 1;
+    while (end < items.size()) {
+      size_t nextIndex = std::min(items[end].glyphIndex, styles.size() - 1);
+      if (!GlyphPaintStylesEqual(style, styles[nextIndex])) {
+        break;
+      }
+      ++end;
+    }
+    writeStyledGlyphRun(out, items, start, end, style, fs, alpha);
+    start = end;
+  }
+  out.closeElement();
+}
+
+void SVGWriter::writeStyledGlyphRun(SVGBuilder& out, const std::vector<GlyphDrawItem>& items,
+                                    size_t start, size_t end, const GlyphPaintStyle& style,
+                                    const FillStrokeInfo& fs, float alpha) {
+  bool hasFill = fs.fill != nullptr;
+  bool hasStroke = fs.stroke != nullptr && fs.stroke->width > 0.0f;
+  float fillWeight = hasFill ? style.fillColor.alpha : 0.0f;
+  float strokeWeight = hasStroke ? style.strokeColor.alpha : 0.0f;
+  float runAlpha = alpha * style.alpha;
+  Rect runBounds = {};
+  bool hasBounds = ComputeGlyphItemsBounds(items, start, end, &runBounds);
+
+  bool hasImage = false;
+  for (size_t i = start; i < end; i++) {
+    hasImage = hasImage || items[i].image != nullptr;
+  }
+  if (hasImage) {
+    out.openElement("g");
+    out.addAttribute("fill", "none");
+    out.addAttribute("stroke", "none");
+    out.closeElementStart();
+    EmitGlyphItemImages(out, items, start, end, runAlpha);
+    out.closeElement();
+  }
+
+  bool fitGradient = hasBounds && (IsGradientSource(fs.fill ? fs.fill->color : nullptr) ||
+                                   IsGradientSource(fs.stroke ? fs.stroke->color : nullptr));
+
+  if (hasFill && fillWeight < 1.0f) {
+    std::string p3Style;
+    if (fitGradient) {
+      _gradientUserSpaceBounds = runBounds;
+    }
+    out.openElement("g");
+    applyFillAttributes(out, fs.fill, runBounds, &p3Style, runAlpha);
+    out.addAttribute("stroke", "none");
+    applyP3Style(out, p3Style);
+    out.closeElementStart();
+    EmitGlyphItemPaths(out, items, start, end, fitGradient);
+    out.closeElement();
+    _gradientUserSpaceBounds = {};
+  }
+  if (hasFill && fillWeight > 0.0f) {
+    std::string p3Style;
+    out.openElement("g");
+    ApplyOverlayPaintColor(out, "fill", style.fillColor, fillWeight * fs.fill->alpha * runAlpha,
+                           &p3Style);
+    if (fs.fill->fillRule == FillRule::EvenOdd) {
+      out.addAttribute("fill-rule", "evenodd");
+    }
+    out.addAttribute("stroke", "none");
+    applyP3Style(out, p3Style);
+    out.closeElementStart();
+    EmitGlyphItemPaths(out, items, start, end, false);
+    out.closeElement();
+  }
+  if (hasStroke) {
+    Stroke blended = *fs.stroke;
+    blended.width = BlendGlyphStrokeWidth(fs.stroke->width, style);
+    if (strokeWeight < 1.0f) {
+      std::string p3Style;
+      if (fitGradient) {
+        _gradientUserSpaceBounds = runBounds;
+      }
+      out.openElement("g");
+      out.addAttribute("fill", "none");
+      applyStrokeAttributes(out, &blended, runBounds, &p3Style, runAlpha);
+      applyP3Style(out, p3Style);
+      out.closeElementStart();
+      EmitGlyphItemPaths(out, items, start, end, fitGradient);
+      out.closeElement();
+      _gradientUserSpaceBounds = {};
+    }
+    if (strokeWeight > 0.0f) {
+      std::string p3Style;
+      out.openElement("g");
+      ApplyOverlayPaintColor(out, "stroke", style.strokeColor,
+                             strokeWeight * fs.stroke->alpha * runAlpha, &p3Style);
+      ApplyStrokeShapeAttributes(out, &blended);
+      out.addAttribute("fill", "none");
+      applyP3Style(out, p3Style);
+      out.closeElementStart();
+      EmitGlyphItemPaths(out, items, start, end, false);
+      out.closeElement();
+    }
+  }
 }
 
 // ── writeTextAsFont ─────────────────────────────────────────────────────────
@@ -3542,6 +3784,11 @@ void SVGWriter::emitGeometryWithFs(SVGBuilder& out, const AccumulatedGeometry& e
       break;
     case NodeType::Text: {
       auto* text = static_cast<const Text*>(entry.element);
+      if (!entry.glyphStyles.empty() && !text->glyphRuns.empty() &&
+          !_animWriter.HasPainterAnimates(localFs.fill, localFs.stroke)) {
+        writeTextWithGlyphStyles(out, text, localFs, entry.transform, alpha, entry.glyphStyles);
+        break;
+      }
       // Any Text that carries GlyphRun elements is treated as the authoritative
       // geometry: SVG's native <text> can't express arbitrary glyph IDs /
       // per-glyph xOffsets / anchors / rotations / skews / scales, so going
@@ -3677,6 +3924,33 @@ void SVGWriter::processVectorScope(SVGBuilder& out, const std::vector<Element*>&
           // surrounding accumulator. Resolve text modifiers nested inside the box first.
           const std::vector<Element*> innerWalked = resolveIfEnabled(tb->elements);
           writeTextBoxGroup(out, tb, innerWalked, tbMatrix, tbAlpha);
+        }
+        break;
+      }
+      case NodeType::TextModifier: {
+        // A paint-only modifier survives ModifierResolver; its geometry channels were already
+        // baked into the Text clone. Apply its paint channels to every Text accumulated in this
+        // scope so the following painters emit the base/overlay branches.
+        auto* modifier = static_cast<const TextModifier*>(element);
+        size_t totalGlyphs = 0;
+        for (size_t i = scopeStart; i < accumulator.size(); ++i) {
+          if (accumulator[i].element->nodeType() == NodeType::Text) {
+            totalGlyphs += TextGlyphCount(*static_cast<const Text*>(accumulator[i].element));
+          }
+        }
+        size_t baseIndex = 0;
+        for (size_t i = scopeStart; i < accumulator.size(); ++i) {
+          auto& entry = accumulator[i];
+          if (entry.element->nodeType() != NodeType::Text) {
+            continue;
+          }
+          auto* text = static_cast<const Text*>(entry.element);
+          auto count = TextGlyphCount(*text);
+          if (entry.glyphStyles.size() != count) {
+            entry.glyphStyles.resize(count);
+          }
+          ApplyTextModifierPaint(*modifier, baseIndex, totalGlyphs, &entry.glyphStyles);
+          baseIndex += count;
         }
         break;
       }

@@ -49,6 +49,7 @@
 #include "pagx/utils/ModifierResolver.h"
 #include "pagx/utils/RasterUtils.h"
 #include "pagx/utils/StrokeGeometryUtils.h"
+#include "pagx/utils/TextPaintUtils.h"
 #include "pagx/utils/TextSelectorUtils.h"
 #include "pagx/utils/TextUtils.h"
 #include "renderer/LayerBuilder.h"
@@ -2298,6 +2299,82 @@ PAGX_TEST(PAGXUtilsTest, EffectiveTextBoxSize_AssignsNestedModifierOnlyBox) {
   EXPECT_FLOAT_EQ(inner->resolvedLayoutSize().height, 100.0f);
   EXPECT_FLOAT_EQ(pagx::EffectiveTextBoxWidth(inner), 240.0f);
   EXPECT_FLOAT_EQ(pagx::EffectiveTextBoxHeight(inner), 100.0f);
+}
+
+// ---------------------------------------------------------------------------
+// TextModifier paint overrides
+// ---------------------------------------------------------------------------
+
+static pagx::RangeSelector* MakeWeightedSelector(pagx::PAGXDocument* doc, float weight) {
+  auto* selector = doc->makeNode<pagx::RangeSelector>();
+  selector->weight = weight;
+  return selector;
+}
+
+PAGX_TEST(PAGXUtilsTest, TextPaintUtils_AccumulatesOverrideWeightAndColor) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  std::vector<pagx::GlyphPaintStyle> styles(1);
+  auto* red = doc->makeNode<pagx::TextModifier>();
+  red->fillColor = pagx::Color{1.0f, 0.0f, 0.0f, 1.0f};
+  red->selectors = {MakeWeightedSelector(doc.get(), 0.5f)};
+  pagx::ApplyTextModifierPaint(*red, 0, 1, &styles);
+  EXPECT_FLOAT_EQ(styles[0].fillColor.alpha, 0.5f);
+  EXPECT_FLOAT_EQ(styles[0].fillColor.red, 1.0f);
+
+  auto* green = doc->makeNode<pagx::TextModifier>();
+  green->fillColor = pagx::Color{0.0f, 1.0f, 0.0f, 1.0f};
+  green->selectors = {MakeWeightedSelector(doc.get(), 0.5f)};
+  pagx::ApplyTextModifierPaint(*green, 0, 1, &styles);
+  EXPECT_NEAR(styles[0].fillColor.alpha, 0.75f, 1e-6f);
+  EXPECT_NEAR(styles[0].fillColor.red, 1.0f / 3.0f, 1e-6f);
+  EXPECT_NEAR(styles[0].fillColor.green, 2.0f / 3.0f, 1e-6f);
+  EXPECT_FLOAT_EQ(styles[0].fillColor.blue, 0.0f);
+}
+
+PAGX_TEST(PAGXUtilsTest, TextPaintUtils_ZeroAlphaOverrideKeepsPreviousStyle) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  std::vector<pagx::GlyphPaintStyle> styles(1);
+  auto* red = doc->makeNode<pagx::TextModifier>();
+  red->fillColor = pagx::Color{1.0f, 0.0f, 0.0f, 1.0f};
+  red->selectors = {MakeWeightedSelector(doc.get(), 0.5f)};
+  pagx::ApplyTextModifierPaint(*red, 0, 1, &styles);
+
+  auto* clear = doc->makeNode<pagx::TextModifier>();
+  clear->fillColor = pagx::Color{0.0f, 0.0f, 1.0f, 0.0f};
+  pagx::ApplyTextModifierPaint(*clear, 0, 1, &styles);
+  EXPECT_FLOAT_EQ(styles[0].fillColor.alpha, 0.5f);
+  EXPECT_FLOAT_EQ(styles[0].fillColor.red, 1.0f);
+  EXPECT_FLOAT_EQ(styles[0].fillColor.blue, 0.0f);
+}
+
+PAGX_TEST(PAGXUtilsTest, TextPaintUtils_BlendsStrokeWidth) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  std::vector<pagx::GlyphPaintStyle> styles(1);
+  auto* stroke = doc->makeNode<pagx::TextModifier>();
+  stroke->strokeWidth = 10.0f;
+  stroke->selectors = {MakeWeightedSelector(doc.get(), 0.5f)};
+  pagx::ApplyTextModifierPaint(*stroke, 0, 1, &styles);
+  EXPECT_FLOAT_EQ(styles[0].strokeWidthFactor, 0.5f);
+  EXPECT_FLOAT_EQ(pagx::BlendGlyphStrokeWidth(2.0f, styles[0]), 6.0f);
+}
+
+PAGX_TEST(PAGXUtilsTest, TextPaintUtils_UsesScopeGlyphIndex) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  std::vector<pagx::GlyphPaintStyle> styles(2);
+  auto* selector = doc->makeNode<pagx::RangeSelector>();
+  selector->unit = pagx::SelectorUnit::Index;
+  selector->start = 0.0f;
+  selector->end = 1.0f;
+  auto* red = doc->makeNode<pagx::TextModifier>();
+  red->fillColor = pagx::Color{1.0f, 0.0f, 0.0f, 1.0f};
+  red->selectors = {selector};
+  pagx::ApplyTextModifierPaint(*red, 1, 2, &styles);
+  EXPECT_FLOAT_EQ(styles[0].fillColor.alpha, 0.0f);
+  EXPECT_FLOAT_EQ(styles[1].fillColor.alpha, 0.0f);
+
+  pagx::ApplyTextModifierPaint(*red, 0, 2, &styles);
+  EXPECT_FLOAT_EQ(styles[0].fillColor.alpha, 1.0f);
+  EXPECT_FLOAT_EQ(styles[1].fillColor.alpha, 0.0f);
 }
 
 // ---------------------------------------------------------------------------

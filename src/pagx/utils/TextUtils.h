@@ -134,6 +134,9 @@ struct GlyphDrawItem {
   Matrix transform;
   const PathData* pathData = nullptr;
   const Image* image = nullptr;
+  // Index of the source glyph across the whole Text, including glyphs that produced no
+  // drawable (blank / missing). Selector weights and paint overrides are indexed by this value.
+  size_t glyphIndex = 0;
 };
 
 /**
@@ -159,6 +162,12 @@ std::vector<GlyphDrawItem> ComputeGlyphDrawItems(const Text& text, float textPos
  * separately shaped editable-text line box.
  */
 Rect ComputeGlyphRunTextBounds(const Text& text);
+
+/**
+ * Returns the number of glyphs in `text` across all GlyphRuns. This is the index domain used by
+ * TextModifier selectors, so it counts blank and missing glyphs too.
+ */
+size_t TextGlyphCount(const Text& text);
 
 bool HasNonASCII(const std::string& str);
 

@@ -45,6 +45,7 @@ namespace {
 struct PositionedGlyph {
   const Glyph* glyph = nullptr;
   Matrix transform;
+  size_t glyphIndex = 0;
 };
 
 // Resolves the layer-space pen position for glyph `i` of `run`. The GlyphRun
@@ -136,8 +137,10 @@ static std::vector<PositionedGlyph> WalkGlyphs(const Text& text, float textPosX,
     totalGlyphs += run->glyphs.size();
   }
   result.reserve(totalGlyphs);
+  size_t glyphIndex = 0;
   for (const auto* run : text.glyphRuns) {
     if (!run->font || run->font->unitsPerEm <= 0 || run->glyphs.empty()) {
+      glyphIndex += run->glyphs.size();
       continue;
     }
     float scale = run->fontSize / static_cast<float>(run->font->unitsPerEm);
@@ -145,15 +148,16 @@ static std::vector<PositionedGlyph> WalkGlyphs(const Text& text, float textPosX,
     float baseY = textPosY + run->y;
     float currentX = baseX;
     for (size_t i = 0; i < run->glyphs.size(); i++) {
+      size_t currentGlyphIndex = glyphIndex++;
       uint16_t glyphID = run->glyphs[i];
       if (glyphID == 0) {
         continue;
       }
-      auto glyphIndex = static_cast<size_t>(glyphID) - 1;
-      if (glyphIndex >= run->font->glyphs.size()) {
+      auto glyphIndexInFont = static_cast<size_t>(glyphID) - 1;
+      if (glyphIndexInFont >= run->font->glyphs.size()) {
         continue;
       }
-      auto* glyph = run->font->glyphs[glyphIndex];
+      auto* glyph = run->font->glyphs[glyphIndexInFont];
       if (!glyph) {
         continue;
       }
@@ -166,7 +170,8 @@ static std::vector<PositionedGlyph> WalkGlyphs(const Text& text, float textPosX,
       // glyphs land where the renderer expects them.
       currentX += glyph->advance * scale;
 
-      result.push_back({glyph, ComposeGlyphMatrix(glyph, run, i, scale, posX, posY)});
+      result.push_back(
+          {glyph, ComposeGlyphMatrix(glyph, run, i, scale, posX, posY), currentGlyphIndex});
     }
   }
   return result;
@@ -249,6 +254,7 @@ std::vector<GlyphDrawItem> ComputeGlyphDrawItems(const Text& text, float textPos
       GlyphDrawItem item = {};
       item.transform = path.transform;
       item.pathData = path.pathData;
+      item.glyphIndex = entry.glyphIndex;
       result.push_back(item);
     }
     GlyphImage image = {};
@@ -256,10 +262,19 @@ std::vector<GlyphDrawItem> ComputeGlyphDrawItems(const Text& text, float textPos
       GlyphDrawItem item = {};
       item.transform = image.transform;
       item.image = image.image;
+      item.glyphIndex = entry.glyphIndex;
       result.push_back(item);
     }
   }
   return result;
+}
+
+size_t TextGlyphCount(const Text& text) {
+  size_t count = 0;
+  for (const auto* run : text.glyphRuns) {
+    count += run->glyphs.size();
+  }
+  return count;
 }
 
 Rect ComputeGlyphRunTextBounds(const Text& text) {

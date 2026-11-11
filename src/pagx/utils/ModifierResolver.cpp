@@ -38,6 +38,7 @@
 #include "pagx/nodes/TrimPath.h"
 #include "pagx/types/MergePathMode.h"
 #include "pagx/utils/TextSelectorUtils.h"
+#include "pagx/utils/TextUtils.h"
 #include "renderer/ToTGFX.h"
 #include "tgfx/core/Path.h"
 #include "tgfx/core/PathEffect.h"
@@ -578,11 +579,7 @@ static Group* MakeCopyGroup(PAGXDocument* doc, const std::vector<Element*>& body
 //==============================================================================
 
 static size_t GlyphCount(const Text* text) {
-  size_t count = 0;
-  for (const auto* run : text->glyphRuns) {
-    count += run->glyphs.size();
-  }
-  return count;
+  return TextGlyphCount(*text);
 }
 
 // True when any element in the list (recursively) is a Text. An outer TextModifier cannot reach
@@ -626,8 +623,14 @@ static bool CanBakeText(const Text* text) {
   return true;
 }
 
+static bool HasGeometryChannels(const TextModifier* modifier) {
+  return modifier->position.x != 0.0f || modifier->position.y != 0.0f ||
+         modifier->rotation != 0.0f || modifier->scale.x != 1.0f || modifier->scale.y != 1.0f ||
+         modifier->skew != 0.0f || modifier->anchor.x != 0.0f || modifier->anchor.y != 0.0f;
+}
+
 static bool CanBakeTextModifier(const Text* text, const TextModifier* modifier) {
-  return !HasPaintChannels(modifier) && modifier->skewAxis == 0.0f && CanBakeText(text);
+  return modifier->skewAxis == 0.0f && CanBakeText(text);
 }
 
 static bool IsIdentityModifier(const TextModifier* modifier) {
@@ -637,7 +640,8 @@ static bool IsIdentityModifier(const TextModifier* modifier) {
          !HasPaintChannels(modifier);
 }
 
-Text* ModifierResolver::bakeTextModifier(const Text* text, const TextModifier* modifier) {
+Text* ModifierResolver::bakeTextModifier(const Text* text, const TextModifier* modifier,
+                                         size_t baseIndex, size_t totalCount) {
   if (!CanBakeTextModifier(text, modifier)) {
     return nullptr;
   }
@@ -650,12 +654,12 @@ Text* ModifierResolver::bakeTextModifier(const Text* text, const TextModifier* m
   // id-keyed lookups and makes repeated exports pile up duplicates.
   clone->id.clear();
   clone->glyphRuns.clear();
-  TextSelectorEvaluator evaluator(modifier->selectors, GlyphCount(text));
+  TextSelectorEvaluator evaluator(modifier->selectors, totalCount);
   bool touchesRotation = modifier->rotation != 0.0f;
   bool touchesSkew = modifier->skew != 0.0f;
   bool touchesScale = modifier->scale.x != 1.0f || modifier->scale.y != 1.0f;
   bool touchesAnchor = modifier->anchor.x != 0.0f || modifier->anchor.y != 0.0f;
-  size_t index = 0;
+  size_t index = baseIndex;
   for (const auto* run : text->glyphRuns) {
     auto* runClone = _doc->makeNode<GlyphRun>();
     *runClone = *run;
@@ -701,6 +705,19 @@ Text* ModifierResolver::bakeTextModifier(const Text* text, const TextModifier* m
   return clone;
 }
 
+TextModifier* ModifierResolver::makePaintOnlyModifier(const TextModifier* modifier) {
+  auto* clone = _doc->makeNode<TextModifier>();
+  *clone = *modifier;
+  clone->anchor = {};
+  clone->position = {};
+  clone->rotation = 0.0f;
+  clone->scale = {1.0f, 1.0f};
+  clone->skew = 0.0f;
+  clone->skewAxis = 0.0f;
+  clone->id.clear();
+  return clone;
+}
+
 bool ModifierResolver::CanBakeTextModifiers(const std::vector<Element*>& elements) const {
   std::vector<const Text*> texts = {};
   for (auto* element : elements) {
@@ -716,12 +733,14 @@ bool ModifierResolver::CanBakeTextModifiers(const std::vector<Element*>& element
         if (IsIdentityModifier(modifier)) {
           break;
         }
-        if (HasPaintChannels(modifier) || modifier->skewAxis != 0.0f) {
-          return false;
-        }
-        for (const auto* text : texts) {
-          if (!CanBakeText(text)) {
+        if (HasGeometryChannels(modifier)) {
+          if (modifier->skewAxis != 0.0f) {
             return false;
+          }
+          for (const auto* text : texts) {
+            if (!CanBakeText(text)) {
+              return false;
+            }
           }
         }
         break;
@@ -907,13 +926,10 @@ std::vector<Element*> ModifierResolver::resolve(const std::vector<Element*>& ele
         if (IsIdentityModifier(modifier)) {
           break;
         }
-        // A modifier transforms every Text accumulated before it in this scope. Bake into a clone
-        // so the authored document stays untouched; a target that cannot be expressed through
-        // GlyphRun channels keeps the modifier in the output for the caller's bake path.
-        bool bakedAll = true;
         // A Text nested in an earlier Group / TextBox also accumulates glyphs, but it lives in its
         // own scope and cannot be reached from here; keeping the modifier lets the bake path cover
         // it instead of silently losing the effect.
+        bool bakedAll = true;
         for (const auto* prior : output) {
           if ((prior->nodeType() == NodeType::Group &&
                ContainsText(static_cast<const Group*>(prior)->elements)) ||
@@ -923,19 +939,52 @@ std::vector<Element*> ModifierResolver::resolve(const std::vector<Element*>& ele
             break;
           }
         }
-        for (auto*& slot : output) {
-          if (slot->nodeType() != NodeType::Text) {
-            continue;
+        bool bakeGeometry = HasGeometryChannels(modifier);
+        if (bakedAll && bakeGeometry) {
+          for (const auto* prior : output) {
+            if (prior->nodeType() == NodeType::Text &&
+                !CanBakeTextModifier(static_cast<const Text*>(prior), modifier)) {
+              bakedAll = false;
+              break;
+            }
           }
-          auto* baked = bakeTextModifier(static_cast<const Text*>(slot), modifier);
-          if (baked == nullptr) {
-            bakedAll = false;
-            continue;
-          }
-          slot = baked;
         }
         if (!bakedAll) {
           output.push_back(element);
+          break;
+        }
+        size_t totalGlyphs = 0;
+        if (bakeGeometry) {
+          for (const auto* prior : output) {
+            if (prior->nodeType() == NodeType::Text) {
+              totalGlyphs += GlyphCount(static_cast<const Text*>(prior));
+            }
+          }
+        }
+        size_t baseIndex = 0;
+        bool geometryBaked = true;
+        if (bakeGeometry) {
+          for (auto*& slot : output) {
+            if (slot->nodeType() != NodeType::Text) {
+              continue;
+            }
+            auto* text = static_cast<const Text*>(slot);
+            auto count = GlyphCount(text);
+            auto* baked = bakeTextModifier(text, modifier, baseIndex, totalGlyphs);
+            if (baked == nullptr) {
+              geometryBaked = false;
+              break;
+            }
+            slot = baked;
+            baseIndex += count;
+          }
+        }
+        if (!geometryBaked) {
+          output.push_back(element);
+          break;
+        }
+        if (HasPaintChannels(modifier)) {
+          output.push_back(makePaintOnlyModifier(modifier));
         }
         break;
       }

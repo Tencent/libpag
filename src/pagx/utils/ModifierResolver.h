@@ -89,10 +89,19 @@ class ModifierResolver {
   Element* applyRoundCornerToElement(Element* shape, const RoundCorner* corner) const;
 
   /**
-   * Returns a new Text owned by the document with `modifier` baked into its GlyphRun channels, or
-   * nullptr when the modifier cannot be expressed through those channels.
+   * Returns a new Text owned by the document with `modifier`'s geometry channels baked into its
+   * GlyphRun channels, or nullptr when the modifier cannot be expressed through those channels.
+   * `baseIndex`/`totalCount` place this Text in the scope's selector index domain.
    */
-  Text* bakeTextModifier(const Text* text, const TextModifier* modifier);
+  Text* bakeTextModifier(const Text* text, const TextModifier* modifier, size_t baseIndex,
+                         size_t totalCount);
+
+  /**
+   * Returns a document-owned copy of `modifier` with its geometry channels reset to identity and
+   * its paint channels/selectors preserved. The exporter uses it to apply paint overrides after
+   * the geometry has already been baked into the Text clone.
+   */
+  TextModifier* makePaintOnlyModifier(const TextModifier* modifier);
 };
 
 }  // namespace pagx

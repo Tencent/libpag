@@ -5871,6 +5871,257 @@ PAGX_TEST(PAGXSVGTest, SVGExport_TextModifierBakesIntoGlyphRuns) {
   EXPECT_EQ(svg.find("data:image/png"), std::string::npos);
 }
 
+// ST21: a TextModifier fillColor is an override weight, so a 1/2 weight must emit the original
+// painter plus a SrcOver overlay instead of replacing the fill outright.
+static pagx::Font* MakeSquareGlyphFont(pagx::PAGXDocument* doc) {
+  auto* font = doc->makeNode<pagx::Font>();
+  font->unitsPerEm = 100;
+  auto* glyph = doc->makeNode<pagx::Glyph>();
+  glyph->path = doc->makeNode<pagx::PathData>();
+  *glyph->path = pagx::PathDataFromSVGString("M 0,0 L 20,0 L 20,-20 L 0,-20 Z");
+  glyph->advance = 20;
+  font->glyphs.push_back(glyph);
+  return font;
+}
+
+static pagx::Text* MakeSquareGlyphText(pagx::PAGXDocument* doc, pagx::Font* font,
+                                       const pagx::Point& position) {
+  auto* text = doc->makeNode<pagx::Text>();
+  text->position = position;
+  text->fontSize = 100;
+  auto* run = doc->makeNode<pagx::GlyphRun>();
+  run->font = font;
+  run->fontSize = 100;
+  run->glyphs = {1};
+  run->positions = {{0, 0}};
+  text->glyphRuns.push_back(run);
+  return text;
+}
+
+PAGX_TEST(PAGXSVGTest, SVGExport_TextModifierOverrideBranches) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto* font = MakeSquareGlyphFont(doc.get());
+  auto* text = MakeSquareGlyphText(doc.get(), font, {20, 40});
+  auto* selector = doc->makeNode<pagx::RangeSelector>();
+  selector->weight = 0.5f;
+  auto* modifier = doc->makeNode<pagx::TextModifier>();
+  modifier->fillColor = pagx::Color{1, 0, 0, 1};
+  modifier->selectors = {selector};
+  auto* layer = doc->makeNode<pagx::Layer>();
+  layer->contents = {text, modifier, MakeSolidFillSVG(doc.get(), 0, 0, 1)};
+  doc->layers.push_back(layer);
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_EQ(svg.find("data:image/png"), std::string::npos);
+  EXPECT_NE(svg.find("fill=\"#0000FF\""), std::string::npos);
+  EXPECT_NE(svg.find("fill=\"#FF0000\""), std::string::npos);
+  EXPECT_NE(svg.find("fill-opacity=\"0.5\""), std::string::npos);
+}
+
+PAGX_TEST(PAGXSVGTest, SVGExport_TextModifierFullOverrideDropsBase) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto* font = MakeSquareGlyphFont(doc.get());
+  auto* text = MakeSquareGlyphText(doc.get(), font, {20, 40});
+  auto* modifier = doc->makeNode<pagx::TextModifier>();
+  modifier->fillColor = pagx::Color{1, 0, 0, 1};
+  auto* layer = doc->makeNode<pagx::Layer>();
+  layer->contents = {text, modifier, MakeSolidFillSVG(doc.get(), 0, 0, 1)};
+  doc->layers.push_back(layer);
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_EQ(svg.find("data:image/png"), std::string::npos);
+  EXPECT_EQ(svg.find("fill=\"#0000FF\""), std::string::npos);
+  EXPECT_NE(svg.find("fill=\"#FF0000\""), std::string::npos);
+}
+
+static std::vector<uint8_t> RenderSVGPixel(tgfx::Context* context, const std::string& svg, int px,
+                                           int py) {
+  auto roundTrip = pagx::SVGImporter::ParseString(svg);
+  if (roundTrip == nullptr) {
+    return {};
+  }
+  roundTrip->applyLayout();
+  auto tgfxLayer = pagx::LayerBuilder::Build(roundTrip.get());
+  if (tgfxLayer == nullptr) {
+    return {};
+  }
+  auto surface = Surface::Make(context, 100, 100);
+  if (surface == nullptr) {
+    return {};
+  }
+  DisplayList displayList;
+  displayList.root()->addChild(tgfxLayer);
+  displayList.render(surface.get(), false);
+  std::vector<uint8_t> pixels(100 * 4 * 100);
+  auto info = tgfx::ImageInfo::Make(100, 100, tgfx::ColorType::RGBA_8888,
+                                    tgfx::AlphaType::Premultiplied, static_cast<size_t>(100) * 4);
+  if (!surface->readPixels(info, pixels.data())) {
+    return {};
+  }
+  size_t offset = (static_cast<size_t>(py) * 100 + static_cast<size_t>(px)) * 4;
+  return {pixels[offset], pixels[offset + 1], pixels[offset + 2], pixels[offset + 3]};
+}
+
+// ST21 pixel gate: the exported SVG is imported back and rendered, so the assertion covers the
+// actual base/overlay composition rather than the attribute spelling.
+PAGX_TEST(PAGXSVGTest, SVGExport_TextModifierOverridePixels) {
+  pag::DeviceLockScope deviceLock;
+  ASSERT_TRUE(static_cast<bool>(deviceLock));
+  auto* context = deviceLock.context();
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto* font = MakeSquareGlyphFont(doc.get());
+  auto* text = MakeSquareGlyphText(doc.get(), font, {20, 40});
+  auto* selector = doc->makeNode<pagx::RangeSelector>();
+  selector->weight = 0.5f;
+  auto* modifier = doc->makeNode<pagx::TextModifier>();
+  modifier->fillColor = pagx::Color{1, 0, 0, 1};
+  modifier->selectors = {selector};
+  auto* fill = MakeSolidFillSVG(doc.get(), 0, 0, 1);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  layer->contents = {text, modifier, fill};
+  doc->layers.push_back(layer);
+  doc->applyLayout();
+
+  auto pixel = RenderSVGPixel(context, pagx::SVGExporter::ToSVG(*doc), 30, 30);
+  ASSERT_EQ(pixel.size(), 4u);
+  EXPECT_NEAR(pixel[0], 128, 4);
+  EXPECT_NEAR(pixel[1], 0, 4);
+  EXPECT_NEAR(pixel[2], 128, 4);
+  EXPECT_NEAR(pixel[3], 255, 4);
+}
+
+PAGX_TEST(PAGXSVGTest, SVGExport_TextModifierAlphaAndAccumulationPixels) {
+  pag::DeviceLockScope deviceLock;
+  ASSERT_TRUE(static_cast<bool>(deviceLock));
+  auto* context = deviceLock.context();
+
+  auto makeDoc = [](float fillAlpha, float firstWeight, bool addGreen) {
+    auto doc = pagx::PAGXDocument::Make(100, 100);
+    auto* font = MakeSquareGlyphFont(doc.get());
+    auto* text = MakeSquareGlyphText(doc.get(), font, {20, 40});
+    auto* firstSelector = doc->makeNode<pagx::RangeSelector>();
+    firstSelector->weight = firstWeight;
+    auto* red = doc->makeNode<pagx::TextModifier>();
+    red->fillColor = pagx::Color{1, 0, 0, 1};
+    red->selectors = {firstSelector};
+    auto* fill = MakeSolidFillSVG(doc.get(), 0, 0, 1);
+    fill->alpha = fillAlpha;
+    auto* layer = doc->makeNode<pagx::Layer>();
+    layer->contents = {text, red};
+    if (addGreen) {
+      auto* secondSelector = doc->makeNode<pagx::RangeSelector>();
+      secondSelector->weight = 0.5f;
+      auto* green = doc->makeNode<pagx::TextModifier>();
+      green->fillColor = pagx::Color{0, 1, 0, 1};
+      green->selectors = {secondSelector};
+      layer->contents.push_back(green);
+    }
+    layer->contents.push_back(fill);
+    doc->layers.push_back(layer);
+    doc->applyLayout();
+    return doc;
+  };
+
+  auto halfAlpha = makeDoc(0.5f, 0.5f, false);
+  auto pixel = RenderSVGPixel(context, pagx::SVGExporter::ToSVG(*halfAlpha), 30, 30);
+  ASSERT_EQ(pixel.size(), 4u);
+  EXPECT_NEAR(pixel[0], 64, 4);
+  EXPECT_NEAR(pixel[1], 0, 4);
+  EXPECT_NEAR(pixel[2], 96, 4);
+  EXPECT_NEAR(pixel[3], 159, 4);
+
+  auto fullOverride = makeDoc(0.5f, 1.0f, false);
+  pixel = RenderSVGPixel(context, pagx::SVGExporter::ToSVG(*fullOverride), 30, 30);
+  ASSERT_EQ(pixel.size(), 4u);
+  EXPECT_NEAR(pixel[0], 128, 4);
+  EXPECT_NEAR(pixel[1], 0, 4);
+  EXPECT_NEAR(pixel[2], 0, 4);
+  EXPECT_NEAR(pixel[3], 128, 4);
+
+  auto accumulated = makeDoc(1.0f, 0.5f, true);
+  pixel = RenderSVGPixel(context, pagx::SVGExporter::ToSVG(*accumulated), 30, 30);
+  ASSERT_EQ(pixel.size(), 4u);
+  EXPECT_NEAR(pixel[0], 64, 4);
+  EXPECT_NEAR(pixel[1], 128, 4);
+  EXPECT_NEAR(pixel[2], 64, 4);
+  EXPECT_NEAR(pixel[3], 255, 4);
+}
+
+PAGX_TEST(PAGXSVGTest, SVGExport_TextModifierStrokeOverride) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto* font = MakeSquareGlyphFont(doc.get());
+  auto* text = MakeSquareGlyphText(doc.get(), font, {20, 40});
+  auto* selector = doc->makeNode<pagx::RangeSelector>();
+  selector->weight = 0.5f;
+  auto* modifier = doc->makeNode<pagx::TextModifier>();
+  modifier->strokeColor = pagx::Color{1, 0, 0, 1};
+  modifier->strokeWidth = 10.0f;
+  modifier->selectors = {selector};
+  auto* stroke = doc->makeNode<pagx::Stroke>();
+  stroke->color = doc->makeNode<pagx::SolidColor>();
+  static_cast<pagx::SolidColor*>(stroke->color)->color = {0, 0, 1, 1};
+  stroke->width = 2.0f;
+  auto* layer = doc->makeNode<pagx::Layer>();
+  layer->contents = {text, modifier, stroke};
+  doc->layers.push_back(layer);
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_EQ(svg.find("data:image/png"), std::string::npos);
+  EXPECT_NE(svg.find("stroke=\"#0000FF\""), std::string::npos);
+  EXPECT_NE(svg.find("stroke=\"#FF0000\""), std::string::npos);
+  EXPECT_NE(svg.find("stroke-width=\"6\""), std::string::npos);
+  EXPECT_NE(svg.find("stroke-opacity=\"0.5\""), std::string::npos);
+}
+
+PAGX_TEST(PAGXSVGTest, SVGExport_TextModifierAppliesPerGlyphRange) {
+  pag::DeviceLockScope deviceLock;
+  ASSERT_TRUE(static_cast<bool>(deviceLock));
+  auto* context = deviceLock.context();
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto* font = MakeSquareGlyphFont(doc.get());
+  auto* secondGlyph = doc->makeNode<pagx::Glyph>();
+  secondGlyph->path = doc->makeNode<pagx::PathData>();
+  *secondGlyph->path = pagx::PathDataFromSVGString("M 0,0 L 20,0 L 20,-20 L 0,-20 Z");
+  secondGlyph->advance = 20;
+  font->glyphs.push_back(secondGlyph);
+
+  auto* text = doc->makeNode<pagx::Text>();
+  text->position = {20, 40};
+  text->fontSize = 100;
+  auto* run = doc->makeNode<pagx::GlyphRun>();
+  run->font = font;
+  run->fontSize = 100;
+  run->glyphs = {1, 2};
+  run->positions = {{0, 0}, {20, 0}};
+  text->glyphRuns.push_back(run);
+
+  auto* selector = doc->makeNode<pagx::RangeSelector>();
+  selector->unit = pagx::SelectorUnit::Index;
+  selector->start = 0;
+  selector->end = 1;
+  auto* modifier = doc->makeNode<pagx::TextModifier>();
+  modifier->fillColor = pagx::Color{1, 0, 0, 1};
+  modifier->selectors = {selector};
+  auto* layer = doc->makeNode<pagx::Layer>();
+  layer->contents = {text, modifier, MakeSolidFillSVG(doc.get(), 0, 0, 1)};
+  doc->layers.push_back(layer);
+  doc->applyLayout();
+
+  auto pixel = RenderSVGPixel(context, pagx::SVGExporter::ToSVG(*doc), 30, 30);
+  ASSERT_EQ(pixel.size(), 4u);
+  EXPECT_NEAR(pixel[0], 255, 4);
+  EXPECT_NEAR(pixel[1], 0, 4);
+  EXPECT_NEAR(pixel[2], 0, 4);
+  EXPECT_NEAR(pixel[3], 255, 4);
+
+  pixel = RenderSVGPixel(context, pagx::SVGExporter::ToSVG(*doc), 50, 30);
+  ASSERT_EQ(pixel.size(), 4u);
+  EXPECT_NEAR(pixel[0], 0, 4);
+  EXPECT_NEAR(pixel[1], 0, 4);
+  EXPECT_NEAR(pixel[2], 255, 4);
+  EXPECT_NEAR(pixel[3], 255, 4);
+}
+
 // A Group's alpha has to survive until the painter that draws its geometry, even when that painter
 // sits outside the Group.
 PAGX_TEST(PAGXSVGTest, SVGExport_GroupAlphaReachesOuterPainter) {
