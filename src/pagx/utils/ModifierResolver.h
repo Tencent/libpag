@@ -74,6 +74,7 @@ class ModifierResolver {
  private:
   PAGXDocument* _doc;
   size_t _nodeCountBefore = 0;
+  size_t _generatedElements = 0;
 
   Element* makePathFromData(PathData* data) const;
 

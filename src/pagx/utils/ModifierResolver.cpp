@@ -937,6 +937,21 @@ std::vector<Element*> ModifierResolver::resolve(const std::vector<Element*>& ele
         // below. 10000 is comfortably above any visually meaningful copy count.
         constexpr float MAX_REPEATER_COPIES = 10000.0f;
         copiesF = std::min(copiesF, MAX_REPEATER_COPIES);
+        // Bound the total expanded element count across nested resolvers. Repeaters multiply, so a
+        // per-repeater cap alone still allows an exponential document to exhaust memory.
+        constexpr size_t MAX_GENERATED_ELEMENTS = 200000;
+        size_t bodySize = std::max<size_t>(1, output.size());
+        size_t remaining = MAX_GENERATED_ELEMENTS > _generatedElements
+                               ? MAX_GENERATED_ELEMENTS - _generatedElements
+                               : 0;
+        size_t allowedCopies = remaining / bodySize;
+        if (allowedCopies == 0) {
+          output.clear();
+          shapeSlots.clear();
+          break;
+        }
+        copiesF = std::min(copiesF, static_cast<float>(allowedCopies));
+        _generatedElements += bodySize * static_cast<size_t>(copiesF);
 
         // Snapshot the entire current scope (shapes + painters + nested groups
         // + anything else accumulated so far) as the body of every copy. This

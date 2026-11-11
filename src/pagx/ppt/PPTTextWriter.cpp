@@ -1083,7 +1083,7 @@ void PPTWriter::writeTextBoxGroup(XMLBuilder& out, const Group* textBox,
   auto topLevelFs = CollectFillStroke(elements);
 
   std::vector<RichTextRun> runs;
-  CollectRichTextRuns(elements, topLevelFs.fill, topLevelFs.stroke, 1.0f, runs);
+  CollectRichTextRuns(elements, topLevelFs.fill, topLevelFs.stroke, Matrix{}, 1.0f, runs);
   if (runs.empty()) {
     return;
   }

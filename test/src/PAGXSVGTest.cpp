@@ -6719,6 +6719,28 @@ PAGX_TEST(PAGXSVGTest, SVGExport_PathOutsideStrokeUsesMask) {
   EXPECT_NE(svg.find("stroke-width=\"4\""), std::string::npos);
 }
 
+// ST8: an embedded TextBox run nested in a translated Group keeps that Group transform on the
+// emitted glyph geometry.
+PAGX_TEST(PAGXSVGTest, SVGExport_TextBoxRunKeepsGroupTransform) {
+  auto doc = pagx::PAGXDocument::Make(200, 100);
+  auto* font = MakeSquareGlyphFont(doc.get());
+  auto* text = MakeSquareGlyphText(doc.get(), font, {0, 40});
+  text->text = "A";
+  auto* group = doc->makeNode<pagx::Group>();
+  group->position = {50, 0};
+  group->elements = {text, MakeSolidFillSVG(doc.get(), 0, 0, 0)};
+  auto* box = doc->makeNode<pagx::TextBox>();
+  box->width = 180;
+  box->height = 80;
+  box->elements = {group};
+  auto* layer = doc->makeNode<pagx::Layer>();
+  layer->contents = {box};
+  doc->layers.push_back(layer);
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("matrix(1,0,0,1,50,0)"), std::string::npos);
+}
+
 // A Group's alpha has to survive until the painter that draws its geometry, even when that painter
 // sits outside the Group.
 PAGX_TEST(PAGXSVGTest, SVGExport_GroupAlphaReachesOuterPainter) {

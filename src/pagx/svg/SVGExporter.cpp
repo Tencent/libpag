@@ -3638,6 +3638,7 @@ struct SVGRichTextRun {
   const Fill* fill = nullptr;
   const Stroke* stroke = nullptr;
   float alpha = 1.0f;
+  Matrix transform = {};
 };
 
 using TextPaintStyleMap = std::unordered_map<const Text*, std::vector<GlyphPaintStyle>>;
@@ -3695,6 +3696,7 @@ struct SVGGlyphRunEmission {
   float originX = 0;
   float originY = 0;
   float alpha = 1.0f;
+  Matrix transform = {};
   const std::vector<GlyphPaintStyle>* styles = nullptr;
 };
 
@@ -3705,7 +3707,7 @@ void SVGWriter::writeTextBoxGroup(SVGBuilder& out, const TextBox* textBox,
                                   float alpha) {
   auto topLevelFs = CollectFillStroke(elements);
   std::vector<SVGRichTextRun> runs;
-  CollectRichTextRuns(elements, topLevelFs.fill, topLevelFs.stroke, 1.0f, runs);
+  CollectRichTextRuns(elements, topLevelFs.fill, topLevelFs.stroke, Matrix{}, 1.0f, runs);
   if (runs.empty()) {
     return;
   }
@@ -3782,12 +3784,13 @@ void SVGWriter::writeTextBoxGroup(SVGBuilder& out, const TextBox* textBox,
         auto origin = run.text->renderPosition();
         auto styleIt = stylesByText.find(run.text);
         if (styleIt != stylesByText.end()) {
-          writeTextWithGlyphStylesAt(out, run.text, origin.x, origin.y, runFs, transform,
-                                     alpha * run.alpha, styleIt->second, {});
+          writeTextWithGlyphStylesAt(out, run.text, origin.x, origin.y, runFs,
+                                     transform * run.transform, alpha * run.alpha, styleIt->second,
+                                     {});
           continue;
         }
         if (WriteGlyphGeometry(out, run.text, origin.x, origin.y, runFs, alpha * run.alpha,
-                               MatrixToSVGTransform(transform))) {
+                               MatrixToSVGTransform(transform * run.transform))) {
           continue;
         }
         addWarning("TextBox '" + textBox->id +
@@ -3909,6 +3912,7 @@ void SVGWriter::writeTextBoxGroup(SVGBuilder& out, const TextBox* textBox,
         emission.originX = origin.x;
         emission.originY = origin.y;
         emission.alpha = run.alpha;
+        emission.transform = run.transform;
         auto styleIt = stylesByText.find(run.text);
         if (styleIt != stylesByText.end()) {
           emission.styles = &styleIt->second;
@@ -3973,9 +3977,11 @@ void SVGWriter::writeTextBoxGroup(SVGBuilder& out, const TextBox* textBox,
       runFs.stroke = emission.stroke;
       if (emission.styles != nullptr) {
         writeTextWithGlyphStylesAt(out, emission.text, emission.originX, emission.originY, runFs,
-                                   transform, alpha * emission.alpha, *emission.styles, {});
+                                   transform * emission.transform, alpha * emission.alpha,
+                                   *emission.styles, {});
       } else if (!WriteGlyphGeometry(out, emission.text, emission.originX, emission.originY, runFs,
-                                     alpha * emission.alpha, svgTransform)) {
+                                     alpha * emission.alpha,
+                                     MatrixToSVGTransform(transform * emission.transform))) {
         addWarning("TextBox '" + textBox->id +
                    "' has a run with GlyphRun data but no usable glyph outline; the run is "
                    "dropped.");
@@ -3995,12 +4001,13 @@ void SVGWriter::writeTextBoxGroup(SVGBuilder& out, const TextBox* textBox,
     auto origin = runs[r].text->renderPosition();
     auto styleIt = stylesByText.find(runs[r].text);
     if (styleIt != stylesByText.end()) {
-      writeTextWithGlyphStylesAt(out, runs[r].text, origin.x, origin.y, runFs, transform,
-                                 alpha * runs[r].alpha, styleIt->second, {});
+      writeTextWithGlyphStylesAt(out, runs[r].text, origin.x, origin.y, runFs,
+                                 transform * runs[r].transform, alpha * runs[r].alpha,
+                                 styleIt->second, {});
       continue;
     }
     if (!WriteGlyphGeometry(out, runs[r].text, origin.x, origin.y, runFs, alpha * runs[r].alpha,
-                            svgTransform)) {
+                            MatrixToSVGTransform(transform * runs[r].transform))) {
       addWarning("TextBox '" + textBox->id +
                  "' has a run with GlyphRun data but no usable glyph outline; the run is "
                  "dropped.");

@@ -67,26 +67,28 @@ const TextBox* FindModifierTextBox(const std::vector<Element*>& elements);
  * Fill / Stroke (falling back to the parent's when the Group supplies none).
  *
  * The Run type must be aggregate-initialisable from `{const Text*, const Fill*, const Stroke*,
- * float}` where the float is the accumulated Group alpha (e.g. `pagx::PPTWriter::RichTextRun`
- * and the SVG-side `SVGRichTextRun`).
+ * float, const Matrix&}` where the float is the accumulated Group alpha and the matrix the
+ * accumulated Group transform (e.g. `pagx::PPTWriter::RichTextRun` and `SVGRichTextRun`).
  */
 template <typename Run>
 void CollectRichTextRuns(const std::vector<Element*>& elements, const Fill* parentFill,
-                         const Stroke* parentStroke, float parentAlpha, std::vector<Run>& outRuns) {
+                         const Stroke* parentStroke, const Matrix& parentTransform,
+                         float parentAlpha, std::vector<Run>& outRuns) {
   for (auto* element : elements) {
     auto type = element->nodeType();
     if (type == NodeType::Text) {
       auto* t = static_cast<const Text*>(element);
       if (!t->text.empty()) {
-        outRuns.push_back({t, parentFill, parentStroke, parentAlpha});
+        outRuns.push_back({t, parentFill, parentStroke, parentAlpha, parentTransform});
       }
     } else if (type == NodeType::Group) {
       auto* g = static_cast<const Group*>(element);
       auto groupFs = CollectFillStroke(g->elements);
       const Fill* effectiveFill = groupFs.fill ? groupFs.fill : parentFill;
       const Stroke* effectiveStroke = groupFs.stroke ? groupFs.stroke : parentStroke;
-      CollectRichTextRuns(g->elements, effectiveFill, effectiveStroke, parentAlpha * g->alpha,
-                          outRuns);
+      auto groupMatrix = parentTransform * BuildGroupMatrix(g);
+      CollectRichTextRuns(g->elements, effectiveFill, effectiveStroke, groupMatrix,
+                          parentAlpha * g->alpha, outRuns);
     }
   }
 }
