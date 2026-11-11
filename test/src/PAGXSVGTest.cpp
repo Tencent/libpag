@@ -6478,6 +6478,51 @@ PAGX_TEST(PAGXSVGTest, SVGExport_EmbedsFontsFromExternalDocument) {
   EXPECT_NE(svg.find("<text"), std::string::npos);
 }
 
+// ST30: native text must preserve authored whitespace instead of letting SVG collapse it.
+PAGX_TEST(PAGXSVGTest, SVGExport_TextBoxPreservesWhitespace) {
+  auto doc = pagx::PAGXDocument::Make(200, 100);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* box = doc->makeNode<pagx::TextBox>();
+  box->width = 180;
+  box->height = 80;
+  auto* text = doc->makeNode<pagx::Text>();
+  text->text = "A  B";
+  text->fontFamily = "Arial";
+  text->fontSize = 20;
+  box->elements = {text, MakeSolidFillSVG(doc.get(), 0, 0, 0)};
+  layer->contents = {box};
+  doc->layers.push_back(layer);
+
+  pagx::SVGExportOptions options = {};
+  options.convertTextToPath = false;
+  auto svg = pagx::SVGExporter::ToSVG(*doc, options);
+  EXPECT_NE(svg.find("xml:space=\"preserve\""), std::string::npos);
+  EXPECT_NE(svg.find("A  B"), std::string::npos);
+}
+
+// ST30: CJK lines break without spaces, so justify has to use textLength rather than word-spacing.
+PAGX_TEST(PAGXSVGTest, SVGExport_TextBoxCJKJustifyUsesTextLength) {
+  auto doc = pagx::PAGXDocument::Make(100, 300);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* box = doc->makeNode<pagx::TextBox>();
+  box->width = 60;
+  box->height = 240;
+  box->textAlign = pagx::TextAlign::Justify;
+  auto* text = doc->makeNode<pagx::Text>();
+  text->text = "中文中文中文中文中文中文";
+  text->fontFamily = "Arial";
+  text->fontSize = 20;
+  box->elements = {text, MakeSolidFillSVG(doc.get(), 0, 0, 0)};
+  layer->contents = {box};
+  doc->layers.push_back(layer);
+
+  pagx::SVGExportOptions options = {};
+  options.convertTextToPath = false;
+  auto svg = pagx::SVGExporter::ToSVG(*doc, options);
+  EXPECT_NE(svg.find("textLength="), std::string::npos);
+  EXPECT_NE(svg.find("lengthAdjust=\"spacing\""), std::string::npos);
+}
+
 // A Group's alpha has to survive until the painter that draws its geometry, even when that painter
 // sits outside the Group.
 PAGX_TEST(PAGXSVGTest, SVGExport_GroupAlphaReachesOuterPainter) {

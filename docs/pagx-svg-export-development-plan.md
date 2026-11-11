@@ -685,6 +685,7 @@ ToSVG严格失败返回空结果、ToFile返回false、CLI非零；warnings=null
 | 本轮 ST36 部分（2026-11-11） | `ToSVG` 每次都用 `options.fontConfig` 重跑 `applyLayout`，约束修改后导出不再复用旧 resolved 尺寸；新增编辑后导出回归 | 外部 Font / fontConfig 冷热与 ST37 externalDoc 预扫未做 |
 | 本轮 ST37 部分（2026-11-11） | WOFF2 预扫递归 externalDoc 的 Font 节点并去重，external composition 的内嵌字体不再漏嵌；新增 externalDoc 字体回归 | external Image 资源 / 嵌套外部文档加载失败路径未覆盖 |
 | 本轮 M1 部分（2026-11-11） | `SVGAnimationOptions.selection` 实现 Default（首个声明 Animation）/ Named / All；未被 timeline 驱动的动画用默认 timing；CLI 增加 `--svg-no-animation` / `--svg-animation` / `--svg-all-animations` 与互斥校验；新增三模式回归 | F2 双实例 / external 同名去重、F4 offset/paused 初态、F16 pause scope 仍未做；同 target 同 channel 的多动画 ordered mix 仍 last-wins |
+| 本轮 ST30 部分（2026-11-11） | TextBox Native 路径加 `xml:space="preserve"`，多空格不再被 SVG 折叠；CJK 无空格行 justify 改用 `textLength` + `lengthAdjust="spacing"`，不再依赖 word-spacing；新增空白/CJK 两回归 | tab 的实际 tab-stop、BiDi base direction、RTL 数字 rich text 与 justfy 像素对照未做 |
 
 ### 4.8 S3 文字待办清单（下一批入口）
 

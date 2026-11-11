@@ -3116,6 +3116,45 @@ static int CountWordSpaces(const std::string& text) {
   return count;
 }
 
+// CJK scripts break between characters without an ASCII space. Justified native text therefore
+// needs textLength / lengthAdjust rather than word-spacing.
+static bool HasCJKBreakOpportunity(const std::string& text) {
+  size_t i = 0;
+  int cjkCount = 0;
+  while (i < text.size()) {
+    auto c = static_cast<unsigned char>(text[i]);
+    uint32_t cp = 0;
+    size_t bytes = 1;
+    if (c < 0x80) {
+      cp = c;
+    } else if (c < 0xE0) {
+      cp = c & 0x1Fu;
+      bytes = 2;
+    } else if (c < 0xF0) {
+      cp = c & 0x0Fu;
+      bytes = 3;
+    } else {
+      cp = c & 0x07u;
+      bytes = 4;
+    }
+    if (i + bytes > text.size()) {
+      break;
+    }
+    for (size_t k = 1; k < bytes; k++) {
+      cp = (cp << 6) | (static_cast<unsigned char>(text[i + k]) & 0x3Fu);
+    }
+    i += bytes;
+    if ((cp >= 0x2E80 && cp <= 0x9FFF) || (cp >= 0xF900 && cp <= 0xFAFF) ||
+        (cp >= 0x3040 && cp <= 0x30FF) || (cp >= 0xAC00 && cp <= 0xD7A3) ||
+        (cp >= 0x20000 && cp <= 0x2FFFF)) {
+      if (++cjkCount >= 2) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
 // The positioning/anchor parameters derived from a TextBox or a standalone Text.
 // Computed once by ResolveTextAnchorAndOffset and then consumed per-line by
 // writeTextWithLayout.
@@ -3592,6 +3631,7 @@ void SVGWriter::writeTextBoxGroup(SVGBuilder& out, const TextBox* textBox,
     bool isLastLine = std::fabs(baseline - lastBaseline) < baselineEpsilon;
     // Count word spaces across all runs on this visual line for word-spacing.
     int totalSpaces = 0;
+    std::string lineContent;
     if (anchoring.justifyWidth > 0 && !isLastLine) {
       for (size_t j = i; j < lineEntries.size() &&
                          std::fabs(lineEntries[j].baselineY - baseline) < baselineEpsilon;
@@ -3599,12 +3639,14 @@ void SVGWriter::writeTextBoxGroup(SVGBuilder& out, const TextBox* textBox,
         const auto& e = lineEntries[j];
         std::string t = runs[e.runIndex].text->text.substr(e.byteStart, e.byteEnd - e.byteStart);
         totalSpaces += CountWordSpaces(t);
+        lineContent += t;
       }
     }
     out.openElement("text");
     if (!svgTransform.empty()) {
       out.addAttribute("transform", svgTransform);
     }
+    out.addAttribute("xml:space", "preserve");
     if (anchoring.anchor == TextAnchor::Center) {
       out.addAttribute("text-anchor", "middle");
     } else if (anchoring.anchor == TextAnchor::End) {
@@ -3613,9 +3655,14 @@ void SVGWriter::writeTextBoxGroup(SVGBuilder& out, const TextBox* textBox,
     ApplyTextBoxBodyAttrs(out, textBox);
     out.addRequiredAttribute("x", anchoring.anchorX);
     out.addRequiredAttribute("y", anchoring.offsetY + baseline);
-    if (anchoring.justifyWidth > 0 && !isLastLine && totalSpaces > 0) {
-      float wordSpacing = (anchoring.justifyWidth - lineWidth) / static_cast<float>(totalSpaces);
-      out.addAttribute("word-spacing", FloatToString(wordSpacing));
+    if (anchoring.justifyWidth > 0 && !isLastLine) {
+      if (totalSpaces > 0) {
+        float wordSpacing = (anchoring.justifyWidth - lineWidth) / static_cast<float>(totalSpaces);
+        out.addAttribute("word-spacing", FloatToString(wordSpacing));
+      } else if (HasCJKBreakOpportunity(lineContent)) {
+        out.addRequiredAttribute("textLength", anchoring.justifyWidth);
+        out.addAttribute("lengthAdjust", "spacing");
+      }
     }
     out.closeElementStart();
 
