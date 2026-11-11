@@ -133,6 +133,9 @@ void TextBox::updateLayout(LayoutContext* context) {
       hasPadding ? std::max(0.0f, layoutHeight - padding.top - padding.bottom) : layoutHeight;
   // Non-Text elements: constraint layout with padding.
   auto nodes = CollectLayoutNodes(elements, true);
+  for (auto* node : nodes) {
+    node->updateSize(context);
+  }
   PerformConstraintLayout(nodes, layoutWidth, layoutHeight, padding, context);
   // Text elements: typeset with inset bounds, then offset positions by padding.
   auto params = MakeTextLayoutParams(this, cw, ch);

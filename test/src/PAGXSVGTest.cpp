@@ -5712,6 +5712,74 @@ PAGX_TEST(PAGXSVGTest, SVGExport_HiddenOverflowDropsAllLines) {
   EXPECT_TRUE(warned) << (warnings.empty() ? "no warnings" : warnings[0]);
 }
 
+// ST28: the native text box re-typesets and anchors with the layout-resolved frame. A dual-edge
+// TextBox must not fall back to its lower-priority authored width when placing the text.
+PAGX_TEST(PAGXSVGTest, SVGExport_TextBoxAnchorUsesResolvedWidth) {
+  auto doc = pagx::PAGXDocument::Make(300, 200);
+  auto* layer = doc->makeNode<pagx::Layer>("layer");
+  layer->width = 300;
+  layer->height = 200;
+  auto* box = doc->makeNode<pagx::TextBox>("box");
+  box->width = 100;
+  box->height = 60;
+  box->left = 20;
+  box->right = 30;
+  box->top = 10;
+  box->bottom = 20;
+  box->padding.top = 10;
+  box->padding.right = 10;
+  box->padding.bottom = 10;
+  box->padding.left = 10;
+  box->textAlign = pagx::TextAlign::End;
+  auto* text = doc->makeNode<pagx::Text>("run");
+  text->text = "Hi";
+  text->fontFamily = "Arial";
+  text->fontSize = 20;
+  box->elements = {text, MakeSolidFillSVG(doc.get(), 0, 0, 0)};
+  layer->contents = {box};
+  doc->layers.push_back(layer);
+
+  doc->applyLayout();
+  doc->applyLayout();
+
+  pagx::SVGExportOptions options = {};
+  options.convertTextToPath = false;
+  auto svg = pagx::SVGExporter::ToSVG(*doc, options);
+  SaveFile(svg, "PAGXSVGTest/svg_export_textbox_resolved_width.svg");
+  EXPECT_NE(svg.find(" x=\"240\""), std::string::npos);
+  EXPECT_EQ(svg.find(" x=\"90\""), std::string::npos);
+}
+
+// ST28: a height allocated as 0 by a dual-edge constraint is a real box height, so overflow
+// "hidden" must still drop every line instead of treating 0 as "height unset".
+PAGX_TEST(PAGXSVGTest, SVGExport_HiddenOverflowWithZeroResolvedHeightDropsAllLines) {
+  auto doc = pagx::PAGXDocument::Make(300, 200);
+  auto* layer = doc->makeNode<pagx::Layer>("layer");
+  layer->width = 300;
+  layer->height = 200;
+  auto* box = doc->makeNode<pagx::TextBox>("box");
+  box->width = 200;
+  box->top = 100;
+  box->bottom = 100;
+  box->overflow = pagx::Overflow::Hidden;
+  auto* text = doc->makeNode<pagx::Text>("run");
+  text->text = "One Two";
+  text->fontFamily = "Arial";
+  text->fontSize = 40;
+  box->elements = {text, MakeSolidFillSVG(doc.get(), 0, 0, 0)};
+  layer->contents = {box};
+  doc->layers.push_back(layer);
+
+  std::vector<std::string> warnings;
+  auto svg = pagx::SVGExporter::ToSVG(*doc, {}, &warnings);
+  EXPECT_EQ(svg.find("<text"), std::string::npos);
+  bool warned = false;
+  for (const auto& warning : warnings) {
+    warned = warned || warning.find("nothing is drawn") != std::string::npos;
+  }
+  EXPECT_TRUE(warned) << (warnings.empty() ? "no warnings" : warnings[0]);
+}
+
 // ST18: the embedded WOFF2 face carries the regular style only, so faux bold / italic have to
 // travel as CSS weight / style or the exported glyphs lose them.
 PAGX_TEST(PAGXSVGTest, SVGExport_EmbeddedFontCarriesFauxStyle) {

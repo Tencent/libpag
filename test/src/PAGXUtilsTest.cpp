@@ -2128,6 +2128,178 @@ PAGX_TEST(PAGXUtilsTest, EffectiveTextBoxHeight_NaNUnresolved) {
   EXPECT_TRUE(std::isnan(pagx::EffectiveTextBoxHeight(box)));
 }
 
+PAGX_TEST(PAGXUtilsTest, EffectiveTextBoxSize_UsesResolvedDualEdgeFrame) {
+  auto doc = pagx::PAGXDocument::Make(300, 200);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  layer->width = 300;
+  layer->height = 200;
+  auto* box = doc->makeNode<pagx::TextBox>();
+  box->width = 100;
+  box->height = 60;
+  box->left = 20;
+  box->right = 30;
+  box->top = 10;
+  box->bottom = 20;
+  box->padding.top = 10;
+  box->padding.right = 10;
+  box->padding.bottom = 10;
+  box->padding.left = 10;
+  box->elements.push_back(doc->makeNode<pagx::Rectangle>());
+  layer->contents.push_back(box);
+  doc->layers.push_back(layer);
+
+  doc->applyLayout();
+
+  auto resolved = box->resolvedLayoutSize();
+  EXPECT_FLOAT_EQ(resolved.width, 250.0f);
+  EXPECT_FLOAT_EQ(resolved.height, 170.0f);
+  EXPECT_FLOAT_EQ(pagx::EffectiveTextBoxWidth(box), 250.0f);
+  EXPECT_FLOAT_EQ(pagx::EffectiveTextBoxHeight(box), 170.0f);
+  auto params = pagx::MakeTextBoxParams(box);
+  EXPECT_FLOAT_EQ(params.boxWidth, 230.0f);
+  EXPECT_FLOAT_EQ(params.boxHeight, 150.0f);
+
+  doc->applyLayout();
+
+  EXPECT_FLOAT_EQ(box->resolvedLayoutSize().width, 250.0f);
+  EXPECT_FLOAT_EQ(box->resolvedLayoutSize().height, 170.0f);
+  auto relaidOut = pagx::MakeTextBoxParams(box);
+  EXPECT_FLOAT_EQ(relaidOut.boxWidth, 230.0f);
+  EXPECT_FLOAT_EQ(relaidOut.boxHeight, 150.0f);
+}
+
+PAGX_TEST(PAGXUtilsTest, EffectiveTextBoxSize_UsesResolvedPercentFrame) {
+  auto doc = pagx::PAGXDocument::Make(300, 200);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  layer->width = 300;
+  layer->height = 200;
+  auto* box = doc->makeNode<pagx::TextBox>();
+  box->width = 100;
+  box->height = 60;
+  box->percentWidth = 80;
+  box->percentHeight = 50;
+  box->padding.top = 10;
+  box->padding.right = 10;
+  box->padding.bottom = 10;
+  box->padding.left = 10;
+  box->elements.push_back(doc->makeNode<pagx::Rectangle>());
+  layer->contents.push_back(box);
+  doc->layers.push_back(layer);
+
+  doc->applyLayout();
+
+  EXPECT_FLOAT_EQ(box->resolvedLayoutSize().width, 240.0f);
+  EXPECT_FLOAT_EQ(box->resolvedLayoutSize().height, 100.0f);
+  EXPECT_FLOAT_EQ(pagx::EffectiveTextBoxWidth(box), 240.0f);
+  EXPECT_FLOAT_EQ(pagx::EffectiveTextBoxHeight(box), 100.0f);
+  auto params = pagx::MakeTextBoxParams(box);
+  EXPECT_FLOAT_EQ(params.boxWidth, 220.0f);
+  EXPECT_FLOAT_EQ(params.boxHeight, 80.0f);
+}
+
+PAGX_TEST(PAGXUtilsTest, EffectiveTextBoxSize_UsesAuthoredFrameWhenUnconstrained) {
+  auto doc = pagx::PAGXDocument::Make(300, 200);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  layer->width = 300;
+  layer->height = 200;
+  auto* box = doc->makeNode<pagx::TextBox>();
+  box->width = 100;
+  box->height = 60;
+  box->padding.top = 10;
+  box->padding.right = 10;
+  box->padding.bottom = 10;
+  box->padding.left = 10;
+  box->elements.push_back(doc->makeNode<pagx::Rectangle>());
+  layer->contents.push_back(box);
+  doc->layers.push_back(layer);
+
+  doc->applyLayout();
+
+  EXPECT_FLOAT_EQ(box->resolvedLayoutSize().width, 100.0f);
+  EXPECT_FLOAT_EQ(box->resolvedLayoutSize().height, 60.0f);
+  auto params = pagx::MakeTextBoxParams(box);
+  EXPECT_FLOAT_EQ(params.boxWidth, 80.0f);
+  EXPECT_FLOAT_EQ(params.boxHeight, 40.0f);
+}
+
+PAGX_TEST(PAGXUtilsTest, EffectiveTextBoxSize_KeepsZeroAllocation) {
+  auto doc = pagx::PAGXDocument::Make(300, 200);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  layer->width = 300;
+  layer->height = 200;
+  auto* box = doc->makeNode<pagx::TextBox>();
+  box->left = 170;
+  box->right = 130;
+  layer->contents.push_back(box);
+  doc->layers.push_back(layer);
+
+  doc->applyLayout();
+
+  EXPECT_FLOAT_EQ(box->resolvedLayoutSize().width, 0.0f);
+  EXPECT_FLOAT_EQ(pagx::EffectiveTextBoxWidth(box), 0.0f);
+  EXPECT_FLOAT_EQ(pagx::MakeTextBoxParams(box).boxWidth, 0.0f);
+  EXPECT_TRUE(std::isnan(pagx::EffectiveTextBoxHeight(box)));
+}
+
+PAGX_TEST(PAGXUtilsTest, EffectiveTextBoxSize_ModifierOnlyPercentWinsOverAuthor) {
+  auto doc = pagx::PAGXDocument::Make(300, 200);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  layer->width = 300;
+  layer->height = 200;
+  auto* box = doc->makeNode<pagx::TextBox>();
+  box->width = 100;
+  box->height = 60;
+  box->percentWidth = 80;
+  box->percentHeight = 50;
+  layer->contents.push_back(box);
+  doc->layers.push_back(layer);
+
+  doc->applyLayout();
+
+  EXPECT_FLOAT_EQ(box->resolvedLayoutSize().width, 240.0f);
+  EXPECT_FLOAT_EQ(box->resolvedLayoutSize().height, 100.0f);
+  EXPECT_FLOAT_EQ(pagx::EffectiveTextBoxWidth(box), 240.0f);
+  EXPECT_FLOAT_EQ(pagx::EffectiveTextBoxHeight(box), 100.0f);
+}
+
+PAGX_TEST(PAGXUtilsTest, EffectiveTextBoxSize_ModifierOnlyWithoutSourceStaysNaN) {
+  auto doc = pagx::PAGXDocument::Make(300, 200);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  layer->width = 300;
+  layer->height = 200;
+  auto* box = doc->makeNode<pagx::TextBox>();
+  layer->contents.push_back(box);
+  doc->layers.push_back(layer);
+
+  doc->applyLayout();
+
+  EXPECT_TRUE(std::isnan(pagx::EffectiveTextBoxWidth(box)));
+  EXPECT_TRUE(std::isnan(pagx::EffectiveTextBoxHeight(box)));
+}
+
+PAGX_TEST(PAGXUtilsTest, EffectiveTextBoxSize_AssignsNestedModifierOnlyBox) {
+  auto doc = pagx::PAGXDocument::Make(300, 200);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  layer->width = 300;
+  layer->height = 200;
+  auto* outer = doc->makeNode<pagx::TextBox>();
+  outer->width = 300;
+  outer->height = 200;
+  auto* inner = doc->makeNode<pagx::TextBox>();
+  inner->percentWidth = 80;
+  inner->percentHeight = 50;
+  outer->elements.push_back(inner);
+  layer->contents.push_back(outer);
+  doc->layers.push_back(layer);
+
+  doc->applyLayout();
+
+  EXPECT_FLOAT_EQ(inner->resolvedLayoutSize().width, 240.0f);
+  EXPECT_FLOAT_EQ(inner->resolvedLayoutSize().height, 100.0f);
+  EXPECT_FLOAT_EQ(pagx::EffectiveTextBoxWidth(inner), 240.0f);
+  EXPECT_FLOAT_EQ(pagx::EffectiveTextBoxHeight(inner), 100.0f);
+}
+
 // ---------------------------------------------------------------------------
 // MakeTextBoxParams / MakeStandaloneParams
 // ---------------------------------------------------------------------------

@@ -912,9 +912,9 @@ void PPTWriter::emitTextBoxShapeFrame(XMLBuilder& out, const TextBox* box, const
   // to the actual text bounds (estWidth/estHeight), so to honour the anchor
   // we shift the shape's local origin instead of relying on PPT's in-shape
   // alignment (which would be a no-op when the shape is exactly text-sized).
-  // EffectiveTextBoxWidth returns 0 only for the explicit "0" case (NaN means
-  // "auto-resolve from layout bounds"), so testing the raw box->width keeps
-  // the auto-measured-one-axis path (Box Q / Box R) on the default branch.
+  // A zero-extent authored box uses its position as an anchor and sizes the frame from the text.
+  // Testing the raw box->width keeps that branch separate from a layout-resolved 0 (for example a
+  // dual-edge allocation), which must still emit a real frame.
   bool widthAnchor = !std::isnan(box->width) && box->width == 0.0f;
   bool heightAnchor = !std::isnan(box->height) && box->height == 0.0f;
   bool isVertical = box->writingMode == WritingMode::Vertical;

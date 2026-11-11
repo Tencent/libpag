@@ -231,10 +231,13 @@ bool HasRTLParagraphBase(const std::string& utf8);
 std::string UTF8ToUTF16BEHex(const std::string& utf8);
 
 /**
- * Returns the effective width/height of a TextBox for typesetting and shape sizing.
- * Falls back to the layout-resolved dimensions when no explicit width/height was supplied
- * (e.g. when the TextBox is positioned via left/right/top/bottom constraints), and returns
- * NaN when neither an explicit nor a resolved value is available (auto-sized in that axis).
+ * Returns the effective width/height of a TextBox for typesetting and shape sizing, or NaN when
+ * the axis has no valid size. A laid-out container TextBox returns the resolved frame size from
+ * the layout pass (a legitimate 0 included), so dual-edge and percentage allocations are not
+ * overridden by a lower priority authored width/height. A modifier-only TextBox keeps its authored
+ * size as a measurement input, but an authored percentage or dual-edge constraint must have been
+ * resolved by layout; otherwise that axis remains NaN. Callers must finish layout before using
+ * the result for final output.
  */
 float EffectiveTextBoxWidth(const TextBox* box);
 float EffectiveTextBoxHeight(const TextBox* box);

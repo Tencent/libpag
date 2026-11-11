@@ -512,22 +512,39 @@ std::string UTF8ToUTF16BEHex(const std::string& utf8) {
   return hex;
 }
 
+// The layout pass already resolved the authored priority order, so final output must read that
+// result instead of re-deriving it. A modifier-only TextBox keeps its authored size as a
+// measurement input, but its percentage or dual-edge axis only counts once layout assigned it.
 float EffectiveTextBoxWidth(const TextBox* box) {
-  if (!std::isnan(box->width)) {
-    return box->width;
+  float resolved = box->resolvedLayoutSize().width;
+  if (!box->elements.empty()) {
+    return resolved;
   }
-  // Use the layout-resolved width (set by the constraint layout pass) so TextBoxes
-  // sized via left/right/centerX still wrap and lay out as the author intended.
-  float resolved = box->layoutBounds().width;
-  return resolved > 0 ? resolved : NAN;
+  bool constrained =
+      !std::isnan(box->percentWidth) || (!std::isnan(box->left) && !std::isnan(box->right));
+  if (constrained) {
+    return resolved;
+  }
+  if (std::isnan(box->width)) {
+    return NAN;
+  }
+  return std::isnan(resolved) ? box->width : resolved;
 }
 
 float EffectiveTextBoxHeight(const TextBox* box) {
-  if (!std::isnan(box->height)) {
-    return box->height;
+  float resolved = box->resolvedLayoutSize().height;
+  if (!box->elements.empty()) {
+    return resolved;
   }
-  float resolved = box->layoutBounds().height;
-  return resolved > 0 ? resolved : NAN;
+  bool constrained =
+      !std::isnan(box->percentHeight) || (!std::isnan(box->top) && !std::isnan(box->bottom));
+  if (constrained) {
+    return resolved;
+  }
+  if (std::isnan(box->height)) {
+    return NAN;
+  }
+  return std::isnan(resolved) ? box->height : resolved;
 }
 
 TextLayoutParams MakeTextBoxParams(const TextBox* box) {

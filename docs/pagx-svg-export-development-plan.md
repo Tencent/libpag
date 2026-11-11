@@ -671,6 +671,7 @@ ToSVG严格失败返回空结果、ToFile返回false、CLI非零；warnings=null
 | 本轮 ST17（2026-11-10） | `antiAlias=false` 的层输出 `shape-rendering="crispEdges"` 并强制成组，默认值不改变输出；`PAGXSVGTest` 185 / 185 | 斜边 / 旋转 / clip 下的 AA 仍无像素级验证 |
 | 本轮 ST43（2026-11-10） | `resolveModifiers` 不再作为「关闭就丢效果」的开关，修饰器一律解析，false 只产生告警；`PAGXSVGTest` 186 / 186 | — |
 | 本轮 ST6 链 + ST7 backdrop（2026-11-10） | 阴影滤镜内联 `feMerge` 并推进 `currentSource`，后续滤镜读到阴影输出；`BackgroundBlurStyle` / `GlassStyle` 在预扫描阶段显式告警；顺带修好嵌套 mask writer 丢失 warnings 的问题；`PAGXSVGTest` 189 / 189 | S3 文字、S4 几何、S5 资源、S6 API 未开始 |
+| 本轮 ST28（2026-11-11） | `LayoutNode::resolvedLayoutSize()` 逐轴读取布局产物；`EffectiveTextBoxWidth/Height` 对容器盒优先 resolved（含合法 0），对 modifier-only 盒保留 author 测量输入但百分比/双边必须先分配；`TextBox::updateLayout` 让空 modifier-only 子盒参与约束分配。新增 8 个单测与 2 个 SVG 回归；`PAGXUtilsTest` 233 / 233、`PAGXSVGTest` 202 / 203、全量 2866 / 2868 | 唯一 SVG 失败是既有 `SVGExport_GroupAlphaRoundTripPixels` 尚未接受截图基线（本分支新增用例，非 ST28 改动）；另一失败为既有 `PAGXTest.SVGToPAGXAll` 基线差异；未做像素门禁，RTL / 竖排 / rich text 排版未覆盖 |
 
 ### 4.8 S3 文字待办清单（下一批入口）
 
@@ -700,6 +701,8 @@ ST20 已收口：新增 `TextSelectorEvaluator`（`src/pagx/utils/TextSelectorUt
 ST21/ST22当前仍有输出缺口，但不再把“GlyphRun没有paint通道”当作无实现路线：按第2.8.1节在导出局部GlyphStyle/DrawRecord中承载权重与排他base/overlay；按第2.8.2节复用tgfx沿线求值并以TP01—TP16的数字标准验收。现有PNG回退只记为当前表示，不能证明上述矢量语义已实现。
 
 ST28必须保留：TextBox确实继承Group→LayoutNode的width/height，Native是Exporter分支不是节点字段。入口和双边/百分比/author/内容测量的优先级已在第2.8.3节写定，包含容器有效0与modifier-only unbounded的区别；不删除此条、不新增width/Native字段。
+
+ST28 已收口（2026-11-11）：`LayoutNode` 新增只读 `resolvedLayoutSize()`，保留未分配轴的 NaN；`EffectiveTextBoxWidth/Height` 对容器盒只读该次布局的外框（合法 0 保留），对 modifier-only 盒保留 author 作为测量输入、但百分比/双边必须先真正分配；`MakeTextBoxParams` 仍只扣一次 padding。`CollectLayoutNodes(skipTextLayout=true)` 放行空 TextBox 并排除容器 TextBox，`TextBox::updateLayout` 在约束分配前先 `updateSize`。整数验收覆盖 250×170→230×150、240×100→220×80、100×60→80×40、left=170/right=130 的合法 0、无来源 NaN、嵌套 modifier-only 与布局重跑；SVG 侧另测锚点取 250 而非 author 100，以及高度分配为 0 时 overflow="hidden" 仍丢弃全部行。像素门禁、RTL / 竖排 / rich text 仍不在本条覆盖内。
 
 现有盲区保留依据：cross-parent Mask 只查 warning / defs 且父恒等（`test/src/PAGXSVGTest.cpp:4433`）；伪 JPEG / WebP 头仅 MIME（`test/src/PAGXSVGTest.cpp:3183`、`test/src/PAGXSVGTest.cpp:3211`）；bitmap fallback 无真实数据（`test/src/PAGXSVGTest.cpp:3506`）；动画字符串测试从 `test/src/PAGXSVGTest.cpp:4556` 起。开关用例未做字节相等、普通Layer timeline不证Composition scope、PingPong未全属性、paused/offset仅begin均需直接复现；render CLI当前已有nested驱动，不沿用此前“仅顶层”的旧描述。
 
