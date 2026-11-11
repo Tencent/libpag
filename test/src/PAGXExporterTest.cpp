@@ -38,6 +38,7 @@
 #include "pagx/nodes/Layer.h"
 #include "pagx/nodes/Rectangle.h"
 #include "pagx/types/Data.h"
+#include "pagx/utils/ImageMime.h"
 #include "tgfx/core/Bitmap.h"
 #include "tgfx/core/ImageCodec.h"
 #include "tgfx/core/Pixmap.h"
@@ -56,6 +57,10 @@ const uint8_t kRedPng[] = {
     0x03, 0x32, 0xFD, 0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4E, 0x44, 0xAE, 0x42, 0x60, 0x82};
 
 const uint8_t kJpegBytes[] = {0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46, 0x49, 0x46};
+// Smallest ISO-BMFF header that names the `avif` brand, which is what DetectImageMime reads.
+const uint8_t kAvifBytes[] = {0x00, 0x00, 0x00, 0x14, 'f',  't',  'y',  'p',
+                              'a',  'v',  'i',  'f',  0x00, 0x00, 0x00, 0x00};
+const uint8_t kSvgBytes[] = {'<', 's', 'v', 'g', ' ', 'x', 'm', 'l', 'n', 's', '=', '"', '"', '>'};
 const uint8_t kWebpBytes[] = {'R', 'I', 'F', 'F', 0x00, 0x00, 0x00, 0x00,
                               'W', 'E', 'B', 'P', 'V',  'P',  '8',  ' '};
 const uint8_t kGifBytes[] = {'G', 'I', 'F', '8', '9', 'a', 0x01, 0x00, 0x01, 0x00};
@@ -404,12 +409,14 @@ PAGX_TEST(PAGXExporterTest, ToDataLimitsEntryNameLength) {
   }
 }
 
-PAGX_TEST(PAGXExporterTest, ToDataLeavesImagesWithoutDataAsExternalReferences) {
+PAGX_TEST(PAGXExporterTest, ToDataReportsExternalReferences) {
   auto doc = pagx::PAGXDocument::Make(100, 100);
   AddImage(doc.get(), "img_hash", "hash:0123456789abcdef");
   AddImage(doc.get(), "img_url", "https://example.com/photo.png");
+  AddImage(doc.get(), "img_local", "/Users/test/images/photo.png");
 
-  auto zip = pagx::PAGXExporter::ToData(*doc);
+  std::string error;
+  auto zip = pagx::PAGXExporter::ToData(*doc, {}, &error);
   ASSERT_NE(zip, nullptr);
   std::unordered_map<std::string, std::string> entries;
   ASSERT_TRUE(ReadZip(zip, &entries));
@@ -418,6 +425,49 @@ PAGX_TEST(PAGXExporterTest, ToDataLeavesImagesWithoutDataAsExternalReferences) {
   const auto& xml = entries["document.pagx"];
   EXPECT_NE(xml.find("source=\"hash:0123456789abcdef\""), std::string::npos);
   EXPECT_NE(xml.find("source=\"https://example.com/photo.png\""), std::string::npos);
+  EXPECT_NE(xml.find("source=\"/Users/test/images/photo.png\""), std::string::npos);
+  EXPECT_NE(error.find("not self-contained"), std::string::npos);
+  EXPECT_NE(error.find("3 image reference(s)"), std::string::npos);
+  EXPECT_NE(error.find("host-supplied hash reference"), std::string::npos);
+  EXPECT_NE(error.find("remote URL"), std::string::npos);
+  EXPECT_NE(error.find("local file path"), std::string::npos);
+}
+
+PAGX_TEST(PAGXExporterTest, ToDataPacksBase64DataUriFilePath) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto* image = AddImage(doc.get(), "img_uri", pagx::ImageDataUri(kRedPng, sizeof(kRedPng)));
+  AddPatternLayer(doc.get(), image);
+
+  std::string error;
+  auto zip = pagx::PAGXExporter::ToData(*doc, {}, &error);
+  ASSERT_NE(zip, nullptr);
+  EXPECT_TRUE(error.empty());
+  std::unordered_map<std::string, std::string> entries;
+  ASSERT_TRUE(ReadZip(zip, &entries));
+  ASSERT_NE(entries.find("images/img_uri.png"), entries.end());
+  const auto& xml = entries["document.pagx"];
+  EXPECT_NE(xml.find("source=\"images/img_uri.png\""), std::string::npos);
+  EXPECT_EQ(xml.find("base64"), std::string::npos);
+  EXPECT_EQ(entries["images/img_uri.png"],
+            std::string(reinterpret_cast<const char*>(kRedPng), sizeof(kRedPng)));
+}
+
+PAGX_TEST(PAGXExporterTest, ToDataKeepsAbsoluteReferenceSuffixReserved) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  AddImage(doc.get(), "img_local", "/Users/test/images/photo.png");
+  AddImage(doc.get(), "photo", "", MakeImageData());
+  AddImage(doc.get(), "img_windows", "C:\\Users\\test\\images\\win_photo.png");
+  AddImage(doc.get(), "win_photo", "", MakeImageData());
+
+  std::string error;
+  auto zip = pagx::PAGXExporter::ToData(*doc, {}, &error);
+  ASSERT_NE(zip, nullptr);
+  std::unordered_map<std::string, std::string> entries;
+  ASSERT_TRUE(ReadZip(zip, &entries));
+  EXPECT_EQ(entries.find("images/photo.png"), entries.end());
+  EXPECT_NE(entries.find("images/photo_2.png"), entries.end());
+  EXPECT_EQ(entries.find("images/win_photo.png"), entries.end());
+  EXPECT_NE(entries.find("images/win_photo_2.png"), entries.end());
 }
 
 PAGX_TEST(PAGXExporterTest, ToDataUsesSniffedFormatExtensions) {
@@ -426,6 +476,8 @@ PAGX_TEST(PAGXExporterTest, ToDataUsesSniffedFormatExtensions) {
   AddImage(doc.get(), "img_jpeg", "", MakeBytesData(kJpegBytes, sizeof(kJpegBytes)));
   AddImage(doc.get(), "img_webp", "", MakeBytesData(kWebpBytes, sizeof(kWebpBytes)));
   AddImage(doc.get(), "img_gif", "", MakeBytesData(kGifBytes, sizeof(kGifBytes)));
+  AddImage(doc.get(), "img_avif", "", MakeBytesData(kAvifBytes, sizeof(kAvifBytes)));
+  AddImage(doc.get(), "img_svg", "", MakeBytesData(kSvgBytes, sizeof(kSvgBytes)));
   AddImage(doc.get(), "img_unknown", "", MakeBytesData(kGifBytes, 3));
 
   auto xml = pagx::PAGXExporter::ToXML(*doc);
@@ -433,19 +485,28 @@ PAGX_TEST(PAGXExporterTest, ToDataUsesSniffedFormatExtensions) {
   EXPECT_NE(xml.find("source=\"data:image/jpeg;base64,"), std::string::npos);
   EXPECT_NE(xml.find("source=\"data:image/webp;base64,"), std::string::npos);
   EXPECT_NE(xml.find("source=\"data:image/gif;base64,"), std::string::npos);
+  EXPECT_NE(xml.find("source=\"data:image/avif;base64,"), std::string::npos);
+  EXPECT_NE(xml.find("source=\"data:image/svg+xml;base64,"), std::string::npos);
   EXPECT_NE(xml.find("source=\"data:application/octet-stream;base64,"), std::string::npos);
 
-  auto zip = pagx::PAGXExporter::ToData(*doc);
+  std::string error;
+  auto zip = pagx::PAGXExporter::ToData(*doc, {}, &error);
   ASSERT_NE(zip, nullptr);
   std::unordered_map<std::string, std::string> entries;
   ASSERT_TRUE(ReadZip(zip, &entries));
   ASSERT_NE(entries.find("images/img_png.png"), entries.end());
-  ASSERT_NE(entries.find("images/img_jpeg.jpg"), entries.end());
+  ASSERT_NE(entries.find("images/img_jpeg.jpeg"), entries.end());
   ASSERT_NE(entries.find("images/img_webp.webp"), entries.end());
   ASSERT_NE(entries.find("images/img_gif.gif"), entries.end());
-  ASSERT_NE(entries.find("images/img_unknown.png"), entries.end());
-  EXPECT_EQ(entries["images/img_jpeg.jpg"], BytesOf(MakeBytesData(kJpegBytes, sizeof(kJpegBytes))));
+  ASSERT_NE(entries.find("images/img_avif.avif"), entries.end());
+  ASSERT_NE(entries.find("images/img_svg.svg"), entries.end());
+  ASSERT_NE(entries.find("images/img_unknown.bin"), entries.end());
+  EXPECT_EQ(entries["images/img_jpeg.jpeg"],
+            BytesOf(MakeBytesData(kJpegBytes, sizeof(kJpegBytes))));
   EXPECT_EQ(entries["images/img_gif.gif"], BytesOf(MakeBytesData(kGifBytes, sizeof(kGifBytes))));
+  EXPECT_NE(error.find("image/avif"), std::string::npos);
+  EXPECT_NE(error.find("image/svg+xml"), std::string::npos);
+  EXPECT_NE(error.find("unrecognized format"), std::string::npos);
 }
 
 PAGX_TEST(PAGXExporterTest, ToDataSkipsEmojiUsedOnlyBySkippedGlyphs) {

@@ -21,6 +21,7 @@
 #include "pagx/PAGXDocument.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/Node.h"
+#include "pagx/utils/Base64.h"
 #include "pagx/utils/ImageMime.h"
 #include "pagx/utils/MemZipWriter.h"
 
@@ -30,6 +31,7 @@ namespace {
 
 constexpr const char* DOCUMENT_ENTRY_PATH = "document.pagx";
 constexpr size_t IMAGES_PREFIX_LENGTH = 7;  // strlen("images/")
+constexpr size_t MAX_REPORTED_REFERENCES = 16;
 
 // Most filesystems cap a single file name at 255 bytes. Truncating the stem keeps room for the
 // extension and for the "_<n>" suffix that resolves name collisions.
@@ -69,35 +71,28 @@ std::string SanitizeEntryName(const std::string& name) {
   return sanitized;
 }
 
-// Entry extensions follow the sniffed format; payloads outside the formats an <Image> may carry
-// keep the same PNG fallback that the data URI mime label uses for unrecognized bytes.
-std::string ImageEntryExtension(const uint8_t* bytes, size_t size) {
-  const char* mime = DetectImageMime(bytes, size);
-  if (mime == nullptr) {
-    return "png";
+const char* ExternalReferenceReason(const std::string& filePath) {
+  if (filePath.rfind("hash:", 0) == 0) {
+    return "host-supplied hash reference";
   }
-  std::string label(mime);
-  if (label == "image/jpeg") {
-    return "jpg";
+  if (filePath.find("://") != std::string::npos) {
+    return "remote URL";
   }
-  if (label == "image/webp") {
-    return "webp";
-  }
-  if (label == "image/gif") {
-    return "gif";
-  }
-  return "png";
+  return "local file path";
 }
 
-// Folds a relative resource path into the form a loader would resolve inside the document
-// directory: backslashes become separators, "." segments and repeated separators disappear, and
-// ".." segments cancel the segment before them when possible. Paths that cannot name a file in the
-// archive (absolute paths, URLs, scheme-qualified ids) yield a form that never starts with
-// "images/", so the caller's prefix test drops them.
-std::string NormalizeRelativePath(const std::string& path) {
-  if (path.empty() || path[0] == '/' || path[0] == '\\') {
-    return {};
+bool IsAbsolutePath(const std::string& path) {
+  if (path.empty()) {
+    return false;
   }
+  if (path[0] == '/' || path[0] == '\\') {
+    return true;
+  }
+  return path.size() >= 2 && path[1] == ':' &&
+         ((path[0] >= 'A' && path[0] <= 'Z') || (path[0] >= 'a' && path[0] <= 'z'));
+}
+
+std::string JoinPathSegments(const std::string& path) {
   std::vector<std::string> segments;
   std::string segment;
   for (size_t i = 0; i <= path.size(); i++) {
@@ -125,6 +120,66 @@ std::string NormalizeRelativePath(const std::string& path) {
   return normalized;
 }
 
+// Folds a resource path into the form a loader would resolve inside the document directory:
+// backslashes become separators, "." segments and repeated separators disappear, and ".."
+// segments cancel the segment before them when possible. An absolute path keeps only the suffix
+// that starts at its last "images/" segment: the archive can only write below images/, so that
+// suffix is the part an extracted entry could collide with, while the rest of the host path means
+// nothing here. Anything that yields no images/ path is dropped by the caller's prefix test.
+size_t FindImagesSegment(const std::string& lowerPath) {
+  size_t searchEnd = std::string::npos;
+  while (true) {
+    auto slashIndex = lowerPath.rfind("images/", searchEnd);
+    auto backslashIndex = lowerPath.rfind("images\\", searchEnd);
+    size_t index = std::string::npos;
+    if (slashIndex != std::string::npos) {
+      index = slashIndex;
+    }
+    if (backslashIndex != std::string::npos &&
+        (index == std::string::npos || backslashIndex > index)) {
+      index = backslashIndex;
+    }
+    if (index == std::string::npos) {
+      return std::string::npos;
+    }
+    // The segment must start a path component: "myimages/x.png" is not below images/.
+    if (index == 0 || lowerPath[index - 1] == '/' || lowerPath[index - 1] == '\\') {
+      return index;
+    }
+    searchEnd = index - 1;
+  }
+}
+
+std::string NormalizeRelativePath(const std::string& path) {
+  if (path.empty()) {
+    return {};
+  }
+  if (!IsAbsolutePath(path)) {
+    return JoinPathSegments(path);
+  }
+  auto index = FindImagesSegment(ToLowerAscii(path));
+  if (index == std::string::npos) {
+    return {};
+  }
+  return JoinPathSegments(path.substr(index));
+}
+
+std::string JoinDetails(const std::vector<std::string>& details) {
+  size_t count =
+      details.size() < MAX_REPORTED_REFERENCES ? details.size() : MAX_REPORTED_REFERENCES;
+  std::string joined;
+  for (size_t i = 0; i < count; i++) {
+    if (!joined.empty()) {
+      joined += ", ";
+    }
+    joined += details[i];
+  }
+  if (details.size() > count) {
+    joined += ", and " + std::to_string(details.size() - count) + " more";
+  }
+  return joined;
+}
+
 }  // namespace
 
 PAGXArchiveWriter::PAGXArchiveWriter(const PAGXDocument& document) {
@@ -147,9 +202,25 @@ PAGXArchiveWriter::PAGXArchiveWriter(const PAGXDocument& document) {
 }
 
 std::string PAGXArchiveWriter::AddImage(const Image* image) {
-  if (image->data == nullptr) {
+  if (image->data != nullptr) {
+    return addEntry(image, image->data);
+  }
+  if (image->filePath.empty()) {
+    return {};
+  }
+  if (image->filePath.rfind("data:", 0) == 0) {
+    auto decoded = DecodeBase64DataURI(image->filePath);
+    if (decoded != nullptr && decoded->size() > 0) {
+      return addEntry(image, decoded);
+    }
+    recordExternalReference(image->filePath, "undecodable data URI");
     return image->filePath;
   }
+  recordExternalReference(image->filePath, ExternalReferenceReason(image->filePath));
+  return image->filePath;
+}
+
+std::string PAGXArchiveWriter::addEntry(const Image* image, const std::shared_ptr<Data>& data) {
   auto cached = _entryPaths.find(image);
   if (cached != _entryPaths.end()) {
     return cached->second;
@@ -160,11 +231,47 @@ std::string PAGXArchiveWriter::AddImage(const Image* image) {
   } else if (image->filePath.rfind("emoji:", 0) == 0) {
     baseName = "emoji_" + SanitizeEntryName(image->filePath.substr(6));
   }
-  auto path =
-      allocatePath(baseName, ImageEntryExtension(image->data->bytes(), image->data->size()));
+  const char* mime = DetectImageMime(data->bytes(), data->size());
+  auto path = allocatePath(baseName, ImageMimeToExtension(mime));
+  if (!IsSupportedImageMime(mime)) {
+    recordUnsupportedFormat(path, mime);
+  }
   _entryPaths[image] = path;
-  _entries.emplace_back(path, image->data);
+  _entries.emplace_back(path, data);
   return path;
+}
+
+std::string PAGXArchiveWriter::DescribeUnresolvedReferences() const {
+  std::string description;
+  if (!_unresolvedDetails.empty()) {
+    description = "archive is not self-contained; " + std::to_string(_unresolvedDetails.size()) +
+                  " image reference(s) kept external: " + JoinDetails(_unresolvedDetails);
+  }
+  if (!_unsupportedFormats.empty()) {
+    if (!description.empty()) {
+      description += "; ";
+    }
+    description +=
+        std::to_string(_unsupportedFormats.size()) +
+        " packed image(s) use a format <Image> cannot render: " + JoinDetails(_unsupportedFormats);
+  }
+  return description;
+}
+
+void PAGXArchiveWriter::recordExternalReference(const std::string& reference, const char* reason) {
+  if (reference.empty() || !_reportedReferences.insert("external:" + reference).second) {
+    return;
+  }
+  _unresolvedDetails.push_back(reference + " (" + reason + ")");
+}
+
+void PAGXArchiveWriter::recordUnsupportedFormat(const std::string& entryPath, const char* mime) {
+  auto detail = entryPath + " (" +
+                (mime != nullptr ? std::string(mime) : std::string("unrecognized format")) + ")";
+  if (!_reportedReferences.insert("format:" + detail).second) {
+    return;
+  }
+  _unsupportedFormats.push_back(detail);
 }
 
 std::shared_ptr<Data> PAGXArchiveWriter::Finish(std::string_view documentXML,

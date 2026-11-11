@@ -52,16 +52,25 @@ class PAGXExporter {
 
   /**
    * Exports a PAGXDocument to an in-memory ZIP archive. The archive always contains
-   * `document.pagx`, and every serialized Image that carries inline data is also written as
-   * `images/<name>.<ext>` with the XML referring to that entry instead of a data URI.
+   * `document.pagx`, and every image whose payload is available is written as
+   * `images/<name>.<ext>` with the XML referring to that entry instead of a data URI. A payload
+   * is available when Image::data is set, or when Image::filePath holds a base64 `data:` URI,
+   * which is decoded before packing.
    *
-   * Images are packed only when Image::data is set: nothing is read from disk or downloaded, so
-   * an Image without data keeps its original `filePath` and the archive is self-contained only
-   * when the caller has supplied every referenced image. The document itself is not modified.
+   * Nothing is read from disk or downloaded, so a local file path, a `hash:` reference or a
+   * remote URL keeps its original form and the archive is self-contained only when the caller has
+   * supplied every referenced image. Pass external images through
+   * PAGXDocument::loadFileData() or PAGXDocument::loadFileDataMap() first. The document itself
+   * is not modified.
+   *
+   * When an archive is produced but is not self-contained, *errorMsg describes which references
+   * were left external, along with any packed format `<Image>` cannot render; the ZIP is still
+   * returned.
    *
    * @param document the document to export
    * @param options export options
-   * @param errorMsg optional output for the failure reason when nullptr is returned
+   * @param errorMsg optional output for the failure reason when nullptr is returned, or for the
+   *                 self-containment warning when a non-null archive is returned
    * @return the ZIP bytes, or nullptr on failure
    */
   static std::shared_ptr<Data> ToData(const PAGXDocument& document, const Options& options = {},

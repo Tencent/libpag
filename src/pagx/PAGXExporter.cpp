@@ -78,7 +78,6 @@
 #include "pagx/nodes/ViewModelProperty.h"
 #include "pagx/svg/SVGPathParser.h"
 #include "pagx/types/Data.h"
-#include "pagx/utils/Base64.h"
 #include "pagx/utils/ImageMime.h"
 #include "pagx/utils/PAGXArchiveWriter.h"
 #include "pagx/utils/StringParser.h"
@@ -90,26 +89,9 @@ namespace pagx {
 // Helper functions for converting types to strings
 //==============================================================================
 
-// MIME label for the payload of a `data:` URI. The format is sniffed from the payload rather than
-// guessed: bytes whose format cannot be identified are labelled `application/octet-stream` instead
-// of being passed off as a PNG, so a serializer never invents a format that consumers would then
-// fail to decode silently. A payload that is identified but sits outside the `<Image>` supported
-// set (AVIF, HEIC, SVG, …) keeps its real label so `pagx verify` can report it by name.
-static std::string ImageDataMimeLabel(const uint8_t* bytes, size_t size) {
-  const char* mime = DetectImageMime(bytes, size);
-  return mime != nullptr ? mime : "application/octet-stream";
-}
-
 //==============================================================================
 // Image references
 //==============================================================================
-
-static std::string ImageDataUri(const std::shared_ptr<Data>& data) {
-  const auto* bytes = data->bytes();
-  auto size = data->size();
-  return std::string("data:") + ImageDataMimeLabel(bytes, size) + ";base64," +
-         Base64Encode(bytes, size);
-}
 
 // Resolves the `image` attribute value. Without an archive the image keeps its external source;
 // with one the image is replaced by the entry path the archive assigned, so its payload is stored
@@ -122,7 +104,8 @@ static std::string ImageSourceForXML(const Image* image, PAGXArchiveWriter* arch
   if (!image->filePath.empty()) {
     return image->filePath;
   }
-  return image->data != nullptr ? ImageDataUri(image->data) : std::string();
+  return image->data != nullptr ? ImageDataUri(image->data->bytes(), image->data->size())
+                                : std::string();
 }
 
 // Writes an `image` attribute for ImagePattern / Glyph references. A referenced resource keeps its
@@ -1943,7 +1926,12 @@ std::shared_ptr<Data> PAGXExporter::ToData(const PAGXDocument& doc, const Option
     }
     return nullptr;
   }
-  return archive.Finish(xml, errorMsg);
+  auto data = archive.Finish(xml, errorMsg);
+  if (data != nullptr && errorMsg != nullptr) {
+    auto warning = archive.DescribeUnresolvedReferences();
+    *errorMsg = warning.empty() ? std::string() : "PAGXExporter: " + warning;
+  }
+  return data;
 }
 
 static std::string Serialize(const PAGXDocument& doc, const Options& options,

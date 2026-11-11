@@ -303,18 +303,6 @@ std::shared_ptr<tgfx::Data> GetImageBytes(const Image* image) {
   return nullptr;
 }
 
-// File extension for a MIME sniffed from the payload, so the asset written next to the HTML is
-// labelled with its actual bytes (an SVG stored as `.png` never renders in a browser `<img>`).
-const char* MimeToExt(const std::string& mime) {
-  if (mime == "image/jpeg") return "jpeg";
-  if (mime == "image/webp") return "webp";
-  if (mime == "image/gif") return "gif";
-  if (mime == "image/avif") return "avif";
-  if (mime == "image/heic") return "heic";
-  if (mime == "image/svg+xml") return "svg";
-  return "png";  // image/png and any unknown input
-}
-
 }  // namespace
 
 std::string GetImageSrc(const Image* image, HTMLWriterContext* ctx) {
@@ -327,7 +315,7 @@ std::string GetImageSrc(const Image* image, HTMLWriterContext* ctx) {
     if (bytes && bytes->size() > 0) {
       auto mime = DetectImageMime(bytes->bytes(), bytes->size());
       if (mime != nullptr) {
-        std::string filename = ctx->nextId("img") + "." + MimeToExt(mime);
+        std::string filename = ctx->nextId("img") + "." + ImageMimeToExtension(mime);
         std::string error;
         if (ctx->writeResource(filename, bytes->bytes(), bytes->size(), &error)) {
           ctx->externalImageAssets[image] = filename;

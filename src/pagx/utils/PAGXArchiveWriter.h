@@ -47,13 +47,23 @@ class PAGXArchiveWriter {
 
   std::shared_ptr<Data> Finish(std::string_view documentXML, std::string* errorMsg);
 
+  // Describes every image the archive could not absorb, or returns an empty string when the
+  // archive is self-contained. Callers surface it as a warning after Finish() succeeds.
+  std::string DescribeUnresolvedReferences() const;
+
  private:
+  std::string addEntry(const Image* image, const std::shared_ptr<Data>& data);
   std::string allocatePath(const std::string& baseName, const std::string& extension);
   void reserveKeptPath(const std::string& key);
+  void recordExternalReference(const std::string& reference, const char* reason);
+  void recordUnsupportedFormat(const std::string& entryPath, const char* mime);
 
   std::unordered_map<const Image*, std::string> _entryPaths = {};
   std::unordered_set<std::string> _usedPaths = {};
   std::vector<std::pair<std::string, std::shared_ptr<Data>>> _entries = {};
+  std::vector<std::string> _unresolvedDetails = {};
+  std::vector<std::string> _unsupportedFormats = {};
+  std::unordered_set<std::string> _reportedReferences = {};
   size_t _nextImageIndex = 1;
 };
 

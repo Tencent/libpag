@@ -20,6 +20,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <string>
 
 namespace pagx {
 
@@ -45,5 +46,23 @@ const char* DetectImageMime(const uint8_t* bytes, size_t size);
  * this is the single source of truth for that decision.
  */
 bool IsSupportedImageMime(const char* mime);
+
+/**
+ * Returns the file extension, without the leading dot, that an archive or asset directory should
+ * use for image bytes of the given MIME label.
+ *
+ * A payload whose format cannot be identified maps to "bin" rather than to a format it is not, so
+ * nothing downstream is told to decode bytes as PNG that are not PNG. JPEG always spells "jpeg",
+ * matching the other exporters, so one output never contains the same format under two names.
+ */
+const char* ImageMimeToExtension(const char* mime);
+
+/**
+ * Encodes image bytes as a `data:` URI. The MIME is sniffed from the payload rather than guessed:
+ * bytes that match no known signature are labelled `application/octet-stream` instead of being
+ * passed off as a PNG. Identified formats outside the `<Image>` supported set keep their real
+ * label so diagnostics can report them by name.
+ */
+std::string ImageDataUri(const uint8_t* bytes, size_t size);
 
 }  // namespace pagx
