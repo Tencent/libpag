@@ -40,6 +40,7 @@ class PAGViewModel : public ContentViewModel {
   int getWidth() const override;
   int getHeight() const override;
   bool hasAnimation() const override;
+  bool isSeekable() const override;
   bool isPlaying() const override;
   double getProgress() const override;
   QString getTotalFrame() const override;

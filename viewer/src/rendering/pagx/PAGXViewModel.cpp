@@ -161,7 +161,14 @@ int PAGXViewModel::getHeight() const {
 }
 
 bool PAGXViewModel::hasAnimation() const {
-  return totalFrames > 1;
+  if (defaultAnimation != nullptr) {
+    return totalFrames > 1;
+  }
+  return defaultTimeline != nullptr;
+}
+
+bool PAGXViewModel::isSeekable() const {
+  return defaultAnimation != nullptr && defaultAnimation->duration() > 0;
 }
 
 bool PAGXViewModel::isPlaying() const {
@@ -311,6 +318,7 @@ void PAGXViewModel::handlePlaybackFinished(quint64 generation) {
 PAGXViewModel::RenderState PAGXViewModel::getRenderState() {
   std::lock_guard<std::mutex> lock(renderMutex);
   return {scene,
+          defaultTimeline,
           defaultAnimation,
           defaultLoopMode,
           pagxWidth,
@@ -346,6 +354,9 @@ void PAGXViewModel::setIsPlaying(bool isPlaying) {
 }
 
 void PAGXViewModel::setProgress(double newProgress) {
+  if (!isSeekable()) {
+    return;
+  }
   if (std::abs(progress - newProgress) < 1e-9) {
     return;
   }
@@ -481,7 +492,7 @@ bool PAGXViewModel::loadFile(const QString& filePath) {
     currentFilePath = strPath;
     pagxDocument = document;
     scene = newScene;
-    resolveDefaultAnimation(document);
+    resolveDefaultTimeline(document);
     pagxWidth = static_cast<int>(document->width);
     pagxHeight = static_cast<int>(document->height);
     updateAnimationState();
@@ -511,16 +522,25 @@ bool PAGXViewModel::loadFile(const QString& filePath) {
 }
 
 void PAGXViewModel::firstFrame() {
+  if (!isSeekable()) {
+    return;
+  }
   setIsPlaying(false);
   setProgress(0);
 }
 
 void PAGXViewModel::lastFrame() {
+  if (!isSeekable()) {
+    return;
+  }
   setIsPlaying(false);
   setProgress(1.0);
 }
 
 void PAGXViewModel::nextFrame() {
+  if (!isSeekable()) {
+    return;
+  }
   setIsPlaying(false);
   auto newProgress = progress + progressPerFrame;
   if (newProgress > 1.0) {
@@ -530,6 +550,9 @@ void PAGXViewModel::nextFrame() {
 }
 
 void PAGXViewModel::previousFrame() {
+  if (!isSeekable()) {
+    return;
+  }
   setIsPlaying(false);
   auto newProgress = progress - progressPerFrame;
   if (newProgress < 0.0) {
@@ -541,19 +564,28 @@ void PAGXViewModel::previousFrame() {
 void PAGXViewModel::clearContent() {
   pagxDocument = nullptr;
   scene = nullptr;
+  defaultTimeline = nullptr;
   defaultAnimation = nullptr;
   defaultLoopMode = pagx::LoopMode::Once;
 }
 
-void PAGXViewModel::resolveDefaultAnimation(const std::shared_ptr<pagx::PAGXDocument>& document) {
+void PAGXViewModel::resolveDefaultTimeline(const std::shared_ptr<pagx::PAGXDocument>& document) {
+  defaultTimeline = scene == nullptr ? nullptr : scene->getDefaultTimeline();
   defaultAnimation = nullptr;
   defaultLoopMode = pagx::LoopMode::Once;
-  if (!document->animations.empty()) {
-    auto* firstAnim = document->animations[0];
-    if (firstAnim != nullptr && firstAnim->nodeType() == pagx::NodeType::Animation) {
-      auto* anim = static_cast<pagx::Animation*>(firstAnim);
-      defaultAnimation = scene->getAnimation(anim->id);
-      defaultLoopMode = anim->loop;
+  if (defaultTimeline == nullptr || defaultTimeline->type() != pagx::TimelineType::Animation) {
+    return;
+  }
+  defaultAnimation = std::static_pointer_cast<pagx::PAGAnimation>(defaultTimeline);
+  // The loop mode lives on the Animation node, not on the runtime timeline.
+  for (auto* node : document->animations) {
+    if (node == nullptr || node->nodeType() != pagx::NodeType::Animation) {
+      continue;
+    }
+    auto* animation = static_cast<pagx::Animation*>(node);
+    if (animation->id == defaultAnimation->getId()) {
+      defaultLoopMode = animation->loop;
+      break;
     }
   }
 }
@@ -563,6 +595,7 @@ void PAGXViewModel::emitContentStateReset() {
   Q_EMIT isPlayingChanged(hasAnimation());
   Q_EMIT totalFrameChanged();
   Q_EMIT hasAnimationChanged(hasAnimation());
+  Q_EMIT isSeekableChanged();
 }
 
 void PAGXViewModel::updateAnimationState() {
@@ -617,7 +650,7 @@ QString PAGXViewModel::applyXmlChanges(const QString& newXml) {
     pagxWidth = static_cast<int>(document->width);
     pagxHeight = static_cast<int>(document->height);
     scene = newScene;
-    resolveDefaultAnimation(document);
+    resolveDefaultTimeline(document);
     updateAnimationState();
     needsRender = true;
   }

@@ -100,7 +100,7 @@ IContentRenderer::RenderMetrics PAGXRenderer::flush() {
     playbackFinishNotified = false;
   }
 
-  if (state.isPlaying && state.animation != nullptr && state.animation->duration() > 0) {
+  if (state.isPlaying) {
     advancePlayback(state, reseat);
   } else if (state.animation != nullptr && state.animation->duration() > 0) {
     seekPaused(state, reseat);
@@ -137,6 +137,10 @@ IContentRenderer::RenderMetrics PAGXRenderer::flush() {
 }
 
 void PAGXRenderer::advancePlayback(PAGXViewModel::RenderState& state, bool reseat) {
+  if (state.animation == nullptr || state.animation->duration() <= 0) {
+    advanceTimeline(state);
+    return;
+  }
   // On a fresh play request or content reload, re-seat the animation at the requested position.
   // PAGAnimation holds no play/pause state of its own (playback is gated by the owning
   // PAGComposition's pausedTimelineIds), so replaying only requires seeking to the target time and
@@ -186,6 +190,28 @@ void PAGXRenderer::advancePlayback(PAGXViewModel::RenderState& state, bool resea
       state.animation->currentTime() >= state.animation->duration() && !playbackFinishNotified) {
     playbackFinishNotified = true;
     viewModel->notifyPlaybackFinished(state.generation);
+  }
+}
+
+void PAGXRenderer::advanceTimeline(PAGXViewModel::RenderState& state) {
+  // State machines have no seekable time base, so they are driven purely by wall-clock deltas. The
+  // scene is advanced as well because it carries the auto-playing nested compositions that no
+  // top-level timeline drives.
+  auto now = tgfx::Clock::Now();
+  if (lastAdvanceTimeUs < 0) {
+    lastAdvanceTimeUs = now;
+    return;
+  }
+  int64_t deltaUs = now - lastAdvanceTimeUs;
+  lastAdvanceTimeUs = now;
+  if (deltaUs <= 0) {
+    return;
+  }
+  if (state.timeline != nullptr) {
+    state.timeline->advanceAndApply(deltaUs);
+  }
+  if (state.scene != nullptr) {
+    state.scene->advanceAndApply(deltaUs);
   }
 }
 

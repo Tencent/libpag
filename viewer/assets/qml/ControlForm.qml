@@ -7,6 +7,7 @@ Item {
     required property var contentView
     property bool hasPAGFile: (contentView && contentView.viewModel.filePath !== "")
     property bool hasAnimation: (contentView && contentView.viewModel.hasAnimation)
+    property bool isSeekable: (contentView && contentView.viewModel.isSeekable)
 
     property bool updateAvailable: false
 
@@ -50,8 +51,8 @@ Item {
         anchors.leftMargin: 0
         anchors.right: parent.right
         anchors.rightMargin: 0
-        visible: hasAnimation
-        enabled: hasPAGFile && hasAnimation
+        visible: hasAnimation && isSeekable
+        enabled: hasPAGFile && hasAnimation && isSeekable
         background: Rectangle {
             x: progressSlider.leftPadding
             y: progressSlider.topPadding + progressSlider.availableHeight / 2 - height / 2
@@ -117,7 +118,7 @@ Item {
                 id: previousButton
                 width: 24
                 height: 20
-                enabled: hasPAGFile && hasAnimation
+                enabled: hasPAGFile && hasAnimation && isSeekable
                 focusPolicy: Qt.NoFocus
                 display: AbstractButton.IconOnly
                 flat: true
@@ -157,7 +158,7 @@ Item {
                 id: nextButton
                 width: 24
                 height: 20
-                enabled: hasPAGFile && hasAnimation
+                enabled: hasPAGFile && hasAnimation && isSeekable
                 focusPolicy: Qt.NoFocus
                 display: AbstractButton.IconOnly
                 flat: true
@@ -196,6 +197,7 @@ Item {
             Text {
                 id: timeDisplayedText
                 color: "#ffffff"
+                visible: isSeekable
                 text: qsTr("00:00")
                 font.pixelSize: 12
                 anchors.verticalCenterOffset: 1
@@ -203,6 +205,7 @@ Item {
             }
             Row {
                 spacing: 2
+                visible: isSeekable
                 anchors.verticalCenterOffset: 1
                 anchors.verticalCenter: parent.verticalCenter
 
