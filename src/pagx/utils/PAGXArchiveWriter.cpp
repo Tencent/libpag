@@ -19,6 +19,7 @@
 #include "pagx/utils/PAGXArchiveWriter.h"
 #include <string>
 #include "pagx/PAGXDocument.h"
+#include "pagx/PAGXExporter.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/Node.h"
 #include "pagx/utils/Base64.h"
@@ -30,8 +31,7 @@ namespace pagx {
 
 namespace {
 
-constexpr const char* DOCUMENT_ENTRY_PATH = "document.pagx";
-constexpr size_t IMAGES_PREFIX_LENGTH = 7;  // strlen("images/")
+constexpr size_t IMAGES_PREFIX_LENGTH = 7;  // strlen(PAGXExporter::IMAGES_DIRECTORY)
 constexpr size_t MAX_REPORTED_REFERENCES = 16;
 
 // Most filesystems cap a single file name at 255 bytes. Truncating the stem keeps room for the
@@ -269,7 +269,8 @@ void PAGXArchiveWriter::recordUnsupportedFormat(const std::string& entryPath, co
 std::shared_ptr<Data> PAGXArchiveWriter::Finish(std::string_view documentXML,
                                                 std::string* errorMsg) {
   MemZipWriter writer;
-  if (!writer.write(DOCUMENT_ENTRY_PATH, documentXML.data(), documentXML.size(), errorMsg)) {
+  if (!writer.write(PAGXExporter::DOCUMENT_ENTRY_PATH, documentXML.data(), documentXML.size(),
+                    errorMsg)) {
     return nullptr;
   }
   for (const auto& entry : _entries) {
@@ -295,7 +296,7 @@ std::string PAGXArchiveWriter::allocatePath(const std::string& baseName,
   if (stem.size() > MAX_ENTRY_STEM_LENGTH) {
     stem.resize(MAX_ENTRY_STEM_LENGTH);
   }
-  std::string prefix = "images/" + stem;
+  std::string prefix = std::string(PAGXExporter::IMAGES_DIRECTORY) + stem;
   std::string path = prefix + "." + extension;
   for (size_t suffix = 2; _usedPaths.count(ToLowerAscii(path)) > 0; suffix++) {
     path = prefix + "_" + std::to_string(suffix) + "." + extension;

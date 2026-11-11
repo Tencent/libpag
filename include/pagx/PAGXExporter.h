@@ -45,6 +45,18 @@ class PAGXExporter {
   using Options = PAGXExportOptions;
 
   /**
+   * Entry path of the root document inside the archive returned by ToData(). Callers that
+   * inspect or repackage the archive use this name instead of repeating the literal.
+   */
+  static constexpr const char* DOCUMENT_ENTRY_PATH = "document.pagx";
+
+  /**
+   * Directory prefix that every packed image entry lives under. The rest of an entry path is the
+   * value the document uses in its source or image attribute.
+   */
+  static constexpr const char* IMAGES_DIRECTORY = "images/";
+
+  /**
    * Exports a PAGXDocument to XML string.
    * The output faithfully reflects the structure of the input document.
    */

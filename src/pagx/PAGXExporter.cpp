@@ -1920,12 +1920,6 @@ std::shared_ptr<Data> PAGXExporter::ToData(const PAGXDocument& doc, const Option
                                            std::string* errorMsg) {
   PAGXArchiveWriter archive(doc);
   auto xml = Serialize(doc, options, &archive);
-  if (xml.empty()) {
-    if (errorMsg != nullptr) {
-      *errorMsg = "PAGXExporter: serialization failed.";
-    }
-    return nullptr;
-  }
   auto data = archive.Finish(xml, errorMsg);
   if (data != nullptr && errorMsg != nullptr) {
     auto warning = archive.DescribeUnresolvedReferences();
