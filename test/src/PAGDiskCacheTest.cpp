@@ -19,7 +19,11 @@
 #include <algorithm>
 #include <atomic>
 #include <chrono>
+#include <condition_variable>
+#include <cstring>
 #include <filesystem>
+#include <functional>
+#include <mutex>
 #include <thread>
 #include <vector>
 #include "pag/pag.h"
@@ -97,6 +101,49 @@ static void ClearDiskCacheAndWait() {
   PAGDiskCache::RemoveAll();
   worker->waitAll();
 }
+
+/**
+ * Occupies the single DiskIOWorker thread with a blocking task, so that every task submitted
+ * afterwards (e.g. the asynchronous close of a SequenceFile) stays queued until release() is
+ * called. This makes close/reopen orderings reproducible instead of timing dependent.
+ */
+class ScopedDiskIOWorkerBlock {
+ public:
+  ScopedDiskIOWorkerBlock() {
+    DiskIOWorker::GetInstance()->submit(std::bind(&ScopedDiskIOWorkerBlock::run, this));
+    std::unique_lock<std::mutex> lock(locker);
+    condition.wait(lock, [this] { return entered; });
+  }
+
+  ~ScopedDiskIOWorkerBlock() {
+    release();
+  }
+
+  ScopedDiskIOWorkerBlock(const ScopedDiskIOWorkerBlock&) = delete;
+  ScopedDiskIOWorkerBlock& operator=(const ScopedDiskIOWorkerBlock&) = delete;
+
+  void release() {
+    {
+      std::lock_guard<std::mutex> lock(locker);
+      released = true;
+    }
+    condition.notify_all();
+    DiskIOWorker::GetInstance()->waitAll();
+  }
+
+ private:
+  void run() {
+    std::unique_lock<std::mutex> lock(locker);
+    entered = true;
+    condition.notify_all();
+    condition.wait(lock, [this] { return released; });
+  }
+
+  std::mutex locker = {};
+  std::condition_variable condition = {};
+  bool entered = false;
+  bool released = false;
+};
 
 class ScopedDiskCacheCleanup {
  public:
@@ -296,6 +343,24 @@ static void CheckSequenceFileReuseAndRelease(SequenceFileState& state,
   DiskIOWorker::GetInstance()->waitAll();
   EXPECT_FALSE(std::filesystem::exists(cacheDir + "/files/4.bin"));
 }
+
+static void CheckSequenceFilePixels(const std::shared_ptr<SequenceFile>& sequenceFile,
+                                    const tgfx::ImageInfo& info, int frameCount) {
+  ASSERT_EQ(sequenceFile->info(), info);
+  ASSERT_EQ(sequenceFile->numFrames(), static_cast<uint32_t>(frameCount));
+  EXPECT_EQ(sequenceFile->cachedFrames, frameCount);
+  std::vector<uint8_t> decodedPixels(info.byteSize());
+  auto decodedBuffer = BitmapBuffer::Wrap(info, decodedPixels.data());
+  ASSERT_TRUE(decodedBuffer != nullptr);
+  std::vector<uint8_t> expectedPixels(info.byteSize());
+  for (int i = 0; i < frameCount; i++) {
+    SCOPED_TRACE(i);
+    std::fill(expectedPixels.begin(), expectedPixels.end(), i + 1);
+    std::fill(decodedPixels.begin(), decodedPixels.end(), 0);
+    ASSERT_TRUE(sequenceFile->readFrame(i, decodedBuffer));
+    EXPECT_EQ(memcmp(decodedPixels.data(), expectedPixels.data(), expectedPixels.size()), 0);
+  }
+}
 }  // namespace
 
 /**
@@ -312,6 +377,62 @@ PAG_PIXEL_TEST(PAGDiskCacheTest, SequenceFile) {
   ASSERT_NO_FATAL_FAILURE(CheckHalfResolutionSequence(state));
   ASSERT_NO_FATAL_FAILURE(CheckSequenceFileEviction(state, cacheDir));
   ASSERT_NO_FATAL_FAILURE(CheckSequenceFileReuseAndRelease(state, cacheDir));
+}
+
+/**
+ * 用例描述: 同一 key 在上一次的异步关闭任务尚未执行时被重新打开。重开的文件必须能看到已写入
+ * 的全部帧，且旧的关闭任务不能清除新打开文件的打开登记，否则 removeAll() 会误删仍在使用的缓存。
+ */
+PAG_TEST(PAGDiskCacheTest, ReopenWhileCloseTaskPending) {
+  constexpr int Size = 16;
+  constexpr int FrameCount = 8;
+  auto cacheDir = Platform::Current()->getCacheDir();
+  ScopedDiskCacheCleanup cleanup;
+  ASSERT_NO_FATAL_FAILURE(ResetDiskCacheFixture(cacheDir, cleanup.originalMaxDiskSize));
+  auto key = std::string("PAGDiskCacheTest/ReopenWhileCloseTaskPending");
+  auto info = tgfx::ImageInfo::Make(Size, Size, tgfx::ColorType::RGBA_8888);
+  tgfx::Bitmap bitmap = {};
+  ASSERT_TRUE(bitmap.allocPixels(Size, Size, false, false));
+  tgfx::Pixmap pixmap(bitmap);
+  auto buffer = BitmapBuffer::Wrap(pixmap.info(), pixmap.writablePixels());
+
+  auto diskCache = DiskCache::GetInstance();
+  auto sequenceFile = DiskCache::OpenSequence(key, info, FrameCount, 30.0f);
+  ASSERT_TRUE(sequenceFile != nullptr);
+  for (int i = 0; i < FrameCount; i++) {
+    memset(pixmap.writablePixels(), i + 1, pixmap.rowBytes() * Size);
+    ASSERT_TRUE(sequenceFile->writeFrame(i, buffer));
+  }
+  EXPECT_EQ(sequenceFile->cachedFrames, FrameCount);
+  auto fileID = sequenceFile->fileID;
+  auto filePath = cacheDir + "/files/" + std::to_string(fileID) + ".bin";
+
+  ScopedDiskIOWorkerBlock workerBlock;
+  sequenceFile = nullptr;
+  {
+    std::lock_guard<std::mutex> lock(diskCache->locker);
+    EXPECT_EQ(diskCache->openedFiles.count(fileID), 1u);
+  }
+
+  auto reopened = DiskCache::OpenSequence(key, info, FrameCount, 30.0f);
+  ASSERT_TRUE(reopened != nullptr);
+  EXPECT_EQ(reopened->fileID, fileID);
+  ASSERT_NO_FATAL_FAILURE(CheckSequenceFilePixels(reopened, info, FrameCount))
+      << "Immediately after reopening";
+
+  workerBlock.release();
+  {
+    std::lock_guard<std::mutex> lock(diskCache->locker);
+    EXPECT_EQ(diskCache->openedFiles.count(reopened->fileID), 1u);
+  }
+  ASSERT_NO_FATAL_FAILURE(CheckSequenceFilePixels(reopened, info, FrameCount))
+      << "After the pending close task";
+  PAGDiskCache::RemoveAll();
+  DiskIOWorker::GetInstance()->waitAll();
+  EXPECT_TRUE(std::filesystem::exists(filePath));
+  ASSERT_NO_FATAL_FAILURE(CheckSequenceFilePixels(reopened, info, FrameCount))
+      << "After removing the disk cache";
+  reopened = nullptr;
 }
 
 namespace {
