@@ -403,6 +403,13 @@ class HTMLWriterContext {
       // True when the glyph was registered because a TextModifier channel animates rather than a
       // RangeSelector channel: the frame then rebuilds the modifier pose from its own values.
       bool fromModifier = false;
+      // Registered from the HTML span path: the frame emits `color` / `-webkit-text-stroke`
+      // instead of SVG `fill` / `stroke`, and the glyph has no baked-in position of its own.
+      bool htmlSpan = false;
+      // The glyph's own fill colour (the text/layer fill). A modifier colour is blended into it by
+      // the glyph's factor, so the frame has to reproduce that mix, not just paint the modifier.
+      bool hasBaseFillColor = false;
+      Color baseFillColor = {};
       std::string id = {};
     };
     // Text -> the left/top the exported tag was placed at, so an animated `x` / `y` channel can
