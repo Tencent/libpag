@@ -505,6 +505,9 @@ class SVGWriter {
   struct AccumulatedGeometry {
     const Element* element = nullptr;
     Matrix transform = {};
+    // Alpha in effect where the geometry was collected. Painters multiply this in, so a Group's
+    // alpha reaches geometry even when the painter lives outside the Group.
+    float alpha = 1.0f;
     const TextBox* textBox = nullptr;
     std::vector<SVGGroupTransformStep> animatedGroups = {};
   };
@@ -3628,14 +3631,10 @@ void SVGWriter::processVectorScope(SVGBuilder& out, const std::vector<Element*>&
         if (!acceptAnyPlacement && painterPlacement != targetPlacement) {
           break;
         }
-        // The painter's effective alpha is the alpha of THIS scope, not the
-        // alpha that was in effect when each geometry was collected. A Group
-        // that contains geometry but whose Painter lives outside the Group
-        // must NOT multiply its own alpha into the outer painter's output —
-        // Group is an isolation boundary for painters even though geometry
-        // propagates upward.
+        // Every entry carries the alpha of the scope it was collected in, so geometry keeps a
+        // Group's alpha even when the painter that finally draws it sits outside that Group.
         for (size_t i = scopeStart; i < accumulator.size(); ++i) {
-          emitGeometryWithFs(out, accumulator[i], painterFs, alpha);
+          emitGeometryWithFs(out, accumulator[i], painterFs, accumulator[i].alpha);
         }
         break;
       }
@@ -3646,6 +3645,7 @@ void SVGWriter::processVectorScope(SVGBuilder& out, const std::vector<Element*>&
         AccumulatedGeometry entry;
         entry.element = element;
         entry.transform = transform;
+        entry.alpha = alpha;
         entry.textBox = localTextBox;
         entry.animatedGroups = groupPath;
         accumulator.push_back(entry);

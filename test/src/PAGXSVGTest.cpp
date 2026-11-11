@@ -4119,7 +4119,7 @@ PAGX_TEST(PAGXSVGTest, SVGExport_TrimPathOnEllipse) {
  * argument, and applies that. Regression: if entry.alpha sneaks back in, the outer fill would
  * be emitted with `fill-opacity="0.5"` or equivalent.
  */
-PAGX_TEST(PAGXSVGTest, SVGExport_PaintersOutsideGroupIgnoreGroupAlpha) {
+PAGX_TEST(PAGXSVGTest, SVGExport_PaintersOutsideGroupApplyGroupAlpha) {
   auto doc = pagx::PAGXDocument::Make(200, 200);
   auto* layer = doc->makeNode<pagx::Layer>();
   auto* group = doc->makeNode<pagx::Group>();
@@ -4129,19 +4129,12 @@ PAGX_TEST(PAGXSVGTest, SVGExport_PaintersOutsideGroupIgnoreGroupAlpha) {
   rect->size = {80, 80};
   group->elements.push_back(rect);
   layer->contents.push_back(group);
-  // Painter lives in the layer scope, OUTSIDE the group. With the fix, its alpha is the layer's
-  // alpha (1.0). Without the fix, the rect's `entry.alpha = 0.5` (captured inside the group)
-  // gets multiplied in.
+  // Painter lives in the layer scope, OUTSIDE the group; the geometry keeps the group's alpha.
   layer->contents.push_back(MakeSolidFillSVG(doc.get(), 1.0f, 0.0f, 0.0f));
   doc->layers.push_back(layer);
 
   auto svg = pagx::SVGExporter::ToSVG(*doc);
-  // The fill emits `fill="rgb(255,0,0)"`. Any fill-opacity attribute at all would indicate the
-  // painter took on the group's 0.5 alpha. Both writeRectangle's `fill-opacity` and the inline
-  // `;opacity:0.5` style spellings would trigger the regression, so check both shapes.
-  EXPECT_EQ(svg.find("fill-opacity"), std::string::npos);
-  EXPECT_EQ(svg.find("opacity:0.5"), std::string::npos);
-  EXPECT_EQ(svg.find("opacity=\"0.5\""), std::string::npos);
+  EXPECT_NE(svg.find("fill-opacity=\"0.5\""), std::string::npos) << svg;
 }
 
 /**
@@ -5808,6 +5801,24 @@ PAGX_TEST(PAGXSVGTest, SVGExport_TextModifierBakesIntoGlyphRuns) {
   EXPECT_NE(svg.find("<text"), std::string::npos);
   EXPECT_NE(svg.find("y=\"-100 0\""), std::string::npos);
   EXPECT_EQ(svg.find("data:image/png"), std::string::npos);
+}
+
+// A Group's alpha has to survive until the painter that draws its geometry, even when that painter
+// sits outside the Group.
+PAGX_TEST(PAGXSVGTest, SVGExport_GroupAlphaReachesOuterPainter) {
+  auto doc = pagx::PAGXDocument::Make(200, 100);
+  auto* layer = doc->makeNode<pagx::Layer>("layer");
+  auto* group = doc->makeNode<pagx::Group>("group");
+  group->alpha = 0.5f;
+  auto* text = doc->makeNode<pagx::Text>("run");
+  text->text = "Hi";
+  text->fontSize = 20;
+  group->elements = {text};
+  layer->contents = {group, MakeSolidFillSVG(doc.get(), 0, 0, 0)};
+  doc->layers.push_back(layer);
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("fill-opacity=\"0.5\""), std::string::npos) << svg;
 }
 
 }  // namespace pag
