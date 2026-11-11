@@ -1911,6 +1911,18 @@ void EmitTransformCssAtFrame(const DomTargetBundle& bundle, const BundleChannelS
   bool has3DChannel = chSet.layerRotXCh != nullptr || chSet.layerRotYCh != nullptr ||
                       chSet.layerZCh != nullptr || chSet.layerPerspectiveCh != nullptr ||
                       chSet.layerMatrix3DCh != nullptr || chSet.anchorZCh != nullptr;
+  // A layer carrying its own matrix3D is placed by that matrix alone: the runtime applies it as the
+  // full transform, so an animated pose or position channel must not be stacked on top (the case
+  // names it "matrix3dWins" - with the matrix's translation at 0 the layer sits at the origin, not
+  // at its authored x/y).
+  if (hostLayer != nullptr && !hostLayer->matrix3D.isIdentity()) {
+    // The static exporter emits the matrix alone and matches the reference exactly, so no
+    // `perspective()` function goes on top: the matrix already carries the projection it needs.
+    auto anchored = ApplyAnchorToMatrix(hostLayer->matrix3D, hostLayer->anchor, hostLayer->anchorZ);
+    AppendCssDecl(decls, "transform", Matrix3DToCSS(anchored));
+    needsZeroOrigin = true;
+    return;
+  }
   if (has3DChannel && hostLayer != nullptr) {
     // PAGX composes P * T * T(anchor) * L * T(-anchor), with the projection outermost. A CSS
     // function list in the same order reproduces it exactly: `perspective()` is the projection,
@@ -2008,7 +2020,10 @@ void EmitTransformCssAtFrame(const DomTargetBundle& bundle, const BundleChannelS
     // relative to the static left/top first, then the matrix part, which is the animated matrix
     // channel when present and otherwise the layer's static transform as written inline.
     std::string tf = {};
-    if (chSet.xCh != nullptr || chSet.yCh != nullptr) {
+    // A matrix channel is the layer's whole transform, translation included (its keys carry tx/ty and
+    // they follow x/y in the authoring). Adding the x/y delta on top double-counts the move: on
+    // composite/03 the card ended 40px right and 35px down of the reference.
+    if (chSet.matrixCh == nullptr && (chSet.xCh != nullptr || chSet.yCh != nullptr)) {
       Point basePos = hostLayer != nullptr ? hostLayer->renderPosition() : Point{0.0f, 0.0f};
       if (hostLayer != nullptr && chSet.matrixCh == nullptr && hostLayer->matrix.isIdentity() &&
           hostLayer->matrix3D.isIdentity()) {
