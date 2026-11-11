@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Tests: The painter stack moves together: Fill color, Stroke color / alpha / width / dashOffset and TrimPath
+<!-- Tests: The painter stack moves together: Fill color on the star, Stroke color / alpha / width / dashOffset and TrimPath
      start / end / offset on one path, plus RoundCorner.radius on a second shape. Stroke parameters,
      dash phase and the trim window all rewrite the same SVG element per frame.
      Target: Composite  Channel: color,color,alpha,width,dashOffset,miterLimit,start,end,offset,radius  Type: mixed
@@ -11,7 +11,6 @@
   </Layer>
   <Layer left="0" right="0" top="0" bottom="0">
     <Rectangle id="paintRect" position="100,100" size="150,110" roundness="18"/>
-    <Fill color="#DB2777" alpha="1"/>
     <Stroke id="paintStroke" color="#0E7490" alpha="1" width="6" dashOffset="0" miterLimit="4" join="miter"/>
     <TrimPath id="paintTrim" start="0" end="1" offset="0" type="separate"/>
   </Layer>
@@ -22,7 +21,7 @@
   </Layer>
   <Animations>
     <Animation id="composite" duration="60" frameRate="60" loop="once">
-      <Object target="paintRect">
+      <Object target="paintStar">
         <Channel name="color" type="color">
           <Key time="0" value="#DB2777" interpolation="linear"/>
           <Key time="60" value="#F59E0B"/>

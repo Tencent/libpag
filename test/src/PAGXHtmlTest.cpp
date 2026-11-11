@@ -3751,10 +3751,12 @@ CLI_TEST(PAGXHtmlTest, AnimationLayerTranslationWithMatrixChannel) {
   auto html = LoadXMLAndConvert(xml, opts);
   ASSERT_FALSE(html.empty());
 
-  EXPECT_NE(html.find("0% { transform: translate(0px, 0px) matrix(1,0,0,1,0,0); }"),
-            std::string::npos);
-  EXPECT_NE(html.find("100% { transform: translate(40px, 0px) matrix(2,0,0,2,0,0); }"),
-            std::string::npos);
+  // A matrix channel is the layer's whole transform, translation included: measured against the
+  // renderer, the animated x is not added on top of the matrix (t=0.9 sits at the matrix's 83,65,
+  // not at 120+83). So the frame emits the matrix alone.
+  EXPECT_NE(html.find("0% { transform: matrix(1,0,0,1,0,0); }"), std::string::npos) << html;
+  EXPECT_NE(html.find("100% { transform: matrix(2,0,0,2,0,0); }"), std::string::npos) << html;
+  EXPECT_EQ(html.find("translate(40px"), std::string::npos) << html;
   EXPECT_EQ(html.find("matrix(0,1,-1,0,0,0); }"), std::string::npos);
 }
 
