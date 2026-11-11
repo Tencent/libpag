@@ -4,7 +4,6 @@ styles so the switch is visible on each.
      Target: Text  Channel: fontStyle  Type: string
      Three typical texts (Arial 72 / Times New Roman 44 / Courier New 28) drive the same channel,
      so a rule that only holds for one family or one size cannot pass.
-     Known-gap: font-style-step（映射到 font-weight/font-style，0.953）
      Ref: - -->
 <pagx width="320" height="200">
   <Layer left="0" right="0" top="0" bottom="0">

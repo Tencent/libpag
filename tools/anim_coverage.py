@@ -164,11 +164,6 @@ def load_cases():
         channels = []
         for group in re.findall(r"Channel:\s*(\S+)", header):
             channels.extend(part.strip() for part in group.split(",") if part.strip())
-        expect = re.search(r"Expect:\s*(\w+)", header)
-        # `Known-gap` marks a case whose channel is exported but does not match the reference for a
-        # documented reason (e.g. a CSS interpolation difference), so the keyframe presence check
-        # below must not flag it.
-        known_gap = re.search(r"Known-gap:\s*([\w-]+)", header)
         cases.append(
             {
                 "file": rel,
@@ -176,8 +171,6 @@ def load_cases():
                 "family": rel.split("/")[0] if "/" in rel else "(root)",
                 "targets": targets,
                 "channels": channels,
-                "expect": expect.group(1) if expect else "?",
-                "known_gap": known_gap.group(1) if known_gap else "",
             }
         )
     return cases
@@ -353,7 +346,7 @@ def check(anim, exported, index, cases):
         composed.update(case["channels"])
     supported = set()
     for case in cases:
-        if case["expect"] != "supported" or case["family"] == "composite":
+        if case["family"] == "composite":
             continue
         supported.update(case["channels"])
     for channel in sorted(supported - composed):
@@ -384,10 +377,10 @@ def check(anim, exported, index, cases):
                 stderr=subprocess.DEVNULL,
             )
             html = open(out, encoding="utf-8", errors="ignore").read() if os.path.exists(out) else ""
-            if case.get("known_gap"):
-                continue
-            if ("@keyframes" in html) != (case["expect"] == "supported"):
-                failures.append("Expect does not match the export: " + case["file"])
+            # A case only exists for a channel the exporter claims, so it must produce keyframes;
+            # a static export means the mapping silently stopped working.
+            if "@keyframes" not in html:
+                failures.append("case does not export keyframes: " + case["file"])
 
     # A real duplicate is the same document modulo ids: two cases that only differ by channel would
     # still be different tests, so the signature is the normalised XML, not the channel list.
