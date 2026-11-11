@@ -4801,7 +4801,7 @@ CLI_TEST(PAGXCliTest, Export_Mp4EncodesTheAnimationWhenFFmpegIsAvailable) {
   }
   EXPECT_EQ(ret, 0);
   EXPECT_NE(output.find("wrote " + outputPath), std::string::npos);
-  EXPECT_NE(output.find("7 frames"), std::string::npos);
+  EXPECT_NE(output.find("8 frames"), std::string::npos);
   EXPECT_FALSE(std::filesystem::exists(outputPath + ".part"));
   ASSERT_TRUE(std::filesystem::exists(outputPath));
   EXPECT_GT(std::filesystem::file_size(outputPath), 1000u);
@@ -4877,13 +4877,15 @@ CLI_TEST(PAGXCliTest, Export_Mp4MetadataAndDecodedFramesMatch) {
   EXPECT_EQ(ProbeValue(metadata.output, "height"), "100");
   EXPECT_EQ(ProbeValue(metadata.output, "pix_fmt"), "yuv420p");
   EXPECT_EQ(ProbeValue(metadata.output, "r_frame_rate"), "20/1");
-  EXPECT_EQ(ProbeValue(metadata.output, "nb_frames"), "7");
+  // The nested 20-frame animation has a 5-frame evaluation offset, so 25/60 seconds rounds to
+  // eight frames at 20 fps.
+  EXPECT_EQ(ProbeValue(metadata.output, "nb_frames"), "8");
   auto durationString = ProbeValue(metadata.output, "duration");
   char* durationEnd = nullptr;
   auto duration = std::strtof(durationString.c_str(), &durationEnd);
   EXPECT_NE(durationEnd, durationString.c_str());
   EXPECT_EQ(*durationEnd, '\0');
-  EXPECT_NEAR(duration, 0.35f, 0.001f);
+  EXPECT_NEAR(duration, 0.4f, 0.001f);
 
   auto audio =
       RunCapturedProcess({ffprobe, "-v", "error", "-select_streams", "a:0", "-show_entries",
@@ -4896,10 +4898,10 @@ CLI_TEST(PAGXCliTest, Export_Mp4MetadataAndDecodedFramesMatch) {
                           "-vf", "scale=in_color_matrix=bt709:in_range=tv:out_range=pc,format=rgba",
                           "-fps_mode", "passthrough", "-f", "rawvideo", "pipe:1"});
   ASSERT_EQ(decoded.exitCode, 0) << decoded.errorOutput;
-  const char* timeSeconds[] = {"0", "0.05", "0.1", "0.15", "0.2", "0.25", "0.3"};
+  const char* timeSeconds[] = {"0", "0.05", "0.1", "0.15", "0.2", "0.25", "0.3", "0.35"};
   const size_t frameBytes = 300 * 100 * 4;
-  ASSERT_EQ(decoded.output.size(), frameBytes * 7);
-  for (int frame = 0; frame < 7; ++frame) {
+  ASSERT_EQ(decoded.output.size(), frameBytes * 8);
+  for (int frame = 0; frame < 8; ++frame) {
     auto expected = RenderAnimatedTimelinesAt(timeSeconds[frame], true);
     ASSERT_FALSE(expected.isEmpty());
     auto psnr = ComputeFramePSNR(expected, decoded.output.data() + frame * frameBytes, frameBytes);
