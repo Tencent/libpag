@@ -4544,7 +4544,7 @@ std::string SVGExporter::ToSVG(PAGXDocument& doc, const Options& options,
   // animations produces exactly the same output as before.
   std::unique_ptr<SVGAnimationPlan> animationPlan = nullptr;
   if (options.exportAnimation) {
-    animationPlan = SVGAnimationPlan::Build(&doc, warnings);
+    animationPlan = SVGAnimationPlan::Build(&doc, warnings, options.animation);
   }
 
   // Pre-pass: build WOFF2 fonts for embedded vector fonts. Only Font resources whose first glyph

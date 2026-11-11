@@ -50,6 +50,32 @@ enum class SVGTextExportMode {
 };
 
 /**
+ * Selects which document animations are compiled into SMIL. Default follows the runtime's
+ * getDefaultTimeline (the first declared Animation); Named selects one id; All exports every
+ * top-level Animation in declaration order.
+ */
+enum class SVGAnimationSelection {
+  Default,
+  All,
+  Named,
+};
+
+/**
+ * Animation export options.
+ */
+struct SVGAnimationOptions {
+  /**
+   * Which animations to export. The default is Default.
+   */
+  SVGAnimationSelection selection = SVGAnimationSelection::Default;
+
+  /**
+   * The Animation id used when selection is Named. Ignored for the other modes.
+   */
+  std::string animationId = {};
+};
+
+/**
  * Export options for SVGExporter.
  */
 struct SVGExportOptions {
@@ -154,6 +180,11 @@ struct SVGExportOptions {
    * The default value is true.
    */
   bool exportAnimation = true;
+
+  /**
+   * Animation selection options. Ignored when exportAnimation is false.
+   */
+  SVGAnimationOptions animation = {};
 };
 
 /**

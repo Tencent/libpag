@@ -119,7 +119,8 @@ void CollectTimelines(const std::vector<Layer*>& layers,
 }  // namespace
 
 std::unique_ptr<SVGAnimationPlan> SVGAnimationPlan::Build(PAGXDocument* document,
-                                                          std::vector<std::string>* warnings) {
+                                                          std::vector<std::string>* warnings,
+                                                          const SVGAnimationOptions& options) {
   auto plan = std::unique_ptr<SVGAnimationPlan>(new SVGAnimationPlan());
   if (document == nullptr) {
     return plan;
@@ -138,22 +139,70 @@ std::unique_ptr<SVGAnimationPlan> SVGAnimationPlan::Build(PAGXDocument* document
 
   std::vector<const AnimationTimeline*> timelines = {};
   CollectTimelines(document->layers, &timelines);
+  std::unordered_map<std::string, const AnimationTimeline*> timelineById = {};
+  for (const auto* timeline : timelines) {
+    if (timeline == nullptr) {
+      continue;
+    }
+    if (!timelineById.emplace(timeline->animationId, timeline).second) {
+      AddWarning(warnings, "animation '" + timeline->animationId +
+                               "' has multiple timelines; only the first timeline's timing is "
+                               "exported.");
+    }
+  }
+
+  std::vector<const Animation*> declared = {};
+  for (const auto* node : document->animations) {
+    if (node != nullptr && node->nodeType() == NodeType::Animation) {
+      declared.push_back(static_cast<const Animation*>(node));
+    }
+  }
+  std::vector<const Animation*> selected = {};
+  switch (options.selection) {
+    case SVGAnimationSelection::Named: {
+      const Animation* match = nullptr;
+      for (const auto* animation : declared) {
+        if (animation->id == options.animationId) {
+          match = animation;
+          break;
+        }
+      }
+      if (match == nullptr) {
+        AddWarning(warnings, "animation '" + options.animationId +
+                                 "' is not declared in this document; nothing is emitted for it.");
+      } else {
+        selected.push_back(match);
+      }
+      break;
+    }
+    case SVGAnimationSelection::All:
+      selected = declared;
+      break;
+    case SVGAnimationSelection::Default:
+    default:
+      if (!declared.empty()) {
+        selected.push_back(declared.front());
+      }
+      break;
+  }
+  if (selected.empty() && options.selection == SVGAnimationSelection::Default) {
+    // Compatibility fallback for documents that only mount timelines on layers.
+    for (const auto* timeline : timelines) {
+      const auto* animation = document->findNode<Animation>(timeline->animationId);
+      if (animation != nullptr) {
+        selected.push_back(animation);
+      }
+    }
+  }
 
   std::unordered_set<const Animation*> visited = {};
   std::unordered_set<std::string> reportedChannels = {};
-  for (const auto* timeline : timelines) {
-    const auto* animation = document->findNode<Animation>(timeline->animationId);
-    if (animation == nullptr) {
-      AddWarning(warnings, "animation timeline references unknown animation '" +
-                               timeline->animationId + "'.");
+  for (const auto* animation : selected) {
+    if (animation == nullptr || !visited.insert(animation).second) {
       continue;
     }
-    if (!visited.insert(animation).second) {
-      AddWarning(warnings, "animation '" + animation->id +
-                               "' is driven by more than one timeline; only the first timeline's "
-                               "timing (offset / playing) is exported.");
-      continue;
-    }
+    const auto* timeline =
+        timelineById.count(animation->id) > 0 ? timelineById.find(animation->id)->second : nullptr;
     if (animation->duration <= 0 || animation->frameRate <= 0.0f) {
       plan->_skippedAnimations++;
       AddWarning(warnings, "animation '" + animation->id +

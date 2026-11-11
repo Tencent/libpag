@@ -4619,6 +4619,50 @@ PAGX_TEST(PAGXSVGTest, SVGExport_AnimLayerOpacity) {
   EXPECT_EQ(svg.find("repeatCount"), std::string::npos);
 }
 
+// M1: Default selects the first declared Animation, Named selects one id, All exports every
+// top-level Animation. Timing comes from a mounted timeline when present and from animation
+// defaults otherwise.
+PAGX_TEST(PAGXSVGTest, SVGExport_AnimSelectionDefaultNamedAll) {
+  auto doc = MakeRectDocument();
+  auto* first = doc->makeNode<pagx::Animation>("a1");
+  first->duration = 60;
+  first->frameRate = 60.0f;
+  first->loop = pagx::LoopMode::Once;
+  doc->animations.push_back(first);
+  auto* firstObject = MakeAnimationObject(doc.get(), first, "layer");
+  auto* firstChannel = MakeChannel<float>(doc.get(), firstObject, "alpha");
+  firstChannel->keyframes.push_back({0, 0.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  firstChannel->keyframes.push_back({60, 1.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+
+  auto* second = doc->makeNode<pagx::Animation>("a2");
+  second->duration = 120;
+  second->frameRate = 60.0f;
+  second->loop = pagx::LoopMode::Once;
+  doc->animations.push_back(second);
+  auto* secondObject = MakeAnimationObject(doc.get(), second, "fill");
+  auto* secondChannel = MakeChannel<float>(doc.get(), secondObject, "alpha");
+  secondChannel->keyframes.push_back({0, 1.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  secondChannel->keyframes.push_back({120, 0.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  AttachTimeline(doc->layers[0], "a1");
+
+  auto defaultSvg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(defaultSvg.find("dur=\"1s\""), std::string::npos);
+  EXPECT_EQ(defaultSvg.find("dur=\"2s\""), std::string::npos);
+
+  pagx::SVGExportOptions named = {};
+  named.animation.selection = pagx::SVGAnimationSelection::Named;
+  named.animation.animationId = "a2";
+  auto namedSvg = pagx::SVGExporter::ToSVG(*doc, named);
+  EXPECT_NE(namedSvg.find("dur=\"2s\""), std::string::npos);
+  EXPECT_EQ(namedSvg.find("dur=\"1s\""), std::string::npos);
+
+  pagx::SVGExportOptions all = {};
+  all.animation.selection = pagx::SVGAnimationSelection::All;
+  auto allSvg = pagx::SVGExporter::ToSVG(*doc, all);
+  EXPECT_NE(allSvg.find("dur=\"1s\""), std::string::npos);
+  EXPECT_NE(allSvg.find("dur=\"2s\""), std::string::npos);
+}
+
 PAGX_TEST(PAGXSVGTest, SVGExport_AnimLayerOpacityLoop) {
   auto doc = MakeRectDocument();
   auto* animation = MakeAnimation(doc.get(), 120, pagx::LoopMode::Loop);

@@ -40,6 +40,10 @@ struct ExportOptions {
   bool svgNoXmlDeclaration = false;
   std::optional<pagx::SVGStaticExportPolicy> svgStaticPolicy = std::nullopt;
   std::optional<pagx::SVGTextExportMode> svgTextMode = std::nullopt;
+  bool svgNoAnimation = false;
+  pagx::SVGAnimationSelection svgAnimationSelection = pagx::SVGAnimationSelection::Default;
+  std::string svgAnimationId = {};
+  bool svgAnimationSelected = false;
   bool textToPath = false;
   bool pptBakeUnsupported = true;
   bool pptIgnoreGlyphRuns = false;
@@ -64,6 +68,9 @@ static void PrintUsage() {
       << "  --svg-no-xml-declaration    Omit the <?xml ...?> declaration\n"
       << "  --svg-static-policy <p>     vector-only | preserve-appearance | best-effort\n"
       << "  --svg-text-mode <m>         native | fidelity\n"
+      << "  --svg-no-animation          Do not export SMIL animations\n"
+      << "  --svg-animation <id>        Export only the named Animation\n"
+      << "  --svg-all-animations        Export every top-level Animation\n"
       << "\n"
       << "PPT options:\n"
       << "  --ppt-no-bake-unsupported\n"
@@ -152,6 +159,25 @@ static int ParseOptions(int argc, char* argv[], ExportOptions* options) {
         std::cerr << "pagx export: error: invalid --svg-text-mode '" << value << "'\n";
         return 1;
       }
+    } else if (arg == "--svg-no-animation") {
+      options->svgNoAnimation = true;
+    } else if (arg == "--svg-animation" && i + 1 < argc) {
+      if (options->svgAnimationSelected) {
+        std::cerr << "pagx export: error: --svg-animation and --svg-all-animations are "
+                     "mutually exclusive\n";
+        return 1;
+      }
+      options->svgAnimationSelection = pagx::SVGAnimationSelection::Named;
+      options->svgAnimationId = argv[++i];
+      options->svgAnimationSelected = true;
+    } else if (arg == "--svg-all-animations") {
+      if (options->svgAnimationSelected) {
+        std::cerr << "pagx export: error: --svg-animation and --svg-all-animations are "
+                     "mutually exclusive\n";
+        return 1;
+      }
+      options->svgAnimationSelection = pagx::SVGAnimationSelection::All;
+      options->svgAnimationSelected = true;
     } else if (arg == "--text-to-path") {
       options->textToPath = true;
     } else if (arg == "--ppt-no-bake-unsupported") {
@@ -170,6 +196,11 @@ static int ParseOptions(int argc, char* argv[], ExportOptions* options) {
       return 1;
     }
     i++;
+  }
+
+  if (options->svgNoAnimation && options->svgAnimationSelected) {
+    std::cerr << "pagx export: error: --svg-no-animation conflicts with the animation selection\n";
+    return 1;
   }
 
   if (options->inputFiles.empty()) {
@@ -214,6 +245,9 @@ static int ExportToSVG(const ExportOptions& options) {
   svgOptions.convertTextToPath = options.textToPath;
   svgOptions.staticPolicy = options.svgStaticPolicy;
   svgOptions.textMode = options.svgTextMode;
+  svgOptions.exportAnimation = !options.svgNoAnimation;
+  svgOptions.animation.selection = options.svgAnimationSelection;
+  svgOptions.animation.animationId = options.svgAnimationId;
 
   if (!SVGExporter::ToFile(*document, options.outputFile, svgOptions)) {
     std::cerr << "pagx export: error: failed to write '" << options.outputFile << "'\n";

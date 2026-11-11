@@ -22,6 +22,7 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
+#include "pagx/SVGExporter.h"
 #include "pagx/nodes/Channel.h"
 #include "pagx/nodes/Node.h"
 
@@ -60,7 +61,8 @@ class SVGAnimationPlan {
    * non-null plan even when the document has no animations; callers can test empty().
    */
   static std::unique_ptr<SVGAnimationPlan> Build(PAGXDocument* document,
-                                                 std::vector<std::string>* warnings);
+                                                 std::vector<std::string>* warnings,
+                                                 const SVGAnimationOptions& options = {});
 
   bool empty() const {
     return _bindings.empty();

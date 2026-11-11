@@ -684,6 +684,7 @@ ToSVG严格失败返回空结果、ToFile返回false、CLI非零；warnings=null
 | 本轮 S6 API 部分（2026-11-11） | 新增 `SVGStaticExportPolicy` / `SVGTextExportMode`，设置时覆盖 deprecated `bakeUnsupported` / `convertTextToPath`；CLI 增加 `--svg-static-policy` / `--svg-text-mode`；VectorOnly 对需要新增效果位图的图层直接拒绝（ToSVG 返回空并告警），BestEffort 保留降级告警；两项映射 + 拒绝/降级回归通过 | Named/All、diagnostics / reasonCode、预算、D6 浏览器门禁、策略可用性基线、ST32/37/41/44/46 仍未做 |
 | 本轮 ST36 部分（2026-11-11） | `ToSVG` 每次都用 `options.fontConfig` 重跑 `applyLayout`，约束修改后导出不再复用旧 resolved 尺寸；新增编辑后导出回归 | 外部 Font / fontConfig 冷热与 ST37 externalDoc 预扫未做 |
 | 本轮 ST37 部分（2026-11-11） | WOFF2 预扫递归 externalDoc 的 Font 节点并去重，external composition 的内嵌字体不再漏嵌；新增 externalDoc 字体回归 | external Image 资源 / 嵌套外部文档加载失败路径未覆盖 |
+| 本轮 M1 部分（2026-11-11） | `SVGAnimationOptions.selection` 实现 Default（首个声明 Animation）/ Named / All；未被 timeline 驱动的动画用默认 timing；CLI 增加 `--svg-no-animation` / `--svg-animation` / `--svg-all-animations` 与互斥校验；新增三模式回归 | F2 双实例 / external 同名去重、F4 offset/paused 初态、F16 pause scope 仍未做；同 target 同 channel 的多动画 ordered mix 仍 last-wins |
 
 ### 4.8 S3 文字待办清单（下一批入口）
 
