@@ -28,8 +28,8 @@
 #include "pagx/VideoExporter.h"
 #include "pagx/nodes/Animation.h"
 #include "pagx/nodes/AnimationObject.h"
-#include "pagx/nodes/AnimationState.h"
 #include "pagx/nodes/Channel.h"
+#include "pagx/nodes/State.h"
 #include "pagx/nodes/StateMachine.h"
 #include "pagx/nodes/StateRegion.h"
 
