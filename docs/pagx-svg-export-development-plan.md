@@ -694,6 +694,7 @@ ToSVG严格失败返回空结果、ToFile返回false、CLI非零；warnings=null
 | 本轮 ST11 部分（2026-11-11） | Path 的 Inside/Outside stroke align 分别用 clipPath / mask 实现；adaptive dash 通过 tgfx PathEffect 烘进中心线后输出普通 stroke；非 adaptive 的 Square cap dash 也先按 tgfx 规则合并短 gap；新增三类回归 | Rectangle/Ellipse 的 adaptive dash、Text stroke align、dash×Trim 组合未做 |
 | 本轮 ST8 部分（2026-11-11） | `CollectRichTextRuns` 同时携带 Group 累积 transform；TextBox embedded GlyphRun 的发射矩阵乘上 run transform；新增平移 Group 回归 | foreground 双遍、native tspan 的 per-run transform、bitmap/vector 完整顺序未做 |
 | 本轮 ST16/ST24 部分（2026-11-11） | Resolver 增加跨嵌套 Repeater 的 200k 生成元素总预算，耗尽后停止复制，避免乘性展开耗尽内存 | 预算是硬截断而非 diagnostics 拒绝；200k 阈值与逐项预算未公开配置 |
+| 本轮 S5 部分（2026-11-11） | ImagePattern 优先使用 runtimeImage 的 data URI / 可读路径；零长度 linear 取首色、近零 radial 取末色；fitsToGeometry 的零轴 bbox 按 1/16 clamp；Nearest filter 输出 `image-rendering="pixelated"`；新增 runtime image / 退化渐变 / nearest 三回归 | ST14 的真实四格式与 16 tile×4 fit、ST19 的 mipmap、ST25 空间插值/P3、ST13 shape 零轴 objectBoundingBox、ST42 layout-fit-coverage 仍未做 |
 
 ### 4.8 S3 文字待办清单（下一批入口）
 

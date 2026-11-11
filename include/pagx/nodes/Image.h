@@ -48,6 +48,14 @@ class Image : public Node {
     return NodeType::Image;
   }
 
+  /**
+   * Returns the host-supplied runtime image, or nullptr when the resource only carries encoded
+   * bytes / a file path. Runtime images are never serialized.
+   */
+  const std::shared_ptr<PAGImage>& getRuntimeImage() const {
+    return runtimeImage;
+  }
+
  private:
   Image() = default;
 

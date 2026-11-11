@@ -22,6 +22,7 @@
 #include <fstream>
 #include <set>
 #include "cli/CommandVerify.h"
+#include "pagx/PAGImage.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/PAGXExporter.h"
 #include "pagx/PAGXImporter.h"
@@ -6739,6 +6740,100 @@ PAGX_TEST(PAGXSVGTest, SVGExport_TextBoxRunKeepsGroupTransform) {
 
   auto svg = pagx::SVGExporter::ToSVG(*doc);
   EXPECT_NE(svg.find("matrix(1,0,0,1,50,0)"), std::string::npos);
+}
+
+// ST15: a host-supplied runtime image with a data URI is preferred over the template resource.
+PAGX_TEST(PAGXSVGTest, SVGExport_ImagePatternUsesRuntimeImageDataURI) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {50, 50};
+  rect->size = {80, 80};
+  auto* image = doc->makeNode<pagx::Image>();
+  image->runtimeImage = pagx::PAGImage::MakeFromDataURI(
+      "data:image/png;base64,"
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJg"
+      "gg==");
+  ASSERT_TRUE(image->runtimeImage != nullptr);
+  auto* pattern = doc->makeNode<pagx::ImagePattern>();
+  pattern->image = image;
+  pattern->scaleMode = pagx::ScaleMode::Stretch;
+  auto* fill = doc->makeNode<pagx::Fill>();
+  fill->color = pattern;
+  layer->contents = {rect, fill};
+  doc->layers.push_back(layer);
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("data:image/png;base64,"), std::string::npos);
+}
+
+// ST26: degenerate gradients collapse to tgfx's endpoint color instead of SVG's last stop rule.
+PAGX_TEST(PAGXSVGTest, SVGExport_DegenerateGradientsUseTGFXEndpointColor) {
+  auto makeStop = [](pagx::PAGXDocument* doc, float offset, const pagx::Color& color) {
+    auto* stop = doc->makeNode<pagx::ColorStop>();
+    stop->offset = offset;
+    stop->color = color;
+    return stop;
+  };
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {50, 50};
+  rect->size = {80, 80};
+  auto* linear = doc->makeNode<pagx::LinearGradient>();
+  linear->startPoint = {10, 10};
+  linear->endPoint = {10, 10};
+  linear->colorStops = {makeStop(doc.get(), 0, {1, 0, 0, 1}), makeStop(doc.get(), 1, {0, 0, 1, 1})};
+  auto* fill = doc->makeNode<pagx::Fill>();
+  fill->color = linear;
+  layer->contents = {rect, fill};
+  doc->layers.push_back(layer);
+  auto linearSvg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(linearSvg.find("stop-color=\"#FF0000\""), std::string::npos);
+  EXPECT_EQ(linearSvg.find("stop-color=\"#0000FF\""), std::string::npos);
+
+  auto radialDoc = pagx::PAGXDocument::Make(100, 100);
+  auto* radialLayer = radialDoc->makeNode<pagx::Layer>();
+  auto* radialRect = radialDoc->makeNode<pagx::Rectangle>();
+  radialRect->position = {50, 50};
+  radialRect->size = {80, 80};
+  auto* radial = radialDoc->makeNode<pagx::RadialGradient>();
+  radial->center = {50, 50};
+  radial->radius = 0;
+  radial->colorStops = {makeStop(radialDoc.get(), 0, {1, 0, 0, 1}),
+                        makeStop(radialDoc.get(), 1, {0, 1, 0, 1})};
+  auto* radialFill = radialDoc->makeNode<pagx::Fill>();
+  radialFill->color = radial;
+  radialLayer->contents = {radialRect, radialFill};
+  radialDoc->layers.push_back(radialLayer);
+  auto radialSvg = pagx::SVGExporter::ToSVG(*radialDoc);
+  EXPECT_NE(radialSvg.find("stop-color=\"#00FF00\""), std::string::npos);
+  EXPECT_EQ(radialSvg.find("stop-color=\"#FF0000\""), std::string::npos);
+}
+
+// ST19: nearest filtering maps to image-rendering=pixelated.
+PAGX_TEST(PAGXSVGTest, SVGExport_ImagePatternNearestFilter) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {50, 50};
+  rect->size = {80, 80};
+  auto* image = doc->makeNode<pagx::Image>();
+  image->runtimeImage = pagx::PAGImage::MakeFromDataURI(
+      "data:image/png;base64,"
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJg"
+      "gg==");
+  ASSERT_TRUE(image->runtimeImage != nullptr);
+  auto* pattern = doc->makeNode<pagx::ImagePattern>();
+  pattern->image = image;
+  pattern->filterMode = pagx::FilterMode::Nearest;
+  auto* fill = doc->makeNode<pagx::Fill>();
+  fill->color = pattern;
+  layer->contents = {rect, fill};
+  doc->layers.push_back(layer);
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("image-rendering=\"pixelated\""), std::string::npos);
 }
 
 // A Group's alpha has to survive until the painter that draws its geometry, even when that painter

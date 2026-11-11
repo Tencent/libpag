@@ -32,6 +32,7 @@
 #include <vector>
 #include "base/utils/MathUtil.h"
 #include "pagx/LayoutContext.h"
+#include "pagx/PAGImage.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/TextLayout.h"
 #include "pagx/TextLayoutParams.h"
@@ -89,6 +90,7 @@
 #include "pagx/xml/XMLBuilder.h"
 #include "renderer/LayerBuilder.h"
 #include "renderer/ToTGFX.h"
+#include "tgfx/core/Data.h"
 #include "tgfx/core/PathEffect.h"
 
 namespace pagx {
@@ -357,6 +359,22 @@ static std::string EncodeImageDataURI(const uint8_t* bytes, size_t size, bool* r
 // optional `mimeRecognized` outparam is set to false when the encoded bytes fall outside the
 // PNG/JPEG/WebP/GIF set so the caller can record a warning.
 static std::string GetImageHref(const Image* image, bool* mimeRecognized = nullptr) {
+  // A host-supplied runtime image takes priority over the template resource, matching the
+  // ImagePattern consumer chain. SVG can only use it when the PAGImage retains a data URI or a
+  // readable file path; texture-only images fall through to the template bytes.
+  const auto& runtimeImage = image->getRuntimeImage();
+  if (runtimeImage != nullptr) {
+    const auto& source = runtimeImage->source();
+    if (source.rfind("data:", 0) == 0) {
+      return source;
+    }
+    if (!source.empty()) {
+      auto data = tgfx::Data::MakeFromFile(source);
+      if (data != nullptr && data->size() > 0) {
+        return EncodeImageDataURI(data->bytes(), data->size(), mimeRecognized);
+      }
+    }
+  }
   if (image->data) {
     return EncodeImageDataURI(image->data->bytes(), image->data->size(), mimeRecognized);
   }
@@ -830,7 +848,10 @@ void SVGWriter::finishGradientDef(const Matrix& matrix, const std::vector<ColorS
     // pre-multiplied so it applies after the gradient's own matrix, matching
     // objectBoundingBox's coordinate order.
     const Rect& b = _gradientUserSpaceBounds;
-    Matrix bboxMatrix = {b.width, 0.0f, 0.0f, b.height, b.x, b.y};
+    constexpr float MinFitScale = 1.0f / 16.0f;
+    float sx = std::max(b.width, MinFitScale);
+    float sy = std::max(b.height, MinFitScale);
+    Matrix bboxMatrix = {sx, 0.0f, 0.0f, sy, b.x, b.y};
     effectiveMatrix = bboxMatrix * matrix;
     useUserSpace = true;
   }
@@ -857,7 +878,15 @@ void SVGWriter::writeColorSourceDef(const ColorSource* source, const std::string
       _defs->addRequiredAttribute("y1", grad->startPoint.y);
       _defs->addRequiredAttribute("x2", grad->endPoint.x);
       _defs->addRequiredAttribute("y2", grad->endPoint.y);
-      finishGradientDef(grad->matrix, grad->colorStops, grad->fitsToGeometry);
+      std::vector<ColorStop*> stops = grad->colorStops;
+      float dx = grad->endPoint.x - grad->startPoint.x;
+      float dy = grad->endPoint.y - grad->startPoint.y;
+      if (stops.size() > 1 && dx * dx + dy * dy < 1e-8f) {
+        // tgfx collapses a zero-length linear gradient to its first color; SVG would paint the
+        // last stop instead.
+        stops = {stops.front()};
+      }
+      finishGradientDef(grad->matrix, stops, grad->fitsToGeometry);
       break;
     }
     case NodeType::RadialGradient: {
@@ -867,7 +896,12 @@ void SVGWriter::writeColorSourceDef(const ColorSource* source, const std::string
       _defs->addRequiredAttribute("cx", grad->center.x);
       _defs->addRequiredAttribute("cy", grad->center.y);
       _defs->addRequiredAttribute("r", grad->radius);
-      finishGradientDef(grad->matrix, grad->colorStops, grad->fitsToGeometry);
+      std::vector<ColorStop*> stops = grad->colorStops;
+      if (stops.size() > 1 && grad->radius < 1e-4f && grad->radius >= 0.0f) {
+        // A near-zero radial gradient collapses to its last color in tgfx.
+        stops = {stops.back()};
+      }
+      finishGradientDef(grad->matrix, stops, grad->fitsToGeometry);
       break;
     }
     case NodeType::ConicGradient: {
@@ -965,6 +999,7 @@ std::string SVGWriter::writeImagePatternDef(const ImagePattern* pattern, const R
   if (!pattern->image) {
     return {};
   }
+  const char* imageRendering = pattern->filterMode == FilterMode::Nearest ? "pixelated" : nullptr;
   bool mimeRecognized = true;
   std::string href = GetImageHref(pattern->image, &mimeRecognized);
   if (href.empty()) {
@@ -1063,6 +1098,9 @@ std::string SVGWriter::writeImagePatternDef(const ImagePattern* pattern, const R
     _defs->closeElementStart();
     _defs->openElement("image");
     _defs->addAttribute("href", href);
+    if (imageRendering != nullptr) {
+      _defs->addAttribute("image-rendering", imageRendering);
+    }
     _defs->addRequiredAttribute("width", static_cast<float>(imgW));
     _defs->addRequiredAttribute("height", static_cast<float>(imgH));
   } else if (hasImageSize && !shapeBounds.isEmpty()) {
@@ -1078,6 +1116,9 @@ std::string SVGWriter::writeImagePatternDef(const ImagePattern* pattern, const R
     _defs->closeElementStart();
     _defs->openElement("image");
     _defs->addAttribute("href", href);
+    if (imageRendering != nullptr) {
+      _defs->addAttribute("image-rendering", imageRendering);
+    }
     Rect placed = {};
     if (ComputePlacedImageRectSVG(pattern, imgW, imgH, shapeBounds, &placed)) {
       _defs->addAttributeIfNonZero("x", placed.x - shapeBounds.x);
@@ -1106,6 +1147,9 @@ std::string SVGWriter::writeImagePatternDef(const ImagePattern* pattern, const R
     _defs->closeElementStart();
     _defs->openElement("image");
     _defs->addAttribute("href", href);
+    if (imageRendering != nullptr) {
+      _defs->addAttribute("image-rendering", imageRendering);
+    }
     if (hasImageSize) {
       _defs->addRequiredAttribute("width", static_cast<float>(imgW));
       _defs->addRequiredAttribute("height", static_cast<float>(imgH));
