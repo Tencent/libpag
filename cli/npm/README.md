@@ -138,8 +138,9 @@ The cache location defaults to the platform user cache. `PAGX_FFMPEG_CACHE_DIR` 
 `PAGX_FFMPEG_RELEASE` selects a specific builder release, and `PAGX_FFMPEG_BASE_URL` can point to a
 mirror directory containing the release assets. Set `PAGX_SKIP_FFMPEG_DOWNLOAD=1` before
 installation to skip the optional postinstall download. Downloads include the upstream license
-files. If a download fails, configure a proxy or mirror, retry the download script, or use an
-existing ffmpeg through `FFMPEG_BIN`/`--ffmpeg`.
+files. The downloader does not read `HTTP_PROXY` or `HTTPS_PROXY`. If direct access fails, point
+`PAGX_FFMPEG_BASE_URL` to a mirror, retry the download script, or use an existing ffmpeg through
+`FFMPEG_BIN`/`--ffmpeg`.
 
 ### `pagx optimize [options] <file.pagx>`
 

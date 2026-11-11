@@ -301,8 +301,9 @@ async function ensureFFmpeg(options = {}) {
 
 function formatDownloadError(error) {
   return `pagx: ${error.message}\n` +
-    'Check your network or proxy settings, then retry. To use an existing installation, set ' +
-    'FFMPEG_BIN to the absolute ffmpeg path or pass --ffmpeg <path>.';
+    'Check your network, then retry or set PAGX_FFMPEG_BASE_URL to a mirror. The downloader does ' +
+    'not read HTTP_PROXY or HTTPS_PROXY. To use an existing installation, set FFMPEG_BIN to the ' +
+    'absolute ffmpeg path or pass --ffmpeg <path>.';
 }
 
 module.exports = {

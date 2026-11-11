@@ -287,6 +287,8 @@ test('explicit ffmpeg downloads fail when installation fails', () => {
 test('download failures explain manual recovery', () => {
   const message = formatDownloadError(new Error('network unavailable'));
   assert.match(message, /network unavailable/);
+  assert.match(message, /PAGX_FFMPEG_BASE_URL/);
+  assert.match(message, /does not read HTTP_PROXY or HTTPS_PROXY/);
   assert.match(message, /FFMPEG_BIN/);
   assert.match(message, /--ffmpeg <path>/);
 });
