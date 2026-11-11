@@ -201,13 +201,11 @@ void PAGXRenderer::advanceTimeline(PAGXViewModel::RenderState& state) {
   // scene is advanced as well because it carries the auto-playing nested compositions that no
   // top-level timeline drives.
   auto now = tgfx::Clock::Now();
-  if (lastAdvanceTimeUs < 0) {
-    lastAdvanceTimeUs = now;
-    return;
-  }
-  int64_t deltaUs = now - lastAdvanceTimeUs;
+  // The first flush applies the initial timeline pose at zero elapsed time.
+  // Resetting the wall clock excludes pause duration on resume.
+  int64_t deltaUs = lastAdvanceTimeUs < 0 ? 0 : now - lastAdvanceTimeUs;
   lastAdvanceTimeUs = now;
-  if (deltaUs <= 0) {
+  if (deltaUs < 0) {
     return;
   }
   if (state.timeline != nullptr) {
