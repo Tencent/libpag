@@ -19,6 +19,7 @@
 #include "ContentView.h"
 #include <QQuickWindow>
 #include <QSGImageNode>
+#include <algorithm>
 #include "RenderThread.h"
 
 namespace pag {
@@ -145,10 +146,49 @@ QSGNode* ContentView::updateTextureNode(QSGNode* oldNode) {
       }
       node->setTexture(texture);
       node->markDirty(QSGNode::DirtyMaterial);
-      node->setRect(boundingRect());
+      node->setRect(textureRect(texture));
     }
   }
   return node;
+}
+
+QRectF ContentView::textureRect(QSGTexture* texture) const {
+  auto rect = boundingRect();
+  auto textureSize = texture->textureSize();
+  auto viewModel = getViewModel();
+  if (viewModel == nullptr || textureSize.isEmpty() || rect.isEmpty()) {
+    return rect;
+  }
+  auto contentWidth = static_cast<double>(viewModel->getWidth());
+  auto contentHeight = static_cast<double>(viewModel->getHeight());
+  if (contentWidth <= 0 || contentHeight <= 0) {
+    return rect;
+  }
+  auto textureWidth = static_cast<double>(textureSize.width());
+  auto textureHeight = static_cast<double>(textureSize.height());
+  // Both renderers fit the content into the surface at a uniform scale and center it, so the
+  // content area of the texture is known from its size alone. Placing that area at the same fit in
+  // the current canvas makes a stale frame look like the frame that is about to be rendered.
+  auto textureFit = std::min(textureWidth / contentWidth, textureHeight / contentHeight);
+  auto canvasFit = std::min(rect.width() / contentWidth, rect.height() / contentHeight);
+  if (textureFit <= 0) {
+    return rect;
+  }
+  auto transform = viewModel->getViewTransform();
+  auto pixelRatio = window() == nullptr ? 1.0 : window()->devicePixelRatio();
+  auto scale = canvasFit / textureFit;
+  auto contentX =
+      ((textureWidth - contentWidth * textureFit) * 0.5) * transform.zoomScale + transform.offsetX;
+  auto contentY = ((textureHeight - contentHeight * textureFit) * 0.5) * transform.zoomScale +
+                  transform.offsetY;
+  auto targetX = ((rect.width() - contentWidth * canvasFit) * 0.5) * transform.zoomScale +
+                 transform.offsetX / pixelRatio;
+  auto targetY = ((rect.height() - contentHeight * canvasFit) * 0.5) * transform.zoomScale +
+                 transform.offsetY / pixelRatio;
+  auto width = textureWidth * scale;
+  auto height = textureHeight * scale;
+  return {rect.x() + targetX - contentX * scale, rect.y() + targetY - contentY * scale, width,
+          height};
 }
 
 }  // namespace pag

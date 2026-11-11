@@ -99,6 +99,13 @@ class ContentView : public QQuickItem {
   std::unique_ptr<QTimer> resizeTimer = nullptr;
   std::atomic_bool sizeChanged = false;
   bool contentResizing = false;
+
+ private:
+  /// Computes the scene graph rect for the given texture. While a live window resize is in flight
+  /// the texture still holds the previous canvas size, so its content area is mapped onto the
+  /// aspect-fit region the next rendered frame will use, instead of stretching the whole texture
+  /// onto the new geometry.
+  QRectF textureRect(QSGTexture* texture) const;
 };
 
 }  // namespace pag
