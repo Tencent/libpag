@@ -26,6 +26,7 @@
 #include <cstring>
 #include <fstream>
 #include <memory>
+#include <optional>
 #include <vector>
 #include "base/utils/Log.h"
 #include "pagx/PAGXDefaults.h"
@@ -3152,51 +3153,59 @@ static bool ParseOutputBounds(const std::string& str, Rect* rect) {
   return true;
 }
 
-// Parses the paired root attributes that declare the document's default static output view. A
-// failure is recorded on the document so consumers of the default output reject it instead of
-// silently rendering the whole canvas.
+// Parses the paired root attributes that declare the document's default static output view. An
+// authored text that fails to parse stays on the document so export can replay it, and the
+// diagnostic is recorded in document->errors so consumers reject the document instead of silently
+// rendering the whole canvas.
 static void ParseOutputView(const DOMNode* root, PAGXDocument* doc) {
+  std::optional<std::string> declaredTargetLayer = std::nullopt;
+  std::optional<std::string> declaredOutputBounds = std::nullopt;
   for (const auto& attribute : root->attributes) {
     if (attribute.name == "targetLayer") {
-      doc->declaredTargetLayer = attribute.value;
+      declaredTargetLayer = attribute.value;
     } else if (attribute.name == "outputBounds") {
-      doc->declaredOutputBounds = attribute.value;
+      declaredOutputBounds = attribute.value;
     }
   }
-  bool hasTarget = doc->declaredTargetLayer.has_value();
-  bool hasBounds = doc->declaredOutputBounds.has_value();
-  if (!hasTarget && !hasBounds) {
+  // Keep the authored text until the pair parses cleanly: the exporter replays it verbatim so an
+  // invalid declaration survives a round trip instead of degrading into a whole-canvas document.
+  OutputViewDeclarationAccess::SetDeclared(doc, declaredTargetLayer, declaredOutputBounds);
+  if (!declaredTargetLayer.has_value() && !declaredOutputBounds.has_value()) {
     return;
   }
-  // Keep the authored values until the pair parses cleanly: the exporter replays them verbatim so
-  // an invalid declaration survives a round trip instead of degrading into a whole-canvas document.
-  if (hasTarget != hasBounds) {
-    doc->outputViewError =
-        "The 'targetLayer' and 'outputBounds' attributes must be specified together.";
-    ReportError(doc, root, doc->outputViewError);
+  if (declaredTargetLayer.has_value() != declaredOutputBounds.has_value()) {
+    ReportError(doc, root,
+                "The 'targetLayer' and 'outputBounds' attributes must be specified together.");
     return;
   }
-  const auto& targetAttr = *doc->declaredTargetLayer;
-  const auto& boundsAttr = *doc->declaredOutputBounds;
-  if (targetAttr.size() < 2 || targetAttr[0] != '@') {
-    doc->outputViewError = "Invalid value '" + targetAttr +
-                           "' for 'targetLayer' attribute. Expected a Layer reference '@id'.";
-    ReportError(doc, root, doc->outputViewError);
-    return;
-  }
+  const auto& targetAttr = *declaredTargetLayer;
+  const auto& boundsAttr = *declaredOutputBounds;
+  bool targetValid = targetAttr.size() >= 2 && targetAttr[0] == '@';
   Rect bounds = {};
-  if (!ParseOutputBounds(boundsAttr, &bounds)) {
-    doc->outputViewError =
-        "Invalid value '" + boundsAttr +
-        "' for 'outputBounds' attribute. Expected 'x,y,width,height' with finite components "
-        "and positive width/height.";
-    ReportError(doc, root, doc->outputViewError);
+  bool boundsValid = ParseOutputBounds(boundsAttr, &bounds);
+  if (!targetValid) {
+    ReportError(doc, root,
+                "Invalid value '" + targetAttr +
+                    "' for 'targetLayer' attribute. Expected a Layer reference '@id'.");
+  }
+  if (!boundsValid) {
+    ReportError(doc, root,
+                "Invalid value '" + boundsAttr +
+                    "' for 'outputBounds' attribute. Expected 'x,y,width,height' with finite "
+                    "components and positive width/height.");
+  }
+  // Keep whichever attribute parsed so ResolveOutputView() blames the attribute that actually
+  // failed instead of blaming the one that was never reached.
+  if (targetValid) {
+    doc->targetLayerId = targetAttr.substr(1);
+  }
+  if (boundsValid) {
+    doc->outputBounds = bounds;
+  }
+  if (!targetValid || !boundsValid) {
     return;
   }
-  doc->targetLayerId = targetAttr.substr(1);
-  doc->outputBounds = bounds;
-  doc->declaredTargetLayer.reset();
-  doc->declaredOutputBounds.reset();
+  OutputViewDeclarationAccess::SetDeclared(doc, std::nullopt, std::nullopt);
 }
 
 static void ParseDocument(const DOMNode* root, PAGXDocument* doc) {
@@ -3257,11 +3266,10 @@ static void ParseDocument(const DOMNode* root, PAGXDocument* doc) {
   gPendingMaskRefs.clear();
 
   // Resolve the target view only after every Layer id is registered, so forward references work.
-  if (!doc->targetLayerId.empty() && doc->outputViewError.empty()) {
+  if (!doc->targetLayerId.empty() && doc->outputBounds.has_value()) {
     const Layer* targetLayer = nullptr;
     std::string viewError;
     if (ResolveOutputView(doc, &targetLayer, &viewError) == OutputViewStatus::Invalid) {
-      doc->outputViewError = viewError;
       ReportError(doc, root, viewError);
     }
   }

@@ -19,8 +19,10 @@
 #pragma once
 
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
+#include "pagx/PAGXDocument.h"
 
 namespace tgfx {
 class Canvas;
@@ -30,28 +32,17 @@ class Layer;
 namespace pagx {
 
 class Layer;
-class PAGXDocument;
 
 /**
- * Result of resolving the document's default static output view declared by the paired
- * `targetLayer` / `outputBounds` root attributes.
+ * Grants the importer, exporter and resolver access to the raw target-view attributes kept on
+ * PAGXDocument. Other consumers must go through ResolveOutputView()/HasDeclaredOutputView().
  */
-enum class OutputViewStatus {
-  /**
-   * The document does not declare a target view; it renders the whole canvas.
-   */
-  None,
-
-  /**
-   * The document declares a valid target view.
-   */
-  Valid,
-
-  /**
-   * The document declares invalid target view fields. The document is not renderable through the
-   * default static output path.
-   */
-  Invalid,
+class OutputViewDeclarationAccess {
+ public:
+  static std::optional<std::string> DeclaredTargetLayer(const PAGXDocument& document);
+  static std::optional<std::string> DeclaredBounds(const PAGXDocument& document);
+  static void SetDeclared(PAGXDocument* document, std::optional<std::string> targetLayer,
+                          std::optional<std::string> bounds);
 };
 
 /**

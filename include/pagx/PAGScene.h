@@ -29,6 +29,7 @@
 #include "pagx/PAGDisplayOptions.h"
 #include "pagx/PAGStateMachine.h"
 #include "pagx/PAGTimeline.h"
+#include "pagx/PAGXDocument.h"
 #include "pagx/types/Point.h"
 #include "pagx/types/Rect.h"
 
@@ -78,7 +79,8 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
    * notifyChange() calls can reach it.
    * @param document the source document. Must be non-null. Make() applies layout automatically if
    * it has not already been applied.
-   * @return a shared_ptr to the new PAGScene, or nullptr if the document is null.
+   * @return a shared_ptr to the new PAGScene, or nullptr if the document is null or declares an
+   * invalid default static output view (the paired `targetLayer` / `outputBounds` attributes).
    */
   static std::shared_ptr<PAGScene> Make(std::shared_ptr<PAGXDocument> document);
 
@@ -141,7 +143,8 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
    * @param autoClear  if true (the default), the surface is cleared to transparent before drawing.
    *                   Set to false to overlay the scene content on top of the existing surface
    *                   content.
-   * @return true if the surface was redrawn, false if surface is null or there is no content.
+   * @return true if the surface was redrawn, false if surface is null, there is no content, or the
+   * document's output view declaration is invalid (see getOutputViewStatus()).
    */
   bool draw(const std::shared_ptr<PAGSurface>& surface, bool autoClear = true);
 
@@ -157,16 +160,34 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
 
   /**
    * Returns the output rectangle, in document-root coordinates, that draw() renders when the
-   * document declares a default static output view (the paired `targetLayer` / `outputBounds` root
-   * attributes). Returns std::nullopt when the document has no target view and draw() renders the
-   * whole canvas. Callers use this to size the destination surface: the pixel size is
+   * document declares a valid default static output view (the paired `targetLayer` / `outputBounds`
+   * root attributes). Returns std::nullopt when the document has no target view and draw() renders
+   * the whole canvas, or when the declaration is invalid; use getOutputViewStatus() to tell those
+   * two cases apart. Callers use this to size the destination surface: the pixel size is
    * ceil(width * scale) by ceil(height * scale) with the same rounding rules as other exporters.
    */
   std::optional<Rect> getOutputBounds() const;
 
   /**
+   * Returns the state of the document's default static output view. None means the document renders
+   * the whole canvas; Valid means draw() renders only the target layer into getOutputBounds();
+   * Invalid means the declaration cannot be honored and draw() fails until the declaration is fixed
+   * or cleared. The state is refreshed when the document notifies the scene of a change.
+   */
+  OutputViewStatus getOutputViewStatus() const;
+
+  /**
+   * Returns the diagnostic for an invalid default static output view, or an empty string when the
+   * view is absent or valid.
+   */
+  const std::string& getOutputViewError() const;
+
+  /**
    * Returns the display options used when drawing this PAGScene. The returned object is owned by
-   * this PAGScene and remains valid until the PAGScene is destroyed.
+   * this PAGScene and remains valid until the PAGScene is destroyed. When the document renders a
+   * default static output view, only the zoom scale, content offset and background color affect the
+   * output; the render mode, tile options and subtree cache do not, because the target layer is
+   * drawn directly instead of through the display list.
    */
   PAGDisplayOptions* getDisplayOptions() const;
 
@@ -252,8 +273,7 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
 
   // Renders the scene into the surface without locking or managing the GPU context. The caller
   // must hold a valid context lock. Internal method used by draw() and pagx::Record().
-  bool renderTo(const std::shared_ptr<PAGSurface>& surface, tgfx::Context* context,
-                bool autoClear);
+  bool renderTo(const std::shared_ptr<PAGSurface>& surface, tgfx::Context* context, bool autoClear);
 
   // Converts a surface-space point to the layer tree's root coordinate space using the display
   // list's zoomScale and contentOffset, plus the output window origin when a target view is
@@ -287,8 +307,8 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
   // Cached state of the document's default output view. An edit can turn a valid declaration into
   // an invalid one (for example clearing targetLayerId while keeping outputBounds); renderTo() must
   // reject that state instead of falling back to a whole-canvas render.
-  enum class OutputViewState { None, Valid, Invalid };
-  OutputViewState outputViewState = OutputViewState::None;
+  OutputViewStatus outputViewStatus = OutputViewStatus::None;
+  std::string outputViewError = {};
 
   // Target drawing temporarily reparents layers, which leaves the display list dirty even when
   // no authored content changed. Consume this separate flag only after a successful target draw.
@@ -316,9 +336,9 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
   friend class PAGViewModelValue;
   friend class SuppressDelegation;
   friend std::unique_ptr<tgfx::Recording> Record(tgfx::Context* context,
-                                                  const std::shared_ptr<PAGScene>& scene,
-                                                  const std::shared_ptr<PAGSurface>& surface,
-                                                  bool autoClear);
+                                                 const std::shared_ptr<PAGScene>& scene,
+                                                 const std::shared_ptr<PAGSurface>& surface,
+                                                 bool autoClear);
 };
 
 }  // namespace pagx

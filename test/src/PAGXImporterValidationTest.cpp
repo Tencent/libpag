@@ -207,7 +207,8 @@ PAGX_TEST(PAGXImporterValidationTest, OutputViewTinyBoundsRoundTrip) {
   auto reloaded = pagx::PAGXImporter::FromXML(pagx::PAGXExporter::ToXML(*doc));
   ASSERT_NE(reloaded, nullptr);
   EXPECT_TRUE(reloaded->errors.empty());
-  EXPECT_TRUE(reloaded->outputViewError.empty());
+  EXPECT_EQ(pagx::ResolveOutputView(reloaded.get(), nullptr, nullptr),
+            pagx::OutputViewStatus::Valid);
   EXPECT_EQ(reloaded->targetLayerId, "target");
   ASSERT_TRUE(reloaded->outputBounds.has_value());
   EXPECT_EQ(reloaded->outputBounds->x, -1e-20f);
@@ -227,7 +228,7 @@ PAGX_TEST(PAGXImporterValidationTest, OutputViewRequiresPairedAttributes) {
   auto doc = pagx::PAGXImporter::FromXML(xml);
   ASSERT_TRUE(doc != nullptr);
   EXPECT_TRUE(HasError(doc, "must be specified together"));
-  EXPECT_FALSE(doc->outputViewError.empty());
+  EXPECT_EQ(pagx::ResolveOutputView(doc.get(), nullptr, nullptr), pagx::OutputViewStatus::Invalid);
 
   std::string boundsOnly =
       "<pagx width=\"100\" height=\"100\" outputBounds=\"0,0,10,10\">\n"
@@ -437,7 +438,9 @@ PAGX_TEST(PAGXImporterValidationTest, OutputViewInvalidDeclarationSurvivesExport
                       ">\n  <Layer id=\"target\"/>\n</pagx>\n";
     auto doc = pagx::PAGXImporter::FromXML(xml);
     ASSERT_TRUE(doc != nullptr) << testCase.declaration;
-    EXPECT_FALSE(doc->outputViewError.empty()) << testCase.declaration;
+    EXPECT_EQ(pagx::ResolveOutputView(doc.get(), nullptr, nullptr), pagx::OutputViewStatus::Invalid)
+        << testCase.declaration;
+    EXPECT_TRUE(pagx::HasDeclaredOutputView(*doc)) << testCase.declaration;
     EXPECT_EQ(pagx::PAGScene::Make(doc), nullptr) << testCase.declaration;
 
     auto exported = pagx::PAGXExporter::ToXML(*doc);
@@ -446,9 +449,31 @@ PAGX_TEST(PAGXImporterValidationTest, OutputViewInvalidDeclarationSurvivesExport
     }
     auto reloaded = pagx::PAGXImporter::FromXML(exported);
     ASSERT_TRUE(reloaded != nullptr) << testCase.declaration;
-    EXPECT_FALSE(reloaded->outputViewError.empty()) << testCase.declaration;
+    EXPECT_EQ(pagx::ResolveOutputView(reloaded.get(), nullptr, nullptr),
+              pagx::OutputViewStatus::Invalid)
+        << testCase.declaration;
     EXPECT_EQ(pagx::PAGScene::Make(reloaded), nullptr) << testCase.declaration;
   }
+}
+
+/**
+ * Test case: clearing the declaration removes the authored text too, so an imported invalid
+ * declaration does not resurface on export after the caller deletes it.
+ */
+PAGX_TEST(PAGXImporterValidationTest, OutputViewClearRemovesInvalidDeclaration) {
+  auto doc = pagx::PAGXImporter::FromXML(
+      "<pagx width=\"100\" height=\"100\" targetLayer=\"\" outputBounds=\"\">"
+      "<Layer id=\"target\"/></pagx>");
+  ASSERT_NE(doc, nullptr);
+  EXPECT_EQ(pagx::ResolveOutputView(doc.get(), nullptr, nullptr), pagx::OutputViewStatus::Invalid);
+  EXPECT_TRUE(pagx::HasDeclaredOutputView(*doc));
+
+  doc->clearOutputView();
+  EXPECT_EQ(pagx::ResolveOutputView(doc.get(), nullptr, nullptr), pagx::OutputViewStatus::None);
+  EXPECT_FALSE(pagx::HasDeclaredOutputView(*doc));
+  auto exported = pagx::PAGXExporter::ToXML(*doc);
+  EXPECT_EQ(exported.find("targetLayer="), std::string::npos);
+  EXPECT_EQ(exported.find("outputBounds="), std::string::npos);
 }
 
 PAGX_TEST(PAGXImporterValidationTest, AbsentOutputViewStaysAbsentAfterExport) {
@@ -460,7 +485,8 @@ PAGX_TEST(PAGXImporterValidationTest, AbsentOutputViewStaysAbsentAfterExport) {
   EXPECT_EQ(exported.find("outputBounds="), std::string::npos);
   auto reloaded = pagx::PAGXImporter::FromXML(exported);
   ASSERT_NE(reloaded, nullptr);
-  EXPECT_TRUE(reloaded->outputViewError.empty());
+  EXPECT_EQ(pagx::ResolveOutputView(reloaded.get(), nullptr, nullptr),
+            pagx::OutputViewStatus::None);
   EXPECT_NE(pagx::PAGScene::Make(reloaded), nullptr);
 }
 

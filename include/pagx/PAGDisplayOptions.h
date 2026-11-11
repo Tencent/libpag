@@ -82,6 +82,9 @@ enum class PAGTileUpdateMode {
 /**
  * PAGDisplayOptions exposes display-list rendering options owned by a PAGScene. Use
  * PAGScene::getDisplayOptions() to obtain the options and PAGScene::draw() to render with them.
+ * When the document declares a default static output view, only the zoom scale, content offset and
+ * background color apply; the render mode, tile options and subtree cache are ignored because the
+ * target layer is drawn directly instead of through the display list.
  */
 class PAGDisplayOptions {
  public:

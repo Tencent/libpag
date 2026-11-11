@@ -1356,6 +1356,8 @@
     <xs:attribute name="width" type="xs:decimal" use="required"/>
     <xs:attribute name="height" type="xs:decimal" use="required"/>
     <xs:attribute name="viewModel" type="IdRefType"/>
+    <xs:attribute name="targetLayer" type="IdRefType"/>
+    <xs:attribute name="outputBounds" type="RectType"/>
   </xs:complexType>
 
   <xs:element name="pagx" type="PagxType"/>

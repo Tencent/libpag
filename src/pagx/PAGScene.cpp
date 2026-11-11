@@ -157,20 +157,8 @@ void PAGScene::buildRuntimeTree() {
 void PAGScene::resolveOutputTarget() {
   outputViewDirty = true;
   outputTargetNode = nullptr;
-  const Layer* resolved = nullptr;
-  std::string error;
-  switch (ResolveOutputView(document.get(), &resolved, &error)) {
-    case OutputViewStatus::None:
-      outputViewState = OutputViewState::None;
-      break;
-    case OutputViewStatus::Valid:
-      outputViewState = OutputViewState::Valid;
-      outputTargetNode = resolved;
-      break;
-    case OutputViewStatus::Invalid:
-      outputViewState = OutputViewState::Invalid;
-      break;
-  }
+  outputViewError.clear();
+  outputViewStatus = ResolveOutputView(document.get(), &outputTargetNode, &outputViewError);
 }
 
 std::shared_ptr<PAGViewModel> PAGScene::CreateViewModelFromSchema(
@@ -574,10 +562,13 @@ bool PAGScene::renderTo(const std::shared_ptr<PAGSurface>& surface, tgfx::Contex
   if (tgfxSurface == nullptr) {
     return false;
   }
-  if (outputViewState == OutputViewState::Invalid) {
+  if (outputViewStatus == OutputViewStatus::Invalid) {
+    // The declaration cannot be rendered, so there is nothing left to redraw. Consuming the flag
+    // keeps hosts that gate on hasContentChanged() from retrying the same failed draw forever.
+    outputViewDirty = false;
     return false;
   }
-  if (outputViewState == OutputViewState::Valid) {
+  if (outputViewStatus == OutputViewStatus::Valid) {
     auto* root = _rootComposition != nullptr ? _rootComposition->runtimeLayer.get() : nullptr;
     auto target = _rootComposition != nullptr && _rootComposition->binding != nullptr
                       ? _rootComposition->binding->get<tgfx::Layer>(outputTargetNode)
@@ -616,11 +607,19 @@ bool PAGScene::renderTo(const std::shared_ptr<PAGSurface>& surface, tgfx::Contex
 }
 
 std::optional<Rect> PAGScene::getOutputBounds() const {
-  if (document == nullptr || document->targetLayerId.empty() ||
+  if (outputViewStatus != OutputViewStatus::Valid || document == nullptr ||
       !document->outputBounds.has_value()) {
     return std::nullopt;
   }
   return document->outputBounds;
+}
+
+OutputViewStatus PAGScene::getOutputViewStatus() const {
+  return outputViewStatus;
+}
+
+const std::string& PAGScene::getOutputViewError() const {
+  return outputViewError;
 }
 
 float PAGScene::width() const {
@@ -735,7 +734,7 @@ std::vector<std::shared_ptr<PAGLayer>> PAGScene::getLayersUnderPoint(float surfa
   // Target-view scenes render only a cropped window, so surface coordinates no longer map to the
   // document root through the display-list transform. Hit testing is not supported in this mode,
   // including when an edit left the declaration invalid and draw() renders nothing at all.
-  if (outputViewState != OutputViewState::None) {
+  if (outputViewStatus != OutputViewStatus::None) {
     return {};
   }
   float rootX = 0;
@@ -774,7 +773,7 @@ Rect PAGScene::getGlobalBounds(const std::shared_ptr<PAGLayer>& pagLayer) const 
 }
 
 Point PAGScene::outputViewOrigin() const {
-  if (outputViewState != OutputViewState::Valid || document == nullptr ||
+  if (outputViewStatus != OutputViewStatus::Valid || document == nullptr ||
       !document->outputBounds.has_value()) {
     return {};
   }
@@ -922,7 +921,7 @@ bool PAGScene::hasContentChanged() const {
       return true;
     }
   }
-  if (outputViewState != OutputViewState::None) {
+  if (outputViewStatus != OutputViewStatus::None) {
     return outputViewDirty;
   }
   return displayList->hasContentChanged();

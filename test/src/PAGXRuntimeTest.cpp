@@ -1178,8 +1178,9 @@ PAGX_TEST(PAGXRuntimeTest, OutputViewImageReplacementInvalidatesRenderedContent)
 
 /**
  * Test case: an edit that breaks the target view declaration after the scene was built must make
- * draw() fail instead of silently switching to a whole-canvas render. Clearing only targetLayerId
- * leaves outputBounds behind, which is an invalid pair; restoring the id makes the view valid again.
+ * draw() fail instead of silently switching to a whole-canvas render, consume the pending content
+ * change, and report the invalid state. Clearing both fields returns the document to the
+ * whole-canvas state so a host can recover without rebuilding the scene.
  */
 PAGX_TEST(PAGXRuntimeTest, InvalidOutputViewAfterEditRejectsDraw) {
   auto doc = MakeTargetViewDocument();
@@ -1191,12 +1192,25 @@ PAGX_TEST(PAGXRuntimeTest, InvalidOutputViewAfterEditRejectsDraw) {
 
   doc->targetLayerId.clear();
   doc->notifyChange({doc.get()}, true);
+  EXPECT_EQ(scene->getOutputViewStatus(), pagx::OutputViewStatus::Invalid);
+  EXPECT_FALSE(scene->getOutputViewError().empty());
+  EXPECT_FALSE(scene->getOutputBounds().has_value());
   EXPECT_TRUE(scene->hasContentChanged());
   EXPECT_FALSE(scene->draw(surface));
-  EXPECT_TRUE(scene->hasContentChanged());
+  EXPECT_FALSE(scene->hasContentChanged());
+
+  doc->outputBounds.reset();
+  doc->notifyChange({doc.get()}, true);
+  EXPECT_EQ(scene->getOutputViewStatus(), pagx::OutputViewStatus::None);
+  EXPECT_FALSE(scene->getOutputBounds().has_value());
+  EXPECT_TRUE(scene->draw(surface));
+  EXPECT_FALSE(scene->hasContentChanged());
 
   doc->targetLayerId = "target";
+  doc->outputBounds = pagx::Rect::MakeXYWH(20, 20, 20, 20);
   doc->notifyChange({doc.get()}, true);
+  EXPECT_EQ(scene->getOutputViewStatus(), pagx::OutputViewStatus::Valid);
+  ASSERT_TRUE(scene->getOutputBounds().has_value());
   EXPECT_TRUE(scene->draw(surface));
   EXPECT_FALSE(scene->hasContentChanged());
 }
