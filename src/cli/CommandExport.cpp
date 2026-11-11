@@ -42,6 +42,7 @@ struct ExportOptions {
   std::optional<pagx::SVGTextExportMode> svgTextMode = std::nullopt;
   bool svgNoAnimation = false;
   pagx::SVGAnimationSelection svgAnimationSelection = pagx::SVGAnimationSelection::Default;
+  pagx::SVGAnimationPolicy svgAnimationPolicy = pagx::SVGAnimationPolicy::Strict;
   std::string svgAnimationId = {};
   bool svgAnimationSelected = false;
   bool textToPath = false;
@@ -71,6 +72,7 @@ static void PrintUsage() {
       << "  --svg-no-animation          Do not export SMIL animations\n"
       << "  --svg-animation <id>        Export only the named Animation\n"
       << "  --svg-all-animations        Export every top-level Animation\n"
+      << "  --svg-animation-policy <p>  strict | best-effort (default: strict)\n"
       << "\n"
       << "PPT options:\n"
       << "  --ppt-no-bake-unsupported\n"
@@ -170,6 +172,16 @@ static int ParseOptions(int argc, char* argv[], ExportOptions* options) {
       options->svgAnimationSelection = pagx::SVGAnimationSelection::Named;
       options->svgAnimationId = argv[++i];
       options->svgAnimationSelected = true;
+    } else if (arg == "--svg-animation-policy" && i + 1 < argc) {
+      std::string value = argv[++i];
+      if (value == "strict") {
+        options->svgAnimationPolicy = pagx::SVGAnimationPolicy::Strict;
+      } else if (value == "best-effort") {
+        options->svgAnimationPolicy = pagx::SVGAnimationPolicy::BestEffort;
+      } else {
+        std::cerr << "pagx export: error: invalid --svg-animation-policy '" << value << "'\n";
+        return 1;
+      }
     } else if (arg == "--svg-all-animations") {
       if (options->svgAnimationSelected) {
         std::cerr << "pagx export: error: --svg-animation and --svg-all-animations are "
@@ -248,6 +260,7 @@ static int ExportToSVG(const ExportOptions& options) {
   svgOptions.exportAnimation = !options.svgNoAnimation;
   svgOptions.animation.selection = options.svgAnimationSelection;
   svgOptions.animation.animationId = options.svgAnimationId;
+  svgOptions.animation.policy = options.svgAnimationPolicy;
 
   if (!SVGExporter::ToFile(*document, options.outputFile, svgOptions)) {
     std::cerr << "pagx export: error: failed to write '" << options.outputFile << "'\n";

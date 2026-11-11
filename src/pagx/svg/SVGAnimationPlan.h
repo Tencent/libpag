@@ -68,6 +68,10 @@ class SVGAnimationPlan {
     return _bindings.empty();
   }
 
+  bool rejected() const {
+    return _rejected;
+  }
+
   /**
    * Number of animations that were dropped before producing a single track: non-positive duration
    * or frame rate, or no channel the exporter can express. Used by the coverage tests to prove a
@@ -116,6 +120,7 @@ class SVGAnimationPlan {
   std::unordered_map<const Node*, std::vector<SVGAnimationBinding>> _bindings = {};
   size_t _bindingCount = 0;
   size_t _skippedAnimations = 0;
+  bool _rejected = false;
 };
 
 }  // namespace pagx

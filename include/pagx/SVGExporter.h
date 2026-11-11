@@ -61,6 +61,15 @@ enum class SVGAnimationSelection {
 };
 
 /**
+ * Controls whether animations with channels SVG cannot express are rejected or exported with
+ * explicit warnings. Strict fails the export; BestEffort keeps the expressible subset.
+ */
+enum class SVGAnimationPolicy {
+  Strict,
+  BestEffort,
+};
+
+/**
  * Animation export options.
  */
 struct SVGAnimationOptions {
@@ -73,6 +82,11 @@ struct SVGAnimationOptions {
    * The Animation id used when selection is Named. Ignored for the other modes.
    */
   std::string animationId = {};
+
+  /**
+   * The animation policy. The default is Strict.
+   */
+  SVGAnimationPolicy policy = SVGAnimationPolicy::Strict;
 };
 
 /**

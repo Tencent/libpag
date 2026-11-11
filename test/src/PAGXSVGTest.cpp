@@ -4620,6 +4620,30 @@ PAGX_TEST(PAGXSVGTest, SVGExport_AnimLayerOpacity) {
   EXPECT_EQ(svg.find("repeatCount"), std::string::npos);
 }
 
+// M6: Strict rejects an animation with a channel SVG cannot express; BestEffort keeps the
+// expressible subset and reports the drop.
+PAGX_TEST(PAGXSVGTest, SVGExport_AnimationPolicyStrictRejectsUnsupportedChannel) {
+  auto doc = MakeRectDocument();
+  auto* animation = MakeAnimation(doc.get(), 60, pagx::LoopMode::Once);
+  auto* object = MakeAnimationObject(doc.get(), animation, "rect");
+  auto* channel = MakeChannel<float>(doc.get(), object, "rotation");
+  channel->keyframes.push_back({0, 0.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  channel->keyframes.push_back({60, 90.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  AttachTimeline(doc->layers[0], "anim");
+
+  std::vector<std::string> strictWarnings;
+  pagx::SVGExportOptions strict = {};
+  strict.animation.policy = pagx::SVGAnimationPolicy::Strict;
+  auto strictSvg = pagx::SVGExporter::ToSVG(*doc, strict, &strictWarnings);
+  EXPECT_TRUE(strictSvg.empty());
+  EXPECT_FALSE(strictWarnings.empty());
+
+  pagx::SVGExportOptions bestEffort = {};
+  bestEffort.animation.policy = pagx::SVGAnimationPolicy::BestEffort;
+  auto bestEffortSvg = pagx::SVGExporter::ToSVG(*doc, bestEffort);
+  EXPECT_FALSE(bestEffortSvg.empty());
+}
+
 // M1: Default selects the first declared Animation, Named selects one id, All exports every
 // top-level Animation. Timing comes from a mounted timeline when present and from animation
 // defaults otherwise.

@@ -125,12 +125,14 @@ std::unique_ptr<SVGAnimationPlan> SVGAnimationPlan::Build(PAGXDocument* document
   if (document == nullptr) {
     return plan;
   }
+  bool strict = options.policy == SVGAnimationPolicy::Strict;
 
   for (const auto* node : document->animations) {
     if (node != nullptr && node->nodeType() == NodeType::StateMachine) {
       AddWarning(warnings,
                  "document declares a StateMachine; SMIL cannot express host-driven states so the "
                  "state machine is dropped.");
+      plan->_rejected = plan->_rejected || strict;
     }
   }
   if (document->animations.empty()) {
@@ -170,6 +172,7 @@ std::unique_ptr<SVGAnimationPlan> SVGAnimationPlan::Build(PAGXDocument* document
       if (match == nullptr) {
         AddWarning(warnings, "animation '" + options.animationId +
                                  "' is not declared in this document; nothing is emitted for it.");
+        plan->_rejected = plan->_rejected || strict;
       } else {
         selected.push_back(match);
       }
@@ -205,6 +208,7 @@ std::unique_ptr<SVGAnimationPlan> SVGAnimationPlan::Build(PAGXDocument* document
         timelineById.count(animation->id) > 0 ? timelineById.find(animation->id)->second : nullptr;
     if (animation->duration <= 0 || animation->frameRate <= 0.0f) {
       plan->_skippedAnimations++;
+      plan->_rejected = plan->_rejected || strict;
       AddWarning(warnings, "animation '" + animation->id +
                                "' has a non-positive duration or frame rate; no track is emitted.");
       continue;
@@ -219,6 +223,7 @@ std::unique_ptr<SVGAnimationPlan> SVGAnimationPlan::Build(PAGXDocument* document
         AddWarning(warnings, "animation '" + animation->id + "' targets '" + object->target +
                                  "' which is not resolvable in this document; its channels are "
                                  "dropped.");
+        plan->_rejected = plan->_rejected || strict;
         continue;
       }
       for (const auto* channel : object->channels) {
@@ -226,6 +231,7 @@ std::unique_ptr<SVGAnimationPlan> SVGAnimationPlan::Build(PAGXDocument* document
           continue;
         }
         if (!IsSupportedChannel(target->nodeType(), channel->name)) {
+          plan->_rejected = plan->_rejected || strict;
           std::string key = std::string(NodeTypeName(target->nodeType())) + ":" + channel->name;
           if (reportedChannels.insert(key).second) {
             auto type = target->nodeType();
@@ -260,6 +266,7 @@ std::unique_ptr<SVGAnimationPlan> SVGAnimationPlan::Build(PAGXDocument* document
     }
     if (plan->_bindingCount == bindingsBefore) {
       plan->_skippedAnimations++;
+      plan->_rejected = plan->_rejected || strict;
       AddWarning(warnings, "animation '" + animation->id +
                                "' has no channel the SVG exporter can express; nothing is emitted "
                                "for it.");
