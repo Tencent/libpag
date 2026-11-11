@@ -764,6 +764,10 @@ enum class TargetChannelRole {
   GradientStartAngle,
   // Colour of a gradient's <stop>: `stop-color` is a CSS property on that element.
   StopColor,
+  // A synthetic bold is drawn by stroking the glyph outline, so the animated form is a stroke width
+  // step rather than a font weight (measured: `font-weight: bold` renders identically to regular in
+  // this pipeline). The width scales with the font size, not the family.
+  TextFauxBold,
   // TextModifier channels: every glyph the modifier reaches gets its own rule, like a selector.
   ModifierPosX,
   ModifierPosY,
@@ -934,6 +938,7 @@ constexpr ChannelBindingRule kChannelBindingTable[] = {
     {NodeType::Text, "letterSpacing", TargetChannelRole::LetterSpacing},
     {NodeType::Text, "x", TargetChannelRole::TextAnchorX},
     {NodeType::Text, "y", TargetChannelRole::TextAnchorY},
+    {NodeType::Text, "fauxBold", TargetChannelRole::TextFauxBold},
     {NodeType::TextBox, "alpha", TargetChannelRole::Opacity},
     {NodeType::TextBox, "position.x", TargetChannelRole::GroupPosX},
     {NodeType::TextBox, "position.y", TargetChannelRole::GroupPosY},
@@ -1042,6 +1047,8 @@ struct BundleChannelSet {
   const Channel* shadowOffsetYCh = nullptr;
   const Channel* shadowColorCh = nullptr;
   const Channel* shadowSpreadCh = nullptr;
+  // Synthetic bold on a Text node: a stroke width, scaled by the font size.
+  const Channel* fauxBoldCh = nullptr;
   // TextModifier channels; `modifierTarget` is the modifier they belong to.
   const Node* modifierTarget = nullptr;
   const Channel* modPosXCh = nullptr;
@@ -1330,6 +1337,9 @@ bool BindChannelToBundleSet(
       return true;
     case TargetChannelRole::LayerBlendMode:
       out.blendModeCh = ch;
+      return true;
+    case TargetChannelRole::TextFauxBold:
+      out.fauxBoldCh = ch;
       return true;
     case TargetChannelRole::ModifierPosX:
       out.modPosXCh = ch;
@@ -2588,6 +2598,18 @@ std::string EvaluateKeyframeCssDecls(const DomTargetBundle& bundle, const Bundle
     return decls;
   }
   EmitShadowStyleCssAtFrame(bundle, chSet, t, decls);
+  if (chSet.fauxBoldCh != nullptr && bundle.primaryHost != nullptr &&
+      bundle.primaryHost->nodeType() == NodeType::Text) {
+    auto* text = static_cast<const Text*>(bundle.primaryHost);
+    bool bold = EvalBoolChannel(chSet.fauxBoldCh, t, text->fauxBold);
+    // 0.09em: the middle of the flat 0.08-0.10 band measured across Arial / Times / Courier at
+    // 40px and 80px. Plain `font-weight: bold` renders identically to regular here, so the outline
+    // has to be stroked.
+    constexpr float kFauxBoldStrokeEm = 0.09f;
+    float width = bold ? kFauxBoldStrokeEm * text->renderFontSize() : 0.0f;
+    AppendCssDecl(decls, "-webkit-text-stroke-width", CssFloatToString(width) + "px");
+    AppendCssDecl(decls, "-webkit-text-stroke-color", "currentColor");
+  }
   EmitTransformCssAtFrame(bundle, chSet, t, decls, needsZeroOrigin);
   EmitGeometryCssAtFrame(bundle, chSet, tagName, t, decls, needsZeroOrigin);
   if ((chSet.trimEndCh != nullptr || chSet.trimStartCh != nullptr ||

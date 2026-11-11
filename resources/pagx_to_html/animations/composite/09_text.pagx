@@ -2,7 +2,7 @@
 <!-- Tests: The text pipeline moves at once: the RangeSelector shifts its window (start / end / offset) while its
      falloff curve changes (easeIn / easeOut / weight), so the per-glyph factor has to be recomputed from
      four selector channels in the same frame.
-     Target: Composite  Channel: start,end,offset,easeIn,easeOut,weight,fontSize,letterSpacing,fillColor  Type: mixed
+     Target: Composite  Channel: start,end,offset,easeIn,easeOut,weight,fontSize,letterSpacing,fillColor,fauxBold  Type: mixed
      Expect: supported
      Ref: - -->
 <pagx width="320" height="200">
@@ -51,6 +51,11 @@
         <Channel name="fontSize" type="float">
           <Key time="0" value="34" interpolation="linear"/>
           <Key time="60" value="42"/>
+        </Channel>
+        <Channel name="fauxBold" type="bool">
+          <Key time="0" value="false" interpolation="hold"/>
+          <Key time="30" value="true" interpolation="hold"/>
+          <Key time="60" value="true"/>
         </Channel>
         <Channel name="letterSpacing" type="float">
           <Key time="0" value="0" interpolation="linear"/>
