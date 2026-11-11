@@ -46,8 +46,6 @@ class PAGXRenderer : public IContentRenderer {
   // shown progress or rewind a finished one, then play).
   void advancePlayback(PAGXViewModel::RenderState& state, bool reseat);
 
-  // Advances a timeline that has no seekable time base (a state machine) together with the scene,
-  // which also carries auto-playing nested compositions.
   void advanceTimeline(PAGXViewModel::RenderState& state);
 
   // Handles the paused timeline: on a play-state transition or content reload it reports the
