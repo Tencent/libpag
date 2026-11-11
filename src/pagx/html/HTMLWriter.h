@@ -410,6 +410,12 @@ class HTMLWriterContext {
       // the glyph's factor, so the frame has to reproduce that mix, not just paint the modifier.
       bool hasBaseFillColor = false;
       Color baseFillColor = {};
+      // Same idea for the outline: a modifier's stroke colour / width blend into the text's own
+      // stroke by the glyph factor, so the frame needs the untouched base values.
+      bool hasBaseStrokeColor = false;
+      Color baseStrokeColor = {};
+      bool hasBaseStrokeWidth = false;
+      float baseStrokeWidth = 0.0f;
       std::string id = {};
     };
     // Text -> the left/top the exported tag was placed at, so an animated `x` / `y` channel can
