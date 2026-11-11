@@ -110,6 +110,41 @@ std::string BytesOf(const std::shared_ptr<pagx::Data>& data) {
   return std::string(reinterpret_cast<const char*>(data->bytes()), data->size());
 }
 
+uint16_t ReadLE16(const std::string& bytes, size_t offset) {
+  return static_cast<uint16_t>(static_cast<uint8_t>(bytes[offset])) |
+         static_cast<uint16_t>(static_cast<uint8_t>(bytes[offset + 1]) << 8);
+}
+
+uint32_t ReadLE32(const std::string& bytes, size_t offset) {
+  return static_cast<uint32_t>(static_cast<uint8_t>(bytes[offset])) |
+         (static_cast<uint32_t>(static_cast<uint8_t>(bytes[offset + 1])) << 8) |
+         (static_cast<uint32_t>(static_cast<uint8_t>(bytes[offset + 2])) << 16) |
+         (static_cast<uint32_t>(static_cast<uint8_t>(bytes[offset + 3])) << 24);
+}
+
+// Reads the local file header of `entryPath` and reports the ZIP compression method and the stored
+// size recorded there. Returns false when the entry is absent.
+bool ReadEntryCompression(const std::string& archive, const std::string& entryPath, int* method,
+                          uint32_t* compressedSize) {
+  const std::string signature = "PK\x03\x04";
+  size_t pos = 0;
+  while ((pos = archive.find(signature, pos)) != std::string::npos) {
+    if (pos + 30 > archive.size()) {
+      return false;
+    }
+    auto nameLength = ReadLE16(archive, pos + 26);
+    auto extraLength = ReadLE16(archive, pos + 28);
+    if (pos + 30 + nameLength <= archive.size() &&
+        archive.compare(pos + 30, nameLength, entryPath) == 0) {
+      *method = ReadLE16(archive, pos + 8);
+      *compressedSize = ReadLE32(archive, pos + 18);
+      return true;
+    }
+    pos += 30 + nameLength + extraLength;
+  }
+  return false;
+}
+
 bool ReadZip(const std::shared_ptr<pagx::Data>& data,
              std::unordered_map<std::string, std::string>* entries) {
   std::string error;
@@ -451,6 +486,23 @@ PAGX_TEST(PAGXExporterTest, ToDataPacksBase64DataUriFilePath) {
   EXPECT_EQ(xml.find("base64"), std::string::npos);
   EXPECT_EQ(entries["images/img_uri.png"],
             std::string(reinterpret_cast<const char*>(kRedPng), sizeof(kRedPng)));
+}
+
+PAGX_TEST(PAGXExporterTest, ToDataStoresImagesWithoutDeflate) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto* image = AddImage(doc.get(), "img_png", "", MakeImageData());
+  AddPatternLayer(doc.get(), image);
+
+  auto zip = pagx::PAGXExporter::ToData(*doc);
+  ASSERT_NE(zip, nullptr);
+  auto bytes = BytesOf(zip);
+  int method = -1;
+  uint32_t compressedSize = 0;
+  ASSERT_TRUE(ReadEntryCompression(bytes, "images/img_png.png", &method, &compressedSize));
+  EXPECT_EQ(method, 0);
+  EXPECT_EQ(compressedSize, static_cast<uint32_t>(sizeof(kRedPng)));
+  ASSERT_TRUE(ReadEntryCompression(bytes, "document.pagx", &method, &compressedSize));
+  EXPECT_EQ(method, 8);
 }
 
 PAGX_TEST(PAGXExporterTest, ToDataAcceptsMixedCaseDataUriScheme) {

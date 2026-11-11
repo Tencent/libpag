@@ -26,7 +26,10 @@ namespace {
 bool AddZipEntry(zipFile zf, const char* name, const void* data, unsigned size,
                  int compressionLevel) {
   zip_fileinfo zi = {};
-  if (zipOpenNewFileInZip(zf, name, &zi, nullptr, 0, nullptr, 0, nullptr, Z_DEFLATED,
+  // Level 0 alone still writes a deflate stream around the payload. Selecting method 0 tells ZIP
+  // readers the bytes are stored verbatim, which is what an already-compressed image wants.
+  int method = compressionLevel == Z_NO_COMPRESSION ? 0 : Z_DEFLATED;
+  if (zipOpenNewFileInZip(zf, name, &zi, nullptr, 0, nullptr, 0, nullptr, method,
                           compressionLevel) != ZIP_OK) {
     return false;
   }

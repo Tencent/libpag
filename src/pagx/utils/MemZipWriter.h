@@ -38,9 +38,9 @@ class MemZipWriter {
   MemZipWriter& operator=(const MemZipWriter&) = delete;
 
   // entryPath is the complete, '/'-separated path inside the archive, such as
-  // "index.html" or "images/img0.png". compressionLevel follows zlib; a payload that is already
-  // compressed (PNG/JPEG/WebP/GIF) is stored as-is with Z_NO_COMPRESSION, which costs nothing and
-  // is never larger than deflating it again.
+  // "index.html" or "images/img0.png". compressionLevel follows zlib; Z_NO_COMPRESSION writes a
+  // stored entry (method 0) whose bytes are the payload verbatim, which is what an already
+  // compressed image wants. Other levels use deflate.
   bool write(const std::string& entryPath, const void* bytes, size_t size, std::string* errorMsg,
              int compressionLevel = Z_DEFAULT_COMPRESSION);
 
