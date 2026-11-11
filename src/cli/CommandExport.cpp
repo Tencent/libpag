@@ -146,7 +146,8 @@ constexpr const char* kMP4Usage =
   --no-preset                 Do not pass -preset, for encoders without preset support
   --encoder <name>            Encoder (default: libx264; macOS can explicitly select )"
     "h264_videotoolbox)\n"
-    R"(  --encoder-args "<args>"      Extra ffmpeg arguments appended after the generated ones
+    R"(  --encoder-args "<args>"      Encoding options only: -b:v, -maxrate, -bufsize, -g,
+                              and -x264-params, each followed by one value
   --ffmpeg <path>             ffmpeg executable (default: $FFMPEG_BIN, then PATH)
   --dry-run                   Print the ffmpeg command line instead of encoding
 

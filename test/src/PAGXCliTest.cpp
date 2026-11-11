@@ -20,6 +20,7 @@
 #include <windows.h>
 #else
 #include <fcntl.h>
+#include <signal.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
@@ -4368,6 +4369,30 @@ CLI_TEST(PAGXCliTest, VideoCommandLine_HonorsEncoderOverrideAndExtraArgs) {
   EXPECT_TRUE(HasArgumentSequence(arguments, {"-b:v", "6M", "-movflags", "+faststart"}));
 }
 
+CLI_TEST(PAGXCliTest, VideoCommandLine_RejectsNonEncodingExtraArgs) {
+  auto* format = pagx::cli::FindVideoFormat("mp4");
+  ASSERT_NE(format, nullptr);
+  auto options = DefaultVideoOptions();
+  options.extraArgs = {"-i", "/tmp/extra-input"};
+  std::vector<std::string> arguments = {};
+  std::string errorMsg;
+  EXPECT_FALSE(
+      pagx::cli::BuildFFmpegCommandLine("ffmpeg", *format, options, &arguments, &errorMsg));
+  EXPECT_NE(errorMsg.find("unsupported"), std::string::npos);
+
+  options.extraArgs = {"-threads", "2"};
+  errorMsg.clear();
+  EXPECT_FALSE(
+      pagx::cli::BuildFFmpegCommandLine("ffmpeg", *format, options, &arguments, &errorMsg));
+  EXPECT_NE(errorMsg.find("unsupported"), std::string::npos);
+
+  options.extraArgs = {"-b:v"};
+  errorMsg.clear();
+  EXPECT_FALSE(
+      pagx::cli::BuildFFmpegCommandLine("ffmpeg", *format, options, &arguments, &errorMsg));
+  EXPECT_NE(errorMsg.find("missing value"), std::string::npos);
+}
+
 CLI_TEST(PAGXCliTest, VideoSplitArguments_HonorsQuotesAndEmptyArguments) {
   std::vector<std::string> arguments = {};
   std::string errorMsg = {};
@@ -4529,6 +4554,7 @@ CLI_TEST(PAGXCliTest, VideoEncoder_EncodesPaddedFramesWhenFFmpegIsAvailable) {
   errorMsg.clear();
   ASSERT_TRUE(encoder->finish(&errorMsg)) << errorMsg;
   EXPECT_FALSE(std::filesystem::exists(options.outputFile + ".part"));
+  EXPECT_FALSE(std::filesystem::exists(encoder->stagingDirectory));
   ASSERT_TRUE(std::filesystem::exists(options.outputFile));
   EXPECT_GT(std::filesystem::file_size(options.outputFile), 1000u);
 
@@ -4612,9 +4638,74 @@ CLI_TEST(PAGXCliTest, VideoEncoder_FailurePreservesAnUnrelatedFixedPartFile) {
   auto wrote = encoder->writeFrame(frame.data(), stride, &writeError);
   std::string finishError;
   auto finished = encoder->finish(&finishError);
-  EXPECT_TRUE(!wrote || !finished);
+  EXPECT_FALSE(finished);
+  if (wrote) {
+    EXPECT_NE(finishError.find("ffmpeg failed"), std::string::npos) << finishError;
+  } else {
+    EXPECT_FALSE(writeError.empty());
+    EXPECT_NE(finishError.find("not running"), std::string::npos) << finishError;
+  }
   EXPECT_FALSE(std::filesystem::exists(options.outputFile));
   EXPECT_EQ(ReadFile(options.outputFile + ".part"), "unrelated data");
+}
+
+CLI_TEST(PAGXCliTest, VideoEncoder_HandlesAnEarlyClosedPipe) {
+#ifdef _WIN32
+  GTEST_SKIP() << "POSIX controlled process regression";
+#else
+  auto script = TempDir() + "/close-stdin.sh";
+  auto readyFile = TempDir() + "/stdin-closed";
+  std::filesystem::remove(readyFile);
+  WriteExecutable(script, "#!/bin/sh\nexec 0<&-\nprintf ready > \"" + readyFile + "\"\nexit 1\n");
+  auto options = DefaultVideoOptions();
+  options.outputFile = TempDir() + "/early_closed_pipe.mp4";
+  {
+    std::ofstream out(options.outputFile + ".part");
+    out << "unrelated data";
+  }
+  auto* format = pagx::cli::FindVideoFormat("mp4");
+  ASSERT_NE(format, nullptr);
+  std::string errorMsg;
+  auto encoder = pagx::cli::VideoEncoder::Start(script, *format, options, &errorMsg);
+  ASSERT_NE(encoder, nullptr) << errorMsg;
+  for (int attempt = 0; attempt < 1000 && !std::filesystem::exists(readyFile); ++attempt) {
+    usleep(1000);
+  }
+  ASSERT_TRUE(std::filesystem::exists(readyFile));
+  std::vector<uint8_t> frame = {};
+  FillVideoFrame(&frame, 320 * 4, 320, 180, 0);
+  EXPECT_FALSE(encoder->writeFrame(frame.data(), 320 * 4, &errorMsg));
+  EXPECT_NE(errorMsg.find("stopped reading"), std::string::npos) << errorMsg;
+  EXPECT_NE(errorMsg.find("exit code 1"), std::string::npos) << errorMsg;
+  EXPECT_EQ(errorMsg.find("exit status unavailable"), std::string::npos) << errorMsg;
+  EXPECT_FALSE(encoder->finish(&errorMsg));
+  EXPECT_FALSE(std::filesystem::exists(options.outputFile));
+  EXPECT_FALSE(std::filesystem::exists(encoder->stagingDirectory));
+  EXPECT_EQ(ReadFile(options.outputFile + ".part"), "unrelated data");
+#endif
+}
+
+CLI_TEST(PAGXCliTest, VideoEncoder_ReportsConsumerExitStatus) {
+#ifdef _WIN32
+  GTEST_SKIP() << "POSIX controlled process regression";
+#else
+  auto script = TempDir() + "/consume-and-fail.sh";
+  WriteExecutable(script, "#!/bin/sh\ncat >/dev/null\nexit 7\n");
+  auto options = DefaultVideoOptions();
+  options.outputFile = TempDir() + "/consumer_exit.mp4";
+  auto* format = pagx::cli::FindVideoFormat("mp4");
+  ASSERT_NE(format, nullptr);
+  std::string errorMsg;
+  auto encoder = pagx::cli::VideoEncoder::Start(script, *format, options, &errorMsg);
+  ASSERT_NE(encoder, nullptr) << errorMsg;
+  std::vector<uint8_t> frame = {};
+  FillVideoFrame(&frame, 320 * 4, 320, 180, 0);
+  ASSERT_TRUE(encoder->writeFrame(frame.data(), 320 * 4, &errorMsg)) << errorMsg;
+  EXPECT_FALSE(encoder->finish(&errorMsg));
+  EXPECT_NE(errorMsg.find("exit code 7"), std::string::npos) << errorMsg;
+  EXPECT_FALSE(std::filesystem::exists(options.outputFile));
+  EXPECT_FALSE(std::filesystem::exists(encoder->stagingDirectory));
+#endif
 }
 
 CLI_TEST(PAGXCliTest, VideoEncoder_ReportsExecFailureAndPreservesFixedPartFile) {
@@ -4634,19 +4725,52 @@ CLI_TEST(PAGXCliTest, VideoEncoder_ReportsExecFailureAndPreservesFixedPartFile) 
   std::filesystem::remove(missingExecutable);
   std::string errorMsg = {};
   auto encoder = pagx::cli::VideoEncoder::Start(missingExecutable, *format, options, &errorMsg);
-  if (encoder != nullptr) {
-    std::vector<uint8_t> frame = {};
-    FillVideoFrame(&frame, 64 * 4, 64, 48, 0);
-    auto wrote = encoder->writeFrame(frame.data(), 64 * 4, &errorMsg);
-    if (wrote) {
-      EXPECT_FALSE(encoder->finish(&errorMsg));
-    }
-    EXPECT_NE(errorMsg.find("127"), std::string::npos) << errorMsg;
-  } else {
-    EXPECT_FALSE(errorMsg.empty());
+#ifdef _WIN32
+  ASSERT_EQ(encoder, nullptr);
+  EXPECT_FALSE(errorMsg.empty());
+#else
+  ASSERT_NE(encoder, nullptr) << errorMsg;
+  std::vector<uint8_t> frame = {};
+  FillVideoFrame(&frame, 64 * 4, 64, 48, 0);
+  if (encoder->writeFrame(frame.data(), 64 * 4, &errorMsg)) {
+    EXPECT_FALSE(encoder->finish(&errorMsg));
   }
+  EXPECT_NE(errorMsg.find("127"), std::string::npos) << errorMsg;
+  EXPECT_NE(errorMsg.find("failed to execute ffmpeg"), std::string::npos) << errorMsg;
+  EXPECT_FALSE(std::filesystem::exists(encoder->stagingDirectory));
+#endif
   EXPECT_FALSE(std::filesystem::exists(options.outputFile));
   EXPECT_EQ(ReadFile(options.outputFile + ".part"), "unrelated data");
+}
+
+CLI_TEST(PAGXCliTest, VideoEncoder_DoesNotKillAnExternallyReapedProcess) {
+#ifdef _WIN32
+  GTEST_SKIP() << "POSIX process state regression";
+#else
+  auto location = pagx::cli::FindFFmpeg("");
+  if (location.path.empty()) {
+    GTEST_SKIP() << "ffmpeg is not available";
+  }
+  auto* format = pagx::cli::FindVideoFormat("mp4");
+  ASSERT_NE(format, nullptr);
+  auto options = DefaultVideoOptions();
+  options.outputFile = TempDir() + "/externally_reaped.mp4";
+  std::string errorMsg;
+  auto encoder = pagx::cli::VideoEncoder::Start(location.path, *format, options, &errorMsg);
+  ASSERT_NE(encoder, nullptr) << errorMsg;
+  auto processId = encoder->childProcessId();
+  ASSERT_GT(processId, 0);
+  ASSERT_EQ(kill(processId, SIGKILL), 0);
+  int status = 0;
+  while (waitpid(processId, &status, 0) < 0 && errno == EINTR) {
+  }
+  int exitCode = 0;
+  EXPECT_FALSE(encoder->reapChild(&exitCode));
+  EXPECT_TRUE(encoder->childReaped());
+  EXPECT_EQ(encoder->childProcessId(), -1);
+  encoder->killChild();
+  encoder->abort();
+#endif
 }
 
 CLI_TEST(PAGXCliTest, Export_Mp4DryRunAcceptsStaticDocument) {

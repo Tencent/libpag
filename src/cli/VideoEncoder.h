@@ -101,6 +101,9 @@ struct FFmpegLocation {
 /** Finds ffmpeg, in order: `explicitPath`, then the FFMPEG_BIN environment variable, then PATH. */
 FFmpegLocation FindFFmpeg(const std::string& explicitPath);
 
+/** Initializes process-level signal handling required by the native CLI and its test runners. */
+void InitializeVideoEncoderProcess();
+
 /**
  * Streams premultiplied RGBA frames to one ffmpeg child process through its stdin, then atomically
  * publishes a unique sibling temporary file onto the output path once ffmpeg exits cleanly.
@@ -137,28 +140,39 @@ class VideoEncoder {
   /** Closes the pipe, waits for ffmpeg, then publishes the temporary file onto the output path. */
   bool finish(std::string* errorMsg = nullptr);
 
-  /** Requests ffmpeg termination, reaps it without a timeout, and deletes the owned temporary
-   *  file. A no-op once the encoder has stopped. */
-  void abort();
+  /**
+   * Requests ffmpeg termination and deletes owned temporary output. Returns a cleanup error while
+   * preserving the caller's primary failure. A no-op once the encoder has stopped.
+   */
+  std::string abort();
 
  private:
   struct ChildProcess;
 
-  VideoEncoder(const VideoEncodeOptions& options, std::string partFile);
+  VideoEncoder(const VideoEncodeOptions& options, std::string partFile,
+               std::string stagingDirectory);
 
   bool spawnChild(const std::vector<std::string>& arguments, std::string* errorMsg);
   bool spawnChildWindows(const std::vector<std::string>& arguments, std::string* errorMsg);
   bool spawnChildPosix(const std::vector<std::string>& arguments, std::string* errorMsg);
   bool writeAll(const uint8_t* data, size_t size, std::string* errorMsg);
+  bool handleWriteFailure(uint32_t error, bool brokenPipe, std::string* errorMsg);
   void closeStdin();
   bool reapChild(int* exitCode);
+  bool tryReapChild(int* exitCode);
+  bool reapChildInternal(int* exitCode, bool wait);
+  void readExecError();
+  int64_t childProcessId() const;
+  bool childReaped() const;
   void killChild();
-  void removePartFile();
+  std::string removePartFile();
+  bool removeStagingDirectory(std::string* errorMsg = nullptr);
 
   int width = 0;
   int height = 0;
   std::string outputFile = {};
   std::string partFile = {};
+  std::string stagingDirectory = {};
   std::vector<uint8_t> packedBuffer = {};
   std::unique_ptr<ChildProcess> child = {};
   int64_t framesWritten = 0;
