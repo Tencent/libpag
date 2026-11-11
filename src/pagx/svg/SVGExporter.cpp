@@ -496,11 +496,15 @@ class SVGWriter {
             bool convertTextToPath = true, LayoutContext* layoutContext = nullptr,
             PAGXDocument* doc = nullptr, bool bakeUnsupported = true, float rasterScale = 2.0f,
             std::vector<std::string>* warnings = nullptr,
-            const SVGAnimationPlan* animation = nullptr)
+            const SVGAnimationPlan* animation = nullptr, bool rejectUnsupported = false)
       : _defs(defs), _context(context), _indentSpaces(indentSpaces),
         _convertTextToPath(convertTextToPath), _bakeUnsupported(bakeUnsupported),
-        _rasterScale(rasterScale), _warnings(warnings), _layoutContext(layoutContext),
-        _resolver(doc), _doc(doc), _animWriter(animation, warnings) {
+        _rejectUnsupported(rejectUnsupported), _rasterScale(rasterScale), _warnings(warnings),
+        _layoutContext(layoutContext), _resolver(doc), _doc(doc), _animWriter(animation, warnings) {
+  }
+
+  bool rejected() const {
+    return _rejected;
   }
 
   void writeLayer(SVGBuilder& out, const Layer* layer);
@@ -511,6 +515,8 @@ class SVGWriter {
   int _indentSpaces = 2;
   bool _convertTextToPath = true;
   bool _bakeUnsupported = true;
+  bool _rejectUnsupported = false;
+  bool _rejected = false;
   float _rasterScale = 2.0f;
   std::vector<std::string>* _warnings = nullptr;
   LayoutContext* _layoutContext = nullptr;
@@ -4167,6 +4173,14 @@ void SVGWriter::writeLayer(SVGBuilder& out, const Layer* layer) {
   if (features.hasTextPath && CanBakeTextPaths(layer->contents)) {
     features.hasTextPath = false;
   }
+  // VectorOnly rejects content that cannot be expressed without a new effect bitmap instead of
+  // silently degrading it.
+  if (features.needsRasterization() && _rejectUnsupported) {
+    addWarning("layer '" + (layer->id.empty() ? std::string("(unnamed)") : layer->id) +
+               "' uses SVG-unsupported features and was rejected by staticPolicy VectorOnly.");
+    _rejected = true;
+    return;
+  }
   // Rasterizing an animated layer would freeze it into a single frame, so animated layers always
   // stay on the vector path and report the degradation instead.
   if (_bakeUnsupported && !animated) {
@@ -4463,8 +4477,22 @@ std::string SVGExporter::ToSVG(PAGXDocument& doc, const Options& options,
     doc.applyLayout(options.fontConfig);
   }
   bool bakeUnsupported = options.bakeUnsupported;
+  bool rejectUnsupported = !options.bakeUnsupported;
   if (options.staticPolicy.has_value()) {
-    bakeUnsupported = *options.staticPolicy != SVGStaticExportPolicy::VectorOnly;
+    switch (*options.staticPolicy) {
+      case SVGStaticExportPolicy::VectorOnly:
+        bakeUnsupported = false;
+        rejectUnsupported = true;
+        break;
+      case SVGStaticExportPolicy::PreserveAppearance:
+        bakeUnsupported = true;
+        rejectUnsupported = false;
+        break;
+      case SVGStaticExportPolicy::BestEffort:
+        bakeUnsupported = false;
+        rejectUnsupported = false;
+        break;
+    }
   }
   bool convertTextToPath = options.convertTextToPath;
   if (options.textMode.has_value()) {
@@ -4544,7 +4572,8 @@ std::string SVGExporter::ToSVG(PAGXDocument& doc, const Options& options,
   }
 
   SVGWriter writer(&defs, &context, options.indent, convertTextToPath, layoutContext.get(), &doc,
-                   bakeUnsupported, safeRasterScale, warnings, animationPlan.get());
+                   bakeUnsupported, safeRasterScale, warnings, animationPlan.get(),
+                   rejectUnsupported);
 
   if (options.xmlDeclaration) {
     svg.appendDeclaration();
@@ -4561,6 +4590,9 @@ std::string SVGExporter::ToSVG(PAGXDocument& doc, const Options& options,
   SVGBuilder bodyContent(true, options.indent, 1);
   for (const auto* layer : doc.layers) {
     writer.writeLayer(bodyContent, layer);
+  }
+  if (writer.rejected()) {
+    return {};
   }
 
   std::string defsStr = defs.release();

@@ -2387,6 +2387,7 @@ PAGX_TEST(PAGXSVGTest, SVGExport_ConicGradientDegradesToRadial) {
 
   pagx::SVGExporter::Options opts;
   opts.bakeUnsupported = false;
+  opts.staticPolicy = pagx::SVGStaticExportPolicy::BestEffort;
   auto svg = pagx::SVGExporter::ToSVG(*doc, opts);
   EXPECT_NE(svg.find("<radialGradient"), std::string::npos);
   EXPECT_NE(svg.find("conic gradient degraded"), std::string::npos);
@@ -2417,6 +2418,7 @@ PAGX_TEST(PAGXSVGTest, SVGExport_DiamondGradientDegradesToRadial) {
 
   pagx::SVGExporter::Options opts;
   opts.bakeUnsupported = false;
+  opts.staticPolicy = pagx::SVGStaticExportPolicy::BestEffort;
   auto svg = pagx::SVGExporter::ToSVG(*doc, opts);
   EXPECT_NE(svg.find("<radialGradient"), std::string::npos);
   EXPECT_NE(svg.find("diamond gradient degraded"), std::string::npos);
@@ -2485,8 +2487,7 @@ PAGX_TEST(PAGXSVGTest, SVGExport_StaticPolicyOverridesDeprecatedFlag) {
   vectorOnly.staticPolicy = pagx::SVGStaticExportPolicy::VectorOnly;
   std::vector<std::string> warnings;
   auto vectorSvg = pagx::SVGExporter::ToSVG(*vectorDoc, vectorOnly, &warnings);
-  EXPECT_EQ(vectorSvg.find("data:image/png;base64,"), std::string::npos);
-  EXPECT_NE(vectorSvg.find("<radialGradient"), std::string::npos);
+  EXPECT_TRUE(vectorSvg.empty());
   EXPECT_FALSE(warnings.empty());
 
   auto preserveDoc = makeDoc();
