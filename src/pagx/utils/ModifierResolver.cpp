@@ -939,10 +939,9 @@ std::vector<Element*> ModifierResolver::resolve(const std::vector<Element*>& ele
         copiesF = std::min(copiesF, MAX_REPEATER_COPIES);
         // Bound the total expanded element count across nested resolvers. Repeaters multiply, so a
         // per-repeater cap alone still allows an exponential document to exhaust memory.
-        constexpr size_t MAX_GENERATED_ELEMENTS = 200000;
         size_t bodySize = std::max<size_t>(1, output.size());
-        size_t remaining = MAX_GENERATED_ELEMENTS > _generatedElements
-                               ? MAX_GENERATED_ELEMENTS - _generatedElements
+        size_t remaining = _maxGeneratedElements > _generatedElements
+                               ? _maxGeneratedElements - _generatedElements
                                : 0;
         size_t allowedCopies = remaining / bodySize;
         if (allowedCopies == 0) {

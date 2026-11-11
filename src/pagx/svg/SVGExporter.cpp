@@ -527,12 +527,12 @@ class SVGWriter {
             PAGXDocument* doc = nullptr, bool bakeUnsupported = true, float rasterScale = 2.0f,
             std::vector<std::string>* warnings = nullptr,
             const SVGAnimationPlan* animation = nullptr, bool rejectUnsupported = false,
-            std::vector<SVGDiagnostic>* diagnostics = nullptr)
+            std::vector<SVGDiagnostic>* diagnostics = nullptr, size_t maxGeneratedElements = 200000)
       : _defs(defs), _context(context), _indentSpaces(indentSpaces),
         _convertTextToPath(convertTextToPath), _bakeUnsupported(bakeUnsupported),
         _rejectUnsupported(rejectUnsupported), _rasterScale(rasterScale), _warnings(warnings),
-        _diagnostics(diagnostics), _layoutContext(layoutContext), _resolver(doc), _doc(doc),
-        _animWriter(animation, warnings) {
+        _diagnostics(diagnostics), _layoutContext(layoutContext),
+        _resolver(doc, maxGeneratedElements), _doc(doc), _animWriter(animation, warnings) {
   }
 
   bool rejected() const {
@@ -4993,7 +4993,7 @@ std::string SVGExporter::ToSVG(PAGXDocument& doc, const Options& options,
 
   SVGWriter writer(&defs, &context, options.indent, convertTextToPath, layoutContext.get(), &doc,
                    bakeUnsupported, safeRasterScale, warnings, animationPlan.get(),
-                   rejectUnsupported, options.diagnostics);
+                   rejectUnsupported, options.diagnostics, options.budget.maxGeneratedElements);
 
   if (options.xmlDeclaration) {
     svg.appendDeclaration();
@@ -5054,7 +5054,19 @@ std::string SVGExporter::ToSVG(PAGXDocument& doc, const Options& options,
 
   svg.closeElement();  // </svg>
 
-  return svg.release();
+  std::string result = svg.release();
+  if (options.budget.maxOutputBytes > 0 && result.size() > options.budget.maxOutputBytes) {
+    if (options.diagnostics != nullptr) {
+      SVGDiagnostic diagnostic = {};
+      diagnostic.reasonCode = "budget-exceeded";
+      diagnostic.channelOrOutput = "totalOutputBytes";
+      diagnostic.message = "SVG output exceeded maxOutputBytes; nothing is emitted.";
+      diagnostic.action = SVGDiagnosticAction::Rejected;
+      options.diagnostics->push_back(std::move(diagnostic));
+    }
+    return {};
+  }
+  return result;
 }
 
 bool SVGExporter::ToFile(PAGXDocument& document, const std::string& filePath,

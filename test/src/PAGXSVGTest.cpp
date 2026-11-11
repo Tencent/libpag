@@ -6904,6 +6904,38 @@ PAGX_TEST(PAGXSVGTest, SVGExport_ToFileFailureKeepsExistingFile) {
   std::filesystem::remove(path);
 }
 
+// S6: hard budgets reject oversized output and cap multiplicative repeater expansion.
+PAGX_TEST(PAGXSVGTest, SVGExport_BudgetsCapOutputAndRepeaterCopies) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {20, 20};
+  rect->size = {10, 10};
+  layer->contents = {rect, MakeSolidFillSVG(doc.get(), 1, 0, 0)};
+  doc->layers.push_back(layer);
+
+  pagx::SVGExportOptions tooSmall = {};
+  tooSmall.budget.maxOutputBytes = 10;
+  std::vector<pagx::SVGDiagnostic> diagnostics;
+  tooSmall.diagnostics = &diagnostics;
+  EXPECT_TRUE(pagx::SVGExporter::ToSVG(*doc, tooSmall).empty());
+  ASSERT_FALSE(diagnostics.empty());
+  EXPECT_EQ(diagnostics.front().reasonCode, "budget-exceeded");
+
+  auto* repeater = doc->makeNode<pagx::Repeater>();
+  repeater->copies = 10;
+  repeater->position = {10, 0};
+  layer->contents.push_back(repeater);
+  pagx::SVGExportOptions capped = {};
+  capped.budget.maxGeneratedElements = 5;
+  auto svg = pagx::SVGExporter::ToSVG(*doc, capped);
+  size_t rectCount = 0;
+  for (size_t pos = svg.find("<rect"); pos != std::string::npos; pos = svg.find("<rect", pos + 1)) {
+    ++rectCount;
+  }
+  EXPECT_LE(rectCount, 5u);
+}
+
 // A Group's alpha has to survive until the painter that draws its geometry, even when that painter
 // sits outside the Group.
 PAGX_TEST(PAGXSVGTest, SVGExport_GroupAlphaReachesOuterPainter) {

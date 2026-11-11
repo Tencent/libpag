@@ -114,6 +114,15 @@ struct SVGDiagnostic {
 };
 
 /**
+ * Hard export budgets. Zero means unlimited for the byte budget; the generated-element budget has
+ * a safe default because nested Repeaters can expand exponentially.
+ */
+struct SVGBudget {
+  size_t maxGeneratedElements = 200000;
+  size_t maxOutputBytes = 0;
+};
+
+/**
  * Export options for SVGExporter.
  */
 struct SVGExportOptions {
@@ -163,6 +172,11 @@ struct SVGExportOptions {
    * approximation and additionally carry a stable reason code and the action taken.
    */
   std::vector<SVGDiagnostic>* diagnostics = nullptr;
+
+  /**
+   * Hard budgets for generated geometry and output bytes.
+   */
+  SVGBudget budget = {};
 
   /**
    * Deprecated and ignored: the exporter always resolves path modifiers (TrimPath, RoundCorner,

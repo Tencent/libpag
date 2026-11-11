@@ -51,7 +51,9 @@ class TrimPath;
  */
 class ModifierResolver {
  public:
-  explicit ModifierResolver(PAGXDocument* doc) : _doc(doc), _nodeCountBefore(doc->nodes.size()) {
+  explicit ModifierResolver(PAGXDocument* doc, size_t maxGeneratedElements = 200000)
+      : _doc(doc), _nodeCountBefore(doc->nodes.size()),
+        _maxGeneratedElements(maxGeneratedElements) {
   }
 
   ~ModifierResolver();
@@ -75,6 +77,7 @@ class ModifierResolver {
   PAGXDocument* _doc;
   size_t _nodeCountBefore = 0;
   size_t _generatedElements = 0;
+  size_t _maxGeneratedElements = 200000;
 
   Element* makePathFromData(PathData* data) const;
 
