@@ -34,6 +34,13 @@ PAGXRenderer::PAGXRenderer(PAGXViewModel* viewModel) : viewModel(viewModel) {
 
 void PAGXRenderer::setDrawable(GPUDrawable* drawable) {
   this->drawable = drawable;
+  if (drawable != nullptr) {
+    auto width = static_cast<double>(drawable->width());
+    auto height = static_cast<double>(drawable->height());
+    viewModel->adjustForSurfaceResize(width, height, width, height,
+                                      static_cast<double>(viewModel->getWidth()),
+                                      static_cast<double>(viewModel->getHeight()));
+  }
 }
 
 bool PAGXRenderer::isReady() const {

@@ -108,17 +108,19 @@ class ContentViewModel : public QObject {
   /// Returns a snapshot of the current view transform (zoom + pan offset).
   ViewTransform getViewTransform() const;
 
-  /// Applies a zoom factor anchored at the given point in surface pixel coordinates.
-  void zoomAt(double factor, double anchorX, double anchorY);
+  /// Inverse-maps the anchor from current physical viewport pixels to the transform's render surface,
+  /// then applies the zoom factor. viewportSize is the current physical viewport size.
+  void zoomAt(double factor, double anchorX, double anchorY, const QSizeF& viewportSize);
 
-  /// Pans the view by the given delta in surface pixel coordinates.
-  void panBy(double deltaX, double deltaY);
+  /// Inverse-maps the delta from current physical viewport pixels to the transform's render surface,
+  /// then pans the view. viewportSize is the current physical viewport size.
+  void panBy(double deltaX, double deltaY, const QSizeF& viewportSize);
 
   /// Resets the view transform to the default (no zoom, no pan).
   void resetView();
 
-  /// Adjusts the pan offset to preserve the content point at the viewport center while keeping user
-  /// zoom. All parameters are in surface pixel coordinates.
+  /// Records the transform's render surface size and adjusts the pan offset to preserve the content
+  /// point at the viewport center while keeping user zoom. All parameters are in pixels.
   void adjustForSurfaceResize(double oldSurfaceWidth, double oldSurfaceHeight,
                               double newSurfaceWidth, double newSurfaceHeight, double contentWidth,
                               double contentHeight);
@@ -147,6 +149,8 @@ class ContentViewModel : public QObject {
 
   mutable std::mutex viewTransformMutex = {};
   ViewTransform viewTransform = {};
+  // Protected by viewTransformMutex; tracks the transform's surface, not the last delivered texture.
+  QSizeF surfaceSize = {};
 };
 
 }  // namespace pag

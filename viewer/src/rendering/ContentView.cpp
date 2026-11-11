@@ -71,12 +71,14 @@ void ContentView::prepareForRemoval() {
 
 void ContentView::zoomAt(double factor, double x, double y) {
   auto pixelRatio = window() == nullptr ? 1.0 : window()->devicePixelRatio();
-  getViewModel()->zoomAt(factor, x * pixelRatio, y * pixelRatio);
+  getViewModel()->zoomAt(factor, x * pixelRatio, y * pixelRatio,
+                         QSizeF(std::ceil(width() * pixelRatio), std::ceil(height() * pixelRatio)));
 }
 
 void ContentView::panBy(double deltaX, double deltaY) {
   auto pixelRatio = window() == nullptr ? 1.0 : window()->devicePixelRatio();
-  getViewModel()->panBy(deltaX * pixelRatio, deltaY * pixelRatio);
+  getViewModel()->panBy(deltaX * pixelRatio, deltaY * pixelRatio,
+                        QSizeF(std::ceil(width() * pixelRatio), std::ceil(height() * pixelRatio)));
 }
 
 void ContentView::resetView() {
