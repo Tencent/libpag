@@ -55,6 +55,7 @@ void PAGXRenderer::updateSize() {
                                       static_cast<double>(viewModel->getWidth()),
                                       static_cast<double>(viewModel->getHeight()));
   }
+  viewModel->markNeedsRender();
 }
 
 IContentRenderer::RenderMetrics PAGXRenderer::flush() {
