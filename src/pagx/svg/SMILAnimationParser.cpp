@@ -558,6 +558,7 @@ static void ShiftChannelPhase(TypedChannel<T>* channel, Frame durFrames, double 
   if (channel == nullptr || channel->keyframes.empty() || phaseShift <= 0.0 || durFrames <= 0) {
     return;
   }
+  const auto offset = static_cast<Frame>(std::round(phaseShift * static_cast<double>(durFrames)));
   std::vector<Keyframe<T>> shifted = {};
   shifted.reserve(channel->keyframes.size());
   for (const auto& key : channel->keyframes) {
@@ -566,7 +567,14 @@ static void ShiftChannelPhase(TypedChannel<T>* channel, Frame durFrames, double 
     Frame time = static_cast<Frame>(std::round(u * static_cast<double>(durFrames)));
     auto shiftedKey = key;
     shiftedKey.time = time;
-    shiftedKey.value = std::get<T>(channel->evaluateAt(time));
+    // Sample the source track at the time this key actually represents, not at its new timestamp:
+    // reading the track at `time` returns the already-shifted pose, which collapses the whole
+    // track onto one value.
+    Frame sampleTime = key.time + offset;
+    while (sampleTime > durFrames) {
+      sampleTime -= durFrames;
+    }
+    shiftedKey.value = std::get<T>(channel->evaluateAt(sampleTime));
     shifted.push_back(shiftedKey);
   }
   std::stable_sort(shifted.begin(), shifted.end(), KeyframeTimeLess<T>);
