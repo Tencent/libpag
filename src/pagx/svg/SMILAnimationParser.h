@@ -234,6 +234,11 @@ class SMILAnimationParser {
                                             const ChannelTarget& target,
                                             std::vector<Channel*>& channels);
 
+  /// Base value a to-only / by-only animation composes from: read in SVG-attribute space so the
+  /// attribute -> channel conversions run exactly once over the animated values.
+  static KeyValue ReadAttributeBase(SVGParserContext& ctx, const AnimatedNodeInfo& nodeInfo,
+                                    const ChannelTarget& target, const std::string& attributeName);
+
   // Parses a single <animateTransform> element into a single Matrix channel driving the Layer's
   // runtime "matrix" channel. Each keyframe's transform params (translate/scale/rotate/skewX/
   // skewY, including rotate's "angle cx cy" form) are baked into a full Matrix. additive="sum"

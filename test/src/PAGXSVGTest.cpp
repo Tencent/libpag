@@ -7318,4 +7318,32 @@ PAGX_TEST(PAGXSVGTest, SVGImport_NegativeBeginIndefiniteLoop) {
   EXPECT_NEAR(std::get<float>(ch->evaluateAt(90)), 0.25f, 0.02f);
 }
 
+/**
+ * replace_sum_same_target.svg: a replace animateTransform followed by an additive="sum" one on the
+ * same target must fold the layer's static pose exactly once, independent of the segment order.
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_ReplaceAndSumShareOneMatrixChannel) {
+  auto doc = pagx::SVGImporter::Parse(
+      ProjectPath::Absolute("resources/svg/animation/replace_sum_same_target.svg"));
+  ASSERT_NE(doc, nullptr);
+  auto* anim = static_cast<pagx::Animation*>(doc->animations[0]);
+  ASSERT_EQ(anim->objects.size(), 1u);
+  pagx::TypedChannel<pagx::Matrix>* matrix = nullptr;
+  for (auto* channel : anim->objects[0]->channels) {
+    if (channel->name == "matrix" && channel->valueType() == pagx::ChannelValueType::Matrix) {
+      matrix = static_cast<pagx::TypedChannel<pagx::Matrix>*>(channel);
+    }
+  }
+  ASSERT_NE(matrix, nullptr);
+  // The replace segment owns the pose: the static translate is overridden, and folding it in again
+  // (the flag must not follow the last segment) would report (10, 20) here.
+  const auto start = std::get<pagx::Matrix>(matrix->evaluateAt(0));
+  EXPECT_NEAR(start.tx, 0.0f, 0.01f);
+  EXPECT_NEAR(start.ty, 0.0f, 0.01f);
+  // The replace segment moves 20 to the right, then the sum segment adds 30 downwards on top.
+  const auto end = std::get<pagx::Matrix>(matrix->evaluateAt(120));
+  EXPECT_NEAR(end.tx, 20.0f, 0.05f);
+  EXPECT_NEAR(end.ty, 30.0f, 0.05f);
+}
+
 }  // namespace pag

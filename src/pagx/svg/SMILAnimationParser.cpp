@@ -573,6 +573,37 @@ static Frame ChannelStartFrame(const Channel* channel) {
   }
 }
 
+// One authored key mapped into the wrapped phase domain. `sourceTime` keeps the original
+// timestamp so the two keys that land on the loop seam can be ordered.
+template <typename T>
+struct ShiftedKeyframe {
+  Frame time = 0;
+  Frame sourceTime = 0;
+  Keyframe<T> key = {};
+};
+
+template <typename T>
+static bool ShiftedKeyframeLess(const ShiftedKeyframe<T>& a, const ShiftedKeyframe<T>& b) {
+  if (a.time != b.time) {
+    return a.time < b.time;
+  }
+  // Both loop endpoints can land on the seam frame; the pre-wrap value (the later source time)
+  // comes first so the jump at the seam keeps its direction.
+  return a.sourceTime > b.sourceTime;
+}
+
+// Boundary key for a shifted track: the value the authored curve has at the timestamp this
+// boundary maps to.
+template <typename T>
+static Keyframe<T> MakePhaseBoundaryKeyframe(TypedChannel<T>* channel, Frame time,
+                                             Frame sampleTime) {
+  Keyframe<T> key = {};
+  key.time = time;
+  key.value = std::get<T>(channel->evaluateAt(sampleTime));
+  key.interpolation = KeyframeInterpolationType::Linear;
+  return key;
+}
+
 // Rotates a typed track by phaseShift of one iteration: g(t) = f((t + offset) mod dur). A negative
 // begin on a looping animation means it already started before frame 0, so every authored key
 // moves back by `offset` (wrapped into [0, dur]) and keeps its value; both boundaries are pinned so
@@ -586,15 +617,10 @@ static void ShiftChannelPhase(TypedChannel<T>* channel, Frame durFrames, double 
   if (offset <= 0 || offset >= durFrames) {
     return;
   }
-  struct ShiftedKey {
-    Frame time = 0;
-    Frame sourceTime = 0;
-    Keyframe<T> key = {};
-  };
-  std::vector<ShiftedKey> entries = {};
+  std::vector<ShiftedKeyframe<T>> entries = {};
   entries.reserve(channel->keyframes.size());
   for (const auto& key : channel->keyframes) {
-    ShiftedKey entry = {};
+    ShiftedKeyframe<T> entry = {};
     entry.sourceTime = key.time;
     entry.time = key.time - offset;
     if (entry.time < 0) {
@@ -603,14 +629,7 @@ static void ShiftChannelPhase(TypedChannel<T>* channel, Frame durFrames, double 
     entry.key = key;
     entries.push_back(entry);
   }
-  std::stable_sort(entries.begin(), entries.end(), [](const ShiftedKey& a, const ShiftedKey& b) {
-    if (a.time != b.time) {
-      return a.time < b.time;
-    }
-    // Both loop endpoints can land on the seam frame; the pre-wrap value (the later source time)
-    // comes first so the jump at the seam keeps its direction.
-    return a.sourceTime > b.sourceTime;
-  });
+  std::stable_sort(entries.begin(), entries.end(), ShiftedKeyframeLess<T>);
   std::vector<Keyframe<T>> shifted = {};
   shifted.reserve(entries.size() + 2);
   for (const auto& entry : entries) {
@@ -622,15 +641,8 @@ static void ShiftChannelPhase(TypedChannel<T>* channel, Frame durFrames, double 
     }
     shifted.push_back(key);
   }
-  auto makeBoundary = [channel](Frame time, Frame sampleTime) {
-    Keyframe<T> key = {};
-    key.time = time;
-    key.value = std::get<T>(channel->evaluateAt(sampleTime));
-    key.interpolation = KeyframeInterpolationType::Linear;
-    return key;
-  };
   if (shifted.front().time > 0) {
-    auto head = makeBoundary(0, offset);
+    auto head = MakePhaseBoundaryKeyframe(channel, 0, offset);
     if (shifted.front().interpolation == KeyframeInterpolationType::Hold) {
       head.interpolation = KeyframeInterpolationType::Hold;
     }
@@ -638,7 +650,7 @@ static void ShiftChannelPhase(TypedChannel<T>* channel, Frame durFrames, double 
   }
   if (shifted.back().time < durFrames) {
     // g(dur) wraps back onto the phase start, so the tail is the same value as the head.
-    shifted.push_back(makeBoundary(durFrames, offset));
+    shifted.push_back(MakePhaseBoundaryKeyframe(channel, durFrames, offset));
   }
   channel->keyframes = std::move(shifted);
 }
@@ -2203,6 +2215,14 @@ void SMILAnimationParser::ScaleDashOffsetKeyframes(const std::shared_ptr<DOMNode
   }
 }
 
+// Applies value * factor + offset to every keyframe of a float channel.
+static void ScaleFloatChannelKeyframes(Channel* channel, float factor, float offset) {
+  auto* floatChannel = static_cast<TypedChannel<float>*>(channel);
+  for (auto& key : floatChannel->keyframes) {
+    key.value = key.value * factor + offset;
+  }
+}
+
 void SMILAnimationParser::ApplyAttributeUnitConversions(SVGParserContext& ctx, PAGXDocument* doc,
                                                         const std::string& attributeName,
                                                         const AnimatedNodeInfo& nodeInfo,
@@ -2211,12 +2231,6 @@ void SMILAnimationParser::ApplyAttributeUnitConversions(SVGParserContext& ctx, P
   if (channels.empty() || target.valueType != ChannelValueType::Float) {
     return;
   }
-  auto scaleChannel = [](Channel* channel, float factor, float offset) {
-    auto* ch = static_cast<TypedChannel<float>*>(channel);
-    for (auto& key : ch->keyframes) {
-      key.value = key.value * factor + offset;
-    }
-  };
 
   // `r` drives both axes of an ellipse, and the PAGX Ellipse channel stores diameters.
   if (attributeName == "r") {
@@ -2230,7 +2244,7 @@ void SMILAnimationParser::ApplyAttributeUnitConversions(SVGParserContext& ctx, P
       channels.push_back(heightChannel);
     }
     for (auto* channel : channels) {
-      scaleChannel(channel, 2.0f, 0.0f);
+      ScaleFloatChannelKeyframes(channel, 2.0f, 0.0f);
     }
     return;
   }
@@ -2238,7 +2252,7 @@ void SMILAnimationParser::ApplyAttributeUnitConversions(SVGParserContext& ctx, P
   // `rx`/`ry` are radii on an <ellipse>; on a <rect> they drive roundness (a pixel value).
   if ((attributeName == "rx" || attributeName == "ry") && target.node != nullptr &&
       target.node->nodeType() == NodeType::Ellipse) {
-    scaleChannel(channels.front(), 2.0f, 0.0f);
+    ScaleFloatChannelKeyframes(channels.front(), 2.0f, 0.0f);
     return;
   }
 
@@ -2249,7 +2263,7 @@ void SMILAnimationParser::ApplyAttributeUnitConversions(SVGParserContext& ctx, P
     if (rect != nullptr) {
       const float offset =
           (attributeName == "x") ? rect->size.width / 2.0f : rect->size.height / 2.0f;
-      scaleChannel(channels.front(), 1.0f, offset);
+      ScaleFloatChannelKeyframes(channels.front(), 1.0f, offset);
     }
     return;
   }
@@ -2287,8 +2301,34 @@ void SMILAnimationParser::ApplyAttributeUnitConversions(SVGParserContext& ctx, P
       static_cast<float>(M_PI) * sum * (1.0f + 3.0f * h / (10.0f + std::sqrt(4.0f - 3.0f * h)));
   const float correction = perimeter / 4.0f;
   for (auto* channel : channels) {
-    scaleChannel(channel, 1.0f, -correction);
+    ScaleFloatChannelKeyframes(channel, 1.0f, -correction);
   }
+}
+
+KeyValue SMILAnimationParser::ReadAttributeBase(SVGParserContext& ctx,
+                                                const AnimatedNodeInfo& nodeInfo,
+                                                const ChannelTarget& target,
+                                                const std::string& attributeName) {
+  // to-only/by-only start from the element's current value. That base has to be composed in
+  // SVG-attribute space: some PAGX channels use a different unit (radius -> diameter, rect x ->
+  // center) and the attribute conversions only run over the finished keyframes, so starting from
+  // the runtime value would convert the base a second time.
+  if (nodeInfo.domElement != nullptr) {
+    std::string attribute = ctx.getAttribute(nodeInfo.domElement, attributeName);
+    if (!attribute.empty()) {
+      return parseValue(ctx, attribute, target.valueType);
+    }
+  }
+  // Attribute not written on the element: colors, alpha and visibility share their unit with the
+  // PAGX channel, so the static value is the right base there; geometric attributes default to 0
+  // in SVG and are converted together with the animated values.
+  if (target.valueType == ChannelValueType::Color || target.valueType == ChannelValueType::Bool ||
+      attributeName == "opacity" || attributeName == "fill-opacity" ||
+      attributeName == "stroke-opacity" || attributeName == "stroke-width" ||
+      attributeName == "stroke-miterlimit") {
+    return ReadBaseValue(target);
+  }
+  return parseValue(ctx, "0", target.valueType);
 }
 
 std::vector<Channel*> SMILAnimationParser::parseAnimate(
@@ -2347,29 +2387,6 @@ std::vector<Channel*> SMILAnimationParser::parseAnimate(
   auto toStr = ctx.getAttribute(animElement, "to");
   auto byStr = ctx.getAttribute(animElement, "by");
 
-  // to-only/by-only start from the element's current value. That base has to be composed in
-  // SVG-attribute space: some PAGX channels use a different unit (radius -> diameter, rect x ->
-  // center) and the attribute conversions only run over the finished keyframes, so starting from
-  // the runtime value would convert the base a second time.
-  auto readAttributeBase = [&ctx, &nodeInfo, &target, &attributeName]() -> KeyValue {
-    if (nodeInfo.domElement != nullptr) {
-      std::string attribute = ctx.getAttribute(nodeInfo.domElement, attributeName);
-      if (!attribute.empty()) {
-        return parseValue(ctx, attribute, target.valueType);
-      }
-    }
-    // Attribute not written on the element: colors, alpha and visibility share their unit with the
-    // PAGX channel, so the static value is the right base there; geometric attributes default to 0
-    // in SVG and are converted together with the animated values.
-    if (target.valueType == ChannelValueType::Color || target.valueType == ChannelValueType::Bool ||
-        attributeName == "opacity" || attributeName == "fill-opacity" ||
-        attributeName == "stroke-opacity" || attributeName == "stroke-width" ||
-        attributeName == "stroke-miterlimit") {
-      return ReadBaseValue(target);
-    }
-    return parseValue(ctx, "0", target.valueType);
-  };
-
   std::vector<KeyValue> keyValues = {};
   if (!valuesStr.empty()) {
     auto tokens = SplitSemicolons(valuesStr);
@@ -2392,11 +2409,11 @@ std::vector<Channel*> SMILAnimationParser::parseAnimate(
     }
   } else if (!toStr.empty()) {
     // to-only: SMIL animates from the element's current value to `to`.
-    keyValues.push_back(readAttributeBase());
+    keyValues.push_back(ReadAttributeBase(ctx, nodeInfo, target, attributeName));
     keyValues.push_back(parseValue(ctx, toStr, target.valueType));
   } else if (!byStr.empty()) {
     // by-only: from the base value to base + by (numeric additive types only).
-    KeyValue byBase = readAttributeBase();
+    KeyValue byBase = ReadAttributeBase(ctx, nodeInfo, target, attributeName);
     KeyValue byValue = parseValue(ctx, byStr, target.valueType);
     keyValues.push_back(byBase);
     if (target.valueType == ChannelValueType::Float) {
@@ -3506,16 +3523,17 @@ Animation* SMILAnimationParser::buildAnimation(
         auto* obj = doc->makeNode<AnimationObject>();
         obj->target = targetId;
         // A sum chain composes as static * A1 * A2...; the tracks carry deltas only, so the static
-        // pose is folded in exactly once here. A replace base track already defines the whole
-        // pose and must not receive it.
-        bool matrixBaseIsAdditive = false;
+        // pose is folded in exactly once here. A replace base track already defines the whole pose
+        // and must not receive it — the decision depends on whether a replace segment exists at
+        // all, not on the order the segments appear in.
+        bool hasMatrixChannel = false;
         // Channel names that carry a replace segment: their merged track already spells the full
         // value, so no static base may be folded into them.
         std::unordered_set<std::string> replaceNames = {};
         for (const auto& entry : channels) {
           if (entry.channel->name == "matrix" &&
               entry.channel->valueType() == ChannelValueType::Matrix) {
-            matrixBaseIsAdditive = entry.additive;
+            hasMatrixChannel = true;
           }
           if (!entry.additive) {
             replaceNames.insert(entry.channel->name);
@@ -3523,7 +3541,7 @@ Animation* SMILAnimationParser::buildAnimation(
         }
         obj->channels = MergeAdditiveChannels(&channels);
         auto* targetNode = doc->findNode(targetId);
-        if (matrixBaseIsAdditive) {
+        if (hasMatrixChannel && replaceNames.count("matrix") == 0) {
           if (targetNode != nullptr && targetNode->nodeType() == NodeType::Layer) {
             const auto& staticPose = static_cast<Layer*>(targetNode)->matrix;
             for (auto* channel : obj->channels) {
