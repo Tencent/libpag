@@ -150,13 +150,14 @@ void PAGXRenderer::advancePlayback(PAGXViewModel::RenderState& state, bool resea
     // regardless of where the timeline was left. A finished non-looping (Once) animation is
     // rewound to the start: the replay path (play button) leaves progress at ~1.0, and the user
     // expects a restart rather than resuming stuck at the end. Looping animations (Loop/PingPong)
-    // are never rewound here because PingPong can legitimately sit at currentTime == duration at
-    // the mirror peak; they always resume from their reported progress. state.progress is in [0,1].
-    auto durationUs = state.animation->duration();
+    // are never rewound here because PingPong legitimately sits at the end of its period when it
+    // completes a round trip; they always resume from their reported progress. state.progress is in
+    // [0,1] over the full playback period, which spans one round trip for PingPong.
+    auto periodUs = state.animation->playbackPeriod();
     int64_t targetUs =
-        state.loopMode == pagx::LoopMode::Once && state.animation->currentTime() >= durationUs
+        state.loopMode == pagx::LoopMode::Once && state.animation->playbackPosition() >= periodUs
             ? 0
-            : static_cast<int64_t>(state.progress * static_cast<double>(durationUs));
+            : static_cast<int64_t>(state.progress * static_cast<double>(periodUs));
     state.animation->setCurrentTime(targetUs);
     state.animation->apply();
   }
@@ -170,10 +171,12 @@ void PAGXRenderer::advancePlayback(PAGXViewModel::RenderState& state, bool resea
     state.animation->advanceAndApply(deltaUs);
     state.scene->advanceAndApply(deltaUs);
   }
-  // Report the current playback progress back to the main thread for UI updates.
-  auto durationUs = state.animation->duration();
-  auto currentUs = state.animation->currentTime();
-  auto renderProgress = static_cast<double>(currentUs) / static_cast<double>(durationUs);
+  // Report the current playback progress back to the main thread for UI updates. The linear
+  // playback position is used instead of the folded in-cycle time, otherwise a PingPong return
+  // half would make the progress bar run backward.
+  auto periodUs = state.animation->playbackPeriod();
+  auto positionUs = state.animation->playbackPosition();
+  auto renderProgress = static_cast<double>(positionUs) / static_cast<double>(periodUs);
   if (renderProgress < 0.0) {
     renderProgress = 0.0;
   }
@@ -183,11 +186,10 @@ void PAGXRenderer::advancePlayback(PAGXViewModel::RenderState& state, bool resea
   viewModel->updateProgressFromRender(renderProgress, state.generation);
   // A non-looping animation stays at the last frame once it reaches the end. Notify the main
   // thread so it flips the UI back to the paused state and stops requesting further renders.
-  // Looping modes (Loop/PingPong) never report finished: Loop keeps currentTime in [0, duration),
-  // while PingPong can momentarily land exactly on duration at the mirror peak, which must NOT be
-  // treated as finished.
-  if (state.loopMode == pagx::LoopMode::Once &&
-      state.animation->currentTime() >= state.animation->duration() && !playbackFinishNotified) {
+  // Looping modes (Loop/PingPong) never report finished: Loop keeps wrapping at its period, while
+  // PingPong turns around at the mirror peak inside its period, which must NOT be treated as the
+  // end.
+  if (state.loopMode == pagx::LoopMode::Once && positionUs >= periodUs && !playbackFinishNotified) {
     playbackFinishNotified = true;
     viewModel->notifyPlaybackFinished(state.generation);
   }
@@ -216,13 +218,13 @@ void PAGXRenderer::advanceTimeline(PAGXViewModel::RenderState& state) {
 }
 
 void PAGXRenderer::seekPaused(PAGXViewModel::RenderState& state, bool reseat) {
-  auto durationUs = state.animation->duration();
+  auto periodUs = state.animation->playbackPeriod();
   if (reseat) {
     if (state.seekRequested) {
       // An explicit seek was requested alongside the pause (frame-step controls or slider while
       // transitioning). Honor the target progress instead of reporting the timeline's actual
       // position, which would overwrite the user's intent.
-      auto targetUs = static_cast<int64_t>(state.progress * static_cast<double>(durationUs));
+      auto targetUs = static_cast<int64_t>(state.progress * static_cast<double>(periodUs));
       lastSeekTimeUs = targetUs;
       state.animation->setCurrentTime(targetUs);
       state.animation->apply();
@@ -230,9 +232,9 @@ void PAGXRenderer::seekPaused(PAGXViewModel::RenderState& state, bool reseat) {
       // Pure pause (play button): the timeline already sits at the true playback position, which
       // leads the main thread's progress snapshot by up to one queued frame. Keep the timeline
       // where it is and report its actual position so the UI catches up.
-      auto currentUs = state.animation->currentTime();
-      lastSeekTimeUs = currentUs;
-      auto pausedProgress = static_cast<double>(currentUs) / static_cast<double>(durationUs);
+      auto positionUs = state.animation->playbackPosition();
+      lastSeekTimeUs = positionUs;
+      auto pausedProgress = static_cast<double>(positionUs) / static_cast<double>(periodUs);
       if (pausedProgress < 0.0) {
         pausedProgress = 0.0;
       }
@@ -243,7 +245,7 @@ void PAGXRenderer::seekPaused(PAGXViewModel::RenderState& state, bool reseat) {
     }
   } else {
     // Steady-state paused (e.g. slider scrubbing): seek to the requested progress position.
-    auto targetUs = static_cast<int64_t>(state.progress * static_cast<double>(durationUs));
+    auto targetUs = static_cast<int64_t>(state.progress * static_cast<double>(periodUs));
     if (lastSeekTimeUs < 0 || std::abs(targetUs - lastSeekTimeUs) >= SeekThresholdUs) {
       lastSeekTimeUs = targetUs;
       state.animation->setCurrentTime(targetUs);
@@ -260,11 +262,11 @@ int64_t PAGXRenderer::computeProfileFrame(const PAGXViewModel::RenderState& stat
   if (rate <= 0) {
     return -1;
   }
-  auto durationUs = state.animation->duration();
-  auto currentUs = state.animation->currentTime();
+  auto periodUs = state.animation->playbackPeriod();
+  auto positionUs = state.animation->playbackPosition();
   auto totalFrames =
-      static_cast<int64_t>(std::round(static_cast<double>(durationUs) * rate / 1000000.0));
-  auto frame = static_cast<int64_t>(static_cast<double>(currentUs) * rate / 1000000.0);
+      static_cast<int64_t>(std::round(static_cast<double>(periodUs) * rate / 1000000.0));
+  auto frame = static_cast<int64_t>(static_cast<double>(positionUs) * rate / 1000000.0);
   // Clamp to the last valid frame index so an animation ending exactly on a frame boundary
   // (integer fps) still records the final frame instead of overflowing totalFrame.
   if (totalFrames > 0 && frame >= totalFrames) {

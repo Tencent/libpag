@@ -599,11 +599,13 @@ void PAGXViewModel::emitContentStateReset() {
 }
 
 void PAGXViewModel::updateAnimationState() {
-  if (defaultAnimation != nullptr && defaultAnimation->duration() > 0) {
-    auto durationUs = defaultAnimation->duration();
+  // The frame count follows the full playback period, not the cycle duration: a PingPong animation
+  // spans a forward and a backward pass, matching the linear progress range the renderer reports.
+  auto periodUs = defaultAnimation == nullptr ? 0 : defaultAnimation->playbackPeriod();
+  if (periodUs > 0) {
     auto rate = defaultAnimation->frameRate();
     totalFrames =
-        static_cast<int64_t>(std::round(static_cast<double>(durationUs) * rate / 1000000.0));
+        static_cast<int64_t>(std::round(static_cast<double>(periodUs) * rate / 1000000.0));
     if (totalFrames < 1) {
       totalFrames = 1;
     }
