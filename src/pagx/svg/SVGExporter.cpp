@@ -2362,12 +2362,27 @@ void SVGWriter::writeRectangle(SVGBuilder& out, const Rectangle* rect, const Fil
   float w = renderSize.width;
   float h = renderSize.height;
   float roundness = rect->roundness;
-  // SVG strokes, like OOXML, are always centred on the path geometry. Emulate
-  // StrokeAlign::Inside / Outside by shifting this stroke painter's geometry
-  // inward or outward by half the stroke width before emitting it. Fill-only
-  // painters (fs.stroke == nullptr) skip this branch so the fill geometry
-  // remains untouched.
-  ApplyStrokeBoxInset(fs.stroke, x, y, w, h, &roundness);
+  // tgfx clamps zero / negative axes to a 5e-3 micro contour so stroke, cap and dash effects
+  // still have a well-defined path. A fill on that contour has no visible area and is skipped.
+  constexpr float MICRO_EXTENT = 5e-3f;
+  bool degenerate = w < MICRO_EXTENT || h < MICRO_EXTENT;
+  if (degenerate) {
+    if (fs.stroke == nullptr || fs.stroke->width <= 0.0f) {
+      return;
+    }
+    w = std::max(w, MICRO_EXTENT);
+    h = std::max(h, MICRO_EXTENT);
+    x = renderPos.x - w / 2.0f;
+    y = renderPos.y - h / 2.0f;
+    roundness = std::min(roundness, std::min(w, h) / 2.0f);
+  } else {
+    // SVG strokes, like OOXML, are always centred on the path geometry. Emulate
+    // StrokeAlign::Inside / Outside by shifting this stroke painter's geometry
+    // inward or outward by half the stroke width before emitting it. Fill-only
+    // painters (fs.stroke == nullptr) skip this branch so the fill geometry
+    // remains untouched.
+    ApplyStrokeBoxInset(fs.stroke, x, y, w, h, &roundness);
+  }
 
   std::string transform = MatrixToSVGTransform(m);
   out.openElement("rect");
@@ -2391,15 +2406,26 @@ void SVGWriter::writeEllipse(SVGBuilder& out, const Ellipse* ellipse, const Fill
                              const Matrix& m, float alpha) {
   auto renderSize = ellipse->renderSize();
   auto renderPos = ellipse->renderPosition();
-  float rx = renderSize.width / 2.0f;
-  float ry = renderSize.height / 2.0f;
-  float x = renderPos.x - rx;
-  float y = renderPos.y - ry;
   float w = renderSize.width;
   float h = renderSize.height;
-  ApplyStrokeBoxInset(fs.stroke, x, y, w, h);
-  rx = w / 2.0f;
-  ry = h / 2.0f;
+  constexpr float MICRO_EXTENT = 5e-3f;
+  bool degenerate = w < MICRO_EXTENT || h < MICRO_EXTENT;
+  if (degenerate) {
+    if (fs.stroke == nullptr || fs.stroke->width <= 0.0f) {
+      return;
+    }
+    w = std::max(w, MICRO_EXTENT);
+    h = std::max(h, MICRO_EXTENT);
+  }
+  float rx = w / 2.0f;
+  float ry = h / 2.0f;
+  float x = renderPos.x - rx;
+  float y = renderPos.y - ry;
+  if (!degenerate) {
+    ApplyStrokeBoxInset(fs.stroke, x, y, w, h);
+    rx = w / 2.0f;
+    ry = h / 2.0f;
+  }
   float cx = x + rx;
   float cy = y + ry;
 

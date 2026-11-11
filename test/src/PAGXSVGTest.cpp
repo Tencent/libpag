@@ -6155,6 +6155,59 @@ PAGX_TEST(PAGXSVGTest, SVGExport_TextPathEmitsPlacedGlyphs) {
   EXPECT_EQ(pathCount, 3u);
 }
 
+// ST27: tgfx clamps zero / negative axes to a 5e-3 micro contour for stroke, while a fill on that
+// contour has no visible area.
+PAGX_TEST(PAGXSVGTest, SVGExport_ZeroAxisRectangleKeepsStrokeMicroContour) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {50, 50};
+  rect->size = {0, 0};
+  auto* stroke = doc->makeNode<pagx::Stroke>();
+  stroke->color = doc->makeNode<pagx::SolidColor>();
+  static_cast<pagx::SolidColor*>(stroke->color)->color = {1, 0, 0, 1};
+  stroke->width = 2.0f;
+  layer->contents = {rect, stroke};
+  doc->layers.push_back(layer);
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("<rect"), std::string::npos);
+  EXPECT_NE(svg.find("stroke=\"#FF0000\""), std::string::npos);
+  EXPECT_NE(svg.find("width=\"0.004"), std::string::npos);
+}
+
+PAGX_TEST(PAGXSVGTest, SVGExport_ZeroAxisRectangleSkipsFill) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {50, 50};
+  rect->size = {0, 0};
+  layer->contents = {rect, MakeSolidFillSVG(doc.get(), 1, 0, 0)};
+  doc->layers.push_back(layer);
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_EQ(svg.find("<rect"), std::string::npos);
+}
+
+PAGX_TEST(PAGXSVGTest, SVGExport_NegativeAxisEllipseKeepsStrokeMicroContour) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* ellipse = doc->makeNode<pagx::Ellipse>();
+  ellipse->position = {50, 50};
+  ellipse->size = {-10, -10};
+  auto* stroke = doc->makeNode<pagx::Stroke>();
+  stroke->color = doc->makeNode<pagx::SolidColor>();
+  static_cast<pagx::SolidColor*>(stroke->color)->color = {0, 0, 1, 1};
+  stroke->width = 2.0f;
+  layer->contents = {ellipse, stroke};
+  doc->layers.push_back(layer);
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("<circle"), std::string::npos);
+  EXPECT_NE(svg.find("stroke=\"#0000FF\""), std::string::npos);
+  EXPECT_NE(svg.find("r=\"0.0024"), std::string::npos);
+}
+
 // A Group's alpha has to survive until the painter that draws its geometry, even when that painter
 // sits outside the Group.
 PAGX_TEST(PAGXSVGTest, SVGExport_GroupAlphaReachesOuterPainter) {
