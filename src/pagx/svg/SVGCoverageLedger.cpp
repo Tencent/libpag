@@ -86,8 +86,10 @@ std::vector<SVGChannelEntry> BuildLedger() {
   entries.push_back({NodeType::Polystar, "outerRadius", P, "needs a d track"});
   entries.push_back({NodeType::Polystar, "innerRadius", P, "needs a d track"});
   entries.push_back({NodeType::Polystar, "rotation", P, "needs a d track"});
-  entries.push_back({NodeType::Polystar, "outerRoundness", P, "needs a d track"});
-  entries.push_back({NodeType::Polystar, "innerRoundness", P, "needs a d track"});
+  entries.push_back(
+      {NodeType::Polystar, "outerRoundness", S, "d track on the baked path, fixed topology"});
+  entries.push_back(
+      {NodeType::Polystar, "innerRoundness", S, "d track on the baked path, fixed topology"});
 
   // Text
   entries.push_back({NodeType::Text, "text", P, "layout reshape, bake only"});

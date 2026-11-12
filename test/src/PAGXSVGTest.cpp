@@ -5203,6 +5203,88 @@ PAGX_TEST(PAGXSVGTest, SVGExport_AnimTextPositionEmitsTranslate) {
   EXPECT_NE(svg.find("values=\"0 0;70 20\""), std::string::npos) << svg;
 }
 
+// M5.4 / A14: Polystar roundness keeps the vertex count and content bounds, so the baked path can
+// carry a d track with one stable cubic verb list.
+PAGX_TEST(PAGXSVGTest, SVGExport_AnimPolystarRoundnessEmitsDataTrack) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto* layer = doc->makeNode<pagx::Layer>("layer");
+  auto* star = doc->makeNode<pagx::Polystar>("star");
+  star->type = pagx::PolystarType::Star;
+  star->pointCount = 5;
+  star->outerRadius = 40;
+  star->innerRadius = 20;
+  star->position = {100, 100};
+  auto* fill = doc->makeNode<pagx::Fill>("fill");
+  auto* solid = doc->makeNode<pagx::SolidColor>("color");
+  solid->color = {1, 0, 0, 1};
+  fill->color = solid;
+  layer->contents = {star, fill};
+  doc->layers.push_back(layer);
+
+  auto* animation = MakeAnimation(doc.get(), 60, pagx::LoopMode::Once);
+  auto* object = MakeAnimationObject(doc.get(), animation, "star");
+  auto* channel = MakeChannel<float>(doc.get(), object, "outerRoundness");
+  channel->keyframes.push_back({0, 0.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  channel->keyframes.push_back({60, 1.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  AttachTimeline(layer, "anim");
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  auto marker = svg.find("attributeName=\"d\"");
+  ASSERT_NE(marker, std::string::npos) << svg;
+  auto valuesStart = svg.find("values=\"", marker);
+  ASSERT_NE(valuesStart, std::string::npos);
+  valuesStart += 8;
+  auto valuesEnd = svg.find('"', valuesStart);
+  ASSERT_NE(valuesEnd, std::string::npos);
+  auto values = svg.substr(valuesStart, valuesEnd - valuesStart);
+  EXPECT_EQ(values.find(';'), values.rfind(';'));
+  EXPECT_NE(values.find('C'), std::string::npos) << values;
+}
+
+// A Polystar rotation changes the content bounds (and therefore renderScale), so it stays
+// classified as unsupported instead of freezing silently.
+PAGX_TEST(PAGXSVGTest, SVGExport_AnimPolystarRotationRejected) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto* layer = doc->makeNode<pagx::Layer>("layer");
+  auto* star = doc->makeNode<pagx::Polystar>("star");
+  star->type = pagx::PolystarType::Star;
+  star->pointCount = 5;
+  star->outerRadius = 40;
+  star->innerRadius = 20;
+  star->position = {100, 100};
+  auto* fill = doc->makeNode<pagx::Fill>("fill");
+  auto* solid = doc->makeNode<pagx::SolidColor>("color");
+  solid->color = {1, 0, 0, 1};
+  fill->color = solid;
+  layer->contents = {star, fill};
+  doc->layers.push_back(layer);
+
+  auto* animation = MakeAnimation(doc.get(), 60, pagx::LoopMode::Once);
+  auto* object = MakeAnimationObject(doc.get(), animation, "star");
+  auto* channel = MakeChannel<float>(doc.get(), object, "rotation");
+  channel->keyframes.push_back({0, 0.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  channel->keyframes.push_back({60, 45.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  AttachTimeline(layer, "anim");
+
+  std::vector<std::string> warnings;
+  pagx::SVGExportOptions strict = {};
+  strict.animation.policy = pagx::SVGAnimationPolicy::Strict;
+  auto strictSvg = pagx::SVGExporter::ToSVG(*doc, strict, &warnings);
+  EXPECT_TRUE(strictSvg.empty());
+  bool reported = false;
+  for (const auto& warning : warnings) {
+    reported = reported || warning.find("no SMIL equivalent") != std::string::npos ||
+               warning.find("bakes this element into new geometry") != std::string::npos;
+  }
+  EXPECT_TRUE(reported) << (warnings.empty() ? "no warnings" : warnings[0]);
+
+  pagx::SVGExportOptions bestEffort = {};
+  bestEffort.animation.policy = pagx::SVGAnimationPolicy::BestEffort;
+  auto bestEffortSvg = pagx::SVGExporter::ToSVG(*doc, bestEffort);
+  EXPECT_NE(bestEffortSvg.find("<path"), std::string::npos);
+  EXPECT_EQ(bestEffortSvg.find("<animate"), std::string::npos);
+}
+
 // M1: Default selects the first declared Animation, Named selects one id, All exports every
 // top-level Animation. Timing comes from a mounted timeline when present and from animation
 // defaults otherwise.

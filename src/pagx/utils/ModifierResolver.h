@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <unordered_map>
 #include <vector>
 #include "pagx/PAGXDocument.h"
 #include "pagx/nodes/Element.h"
@@ -73,6 +74,13 @@ class ModifierResolver {
    */
   bool CanBakeTextModifiers(const std::vector<Element*>& elements) const;
 
+  /**
+   * Returns the authored element a baked Path came from when the Path is the direct conversion of
+   * that element (currently Polystar). Returns null when the Path was produced by a path modifier
+   * or has no recorded source. Writers use this to re-emit an animated `d` track for the source.
+   */
+  const Element* sourceOf(const Element* baked) const;
+
  private:
   PAGXDocument* _doc;
   size_t _nodeCountBefore = 0;
@@ -109,6 +117,11 @@ class ModifierResolver {
    * the geometry has already been baked into the Text clone.
    */
   TextModifier* makePaintOnlyModifier(const TextModifier* modifier);
+
+  // Direct conversion results: baked Path -> authored source element. Entries are only consulted
+  // for Paths that survive in the resolved output, so a modifier replacing the bake naturally
+  // drops the mapping.
+  std::unordered_map<const Element*, const Element*> bakedSources = {};
 };
 
 }  // namespace pagx

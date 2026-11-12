@@ -82,6 +82,11 @@ bool IsSupportedChannel(NodeType nodeType, const std::string& name) {
       // Text.x / Text.y translate the shaped run without reshaping it, so the exporter wraps the
       // emitted text in a <g> that carries the translation track.
       return name == "x" || name == "y";
+    case NodeType::Polystar:
+      // Roundness keeps the vertex count and content bounds, so the baked path can carry a `d`
+      // track without re-running layout. Radii / rotation / pointCount change the bounds and stay
+      // classified as unsupported for now.
+      return name == "outerRoundness" || name == "innerRoundness";
     case NodeType::Rectangle:
       return name == "position.x" || name == "position.y" || name == "size.width" ||
              name == "size.height" || name == "roundness";

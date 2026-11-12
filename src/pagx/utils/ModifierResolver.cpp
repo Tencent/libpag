@@ -38,6 +38,7 @@
 #include "pagx/nodes/TextModifier.h"
 #include "pagx/nodes/TrimPath.h"
 #include "pagx/types/MergePathMode.h"
+#include "pagx/utils/PolystarPath.h"
 #include "pagx/utils/ExporterUtils.h"
 #include "pagx/utils/TextSelectorUtils.h"
 #include "pagx/utils/TextUtils.h"
@@ -123,144 +124,6 @@ Element* ModifierResolver::makePathFromData(PathData* data) const {
 }
 
 //==============================================================================
-// Polystar -> tgfx::Path. Mirrors tgfx/src/layers/vectors/Polystar.cpp so the
-// emitted geometry matches what the PAG renderer would produce for the same
-// pagx::Polystar (fractional pointCount, roundness, and reversed all behave
-// identically).
-//==============================================================================
-
-static void AddPolystarCurve(tgfx::Path* path, float centerX, float centerY, float angleDelta,
-                             float dx1, float dy1, float roundness1, float dx2, float dy2,
-                             float roundness2) {
-  float control1X = dx1 - dy1 * roundness1 * angleDelta + centerX;
-  float control1Y = dy1 + dx1 * roundness1 * angleDelta + centerY;
-  float control2X = dx2 + dy2 * roundness2 * angleDelta + centerX;
-  float control2Y = dy2 - dx2 * roundness2 * angleDelta + centerY;
-  path->cubicTo(control1X, control1Y, control2X, control2Y, dx2 + centerX, dy2 + centerY);
-}
-
-static tgfx::Path StarToTGFXPath(const Polystar* star) {
-  tgfx::Path path = {};
-  float points = star->pointCount;
-  if (points <= 0.0f) {
-    return path;
-  }
-  auto renderPos = star->renderPosition();
-  float centerX = renderPos.x;
-  float centerY = renderPos.y;
-  float innerRadius = star->renderInnerRadius();
-  float outerRadius = star->renderOuterRadius();
-  float innerRoundness = star->innerRoundness;
-  float outerRoundness = star->outerRoundness;
-  float direction = star->reversed ? -1.0f : 1.0f;
-  float angleStep = static_cast<float>(M_PI) / points;
-  float currentAngle = (star->rotation - 90.0f) * static_cast<float>(M_PI) / 180.0f;
-  int numPoints = static_cast<int>(std::ceil(points)) * 2;
-  float decimalPart = points - std::floor(points);
-  int decimalIndex = -2;
-  if (decimalPart != 0.0f) {
-    decimalIndex = direction > 0.0f ? 1 : numPoints - 3;
-    currentAngle -= angleStep * decimalPart * 2.0f;
-  }
-
-  float firstDx = outerRadius * std::cos(currentAngle);
-  float firstDy = outerRadius * std::sin(currentAngle);
-  float lastDx = firstDx;
-  float lastDy = firstDy;
-  path.moveTo(lastDx + centerX, lastDy + centerY);
-
-  bool outerFlag = false;
-  for (int i = 0; i < numPoints; ++i) {
-    float angleDelta = angleStep * direction;
-    float dx;
-    float dy;
-    if (i == numPoints - 1) {
-      dx = firstDx;
-      dy = firstDy;
-    } else {
-      float radius = outerFlag ? outerRadius : innerRadius;
-      if (i == decimalIndex || i == decimalIndex + 1) {
-        radius = innerRadius + decimalPart * (radius - innerRadius);
-        angleDelta *= decimalPart;
-      }
-      currentAngle += angleDelta;
-      dx = radius * std::cos(currentAngle);
-      dy = radius * std::sin(currentAngle);
-    }
-    if (innerRoundness != 0.0f || outerRoundness != 0.0f) {
-      float lastRoundness;
-      float roundness;
-      if (outerFlag) {
-        lastRoundness = innerRoundness;
-        roundness = outerRoundness;
-      } else {
-        lastRoundness = outerRoundness;
-        roundness = innerRoundness;
-      }
-      AddPolystarCurve(&path, centerX, centerY, angleDelta * 0.5f, lastDx, lastDy, lastRoundness,
-                       dx, dy, roundness);
-      lastDx = dx;
-      lastDy = dy;
-    } else {
-      path.lineTo(dx + centerX, dy + centerY);
-    }
-    outerFlag = !outerFlag;
-  }
-  path.close();
-  return path;
-}
-
-static tgfx::Path PolygonToTGFXPath(const Polystar* poly) {
-  tgfx::Path path = {};
-  float points = poly->pointCount;
-  if (points <= 0.0f) {
-    return path;
-  }
-  int numPoints = static_cast<int>(std::floor(points));
-  if (numPoints < 3) {
-    return path;
-  }
-  auto renderPos = poly->renderPosition();
-  float centerX = renderPos.x;
-  float centerY = renderPos.y;
-  float radius = poly->renderOuterRadius();
-  float roundness = poly->outerRoundness;
-  float direction = poly->reversed ? -1.0f : 1.0f;
-  float angleStep = 2.0f * static_cast<float>(M_PI) / static_cast<float>(numPoints);
-  float currentAngle = (poly->rotation - 90.0f) * static_cast<float>(M_PI) / 180.0f;
-
-  float firstDx = radius * std::cos(currentAngle);
-  float firstDy = radius * std::sin(currentAngle);
-  float lastDx = firstDx;
-  float lastDy = firstDy;
-  path.moveTo(lastDx + centerX, lastDy + centerY);
-
-  for (int i = 0; i < numPoints; ++i) {
-    float angleDelta = angleStep * direction;
-    float dx;
-    float dy;
-    if (i == numPoints - 1) {
-      dx = firstDx;
-      dy = firstDy;
-    } else {
-      currentAngle += angleDelta;
-      dx = radius * std::cos(currentAngle);
-      dy = radius * std::sin(currentAngle);
-    }
-    if (roundness != 0.0f) {
-      AddPolystarCurve(&path, centerX, centerY, angleDelta * 0.25f, lastDx, lastDy, roundness, dx,
-                       dy, roundness);
-      lastDx = dx;
-      lastDy = dy;
-    } else {
-      path.lineTo(dx + centerX, dy + centerY);
-    }
-  }
-  path.close();
-  return path;
-}
-
-//==============================================================================
 // Primitive -> tgfx::Path. We honour position offsets so the path lives in the
 // same coordinate space the painter assumes.
 //==============================================================================
@@ -326,7 +189,7 @@ static tgfx::Path PrimitiveToTGFXPath(const Element* el) {
   }
   if (type == NodeType::Polystar) {
     auto* ps = static_cast<const Polystar*>(el);
-    return ps->type == PolystarType::Polygon ? PolygonToTGFXPath(ps) : StarToTGFXPath(ps);
+    return PolystarToTGFXPath(SamplePolystar(ps));
   }
   return tgfx::Path();
 }
@@ -742,6 +605,14 @@ TextModifier* ModifierResolver::makePaintOnlyModifier(const TextModifier* modifi
   return clone;
 }
 
+const Element* ModifierResolver::sourceOf(const Element* baked) const {
+  if (baked == nullptr) {
+    return nullptr;
+  }
+  auto iter = bakedSources.find(baked);
+  return iter == bakedSources.end() ? nullptr : iter->second;
+}
+
 bool ModifierResolver::CanBakeTextModifiers(const std::vector<Element*>& elements) const {
   std::vector<const Text*> texts = {};
   for (auto* element : elements) {
@@ -825,9 +696,10 @@ std::vector<Element*> ModifierResolver::resolve(const std::vector<Element*>& ele
         // geometry. Round-tripping through tgfx keeps this consistent with how
         // the renderer would interpret the same Polystar.
         auto* ps = static_cast<const Polystar*>(element);
-        auto tp = ps->type == PolystarType::Polygon ? PolygonToTGFXPath(ps) : StarToTGFXPath(ps);
+        auto tp = PolystarToTGFXPath(SamplePolystar(ps));
         auto* pd = MakePathDataFromTGFX(_doc, tp);
         auto* path = makePathFromData(pd);
+        bakedSources[path] = element;
         shapeSlots.push_back(output.size());
         output.push_back(path);
         break;

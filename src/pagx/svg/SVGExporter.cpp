@@ -578,6 +578,9 @@ class SVGWriter {
   const Path* _pendingPathAnimatedData = nullptr;
   Point _pendingPathRenderPosition = {};
   float _pendingPathRenderScale = 1.0f;
+  // Set when the emitted Path is the direct bake of a Polystar whose roundness track can be
+  // re-emitted as a d animation.
+  const Polystar* _pendingPolystarAnimated = nullptr;
 
   // Total transform applied to the mask layer body while a <mask> / <clipPath> def is being
   // written. Set by writeMaskOrClipDef so the content writers do not have to recompute it.
@@ -636,6 +639,17 @@ class SVGWriter {
         if (candidate == element) {
           kept = true;
           break;
+        }
+      }
+      // A Polystar bake keeps a source mapping, which lets writePath re-emit its roundness track
+      // as a d animation even though the authored node is gone.
+      if (!kept && element->nodeType() == NodeType::Polystar &&
+          _animWriter.HasPolystarDataAnimates(element)) {
+        for (auto* candidate : resolved) {
+          if (_resolver.sourceOf(candidate) == element) {
+            kept = true;
+            break;
+          }
         }
       }
       if (kept) {
@@ -2447,11 +2461,13 @@ void SVGWriter::finishShapeElement(SVGBuilder& out, const FillStrokeInfo& fs, fl
   bool hasGroupAnimation = _pendingGroupSteps != nullptr;
   bool hasGeometryAnimation = geometry != nullptr && _animWriter.HasShapeGeometryAnimates(geometry);
   bool hasPathDataAnimation = geometry != nullptr && _pendingPathAnimatedData == geometry;
+  bool hasPolystarDataAnimation = geometry != nullptr && _pendingPolystarAnimated != nullptr &&
+                                  _resolver.sourceOf(geometry) == _pendingPolystarAnimated;
   bool hasGroupOpacity =
       hasGroupAnimation && !_animWriter.HasPainterOpacityAnimates(fs.fill, fs.stroke) &&
       _animWriter.HasElementOpacityAnimates(_pendingGroupSteps->data(), _pendingGroupSteps->size());
   if (!hasGroupAnimation && !hasGeometryAnimation && !hasPathDataAnimation &&
-      !_animWriter.HasPainterAnimates(fs.fill, fs.stroke)) {
+      !hasPolystarDataAnimation && !_animWriter.HasPainterAnimates(fs.fill, fs.stroke)) {
     out.closeElementSelfClosing();
     return;
   }
@@ -2466,6 +2482,9 @@ void SVGWriter::finishShapeElement(SVGBuilder& out, const FillStrokeInfo& fs, fl
   if (hasPathDataAnimation) {
     _animWriter.WritePathDataAnimates(out, geometry, _pendingPathRenderPosition,
                                       _pendingPathRenderScale);
+  }
+  if (hasPolystarDataAnimation) {
+    _animWriter.WritePolystarDataAnimates(out, _pendingPolystarAnimated);
   }
   if (hasGroupOpacity) {
     if (fs.fill != nullptr) {
@@ -2757,6 +2776,13 @@ void SVGWriter::writePath(SVGBuilder& out, const Path* path, const FillStrokeInf
   _pendingPathRenderScale = scale;
   if (!clipInside && !maskOutside && !adaptiveDash && _animWriter.HasPathPointAnimates(path)) {
     _pendingPathAnimatedData = path;
+  }
+  _pendingPolystarAnimated = nullptr;
+  if (!clipInside && !maskOutside && !adaptiveDash) {
+    const Element* bakedSource = _resolver.sourceOf(path);
+    if (bakedSource != nullptr && _animWriter.HasPolystarDataAnimates(bakedSource)) {
+      _pendingPolystarAnimated = static_cast<const Polystar*>(bakedSource);
+    }
   }
 
   out.openElement("path");

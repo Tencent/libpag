@@ -33,6 +33,7 @@
 #include "pagx/nodes/Layer.h"
 #include "pagx/nodes/Path.h"
 #include "pagx/nodes/PathData.h"
+#include "pagx/nodes/Polystar.h"
 #include "pagx/nodes/Rectangle.h"
 #include "pagx/nodes/SolidColor.h"
 #include "pagx/nodes/Stroke.h"
@@ -40,6 +41,7 @@
 #include "pagx/runtime/MatrixDecompose.h"
 #include "pagx/svg/SVGAnimationPlan.h"
 #include "pagx/svg/SVGPathParser.h"
+#include "pagx/utils/PolystarPath.h"
 #include "pagx/types/Color.h"
 #include "pagx/utils/ExporterUtils.h"
 #include "pagx/utils/StringParser.h"
@@ -1966,6 +1968,139 @@ bool SVGAnimationWriter::WriteTextPositionAnimates(XMLBuilder& out, const Node* 
   }
   // The host <g> carries no static transform, so the animation replaces an empty transform.
   WriteAnimateElement(out, "transform", "translate", true, sequence, timing, nullptr, nullptr);
+  return true;
+}
+
+bool SVGAnimationWriter::HasPolystarDataAnimates(const Node* polystar) const {
+  if (_plan == nullptr || polystar == nullptr || polystar->nodeType() != NodeType::Polystar) {
+    return false;
+  }
+  auto* list = _plan->BindingsFor(polystar);
+  if (list == nullptr || list->empty()) {
+    return false;
+  }
+  for (const auto& binding : *list) {
+    const auto& name = binding.channel->name;
+    if (name != "outerRoundness" && name != "innerRoundness") {
+      return false;
+    }
+  }
+  return true;
+}
+
+bool SVGAnimationWriter::WritePolystarDataAnimates(XMLBuilder& out, const Node* node) {
+  if (!HasPolystarDataAnimates(node)) {
+    return false;
+  }
+  const auto* polystar = static_cast<const Polystar*>(node);
+  auto* list = _plan->BindingsFor(node);
+  const Animation* animation = list->front().animation;
+  for (const auto& binding : *list) {
+    if (binding.animation != animation) {
+      AddWarning("roundness channels on <Polystar> '" + node->id +
+                 "' span multiple animations; the d track is dropped.");
+      return false;
+    }
+  }
+  SmilTiming timing;
+  if (!ResolveTiming(animation, list->front().timeline, &timing)) {
+    return false;
+  }
+  auto span = static_cast<double>(animation->duration);
+  if (span <= 0) {
+    return false;
+  }
+
+  std::vector<Frame> frames;
+  bool allHold = true;
+  bool hasCurve = false;
+  std::vector<Frame> detail;
+  for (const auto& binding : *list) {
+    const auto* typed = static_cast<const TypedChannel<float>*>(binding.channel);
+    AppendTrackFrames(binding.channel, animation->duration, &frames);
+    for (size_t i = 0; i + 1 < typed->keyframes.size(); i++) {
+      auto type = typed->keyframes[i].interpolation;
+      if (!IsHold(type)) {
+        allHold = false;
+      }
+      Frame start = std::max<Frame>(typed->keyframes[i].time, 0);
+      Frame end = std::min<Frame>(typed->keyframes[i + 1].time, animation->duration);
+      if (end <= start) {
+        continue;
+      }
+      if (IsHold(type)) {
+        double gapFrames = std::clamp(static_cast<double>(end - start) * HoldGapRatio,
+                                      HoldGapFloor * span, HoldGapCeiling * span);
+        auto holdTime = static_cast<Frame>(static_cast<double>(end) - gapFrames);
+        if (holdTime > start) {
+          detail.push_back(holdTime);
+        }
+      } else if (type == KeyframeInterpolationType::Bezier) {
+        hasCurve = true;
+        constexpr int SubSamples = 8;
+        for (int s = 1; s < SubSamples; s++) {
+          detail.push_back(start + static_cast<Frame>((end - start) * s / SubSamples));
+        }
+      }
+    }
+  }
+  if (hasCurve) {
+    AddWarning("roundness channels on <Polystar> '" + node->id +
+               "' use bezier easing; the d track is sampled linearly.");
+  }
+  if (!detail.empty()) {
+    frames.insert(frames.end(), detail.begin(), detail.end());
+  }
+  std::sort(frames.begin(), frames.end());
+  frames.erase(std::unique(frames.begin(), frames.end()), frames.end());
+  if (frames.size() < 2) {
+    return false;
+  }
+  if (frames.size() > MaxPathDataSamples) {
+    std::vector<Frame> reduced;
+    reduced.reserve(MaxPathDataSamples);
+    for (size_t i = 0; i < MaxPathDataSamples; i++) {
+      size_t index = i * (frames.size() - 1) / (MaxPathDataSamples - 1);
+      reduced.push_back(frames[index]);
+    }
+    std::sort(reduced.begin(), reduced.end());
+    reduced.erase(std::unique(reduced.begin(), reduced.end()), reduced.end());
+    frames = std::move(reduced);
+    AddWarning("roundness track on <Polystar> '" + node->id +
+               "' exceeded 512 samples and was downsampled; dense bezier segments lose some "
+               "intermediate shape.");
+  }
+
+  PolystarSample sample = SamplePolystar(polystar);
+  sample.forceCurves = true;
+  SmilSequence sequence;
+  for (auto frame : frames) {
+    for (const auto& binding : *list) {
+      auto value = binding.channel->evaluateAt(frame);
+      const auto* roundness = std::get_if<float>(&value);
+      if (roundness == nullptr) {
+        continue;
+      }
+      if (binding.channel->name == "outerRoundness") {
+        sample.outerRoundness = *roundness;
+      } else {
+        sample.innerRoundness = *roundness;
+      }
+    }
+    sequence.values.push_back(TGFXPathToSVGString(PolystarToTGFXPath(sample)));
+    sequence.keyTimes.push_back(std::clamp(static_cast<double>(frame) / span, 0.0, 1.0));
+  }
+  if (sequence.values.size() < 2) {
+    return false;
+  }
+  if (allHold) {
+    sequence.discrete = true;
+  }
+  if (timing.mirror) {
+    ApplyPingPong(&sequence);
+    timing.durationSeconds *= 2.0;
+  }
+  WriteAnimateElement(out, "d", nullptr, false, sequence, timing, nullptr, nullptr);
   return true;
 }
 

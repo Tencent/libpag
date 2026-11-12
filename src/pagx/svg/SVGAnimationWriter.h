@@ -178,6 +178,19 @@ class SVGAnimationWriter {
   bool WriteTextPositionAnimates(XMLBuilder& out, const Node* text);
 
   /**
+   * Returns true when every channel bound to the Polystar is a roundness track, which is the
+   * geometry subset whose content bounds (and therefore layout placement) stay static.
+   */
+  bool HasPolystarDataAnimates(const Node* polystar) const;
+
+  /**
+   * Emits a `d` track for a Polystar whose inner/outer roundness is animated. Every frame uses the
+   * same cubic verb list (zero-roundness cubics collapse onto the straight edge) so SMIL can
+   * interpolate the path.
+   */
+  bool WritePolystarDataAnimates(XMLBuilder& out, const Node* polystar);
+
+  /**
    * Emits the opacity animation for a geometry element that sits under animated Group alpha
    * channels. The group alpha is already folded into `baseAlpha`, so the emitted values are the
    * animated ratio applied on top of it.
