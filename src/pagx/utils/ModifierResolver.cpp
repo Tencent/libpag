@@ -245,7 +245,9 @@ Element* ModifierResolver::applyTrimToElement(Element* shape, const TrimPath* tr
   if (effect == nullptr || !effect->filterPath(&tp)) {
     return shape;
   }
-  return makePathFromData(MakePathDataFromTGFX(_doc, tp));
+  auto* result = makePathFromData(MakePathDataFromTGFX(_doc, tp));
+  RecordBake(shape, result);
+  return result;
 }
 
 // Distribute a Continuous-mode TrimPath across in-scope shapes by cumulative
@@ -355,7 +357,10 @@ void ModifierResolver::applyContinuousTrim(std::vector<Element*>& output,
     if (effect != nullptr) {
       effect->filterPath(&path);
     }
-    output[shapeSlots[order]] = makePathFromData(MakePathDataFromTGFX(_doc, path));
+    auto* before = output[shapeSlots[order]];
+    auto* after = makePathFromData(MakePathDataFromTGFX(_doc, path));
+    RecordBake(before, after);
+    output[shapeSlots[order]] = after;
   }
 
   // Drop shapes that have no surviving segment so downstream painters
@@ -392,7 +397,9 @@ Element* ModifierResolver::applyRoundCornerToElement(Element* shape,
   if (effect == nullptr || !effect->filterPath(&tp)) {
     return shape;
   }
-  return makePathFromData(MakePathDataFromTGFX(_doc, tp));
+  auto* result = makePathFromData(MakePathDataFromTGFX(_doc, tp));
+  RecordBake(shape, result);
+  return result;
 }
 
 // MergePathMode::Append preserves each sub-path verbatim and relies on the
@@ -605,6 +612,18 @@ TextModifier* ModifierResolver::makePaintOnlyModifier(const TextModifier* modifi
   return clone;
 }
 
+void ModifierResolver::RecordBake(const Element* before, const Element* after) const {
+  if (after == nullptr) {
+    return;
+  }
+  bakedSources[after] = SourceRoot(before);
+}
+
+const Element* ModifierResolver::SourceRoot(const Element* element) const {
+  auto iter = bakedSources.find(element);
+  return iter == bakedSources.end() ? element : iter->second;
+}
+
 const Element* ModifierResolver::sourceOf(const Element* baked) const {
   if (baked == nullptr) {
     return nullptr;
@@ -699,7 +718,7 @@ std::vector<Element*> ModifierResolver::resolve(const std::vector<Element*>& ele
         auto tp = PolystarToTGFXPath(SamplePolystar(ps));
         auto* pd = MakePathDataFromTGFX(_doc, tp);
         auto* path = makePathFromData(pd);
-        bakedSources[path] = element;
+        RecordBake(element, path);
         shapeSlots.push_back(output.size());
         output.push_back(path);
         break;
@@ -720,6 +739,7 @@ std::vector<Element*> ModifierResolver::resolve(const std::vector<Element*>& ele
           // Bake the reversed primitive into an editable Path while preserving its rendered space.
           auto tp = PrimitiveToTGFXPath(element);
           auto* path = makePathFromData(MakePathDataFromTGFX(_doc, tp));
+          RecordBake(element, path);
           shapeSlots.push_back(output.size());
           output.push_back(path);
           break;

@@ -581,6 +581,10 @@ class SVGWriter {
   // Set when the emitted Path is the direct bake of a Polystar whose roundness track can be
   // re-emitted as a d animation.
   const Polystar* _pendingPolystarAnimated = nullptr;
+  // Scope list each resolved element came from, so an animated source can be re-resolved per
+  // frame by the animation writer.
+  std::unordered_map<const Element*, const std::vector<Element*>*> _elementScopes = {};
+  SVGSampledDataTrack _pendingBakedTrack = {};
 
   // Total transform applied to the mask layer body while a <mask> / <clipPath> def is being
   // written. Set by writeMaskOrClipDef so the content writers do not have to recompute it.
@@ -613,6 +617,9 @@ class SVGWriter {
     // TrimPath and Repeater have no SVG counterpart, so the shapes simply disappear from the
     // output. A wrong picture is worse than a baked one.
     std::vector<Element*> resolved = _resolver.resolve(elements);
+    for (auto* element : resolved) {
+      _elementScopes[element] = &elements;
+    }
     reportBakedAnimates(elements, resolved);
     return resolved;
   }
@@ -641,10 +648,12 @@ class SVGWriter {
           break;
         }
       }
-      // A Polystar bake keeps a source mapping, which lets writePath re-emit its roundness track
-      // as a d animation even though the authored node is gone.
-      if (!kept && element->nodeType() == NodeType::Polystar &&
-          _animWriter.HasPolystarDataAnimates(element)) {
+      // A bake keeps a source mapping, which lets writePath re-emit the animation as a d track
+      // even though the authored node is gone. This covers Polystar directly and Rectangle /
+      // Ellipse / Path re-baked through their modifier chain.
+      bool reemittable = _animWriter.HasPolystarDataAnimates(element) ||
+                         _animWriter.HasBakedShapeAnimates(element);
+      if (!kept && reemittable) {
         for (auto* candidate : resolved) {
           if (_resolver.sourceOf(candidate) == element) {
             kept = true;
@@ -2474,11 +2483,15 @@ void SVGWriter::finishShapeElement(SVGBuilder& out, const FillStrokeInfo& fs, fl
   bool hasPathDataAnimation = geometry != nullptr && _pendingPathAnimatedData == geometry;
   bool hasPolystarDataAnimation = geometry != nullptr && _pendingPolystarAnimated != nullptr &&
                                   _resolver.sourceOf(geometry) == _pendingPolystarAnimated;
+  bool hasBakedDataAnimation = geometry != nullptr && _pendingBakedTrack.baked == geometry &&
+                               _pendingBakedTrack.source != nullptr &&
+                               !_pendingBakedTrack.values.empty();
   bool hasGroupOpacity =
       hasGroupAnimation && !_animWriter.HasPainterOpacityAnimates(fs.fill, fs.stroke) &&
       _animWriter.HasElementOpacityAnimates(_pendingGroupSteps->data(), _pendingGroupSteps->size());
   if (!hasGroupAnimation && !hasGeometryAnimation && !hasPathDataAnimation &&
-      !hasPolystarDataAnimation && !_animWriter.HasPainterAnimates(fs.fill, fs.stroke)) {
+      !hasPolystarDataAnimation && !hasBakedDataAnimation &&
+      !_animWriter.HasPainterAnimates(fs.fill, fs.stroke)) {
     out.closeElementSelfClosing();
     return;
   }
@@ -2496,6 +2509,11 @@ void SVGWriter::finishShapeElement(SVGBuilder& out, const FillStrokeInfo& fs, fl
   }
   if (hasPolystarDataAnimation) {
     _animWriter.WritePolystarDataAnimates(out, _pendingPolystarAnimated);
+  }
+  if (hasBakedDataAnimation) {
+    _animWriter.WriteSampledDataAnimates(out, _pendingBakedTrack.source,
+                                         _pendingBakedTrack.values, _pendingBakedTrack.keyTimes,
+                                         _pendingBakedTrack.discrete);
   }
   if (hasGroupOpacity) {
     if (fs.fill != nullptr) {
@@ -2789,10 +2807,23 @@ void SVGWriter::writePath(SVGBuilder& out, const Path* path, const FillStrokeInf
     _pendingPathAnimatedData = path;
   }
   _pendingPolystarAnimated = nullptr;
+  _pendingBakedTrack = {};
   if (!clipInside && !maskOutside && !adaptiveDash) {
     const Element* bakedSource = _resolver.sourceOf(path);
     if (bakedSource != nullptr && _animWriter.HasPolystarDataAnimates(bakedSource)) {
       _pendingPolystarAnimated = static_cast<const Polystar*>(bakedSource);
+    }
+  }
+  if (!clipInside && !maskOutside && !adaptiveDash && _pendingPolystarAnimated == nullptr) {
+    const Element* bakedSource = _resolver.sourceOf(path);
+    auto scope = _elementScopes.find(path);
+    if (bakedSource != nullptr && _animWriter.HasBakedShapeAnimates(bakedSource) &&
+        scope != _elementScopes.end() && scope->second != nullptr) {
+      if (!_animWriter.BuildBakedShapeDataTrack(path, &_resolver, *scope->second,
+                                                &_pendingBakedTrack)) {
+        // Build already reported why; Strict must reject instead of freezing the static bake.
+        _rejected = _rejected || _rejectUnsupported || _animationStrict;
+      }
     }
   }
 

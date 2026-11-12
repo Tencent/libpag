@@ -26,11 +26,14 @@ namespace pagx {
 
 class ColorSource;
 class ColorStop;
+class Element;
 class Fill;
 class Group;
 class Layer;
+class ModifierResolver;
 class Node;
 class PAGXDocument;
+class Path;
 class Stroke;
 class SVGAnimationPlan;
 class XMLBuilder;
@@ -43,6 +46,18 @@ class XMLBuilder;
 struct SVGGroupTransformStep {
   const Group* group = nullptr;
   Matrix prefix = {};
+};
+
+/**
+ * A `d` track built by re-resolving the source's scope at sampled frames. `baked` is the Path the
+ * track belongs to; `source` is the authored Rectangle / Ellipse / Path node.
+ */
+struct SVGSampledDataTrack {
+  const Path* baked = nullptr;
+  const Node* source = nullptr;
+  std::vector<std::string> values = {};
+  std::vector<double> keyTimes = {};
+  bool discrete = false;
 };
 
 /**
@@ -201,6 +216,27 @@ class SVGAnimationWriter {
    * Emits the `seed` animation inside the current feTurbulence element.
    */
   bool WriteNoiseSeedAnimates(XMLBuilder& out, const Node* noise);
+
+  /**
+   * Returns true when every channel bound to a Rectangle / Ellipse / Path source is a geometry
+   * channel the exporter can re-bake through the document's modifiers per frame.
+   */
+  bool HasBakedShapeAnimates(const Node* source) const;
+
+  /**
+   * Samples the source through the modifier chain by writing each frame's channel values onto the
+   * source, re-running the resolver and reading the baked Path back. Restores the source before
+   * returning. Returns false when the source is not re-bakeable or a frame fails.
+   */
+  bool BuildBakedShapeDataTrack(const Path* baked, ModifierResolver* resolver,
+                                const std::vector<Element*>& scope, SVGSampledDataTrack* track);
+
+  /**
+   * Emits a `d` track from geometry the exporter sampled by re-resolving the source's scope at
+   * each frame. `keyTimes` are normalized to the animation duration.
+   */
+  bool WriteSampledDataAnimates(XMLBuilder& out, const Node* source, std::vector<std::string> values,
+                                std::vector<double> keyTimes, bool discrete);
 
   /**
    * Emits the opacity animation for a geometry element that sits under animated Group alpha

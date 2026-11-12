@@ -21,6 +21,7 @@
 #include <cmath>
 #include <cstdio>
 #include <limits>
+#include <utility>
 #include "base/utils/MathUtil.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/PAGXNodeChannel.h"
@@ -42,6 +43,7 @@
 #include "pagx/runtime/MatrixDecompose.h"
 #include "pagx/svg/SVGAnimationPlan.h"
 #include "pagx/svg/SVGPathParser.h"
+#include "pagx/utils/ModifierResolver.h"
 #include "pagx/utils/PolystarPath.h"
 #include "pagx/types/Color.h"
 #include "pagx/utils/ExporterUtils.h"
@@ -577,6 +579,46 @@ void CollectPathPointBindings(const SVGAnimationPlan* plan, const Node* path,
       continue;
     }
     out->push_back({&binding, index, isX});
+  }
+}
+
+// Rebuilds the path data from a point array while keeping the authored verb list. Used when a
+// sampled frame changes Path point channels before the modifier chain runs.
+void FillPathDataFromPoints(const PathData& source, const std::vector<Point>& points,
+                            PathData* result) {
+  size_t index = 0;
+  for (auto verb : source.verbs()) {
+    switch (verb) {
+      case PathVerb::Move:
+        if (index < points.size()) {
+          result->moveTo(points[index].x, points[index].y);
+        }
+        index += 1;
+        break;
+      case PathVerb::Line:
+        if (index < points.size()) {
+          result->lineTo(points[index].x, points[index].y);
+        }
+        index += 1;
+        break;
+      case PathVerb::Quad:
+        if (index + 1 < points.size()) {
+          result->quadTo(points[index].x, points[index].y, points[index + 1].x,
+                         points[index + 1].y);
+        }
+        index += 2;
+        break;
+      case PathVerb::Cubic:
+        if (index + 2 < points.size()) {
+          result->cubicTo(points[index].x, points[index].y, points[index + 1].x,
+                          points[index + 1].y, points[index + 2].x, points[index + 2].y);
+        }
+        index += 3;
+        break;
+      case PathVerb::Close:
+        result->close();
+        break;
+    }
   }
 }
 
@@ -2138,6 +2180,208 @@ bool SVGAnimationWriter::WriteNoiseSeedAnimates(XMLBuilder& out, const Node* noi
     return false;
   }
   return WriteChannelAnimate(out, noise, "seed", "seed");
+}
+
+bool SVGAnimationWriter::HasBakedShapeAnimates(const Node* source) const {
+  if (_plan == nullptr || source == nullptr) {
+    return false;
+  }
+  auto* list = _plan->BindingsFor(source);
+  if (list == nullptr || list->empty()) {
+    return false;
+  }
+  // Only Path points can be sampled without re-running layout. Rectangle / Ellipse size channels
+  // live in the layout-resolved bounds, so they stay classified as unsupported under a modifier
+  // until the sampler can bypass the resolved layout.
+  if (source->nodeType() != NodeType::Path) {
+    return false;
+  }
+  for (const auto& binding : *list) {
+    size_t index = 0;
+    bool isX = false;
+    if (!ParsePathPointChannel(binding.channel->name, &index, &isX)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+bool SVGAnimationWriter::WriteSampledDataAnimates(XMLBuilder& out, const Node* source,
+                                                  std::vector<std::string> values,
+                                                  std::vector<double> keyTimes, bool discrete) {
+  if (_plan == nullptr || source == nullptr || values.size() < 2 ||
+      values.size() != keyTimes.size()) {
+    return false;
+  }
+  auto* list = _plan->BindingsFor(source);
+  if (list == nullptr || list->empty()) {
+    return false;
+  }
+  SmilTiming timing;
+  if (!ResolveTiming(list->front().animation, list->front().timeline, &timing)) {
+    return false;
+  }
+  SmilSequence sequence;
+  sequence.values = std::move(values);
+  sequence.keyTimes = std::move(keyTimes);
+  sequence.discrete = discrete;
+  if (timing.mirror) {
+    ApplyPingPong(&sequence);
+    timing.durationSeconds *= 2.0;
+  }
+  WriteAnimateElement(out, "d", nullptr, false, sequence, timing, nullptr, nullptr);
+  return true;
+}
+
+bool SVGAnimationWriter::BuildBakedShapeDataTrack(const Path* baked, ModifierResolver* resolver,
+                                                  const std::vector<Element*>& scope,
+                                                  SVGSampledDataTrack* track) {
+  if (_plan == nullptr || baked == nullptr || resolver == nullptr || track == nullptr) {
+    return false;
+  }
+  const Element* source = resolver->sourceOf(baked);
+  if (source == nullptr || !HasBakedShapeAnimates(source)) {
+    return false;
+  }
+  auto* list = _plan->BindingsFor(source);
+  if (list == nullptr || list->empty()) {
+    return false;
+  }
+  const Animation* animation = list->front().animation;
+  for (const auto& binding : *list) {
+    if (binding.animation != animation) {
+      AddWarning("geometry channels on <" + std::string(NodeTypeName(source->nodeType())) + "> '" +
+                 source->id + "' span multiple animations; the d track is dropped.");
+      return false;
+    }
+  }
+  auto span = static_cast<double>(animation->duration);
+  if (span <= 0) {
+    return false;
+  }
+  auto* sourcePath = source->nodeType() == NodeType::Path
+                         ? const_cast<Path*>(static_cast<const Path*>(source))
+                         : nullptr;
+  if (sourcePath != nullptr && sourcePath->data == nullptr) {
+    return false;
+  }
+
+  std::vector<Frame> frames;
+  bool allHold = true;
+  bool hasCurve = false;
+  std::vector<Frame> detail;
+  for (const auto& binding : *list) {
+    const auto* typed = static_cast<const TypedChannel<float>*>(binding.channel);
+    AppendTrackFrames(binding.channel, animation->duration, &frames);
+    for (size_t i = 0; i + 1 < typed->keyframes.size(); i++) {
+      auto type = typed->keyframes[i].interpolation;
+      if (!IsHold(type)) {
+        allHold = false;
+      }
+      Frame start = std::max<Frame>(typed->keyframes[i].time, 0);
+      Frame end = std::min<Frame>(typed->keyframes[i + 1].time, animation->duration);
+      if (end <= start) {
+        continue;
+      }
+      if (IsHold(type)) {
+        double gapFrames = std::clamp(static_cast<double>(end - start) * HoldGapRatio,
+                                      HoldGapFloor * span, HoldGapCeiling * span);
+        auto holdTime = static_cast<Frame>(static_cast<double>(end) - gapFrames);
+        if (holdTime > start) {
+          detail.push_back(holdTime);
+        }
+      } else if (type == KeyframeInterpolationType::Bezier) {
+        hasCurve = true;
+        constexpr int SubSamples = 8;
+        for (int s = 1; s < SubSamples; s++) {
+          detail.push_back(start + static_cast<Frame>((end - start) * s / SubSamples));
+        }
+      }
+    }
+  }
+  if (hasCurve) {
+    AddWarning("geometry channels on <" + std::string(NodeTypeName(source->nodeType())) + "> '" +
+               source->id + "' use bezier easing; the d track is sampled linearly.");
+  }
+  if (!detail.empty()) {
+    frames.insert(frames.end(), detail.begin(), detail.end());
+  }
+  std::sort(frames.begin(), frames.end());
+  frames.erase(std::unique(frames.begin(), frames.end()), frames.end());
+  if (frames.size() < 2) {
+    return false;
+  }
+  // Each sample re-runs the whole modifier chain, so the grid stays small.
+  constexpr size_t MaxBakeSamples = 32;
+  if (frames.size() > MaxBakeSamples) {
+    std::vector<Frame> reduced;
+    reduced.reserve(MaxBakeSamples);
+    for (size_t i = 0; i < MaxBakeSamples; i++) {
+      size_t index = i * (frames.size() - 1) / (MaxBakeSamples - 1);
+      reduced.push_back(frames[index]);
+    }
+    std::sort(reduced.begin(), reduced.end());
+    reduced.erase(std::unique(reduced.begin(), reduced.end()), reduced.end());
+    frames = std::move(reduced);
+    AddWarning("geometry track on <" + std::string(NodeTypeName(source->nodeType())) + "> '" +
+               source->id + "' exceeded 32 re-bake samples and was downsampled.");
+  }
+
+  if (sourcePath == nullptr) {
+    return false;
+  }
+  track->values.clear();
+  track->keyTimes.clear();
+  for (auto frame : frames) {
+    std::vector<Point> points = sourcePath->data->points();
+    for (const auto& binding : *list) {
+      auto value = binding.channel->evaluateAt(frame);
+      const auto* number = std::get_if<float>(&value);
+      size_t pointIndex = 0;
+      bool isX = false;
+      if (number == nullptr ||
+          !ParsePathPointChannel(binding.channel->name, &pointIndex, &isX) ||
+          pointIndex >= points.size()) {
+        continue;
+      }
+      if (isX) {
+        points[pointIndex].x = *number;
+      } else {
+        points[pointIndex].y = *number;
+      }
+    }
+    PathData local = PathDataFromSVGString("");
+    FillPathDataFromPoints(*sourcePath->data, points, &local);
+    PathData* savedData = sourcePath->data;
+    sourcePath->data = &local;
+    std::string d;
+    auto resolved = resolver->resolve(scope);
+    for (auto* element : resolved) {
+      if (element->nodeType() != NodeType::Path) {
+        continue;
+      }
+      if (resolver->sourceOf(element) != source) {
+        continue;
+      }
+      d = PathDataToSVGString(*static_cast<const Path*>(element)->data);
+      break;
+    }
+    sourcePath->data = savedData;
+    if (d.empty()) {
+      AddWarning("geometry track on <Path> '" + source->id +
+                 "' could not be re-baked through its modifiers.");
+      return false;
+    }
+    track->values.push_back(std::move(d));
+    track->keyTimes.push_back(std::clamp(static_cast<double>(frame) / span, 0.0, 1.0));
+  }
+  if (track->values.size() < 2) {
+    return false;
+  }
+  track->baked = baked;
+  track->source = source;
+  track->discrete = allHold;
+  return true;
 }
 
 bool SVGAnimationWriter::WritePaintAnimates(XMLBuilder& out, const Node* painter,

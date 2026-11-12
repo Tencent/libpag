@@ -118,10 +118,20 @@ class ModifierResolver {
    */
   TextModifier* makePaintOnlyModifier(const TextModifier* modifier);
 
-  // Direct conversion results: baked Path -> authored source element. Entries are only consulted
-  // for Paths that survive in the resolved output, so a modifier replacing the bake naturally
-  // drops the mapping.
-  std::unordered_map<const Element*, const Element*> bakedSources = {};
+  /**
+   * Records that `after` is the baked form of `before`, keeping the authored root source so a
+   * later re-resolve can correlate its output with the animated element.
+   */
+  void RecordBake(const Element* before, const Element* after) const;
+
+  /**
+   * Returns the authored root of `element`, or `element` itself when it was never baked.
+   */
+  const Element* SourceRoot(const Element* element) const;
+
+  // Baked Path -> authored source element. Entries are only consulted for Paths that survive in
+  // the resolved output, so a modifier replacing the bake naturally drops the mapping.
+  mutable std::unordered_map<const Element*, const Element*> bakedSources = {};
 };
 
 }  // namespace pagx
