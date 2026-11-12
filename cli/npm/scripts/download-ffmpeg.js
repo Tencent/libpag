@@ -131,12 +131,18 @@ function requestResponse(parsed, deadline) {
       reject(new Error(`download exceeded its overall deadline: ${parsed.toString()}`));
       return;
     }
+    let deadlineError = null;
     const transport = parsed.protocol === 'https:' ? https : http;
     const request = transport.get(parsed, {
       headers: { 'User-Agent': 'pagx-ffmpeg-downloader' },
-    }, (response) => resolve({ response, cancel: () => clearTimeout(deadlineTimer) }));
+    }, (response) => resolve({
+      response,
+      cancel: () => clearTimeout(deadlineTimer),
+      getDeadlineError: () => deadlineError,
+    }));
     const deadlineTimer = setTimeout(() => {
-      request.destroy(new Error(`download exceeded its overall deadline: ${parsed.toString()}`));
+      deadlineError = new Error(`download exceeded its overall deadline: ${parsed.toString()}`);
+      request.destroy(deadlineError);
     }, remaining);
     request.setTimeout(Math.min(SOCKET_TIMEOUT_MS, remaining), () => {
       request.destroy(new Error(`download timed out while idle: ${parsed.toString()}`));
@@ -167,7 +173,7 @@ async function downloadFile(url, destination, options = {}) {
   const deadline = options.deadline || Date.now() + (options.timeoutMs || DOWNLOAD_TIMEOUT_MS);
   const maxBytes = options.maxBytes == null ? MAX_DOWNLOAD_BYTES : options.maxBytes;
   const parsed = validateDownloadURL(url, options.previousURL);
-  const { response, cancel } = await requestResponse(parsed, deadline);
+  const { response, cancel, getDeadlineError } = await requestResponse(parsed, deadline);
   try {
     const status = response.statusCode || 0;
     if (status >= 300 && status < 400 && response.headers.location) {
@@ -199,6 +205,8 @@ async function downloadFile(url, destination, options = {}) {
       );
     } catch (error) {
       fs.rmSync(destination, { force: true });
+      const deadlineError = getDeadlineError();
+      if (deadlineError) throw deadlineError;
       throw new Error(`failed to save ${url}: ${error.message}`);
     }
   } finally {
@@ -270,6 +278,7 @@ function sanitizeExtractedTree(destination) {
 
 async function extractTarArchive(archivePath, destination) {
   const budget = { entries: 0, totalBytes: 0 };
+  let failure = null;
   await tar.x({
     file: archivePath,
     cwd: destination,
@@ -278,13 +287,20 @@ async function extractTarArchive(archivePath, destination) {
     preserveOwner: false,
     noMtime: true,
     filter: (entryPath, entry) => {
-      if (entry.type !== 'File' && entry.type !== 'Directory') {
-        throw new Error(`unsafe archive entry type ${entry.type}: ${entryPath}`);
+      if (failure) return false;
+      try {
+        if (entry.type !== 'File' && entry.type !== 'Directory') {
+          throw new Error(`unsafe archive entry type ${entry.type}: ${entryPath}`);
+        }
+        accountArchiveEntry(entryPath, entry.size, budget);
+        return true;
+      } catch (error) {
+        failure = error;
+        return false;
       }
-      accountArchiveEntry(entryPath, entry.size, budget);
-      return true;
     },
   });
+  if (failure) throw failure;
 }
 
 function openZipEntry(zip, entry) {
