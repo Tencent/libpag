@@ -4600,6 +4600,39 @@ static std::shared_ptr<pagx::PAGXDocument> MakeRectDocument(pagx::Rectangle** ou
   return doc;
 }
 
+
+// F10: animations inside a mask layer reach the actual <mask>/<clipPath> host, and a Strict
+// rejection inside the mask propagates to the whole export.
+PAGX_TEST(PAGXSVGTest, SVGExport_AnimMaskContent) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto* maskLayer = doc->makeNode<pagx::Layer>("maskLayer");
+  auto* maskRect = doc->makeNode<pagx::Rectangle>("maskRect");
+  maskRect->position = {100, 100};
+  maskRect->size = {120, 120};
+  maskLayer->contents = {maskRect, MakeSolidFillSVG(doc.get(), 1, 1, 1)};
+
+  auto* user = doc->makeNode<pagx::Layer>("user");
+  user->mask = maskLayer;
+  user->maskType = pagx::MaskType::Alpha;
+  auto* rect = doc->makeNode<pagx::Rectangle>("rect");
+  rect->position = {100, 100};
+  rect->size = {180, 180};
+  user->contents = {rect, MakeSolidFillSVG(doc.get(), 0.2f, 0.6f, 0.9f)};
+  doc->layers.push_back(user);
+
+  auto* animation = MakeAnimation(doc.get(), 60, pagx::LoopMode::Once);
+  auto* object = MakeAnimationObject(doc.get(), animation, "maskRect");
+  auto* channel = MakeChannel<float>(doc.get(), object, "size.width");
+  channel->keyframes.push_back({0, 120.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  channel->keyframes.push_back({60, 160.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  AttachTimeline(user, "anim");
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("<mask"), std::string::npos) << svg;
+  EXPECT_NE(svg.find("attributeName=\"width\""), std::string::npos) << svg;
+  EXPECT_NE(svg.find("values=\"120;160\""), std::string::npos) << svg;
+}
+
 PAGX_TEST(PAGXSVGTest, SVGExport_NoAnimationOutputUnchanged) {
   auto doc = MakeRectDocument();
   auto svg = pagx::SVGExporter::ToSVG(*doc);

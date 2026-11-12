@@ -532,7 +532,8 @@ class SVGWriter {
       : _defs(defs), _context(context), _indentSpaces(indentSpaces),
         _convertTextToPath(convertTextToPath), _bakeUnsupported(bakeUnsupported),
         _rejectUnsupported(rejectUnsupported), _animationStrict(animationStrict),
-        _rasterScale(rasterScale), _maxRasterPixels(maxRasterPixels), _warnings(warnings),
+        _rasterScale(rasterScale), _maxGeneratedElements(maxGeneratedElements),
+        _maxRasterPixels(maxRasterPixels), _warnings(warnings),
         _diagnostics(diagnostics), _layoutContext(layoutContext),
         _resolver(doc, maxGeneratedElements), _doc(doc), _animWriter(animation, warnings, doc) {
   }
@@ -553,6 +554,7 @@ class SVGWriter {
   bool _animationStrict = false;
   bool _rejected = false;
   float _rasterScale = 2.0f;
+  size_t _maxGeneratedElements = 200000;
   size_t _maxRasterPixels = 0;
   std::vector<std::string>* _warnings = nullptr;
   std::vector<SVGDiagnostic>* _diagnostics = nullptr;
@@ -2236,6 +2238,11 @@ std::string SVGWriter::writeMaskOrClipDef(const Layer* maskLayer, const Layer* o
     }
     defId = _context->uniqueId(desired);
   }
+  // Mask layers are referenced through Layer::mask and are not part of doc.layers, so the document
+  // layout pass never measures them. Measure the mask subtree here; otherwise its geometry resolves
+  // to a zero preferred size and the mask body is emitted empty.
+  auto* layoutMask = static_cast<LayoutNode*>(const_cast<Layer*>(maskLayer));
+  layoutMask->updateSize(_layoutContext);
   SVGBuilder paintDefs(true, _indentSpaces);
   _defs->openElement(tag);
   _defs->addAttribute("id", defId);
@@ -2244,10 +2251,13 @@ std::string SVGWriter::writeMaskOrClipDef(const Layer* maskLayer, const Layer* o
   }
   _defs->closeElementStart();
   SVGWriter nestedWriter(&paintDefs, _context, _indentSpaces, _convertTextToPath, _layoutContext,
-                         _doc, _bakeUnsupported, _rasterScale, _warnings);
+                         _doc, _bakeUnsupported, _rasterScale, _warnings,
+                         _animWriter.plan(), _rejectUnsupported, _animationStrict, _diagnostics,
+                         _maxGeneratedElements, _maxRasterPixels);
   nestedWriter._maskContentTransform = maskRelativeMatrix(maskLayer, owner);
   nestedWriter._clipPathContent = isClipPath;
   (nestedWriter.*writer)(*_defs, maskLayer);
+  _rejected = _rejected || nestedWriter.rejected();
   _defs->closeElement();
   std::string paintDefsStr = paintDefs.release();
   if (!paintDefsStr.empty()) {
