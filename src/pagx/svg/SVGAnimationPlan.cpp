@@ -27,6 +27,7 @@
 #include "pagx/nodes/Gradient.h"
 #include "pagx/nodes/Layer.h"
 #include "pagx/nodes/LinearGradient.h"
+#include "pagx/nodes/Path.h"
 #include "pagx/nodes/RadialGradient.h"
 #include "pagx/nodes/SolidColor.h"
 #include "pagx/nodes/Stroke.h"
@@ -164,6 +165,33 @@ void CollectStopOwners(PAGXDocument* document,
       }
     }
   }
+}
+
+// Parses a `point{N}.x` / `point{N}.y` channel name. The family is table-external: it addresses
+// the PathData point array directly instead of a reflective node field, so it never appears in
+// ListChannels and must not change the 175-entry ledger.
+bool ParsePathPointChannel(const std::string& channel, size_t* index) {
+  if (channel.rfind("point", 0) != 0) {
+    return false;
+  }
+  auto dot = channel.rfind('.');
+  if (dot == std::string::npos || dot + 2 != channel.size() || dot <= 5) {
+    return false;
+  }
+  char axis = channel[dot + 1];
+  if (axis != 'x' && axis != 'y') {
+    return false;
+  }
+  size_t value = 0;
+  for (size_t i = 5; i < dot; i++) {
+    char c = channel[i];
+    if (c < '0' || c > '9') {
+      return false;
+    }
+    value = value * 10 + static_cast<size_t>(c - '0');
+  }
+  *index = value;
+  return true;
 }
 
 // SVG collapses a zero-length linear gradient to its first stop and a zero-radius radial gradient
@@ -350,7 +378,26 @@ std::unique_ptr<SVGAnimationPlan> SVGAnimationPlan::Build(PAGXDocument* document
           }
           continue;
         }
-        if (!IsSupportedChannel(target->nodeType(), channel->name)) {
+        bool pathPointChannel = false;
+        if (target->nodeType() == NodeType::Path) {
+          size_t pointIndex = 0;
+          if (ParsePathPointChannel(channel->name, &pointIndex)) {
+            pathPointChannel = true;
+            const auto* path = static_cast<const Path*>(target);
+            if (channel->valueType() != ChannelValueType::Float || path->data == nullptr ||
+                pointIndex >= path->data->countPoints()) {
+              plan->_rejected = plan->_rejected || strict;
+              std::string key = "Path:point:" + channel->name;
+              if (reportedChannels.insert(key).second) {
+                AddWarning(warnings, "channel '" + channel->name + "' on <Path> '" + target->id +
+                                         "' is dropped: the point index is outside the authored "
+                                         "path or the channel is not a float track.");
+              }
+              continue;
+            }
+          }
+        }
+        if (!pathPointChannel && !IsSupportedChannel(target->nodeType(), channel->name)) {
           plan->_rejected = plan->_rejected || strict;
           std::string key = std::string(NodeTypeName(target->nodeType())) + ":" + channel->name;
           if (reportedChannels.insert(key).second) {

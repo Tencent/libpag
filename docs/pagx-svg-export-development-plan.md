@@ -704,6 +704,7 @@ ToSVG严格失败返回空结果、ToFile返回false、CLI非零；warnings=null
 | 本轮 M4.1（2026-11-11） | SolidColor.color 进入白名单；Fill/Stroke 的 painter 动画会向上解析共享 SolidColor 的绑定并各自发射 fill/stroke 轨道；`HasPainterAnimation` 同步识别源绑定；ledger 的 SolidColor 升级为 Supported；新增 SolidColor 驱动 Fill 回归 | 多消费者去重像素与源/Painter 同有绑定的真实顺序未做 |
 | 本轮 M4.2（2026-11-11） | ColorStop.offset/color 进入白名单；linear/radial 的 `<stop>` 直接承载 offset、stop-color、stop-opacity 三条 SMIL；共享 stop 在每个 def 实例各发一份；conic/diamond 的 stop 通道在 Plan 阶段按实例拒绝（Strict 拒绝、BestEffort 保留静态）；P3 动画 stop 报 `color-space`/Approximated 并去掉会覆盖轨道的 CSS 声明；新增 stop 双通道 / 跨 def / conic 拒绝 / P3 四个回归 | 重复/非单调 offset 与 stop 颜色混色的浏览器像素对照、stop 数量重排未做 |
 | 本轮 M4.3（2026-11-11） | linear 四端点与 radial 中心/半径进入白名单；def 内直接发射 x1/y1/x2/y2 与 cx/cy/r；r 的采样值下限钳到 0（SVG 拒绝负半径）；静态已退化的 gradient 不承载几何轨道，Plan 阶段按实例拒绝并告警；conic/diamond 的几何通道在 ledger 标为 NotExpressible；新增端点共享 painter / radial 钳制 / 静态退化拒绝三回归 | 动态 bounds 与 stop 联动的浏览器像素门禁留到 M5.4；conic/diamond 仍为退化近似 |
+| 本轮 M5.0/M5.1 部分（2026-11-12） | 新增 Path `point{N}.x/y` 表外通道族（不进入 175 条账本）：Plan 按实例校验 float 类型与点索引，导出在 `<path>` 上发射 `d` 轨道，逐帧求值点数组后按原 verb 结构重建，静态 renderPosition/renderScale 烘入每帧；Hold → discrete，单一或一致 Bezier → keySplines，混合缓动按 8 段降采样并告警；被 path modifier 烘焙、stroke align、adaptive dash 改写的 path 在 Strict 下拒绝并告警；新增 d 轨道 / Hold / modifier 拒绝三回归 | Polystar/Trim/Round 的逐帧重烘焙、point 原始空间与动态 bounds、Mask+modifier 的 d 轨道与浏览器像素门禁未做 |
 
 ### 4.8 S3 文字待办清单（下一批入口）
 

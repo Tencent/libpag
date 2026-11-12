@@ -5015,6 +5015,114 @@ PAGX_TEST(PAGXSVGTest, SVGExport_AnimDegenerateGradientGeometryRejected) {
   EXPECT_EQ(bestEffortSvg.find("stop-color=\"#0000FF\""), std::string::npos);
 }
 
+// M5.1: point channels drive a `d` track that keeps the authored verb structure.
+PAGX_TEST(PAGXSVGTest, SVGExport_AnimPathPointEmitsDataTrack) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto* layer = doc->makeNode<pagx::Layer>("layer");
+  auto* path = doc->makeNode<pagx::Path>("path");
+  auto* data = doc->makeNode<pagx::PathData>();
+  *data = pagx::PathDataFromSVGString("M10 10 L60 10 L10 60 Z");
+  path->data = data;
+  auto* fill = doc->makeNode<pagx::Fill>("fill");
+  auto* solid = doc->makeNode<pagx::SolidColor>("color");
+  solid->color = {1, 0, 0, 1};
+  fill->color = solid;
+  layer->contents = {path, fill};
+  doc->layers.push_back(layer);
+
+  auto* animation = MakeAnimation(doc.get(), 60, pagx::LoopMode::Once);
+  auto* object = MakeAnimationObject(doc.get(), animation, "path");
+  auto* channel = MakeChannel<float>(doc.get(), object, "point1.x");
+  channel->keyframes.push_back({0, 60.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  channel->keyframes.push_back({60, 110.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  AttachTimeline(layer, "anim");
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  auto marker = svg.find("attributeName=\"d\"");
+  ASSERT_NE(marker, std::string::npos) << svg;
+  auto valuesStart = svg.find("values=\"", marker);
+  ASSERT_NE(valuesStart, std::string::npos);
+  valuesStart += 8;
+  auto valuesEnd = svg.find('"', valuesStart);
+  ASSERT_NE(valuesEnd, std::string::npos);
+  auto values = svg.substr(valuesStart, valuesEnd - valuesStart);
+  EXPECT_EQ(values.find(';'), values.rfind(';'));
+  EXPECT_NE(values.find("L60"), std::string::npos) << values;
+  EXPECT_NE(values.find("L110"), std::string::npos) << values;
+}
+
+// M5.1: a Hold point track emits a discrete d track instead of interpolating between frames.
+PAGX_TEST(PAGXSVGTest, SVGExport_AnimPathPointHoldIsDiscrete) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto* layer = doc->makeNode<pagx::Layer>("layer");
+  auto* path = doc->makeNode<pagx::Path>("path");
+  auto* data = doc->makeNode<pagx::PathData>();
+  *data = pagx::PathDataFromSVGString("M10 10 L60 10 L10 60 Z");
+  path->data = data;
+  auto* fill = doc->makeNode<pagx::Fill>("fill");
+  auto* solid = doc->makeNode<pagx::SolidColor>("color");
+  solid->color = {0, 0, 0, 1};
+  fill->color = solid;
+  layer->contents = {path, fill};
+  doc->layers.push_back(layer);
+
+  auto* animation = MakeAnimation(doc.get(), 60, pagx::LoopMode::Once);
+  auto* object = MakeAnimationObject(doc.get(), animation, "path");
+  auto* channel = MakeChannel<float>(doc.get(), object, "point0.y");
+  channel->keyframes.push_back({0, 10.0f, pagx::KeyframeInterpolationType::Hold, {}, {}});
+  channel->keyframes.push_back({60, 50.0f, pagx::KeyframeInterpolationType::Hold, {}, {}});
+  AttachTimeline(layer, "anim");
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("attributeName=\"d\""), std::string::npos) << svg;
+  EXPECT_NE(svg.find("calcMode=\"discrete\""), std::string::npos) << svg;
+}
+
+// M5.1: a path modifier replaces the authored Path, so its point channels have no host and are
+// rejected instead of silently leaving the static baked d.
+PAGX_TEST(PAGXSVGTest, SVGExport_AnimPathPointWithModifierIsRejected) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto* layer = doc->makeNode<pagx::Layer>("layer");
+  auto* path = doc->makeNode<pagx::Path>("path");
+  auto* data = doc->makeNode<pagx::PathData>();
+  *data = pagx::PathDataFromSVGString("M40 40 L160 40 L160 160 L40 160 Z");
+  path->data = data;
+  auto* trim = doc->makeNode<pagx::TrimPath>("trim");
+  trim->start = 0.0f;
+  trim->end = 0.6f;
+  auto* stroke = doc->makeNode<pagx::Stroke>("stroke");
+  auto* solid = doc->makeNode<pagx::SolidColor>("color");
+  solid->color = {0, 0, 0, 1};
+  stroke->color = solid;
+  stroke->width = 3;
+  layer->contents = {path, trim, stroke};
+  doc->layers.push_back(layer);
+
+  auto* animation = MakeAnimation(doc.get(), 60, pagx::LoopMode::Once);
+  auto* object = MakeAnimationObject(doc.get(), animation, "path");
+  auto* channel = MakeChannel<float>(doc.get(), object, "point2.x");
+  channel->keyframes.push_back({0, 160.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  channel->keyframes.push_back({60, 120.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  AttachTimeline(layer, "anim");
+
+  std::vector<std::string> warnings;
+  pagx::SVGExportOptions strict = {};
+  strict.animation.policy = pagx::SVGAnimationPolicy::Strict;
+  auto strictSvg = pagx::SVGExporter::ToSVG(*doc, strict, &warnings);
+  EXPECT_TRUE(strictSvg.empty());
+  bool reported = false;
+  for (const auto& warning : warnings) {
+    reported = reported || warning.find("bakes this path into new geometry") != std::string::npos;
+  }
+  EXPECT_TRUE(reported) << (warnings.empty() ? "no warnings" : warnings[0]);
+
+  pagx::SVGExportOptions bestEffort = {};
+  bestEffort.animation.policy = pagx::SVGAnimationPolicy::BestEffort;
+  auto bestEffortSvg = pagx::SVGExporter::ToSVG(*doc, bestEffort);
+  EXPECT_NE(bestEffortSvg.find("<path"), std::string::npos);
+  EXPECT_EQ(bestEffortSvg.find("attributeName=\"d\""), std::string::npos);
+}
+
 // M1: Default selects the first declared Animation, Named selects one id, All exports every
 // top-level Animation. Timing comes from a mounted timeline when present and from animation
 // defaults otherwise.

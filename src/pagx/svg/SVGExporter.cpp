@@ -527,14 +527,14 @@ class SVGWriter {
             PAGXDocument* doc = nullptr, bool bakeUnsupported = true, float rasterScale = 2.0f,
             std::vector<std::string>* warnings = nullptr,
             const SVGAnimationPlan* animation = nullptr, bool rejectUnsupported = false,
-            std::vector<SVGDiagnostic>* diagnostics = nullptr, size_t maxGeneratedElements = 200000,
-            size_t maxRasterPixels = 0)
+            bool animationStrict = false, std::vector<SVGDiagnostic>* diagnostics = nullptr,
+            size_t maxGeneratedElements = 200000, size_t maxRasterPixels = 0)
       : _defs(defs), _context(context), _indentSpaces(indentSpaces),
         _convertTextToPath(convertTextToPath), _bakeUnsupported(bakeUnsupported),
-        _rejectUnsupported(rejectUnsupported), _rasterScale(rasterScale),
-        _maxRasterPixels(maxRasterPixels), _warnings(warnings), _diagnostics(diagnostics),
-        _layoutContext(layoutContext), _resolver(doc, maxGeneratedElements), _doc(doc),
-        _animWriter(animation, warnings) {
+        _rejectUnsupported(rejectUnsupported), _animationStrict(animationStrict),
+        _rasterScale(rasterScale), _maxRasterPixels(maxRasterPixels), _warnings(warnings),
+        _diagnostics(diagnostics), _layoutContext(layoutContext),
+        _resolver(doc, maxGeneratedElements), _doc(doc), _animWriter(animation, warnings) {
   }
 
   bool rejected() const {
@@ -550,6 +550,7 @@ class SVGWriter {
   bool _convertTextToPath = true;
   bool _bakeUnsupported = true;
   bool _rejectUnsupported = false;
+  bool _animationStrict = false;
   bool _rejected = false;
   float _rasterScale = 2.0f;
   size_t _maxRasterPixels = 0;
@@ -571,6 +572,12 @@ class SVGWriter {
   const std::vector<SVGGroupTransformStep>* _pendingGroupSteps = nullptr;
   Matrix _pendingStaticTransform = {};
   const Element* _pendingGeometry = nullptr;
+
+  // Set by writePath when the emitted <path> carries its own point animation. The d track uses
+  // the same static renderPosition / renderScale the static writer bakes into the geometry.
+  const Path* _pendingPathAnimatedData = nullptr;
+  Point _pendingPathRenderPosition = {};
+  float _pendingPathRenderScale = 1.0f;
 
   // Total transform applied to the mask layer body while a <mask> / <clipPath> def is being
   // written. Set by writeMaskOrClipDef so the content writers do not have to recompute it.
@@ -602,7 +609,37 @@ class SVGWriter {
     // Modifiers are always resolved. Skipping them does not keep the content editable: Polystar,
     // TrimPath and Repeater have no SVG counterpart, so the shapes simply disappear from the
     // output. A wrong picture is worse than a baked one.
-    return _resolver.resolve(elements);
+    std::vector<Element*> resolved = _resolver.resolve(elements);
+    reportBakedPathAnimates(elements, resolved);
+    return resolved;
+  }
+
+  // A path modifier replaces the authored Path with baked geometry, so a point channel bound to
+  // the original node has no host left. Report the loss instead of silently emitting static d.
+  void reportBakedPathAnimates(const std::vector<Element*>& originals,
+                               const std::vector<Element*>& resolved) {
+    for (auto* element : originals) {
+      if (element == nullptr || element->nodeType() != NodeType::Path) {
+        continue;
+      }
+      if (!_animWriter.HasPathPointAnimates(element)) {
+        continue;
+      }
+      bool kept = false;
+      for (auto* candidate : resolved) {
+        if (candidate == element) {
+          kept = true;
+          break;
+        }
+      }
+      if (kept) {
+        continue;
+      }
+      addWarning("point channels on <Path> '" + element->id +
+                     "' are dropped: a path modifier bakes this path into new geometry.",
+                 "animation-rejected");
+      _rejected = _rejected || _rejectUnsupported || _animationStrict;
+    }
   }
 
   const LayerBuildResult& ensureBuildResult();
@@ -2402,10 +2439,11 @@ void SVGWriter::finishShapeElement(SVGBuilder& out, const FillStrokeInfo& fs, fl
   const Element* geometry = _pendingGeometry;
   bool hasGroupAnimation = _pendingGroupSteps != nullptr;
   bool hasGeometryAnimation = geometry != nullptr && _animWriter.HasShapeGeometryAnimates(geometry);
+  bool hasPathDataAnimation = geometry != nullptr && _pendingPathAnimatedData == geometry;
   bool hasGroupOpacity =
       hasGroupAnimation && !_animWriter.HasPainterOpacityAnimates(fs.fill, fs.stroke) &&
       _animWriter.HasElementOpacityAnimates(_pendingGroupSteps->data(), _pendingGroupSteps->size());
-  if (!hasGroupAnimation && !hasGeometryAnimation &&
+  if (!hasGroupAnimation && !hasGeometryAnimation && !hasPathDataAnimation &&
       !_animWriter.HasPainterAnimates(fs.fill, fs.stroke)) {
     out.closeElementSelfClosing();
     return;
@@ -2417,6 +2455,10 @@ void SVGWriter::finishShapeElement(SVGBuilder& out, const FillStrokeInfo& fs, fl
   }
   if (hasGeometryAnimation) {
     _animWriter.WriteShapeGeometryAnimates(out, geometry, fs.stroke);
+  }
+  if (hasPathDataAnimation) {
+    _animWriter.WritePathDataAnimates(out, geometry, _pendingPathRenderPosition,
+                                      _pendingPathRenderScale);
   }
   if (hasGroupOpacity) {
     if (fs.fill != nullptr) {
@@ -2633,6 +2675,16 @@ void SVGWriter::writePath(SVGBuilder& out, const Path* path, const FillStrokeInf
   bool clipInside = fs.stroke != nullptr && fs.stroke->align == StrokeAlign::Inside;
   bool maskOutside = fs.stroke != nullptr && fs.stroke->align == StrokeAlign::Outside;
   bool adaptiveDash = fs.stroke != nullptr && fs.stroke->dashAdaptive && !fs.stroke->dashes.empty();
+  // The d track carries authored point coordinates. Clip/mask stroke alignment and adaptive dash
+  // emit a derived path into defs or into the painted `d`, so an animated point array would not
+  // reach those hosts; those combinations are classified as unsupported instead.
+  if (_animWriter.HasPathPointAnimates(path) && (clipInside || maskOutside || adaptiveDash)) {
+    addWarning("point channels on <Path> '" + path->id +
+                   "' are dropped: stroke alignment or adaptive dash rewrites this path before it "
+                   "is emitted.",
+               "animation-rejected");
+    _rejected = _rejected || _rejectUnsupported || _animationStrict;
+  }
   std::string clipId;
   std::string maskId;
   if (clipInside || maskOutside || adaptiveDash) {
@@ -2691,6 +2743,13 @@ void SVGWriter::writePath(SVGBuilder& out, const Path* path, const FillStrokeInf
       adjustedStroke->dashes.clear();
       adjustedStroke->dashOffset = 0.0f;
     }
+  }
+
+  _pendingPathAnimatedData = nullptr;
+  _pendingPathRenderPosition = renderPos;
+  _pendingPathRenderScale = scale;
+  if (!clipInside && !maskOutside && !adaptiveDash && _animWriter.HasPathPointAnimates(path)) {
+    _pendingPathAnimatedData = path;
   }
 
   out.openElement("path");
@@ -5059,7 +5118,9 @@ std::string SVGExporter::ToSVG(PAGXDocument& doc, const Options& options,
 
   SVGWriter writer(&defs, &context, options.indent, convertTextToPath, layoutContext.get(), &doc,
                    bakeUnsupported, safeRasterScale, warnings, animationPlan.get(),
-                   rejectUnsupported, options.diagnostics, options.budget.maxGeneratedElements,
+                   rejectUnsupported, options.exportAnimation &&
+                                         options.animation.policy == SVGAnimationPolicy::Strict,
+                   options.diagnostics, options.budget.maxGeneratedElements,
                    options.budget.maxRasterPixels);
 
   if (options.xmlDeclaration) {

@@ -151,6 +151,21 @@ class SVGAnimationWriter {
   bool WriteGradientGeometryAnimates(XMLBuilder& out, const Node* gradient);
 
   /**
+   * Returns true when the Path carries at least one `point{N}.x` / `point{N}.y` channel. These
+   * channels are a table-external family: they address the PathData point array directly and are
+   * not part of the reflective node channel registry.
+   */
+  bool HasPathPointAnimates(const Node* path) const;
+
+  /**
+   * Emits the `d` track for a Path whose point channels are animated. `renderPosition` and
+   * `renderScale` are the static placement the exporter bakes into every frame, matching the
+   * authored-point coordinate space the keyframe values live in.
+   */
+  bool WritePathDataAnimates(XMLBuilder& out, const Node* path, const Point& renderPosition,
+                             float renderScale);
+
+  /**
    * Emits the opacity animation for a geometry element that sits under animated Group alpha
    * channels. The group alpha is already folded into `baseAlpha`, so the emitted values are the
    * animated ratio applied on top of it.

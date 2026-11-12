@@ -31,11 +31,14 @@
 #include "pagx/nodes/Ellipse.h"
 #include "pagx/nodes/Fill.h"
 #include "pagx/nodes/Layer.h"
+#include "pagx/nodes/Path.h"
+#include "pagx/nodes/PathData.h"
 #include "pagx/nodes/Rectangle.h"
 #include "pagx/nodes/SolidColor.h"
 #include "pagx/nodes/Stroke.h"
 #include "pagx/runtime/MatrixDecompose.h"
 #include "pagx/svg/SVGAnimationPlan.h"
+#include "pagx/svg/SVGPathParser.h"
 #include "pagx/types/Color.h"
 #include "pagx/utils/ExporterUtils.h"
 #include "pagx/utils/StringParser.h"
@@ -515,6 +518,109 @@ bool CollectSegmentSplines(const Channel* channel, const std::vector<Frame>& fra
   }
   *useSpline = anyBezier;
   return anyBezier;
+}
+
+// Parses a `point{N}.x` / `point{N}.y` channel name. This family is not part of the reflective
+// node channel registry: it addresses the PathData point array directly, mirroring the runtime's
+// PathRuntimeTarget parser in LayerBuilder.
+bool ParsePathPointChannel(const std::string& channel, size_t* index, bool* isX) {
+  if (channel.rfind("point", 0) != 0) {
+    return false;
+  }
+  auto dot = channel.rfind('.');
+  if (dot == std::string::npos || dot + 2 != channel.size() || dot <= 5) {
+    return false;
+  }
+  char axis = channel[dot + 1];
+  if (axis != 'x' && axis != 'y') {
+    return false;
+  }
+  size_t value = 0;
+  for (size_t i = 5; i < dot; i++) {
+    char c = channel[i];
+    if (c < '0' || c > '9') {
+      return false;
+    }
+    value = value * 10 + static_cast<size_t>(c - '0');
+  }
+  *index = value;
+  *isX = axis == 'x';
+  return true;
+}
+
+struct PathPointBinding {
+  const SVGAnimationBinding* binding = nullptr;
+  size_t index = 0;
+  bool isX = false;
+};
+
+void CollectPathPointBindings(const SVGAnimationPlan* plan, const Node* path,
+                              std::vector<PathPointBinding>* out) {
+  auto* list = plan->BindingsFor(path);
+  if (list == nullptr) {
+    return;
+  }
+  for (const auto& binding : *list) {
+    if (binding.channel->valueType() != ChannelValueType::Float) {
+      continue;
+    }
+    size_t index = 0;
+    bool isX = false;
+    if (!ParsePathPointChannel(binding.channel->name, &index, &isX)) {
+      continue;
+    }
+    out->push_back({&binding, index, isX});
+  }
+}
+
+// Rebuilds the path data with the sampled point array. Every frame keeps the authored verb
+// structure, which is what lets SMIL interpolate the `d` values instead of switching discretely.
+std::string PathDataAtFrame(const PathData& source, const std::vector<Point>& points,
+                            const Point& renderPosition, float renderScale) {
+  PathData frame = PathDataFromSVGString("");
+  size_t index = 0;
+  for (auto verb : source.verbs()) {
+    switch (verb) {
+      case PathVerb::Move:
+        if (index < points.size()) {
+          frame.moveTo(points[index].x * renderScale + renderPosition.x,
+                       points[index].y * renderScale + renderPosition.y);
+        }
+        index += 1;
+        break;
+      case PathVerb::Line:
+        if (index < points.size()) {
+          frame.lineTo(points[index].x * renderScale + renderPosition.x,
+                       points[index].y * renderScale + renderPosition.y);
+        }
+        index += 1;
+        break;
+      case PathVerb::Quad:
+        if (index + 1 < points.size()) {
+          frame.quadTo(points[index].x * renderScale + renderPosition.x,
+                       points[index].y * renderScale + renderPosition.y,
+                       points[index + 1].x * renderScale + renderPosition.x,
+                       points[index + 1].y * renderScale + renderPosition.y);
+        }
+        index += 2;
+        break;
+      case PathVerb::Cubic:
+        if (index + 2 < points.size()) {
+          frame.cubicTo(points[index].x * renderScale + renderPosition.x,
+                        points[index].y * renderScale + renderPosition.y,
+                        points[index + 1].x * renderScale + renderPosition.x,
+                        points[index + 1].y * renderScale + renderPosition.y,
+                        points[index + 2].x * renderScale + renderPosition.x,
+                        points[index + 2].y * renderScale + renderPosition.y);
+        }
+        index += 3;
+        break;
+      case PathVerb::Close:
+        frame.close();
+        break;
+    }
+  }
+  return PathDataToSVGString(frame);
 }
 
 // Evaluates the layer transform at every keyframe time of the matrix channel, using the same
@@ -1605,6 +1711,174 @@ bool SVGAnimationWriter::WriteGradientGeometryAnimates(XMLBuilder& out, const No
   return WriteChannelAnimateClamped(out, gradient, "radius", "r", 0.0f,
                                     std::numeric_limits<float>::max()) ||
          wrote;
+}
+
+bool SVGAnimationWriter::HasPathPointAnimates(const Node* path) const {
+  if (_plan == nullptr || path == nullptr || path->nodeType() != NodeType::Path) {
+    return false;
+  }
+  std::vector<PathPointBinding> bindings;
+  CollectPathPointBindings(_plan, path, &bindings);
+  return !bindings.empty();
+}
+
+bool SVGAnimationWriter::WritePathDataAnimates(XMLBuilder& out, const Node* node,
+                                               const Point& renderPosition, float renderScale) {
+  if (_plan == nullptr || node == nullptr || node->nodeType() != NodeType::Path) {
+    return false;
+  }
+  const auto* path = static_cast<const Path*>(node);
+  if (path->data == nullptr) {
+    return false;
+  }
+  std::vector<PathPointBinding> bindings;
+  CollectPathPointBindings(_plan, node, &bindings);
+  if (bindings.empty()) {
+    return false;
+  }
+  const Animation* animation = bindings.front().binding->animation;
+  for (const auto& binding : bindings) {
+    if (binding.binding->animation != animation) {
+      AddWarning("path point channels on <Path> '" + node->id +
+                 "' span multiple animations; the d track is dropped.");
+      return false;
+    }
+  }
+  SmilTiming timing;
+  if (!ResolveTiming(animation, bindings.front().binding->timeline, &timing)) {
+    return false;
+  }
+
+  std::vector<Frame> frames;
+  for (const auto& binding : bindings) {
+    AppendTrackFrames(binding.binding->channel, animation->duration, &frames);
+  }
+  std::sort(frames.begin(), frames.end());
+  frames.erase(std::unique(frames.begin(), frames.end()), frames.end());
+  if (frames.size() < 2) {
+    return false;
+  }
+  auto span = static_cast<double>(animation->duration);
+  if (span <= 0) {
+    return false;
+  }
+
+  // A single shared easing can ride on calcMode="spline"; mixed per-channel easing has no single
+  // keySplines list, so those segments are densified and interpolated linearly.
+  bool allHold = true;
+  bool splineShared = true;
+  std::vector<SmilSpline> sharedSplines;
+  for (size_t i = 0; i < bindings.size(); i++) {
+    const auto* typed = static_cast<const TypedChannel<float>*>(bindings[i].binding->channel);
+    for (size_t k = 0; k + 1 < typed->keyframes.size(); k++) {
+      if (!IsHold(typed->keyframes[k].interpolation)) {
+        allHold = false;
+      }
+    }
+    std::vector<SmilSpline> splines;
+    bool useSpline = false;
+    if (!CollectSegmentSplines(bindings[i].binding->channel, frames, &splines, &useSpline)) {
+      splineShared = false;
+      continue;
+    }
+    if (i == 0) {
+      sharedSplines = splines;
+    } else if (splines.size() != sharedSplines.size()) {
+      splineShared = false;
+    } else {
+      for (size_t k = 0; k < splines.size(); k++) {
+        if (splines[k].x1 != sharedSplines[k].x1 || splines[k].y1 != sharedSplines[k].y1 ||
+            splines[k].x2 != sharedSplines[k].x2 || splines[k].y2 != sharedSplines[k].y2) {
+          splineShared = false;
+          break;
+        }
+      }
+    }
+  }
+  bool useSpline = splineShared && !allHold && !sharedSplines.empty();
+
+  if (!allHold && !useSpline) {
+    // Add a frame just before each Hold boundary so a linear track still snaps instead of
+    // ramping, and sub-sample Bezier segments because the track can only carry one easing.
+    std::vector<Frame> detail;
+    bool hasCurve = false;
+    for (const auto& binding : bindings) {
+      const auto* typed = static_cast<const TypedChannel<float>*>(binding.binding->channel);
+      for (size_t k = 0; k + 1 < typed->keyframes.size(); k++) {
+        Frame start = std::max(typed->keyframes[k].time, Frame(0));
+        Frame end = std::min(typed->keyframes[k + 1].time, animation->duration);
+        if (end <= start) {
+          continue;
+        }
+        auto type = typed->keyframes[k].interpolation;
+        if (IsHold(type)) {
+          double gapFrames = std::clamp(static_cast<double>(end - start) * HoldGapRatio,
+                                        HoldGapFloor * span, HoldGapCeiling * span);
+          auto holdTime = static_cast<Frame>(static_cast<double>(end) - gapFrames);
+          if (holdTime > start) {
+            detail.push_back(holdTime);
+          }
+          continue;
+        }
+        if (type != KeyframeInterpolationType::Bezier) {
+          continue;
+        }
+        hasCurve = true;
+        constexpr int SubSamples = 8;
+        for (int s = 1; s < SubSamples; s++) {
+          detail.push_back(start + static_cast<Frame>((end - start) * s / SubSamples));
+        }
+      }
+    }
+    if (!detail.empty()) {
+      frames.insert(frames.end(), detail.begin(), detail.end());
+      std::sort(frames.begin(), frames.end());
+      frames.erase(std::unique(frames.begin(), frames.end()), frames.end());
+    }
+    if (hasCurve) {
+      AddWarning("path point channels on <Path> '" + node->id +
+                 "' use different bezier easings; the d track is sampled to keep one interpolation "
+                 "track.");
+    }
+  }
+
+  std::vector<Point> points = path->data->points();
+  SmilSequence sequence;
+  for (auto frame : frames) {
+    for (const auto& binding : bindings) {
+      if (binding.index >= points.size()) {
+        continue;
+      }
+      auto value = binding.binding->channel->evaluateAt(frame);
+      const auto* coordinate = std::get_if<float>(&value);
+      if (coordinate == nullptr) {
+        continue;
+      }
+      if (binding.isX) {
+        points[binding.index].x = *coordinate;
+      } else {
+        points[binding.index].y = *coordinate;
+      }
+    }
+    sequence.values.push_back(
+        PathDataAtFrame(*path->data, points, renderPosition, renderScale));
+    sequence.keyTimes.push_back(std::clamp(static_cast<double>(frame) / span, 0.0, 1.0));
+  }
+  if (sequence.values.size() < 2) {
+    return false;
+  }
+  if (allHold) {
+    sequence.discrete = true;
+  } else if (useSpline) {
+    sequence.useSpline = true;
+    sequence.splines = sharedSplines;
+  }
+  if (timing.mirror) {
+    ApplyPingPong(&sequence);
+    timing.durationSeconds *= 2.0;
+  }
+  WriteAnimateElement(out, "d", nullptr, false, sequence, timing, nullptr, nullptr);
+  return true;
 }
 
 bool SVGAnimationWriter::WritePaintAnimates(XMLBuilder& out, const Node* painter,
