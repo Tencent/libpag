@@ -2126,6 +2126,20 @@ bool SVGAnimationWriter::WritePolystarDataAnimates(XMLBuilder& out, const Node* 
   return true;
 }
 
+bool SVGAnimationWriter::HasNoiseSeedAnimates(const Node* noise) const {
+  if (_plan == nullptr || noise == nullptr || noise->nodeType() != NodeType::NoiseFilter) {
+    return false;
+  }
+  return _plan->Find(noise, "seed") != nullptr;
+}
+
+bool SVGAnimationWriter::WriteNoiseSeedAnimates(XMLBuilder& out, const Node* noise) {
+  if (!HasNoiseSeedAnimates(noise)) {
+    return false;
+  }
+  return WriteChannelAnimate(out, noise, "seed", "seed");
+}
+
 bool SVGAnimationWriter::WritePaintAnimates(XMLBuilder& out, const Node* painter,
                                             const char* paintAttribute, float alphaMultiplier) {
   auto* colorBinding = _plan->Find(painter, "color");

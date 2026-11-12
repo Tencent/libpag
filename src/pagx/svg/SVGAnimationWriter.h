@@ -193,6 +193,16 @@ class SVGAnimationWriter {
   bool WritePolystarDataAnimates(XMLBuilder& out, const Node* polystar);
 
   /**
+   * Returns true when the NoiseFilter drives a `seed` track.
+   */
+  bool HasNoiseSeedAnimates(const Node* noise) const;
+
+  /**
+   * Emits the `seed` animation inside the current feTurbulence element.
+   */
+  bool WriteNoiseSeedAnimates(XMLBuilder& out, const Node* noise);
+
+  /**
    * Emits the opacity animation for a geometry element that sits under animated Group alpha
    * channels. The group alpha is already folded into `baseAlpha`, so the emitted values are the
    * animated ratio applied on top of it.

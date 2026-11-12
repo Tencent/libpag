@@ -58,6 +58,7 @@
 #include "pagx/nodes/LinearGradient.h"
 #include "pagx/nodes/MergePath.h"
 #include "pagx/nodes/Path.h"
+#include "pagx/nodes/NoiseFilter.h"
 #include "pagx/nodes/PathData.h"
 #include "pagx/nodes/Polystar.h"
 #include "pagx/nodes/RadialGradient.h"
@@ -5978,6 +5979,30 @@ PAGX_TEST(PAGXSVGTest, SVGAnimationCapabilitiesDocIsCurrent) {
   std::string expected((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
   EXPECT_EQ(expected, doc) << "capability document is stale; copy " << generatedPath << " to "
                            << expectedPath;
+}
+
+// feTurbulence seed animation: the primitive keeps its static seed as the base value and carries
+// a seed track inside the open element.
+PAGX_TEST(PAGXSVGTest, SVGExport_AnimNoiseFilterSeed) {
+  auto doc = MakeRectDocument();
+  auto* noise = doc->makeNode<pagx::NoiseFilter>("noise");
+  noise->mode = pagx::NoiseMode::Mono;
+  noise->size = 8;
+  noise->density = 0.5f;
+  noise->seed = 1;
+  doc->layers[0]->filters.push_back(noise);
+
+  auto* animation = MakeAnimation(doc.get(), 60, pagx::LoopMode::Once);
+  auto* object = MakeAnimationObject(doc.get(), animation, "noise");
+  auto* channel = MakeChannel<float>(doc.get(), object, "seed");
+  channel->keyframes.push_back({0, 1.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  channel->keyframes.push_back({60, 4.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  AttachTimeline(doc->layers[0], "anim");
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("attributeName=\"seed\""), std::string::npos) << svg;
+  EXPECT_NE(svg.find("values=\"1;4\""), std::string::npos) << svg;
+  EXPECT_NE(svg.find("</feTurbulence>"), std::string::npos) << svg;
 }
 
 // Two animations driving the same attribute cannot share one SMIL track: Strict rejects, and

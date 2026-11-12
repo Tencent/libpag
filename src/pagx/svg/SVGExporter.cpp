@@ -785,11 +785,12 @@ class SVGWriter {
   // Emits an inline feMerge so a shadow filter's output becomes the chain input for later filters.
   std::string mergeShadowIntoChain(const std::string& shadowResult, const std::string& source,
                                    bool shadowOnly);
-  std::string writeNoiseTurbulence(float size, float seed, const std::string& resultName);
+  std::string writeNoiseTurbulence(float size, float seed, const std::string& resultName,
+                                   const NoiseFilter* owner);
   std::string writeNoiseBand(float size, float density, float seed, bool isDark,
-                             const std::string& label);
+                             const std::string& label, const NoiseFilter* owner);
   std::string writeNoiseMultiCore(float size, float density, float seed, float opacity,
-                                  const std::string& id);
+                                  const std::string& id, const NoiseFilter* owner);
   void writeNoiseFilter(const NoiseFilter* noise, int& noiseIndex, std::string& currentSource);
   void writeNoiseResultBlend(const std::string& clippedResult, const std::string& filterId,
                              BlendMode blendMode, std::string& currentSource);
@@ -1481,7 +1482,8 @@ void SVGWriter::writeBlendFilter(const BlendFilter* blend, int& shadowIndex,
 // SVGWriter – noise filter primitives
 //==============================================================================
 
-std::string SVGWriter::writeNoiseTurbulence(float size, float seed, const std::string& resultName) {
+std::string SVGWriter::writeNoiseTurbulence(float size, float seed, const std::string& resultName,
+                                          const NoiseFilter* owner) {
   // SVG filter primitives operate in document units and do not receive the runtime content scale
   // used by GPU rasterization, so exported noise frequency intentionally derives from authoring size.
   auto freq = size > 0.0f ? 1.0f / size : 0.25f;
@@ -1492,13 +1494,19 @@ std::string SVGWriter::writeNoiseTurbulence(float size, float seed, const std::s
   _defs->addAttribute("numOctaves", "3");
   _defs->addAttribute("seed", FloatToString(seed));
   _defs->addAttribute("result", resultName);
-  _defs->closeElementSelfClosing();
+  if (owner != nullptr && _animWriter.HasNoiseSeedAnimates(owner)) {
+    _defs->closeElementStart();
+    _animWriter.WriteNoiseSeedAnimates(*_defs, owner);
+    _defs->closeElement();
+  } else {
+    _defs->closeElementSelfClosing();
+  }
   return resultName;
 }
 
 std::string SVGWriter::writeNoiseBand(float size, float density, float seed, bool isDark,
-                                      const std::string& label) {
-  auto turbResult = writeNoiseTurbulence(size, seed, "turb" + label);
+                                      const std::string& label, const NoiseFilter* owner) {
+  auto turbResult = writeNoiseTurbulence(size, seed, "turb" + label, owner);
 
   _defs->openElement("feColorMatrix");
   _defs->addAttribute("in", turbResult);
@@ -1541,8 +1549,8 @@ std::string SVGWriter::writeNoiseBand(float size, float density, float seed, boo
 }
 
 std::string SVGWriter::writeNoiseMultiCore(float size, float density, float seed, float opacity,
-                                           const std::string& id) {
-  auto turbResult = writeNoiseTurbulence(size, seed, "n" + id);
+                                           const std::string& id, const NoiseFilter* owner) {
+  auto turbResult = writeNoiseTurbulence(size, seed, "n" + id, owner);
 
   _defs->openElement("feComponentTransfer");
   _defs->addAttribute("in", turbResult);
@@ -1634,7 +1642,7 @@ void SVGWriter::writeNoiseFilter(const NoiseFilter* noise, int& noiseIndex,
   std::string filterId = "noise" + std::to_string(noiseIndex++);
 
   if (noise->mode == NoiseMode::Mono) {
-    auto band = writeNoiseBand(noise->size, noise->density, noise->seed, true, "Dark" + filterId);
+    auto band = writeNoiseBand(noise->size, noise->density, noise->seed, true, "Dark" + filterId, noise);
     _defs->openElement("feFlood");
     applyFloodColor(noise->color);
     _defs->addAttribute("result", "flood" + filterId);
@@ -1659,9 +1667,9 @@ void SVGWriter::writeNoiseFilter(const NoiseFilter* noise, int& noiseIndex,
   }
 
   if (noise->mode == NoiseMode::Duo) {
-    auto dark = writeNoiseBand(noise->size, noise->density, noise->seed, true, "Dark" + filterId);
+    auto dark = writeNoiseBand(noise->size, noise->density, noise->seed, true, "Dark" + filterId, noise);
     auto bright =
-        writeNoiseBand(noise->size, noise->density, noise->seed, false, "Bright" + filterId);
+        writeNoiseBand(noise->size, noise->density, noise->seed, false, "Bright" + filterId, noise);
 
     _defs->openElement("feComposite");
     _defs->addAttribute("in", dark);
@@ -1713,7 +1721,8 @@ void SVGWriter::writeNoiseFilter(const NoiseFilter* noise, int& noiseIndex,
   }
 
   auto multiResult =
-      writeNoiseMultiCore(noise->size, noise->density, noise->seed, noise->opacity, filterId);
+      writeNoiseMultiCore(noise->size, noise->density, noise->seed, noise->opacity, filterId,
+                       noise);
 
   _defs->openElement("feComposite");
   _defs->addAttribute("in", multiResult);
@@ -1732,7 +1741,7 @@ std::string SVGWriter::writeNoiseStyle(const NoiseStyle* noise, int& noiseStyleI
   std::string styleId = "noiseStyle" + std::to_string(noiseStyleIndex++);
 
   if (noise->mode == NoiseMode::Mono) {
-    auto band = writeNoiseBand(noise->size, noise->density, noise->seed, true, "Dark" + styleId);
+    auto band = writeNoiseBand(noise->size, noise->density, noise->seed, true, "Dark" + styleId, nullptr);
     _defs->openElement("feFlood");
     applyFloodColor(noise->color);
     _defs->addAttribute("result", "flood" + styleId);
@@ -1750,9 +1759,10 @@ std::string SVGWriter::writeNoiseStyle(const NoiseStyle* noise, int& noiseStyleI
   }
 
   if (noise->mode == NoiseMode::Duo) {
-    auto dark = writeNoiseBand(noise->size, noise->density, noise->seed, true, "Dark" + styleId);
+    auto dark = writeNoiseBand(noise->size, noise->density, noise->seed, true, "Dark" + styleId, nullptr);
     auto bright =
-        writeNoiseBand(noise->size, noise->density, noise->seed, false, "Bright" + styleId);
+        writeNoiseBand(noise->size, noise->density, noise->seed, false, "Bright" + styleId,
+                   nullptr);
 
     _defs->openElement("feComposite");
     _defs->addAttribute("in", dark);
@@ -1797,7 +1807,8 @@ std::string SVGWriter::writeNoiseStyle(const NoiseStyle* noise, int& noiseStyleI
   }
 
   auto multiResult =
-      writeNoiseMultiCore(noise->size, noise->density, noise->seed, noise->opacity, styleId);
+      writeNoiseMultiCore(noise->size, noise->density, noise->seed, noise->opacity, styleId,
+                        nullptr);
 
   writeNoiseStyleClip(multiResult, styleId);
   return "noiseStyleOut" + styleId;

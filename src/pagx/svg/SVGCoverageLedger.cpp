@@ -235,7 +235,7 @@ std::vector<SVGChannelEntry> BuildLedger() {
   entries.push_back({NodeType::BlendFilter, "color", S, "animate feFlood flood-color"});
   entries.push_back({NodeType::NoiseFilter, "size", P, "non-linear baseFrequency mapping"});
   entries.push_back({NodeType::NoiseFilter, "density", P, "not implemented"});
-  entries.push_back({NodeType::NoiseFilter, "seed", P, "animate feTurbulence seed"});
+  entries.push_back({NodeType::NoiseFilter, "seed", S, "animate feTurbulence seed"});
   entries.push_back({NodeType::NoiseFilter, "color", P, "feFlood per mode"});
   entries.push_back({NodeType::NoiseFilter, "firstColor", P, "feFlood per mode"});
   entries.push_back({NodeType::NoiseFilter, "secondColor", P, "feFlood per mode"});

@@ -120,6 +120,9 @@ bool IsSupportedChannel(NodeType nodeType, const std::string& name) {
       return name == "offsetX" || name == "offsetY" || name == "blurX" || name == "blurY";
     case NodeType::BlendFilter:
       return name == "color";
+    case NodeType::NoiseFilter:
+      // feTurbulence exposes `seed` as an animatable attribute.
+      return name == "seed";
     default:
       return false;
   }

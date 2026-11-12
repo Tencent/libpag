@@ -552,7 +552,7 @@ MB范围包含3D、conic/diamond、noise、backdrop/Glass、复杂shape/text/eff
 
 #### M4/M5：固定展开顺序、前置依赖与台账准入
 
-本表固定四类展开的执行次序，不需要实施时再询问。当前已存在 `src/pagx/svg/SVGCoverageLedger.h:32` 的Supported/Planned/NotExpressible实现状态和 `src/pagx/svg/SVGAnimationPlan.cpp:67` 的白名单；它们不等同正文N/G/B/U能力分类。**当前白名单为16类/75项（含 SolidColor.color、ColorStop.offset/color、linear 四端点、radial 中心/半径、Text.x/y、Polystar 固定拓扑六通道）**，Path point 族按表外通道单列，其余 Text shaping 与动态 modifier 尚未放行；不按旧7类/39项覆盖用户已有滤镜增量。未发现已实现的ModifierDependencyGraph，本方案只扩现有resolver产物/DrawRecord来源，不能引用不存在的图模块当作前置。
+本表固定四类展开的执行次序，不需要实施时再询问。当前已存在 `src/pagx/svg/SVGCoverageLedger.h:32` 的Supported/Planned/NotExpressible实现状态和 `src/pagx/svg/SVGAnimationPlan.cpp:67` 的白名单；它们不等同正文N/G/B/U能力分类。**当前白名单为17类/76项（含 SolidColor.color、ColorStop.offset/color、linear 四端点、radial 中心/半径、Text.x/y、Polystar 固定拓扑六通道、NoiseFilter.seed）**，Path point 族按表外通道单列，其余 Text shaping 与动态 modifier 尚未放行；不按旧7类/39项覆盖用户已有滤镜增量。未发现已实现的ModifierDependencyGraph，本方案只扩现有resolver产物/DrawRecord来源，不能引用不存在的图模块当作前置。
 
 共同前置Q：S1的实例/引用/Painter capture与宿主，S3的最终glyph及第2.8节ST21/ST22/ST28，S4的modifier顺序/来源，S5的静态ColorSource/defs/fit；M1的typed/contextDoc/Clock和M2的ordered pose/alpha；M3至少具备本子批次所需的关键帧、Hold、区间求值、序列化和预算门禁。**不要求先做完所有M3高级组合再做独立N轨道，但某条G轨道缺其误差/预算能力时必须保持Planned或明确拒绝，不能先放行再补证明。**
 
@@ -701,6 +701,7 @@ ToSVG严格失败返回空结果、ToFile返回false、CLI非零；warnings=null
 | 本轮 S6 预算（2026-11-11） | `SVGBudget.maxGeneratedElements` 接入 Resolver 的乘性展开上限；`maxOutputBytes` 超限时 ToSVG 返回空并写 `budget-exceeded` 诊断；`maxRasterPixels` 在层烘焙前检查，超限回退矢量并写诊断；新增预算回归 | samples / instances / encodedBytes 等其余预算字段未实现；D6、策略基线、ST32/41/44、C20—C24 未完成 |
 | 本轮 D6（2026-11-11） | 新增 `test/svg_browser_gate.js` 与 `SVGBrowserTest`：`pagx export` → 固定 Chromium 截图 → `pagx render` 参考 → pixel/SSIM 指标，固定 1400×900 / 白底 / scale 1 / pixelmatch 0.1；支持 `SVG_BROWSER_CASES` 与单例阈值覆盖；`constraint_textbox` 实测 pixelDiff 0.031、RGB 5.29、SSIM 0.416 | 默认阈值按首个文本样本标定为 0.05 / 10 / 0.4，仍需更多语料标定；Playwright 固定 Chromium 未在本机安装 |
 | 本轮 4.7 策略基线（2026-11-11） | 新增 `test/svg_policy_baseline.js` 与 `SVGPolicyBaseline` target，扫描 271 个 resources PAGX：vector-only 241 native / 4 bake / 26 reject（17 unsupported-feature、9 import/resource）、preserve 241 / 21 / 9、best-effort 256 / 6 / 9；生成 `docs/svg-policy-baseline.md` | bake 桶把作者图片的 PNG 也计入，是效果烘焙上界；真实 reject 比例仍需分离资源失败 |
+| 本轮 M4.E seed（2026-11-12） | `NoiseFilter.seed` 进入白名单与 Supported；`feTurbulence` 的 seed 作为静态基值保留，元素内发射 `seed` 轨道；NoiseStyle 仍走烘焙路径，不伪造 seed 动画；新增 seed 回归 | 其余 50 项 effect 通道与 NoiseStyle 参数未动 |
 | 本轮 M6 能力文档（2026-11-12） | 新增 `docs/pagx-svg-animation-capabilities.md`，由 `SVGChannelLedger()` 生成（175 通道：77 Supported / 90 Planned / 8 NotExpressible），并新增 `SVGAnimationCapabilitiesDocIsCurrent` 门禁：ledger 改动后文档不更新即失败；表外 Path point 族与动效门禁用例一并记录 | 文档仅覆盖通道级状态，F1—F18/A12—A20 的场景矩阵仍待逐条落表 |
 | 本轮 M6 动效门禁（2026-11-12） | 浏览器门禁支持 `case.pagx@seconds`：暂停 SMIL、`setCurrentTime(seconds)` 后截图，并与 `pagx render --time` 参考比较；新增 `SVGBrowserAnimTest` 与五个 0.5s 用例：SolidColor 红→蓝（pixelDiff 0 / RGB 0 / SSIM 1）、ColorStop 红→绿（0 / 0.14 / 0.99999）、linear endPoint.x 160→80（0 / 0.06 / 1）、Text.x 平移（0.00007 / 0.63 / 0.983）、Polystar outerRoundness 0→1（0 / 0.14 / 0.9994）；门禁发现并修复 Text 包装 `<g>` 未先闭合 start tag 导致 `<g  <animateTransform` 的非法结构，单元测试补结构断言 | d 轨道的浏览器 seek 对照（运行时无普通 Path point writer）与更多语料阈值未做 |
 | 本轮 M4.1（2026-11-11） | SolidColor.color 进入白名单；Fill/Stroke 的 painter 动画会向上解析共享 SolidColor 的绑定并各自发射 fill/stroke 轨道；`HasPainterAnimation` 同步识别源绑定；ledger 的 SolidColor 升级为 Supported；新增 SolidColor 驱动 Fill 回归 | 多消费者去重像素与源/Painter 同有绑定的真实顺序未做 |
@@ -1234,7 +1235,7 @@ F1—F12 原 ID 全保留；F13—F18 是动态补审。除历史官方样例证
 | F14 | `src/pagx/PAGAnimation.cpp:59`、`src/pagx/PAGAnimation.cpp:111`merge/filter；`src/renderer/LayerBuilder.cpp:192`、`src/renderer/LayerBuilder.cpp:267`shared pose | 静态masked/同anim跨Object/跨anim ordered mix三层，matrix不屏z/anchor、后component decompose；M2 |
 | F15 | `src/pagx/runtime/KeyframeEvaluatorImpl.h:106`T{}、`src/pagx/svg/SVGAnimationWriter.cpp:129`clamp key、`src/pagx/svg/SVGAnimationWriter.cpp:191`Hold近似；`src/pagx/runtime/BezierEasing.cpp:104`、`src/pagx/utils/ColorSpaceUtils.cpp:78`overshoot | 跨duration t0=50、空≠无、单/1-frame/D1/D0/nonfinite/duplicate ordered keys、float不clamp/Color分量clamp、No epsilon；M3 |
 | F16 | `src/pagx/runtime/PAGComposition.cpp:57`、`src/pagx/runtime/PAGComposition.cpp:130`paused IDs共享 | 同slot同ID任paused禁全advance但apply全执行，兄弟slot独立、ordinal≠pause scope；M1 |
-| F17 | `src/pagx/PAGXNodeChannel.cpp:486`175/30 registry；本次 `src/pagx/svg/SVGAnimationPlan.cpp:67`75/16白名单与 `src/pagx/svg/SVGCoverageLedger.cpp:30`实现状态 | M4.0—M5.4逐子集同步Plan、ledger和输出/拒绝门禁；颜色、stop、d、Text完整依赖不漏，Planned/Supported≠N/G证明；M0/M4/M5/M6 |
+| F17 | `src/pagx/PAGXNodeChannel.cpp:486`175/30 registry；本次 `src/pagx/svg/SVGAnimationPlan.cpp:67`76/17白名单与 `src/pagx/svg/SVGCoverageLedger.cpp:30`实现状态 | M4.0—M5.4逐子集同步Plan、ledger和输出/拒绝门禁；颜色、stop、d、Text完整依赖不漏，Planned/Supported≠N/G证明；M0/M4/M5/M6 |
 | F18 | `src/pagx/PAGAnimation.cpp:274`Clock、`src/pagx/PAGScene.cpp:514`宿主flush、`src/pagx/utils/RasterUtils.cpp:351`背景合成契约 | 多Clock无公周期、finite事件/3D/noise/complex fallback；D8禁用拒绝、明确MB初态/window/resources/resolution/sampling/tail/repeat/预算，无界U；M3/MB/M6 |
 
 ### 5.1 只读 coverage 校验与维护门禁
