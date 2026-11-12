@@ -1511,6 +1511,12 @@ bool SVGAnimationWriter::WritePaintAnimates(XMLBuilder& out, const Node* painter
     painterAlpha = static_cast<const Stroke*>(painter)->alpha;
     colorSource = static_cast<const Stroke*>(painter)->color;
   }
+  if (colorBinding == nullptr && colorSource != nullptr &&
+      colorSource->nodeType() == NodeType::SolidColor) {
+    // A SolidColor resource may be shared by several Fill / Stroke painters. Each consumer emits
+    // its own SMIL track so every painted element follows the source binding.
+    colorBinding = _plan->Find(colorSource, "color");
+  }
   float colorAlpha = StaticColorAlpha(colorSource);
 
   bool wrote = false;

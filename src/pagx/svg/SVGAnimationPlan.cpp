@@ -23,7 +23,10 @@
 #include "pagx/nodes/AnimationObject.h"
 #include "pagx/nodes/AnimationTimeline.h"
 #include "pagx/nodes/Composition.h"
+#include "pagx/nodes/Fill.h"
 #include "pagx/nodes/Layer.h"
+#include "pagx/nodes/SolidColor.h"
+#include "pagx/nodes/Stroke.h"
 #include "pagx/nodes/Timeline.h"
 #include "pagx/utils/StringParser.h"
 
@@ -79,6 +82,8 @@ bool IsSupportedChannel(NodeType nodeType, const std::string& name) {
              name == "size.height";
     case NodeType::Fill:
       return name == "color" || name == "alpha";
+    case NodeType::SolidColor:
+      return name == "color";
     case NodeType::Stroke:
       return name == "color" || name == "alpha" || name == "width" || name == "dashOffset" ||
              name == "miterLimit";
@@ -319,8 +324,31 @@ bool SVGAnimationPlan::HasAlphaAnimation(const Node* node) const {
 }
 
 bool SVGAnimationPlan::HasPainterAnimation(const Node* fill, const Node* stroke) const {
-  return (fill != nullptr && BindingsFor(fill) != nullptr) ||
-         (stroke != nullptr && BindingsFor(stroke) != nullptr);
+  if (fill != nullptr) {
+    if (BindingsFor(fill) != nullptr) {
+      return true;
+    }
+    if (fill->nodeType() == NodeType::Fill) {
+      auto* source = static_cast<const Fill*>(fill)->color;
+      if (source != nullptr && source->nodeType() == NodeType::SolidColor &&
+          BindingsFor(source) != nullptr) {
+        return true;
+      }
+    }
+  }
+  if (stroke != nullptr) {
+    if (BindingsFor(stroke) != nullptr) {
+      return true;
+    }
+    if (stroke->nodeType() == NodeType::Stroke) {
+      auto* source = static_cast<const Stroke*>(stroke)->color;
+      if (source != nullptr && source->nodeType() == NodeType::SolidColor &&
+          BindingsFor(source) != nullptr) {
+        return true;
+      }
+    }
+  }
+  return false;
 }
 
 }  // namespace pagx

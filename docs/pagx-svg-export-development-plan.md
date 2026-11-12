@@ -416,7 +416,7 @@ TP03首glyph的true矩阵为`{a=0,b=1,c=-1,d=0,tx=-10,ty=0}`，映射(10,0)得�
 | BlendFilter | 1 | `color` | N/G 真正 ColorFilter source/dest/alpha 与固定 blendMode；Plus / 非等价合成 B；M4 | `src/pagx/PAGXNodeChannel.cpp:921` |
 | NoiseFilter | 7 | `size, density, seed, color, firstColor, secondColor, opacity` | B 活跃三 mode / input offset / phase；inactive U/无贡献与 density0 input no-op 分开；M4 分类、MB 可选 | `src/pagx/PAGXNodeChannel.cpp:934` |
 
-合计175，其中styles/filters完整51项。原重组基点白名单为7类/39项；本次 `a7c6c9f23` 已增加BlurFilter、四种阴影filter/style的offset/blur及BlendFilter.color，`IsSupportedChannel`共13类/58项（`src/pagx/svg/SVGAnimationPlan.cpp:67`）。这是当前接线集合，不是175项全支持或组合保真证明；颜色源、stop、d及文字展开按本节M4/M5子步骤同步白名单和 `SVGCoverageLedger`。
+合计175，其中styles/filters完整51项。原重组基点白名单为7类/39项；本次 `a7c6c9f23` 已增加BlurFilter、四种阴影filter/style的offset/blur及BlendFilter.color，`IsSupportedChannel`共14类/59项（2026-11-11 增加 SolidColor.color）（`src/pagx/svg/SVGAnimationPlan.cpp:67`）。这是当前接线集合，不是175项全支持或组合保真证明；颜色源、stop、d及文字展开按本节M4/M5子步骤同步白名单和 `SVGCoverageLedger`。
 
 ### 3.3 表外通道、类型与目标准入
 
@@ -552,7 +552,7 @@ MB范围包含3D、conic/diamond、noise、backdrop/Glass、复杂shape/text/eff
 
 #### M4/M5：固定展开顺序、前置依赖与台账准入
 
-本表固定四类展开的执行次序，不需要实施时再询问。当前已存在 `src/pagx/svg/SVGCoverageLedger.h:32` 的Supported/Planned/NotExpressible实现状态和 `src/pagx/svg/SVGAnimationPlan.cpp:67` 的白名单；它们不等同正文N/G/B/U能力分类。**当前a7c6c9f23白名单为13类/58项**，SolidColor、Gradient、ColorStop、Path、Text及动态modifier尚未放行；不按旧7类/39项覆盖用户已有滤镜增量。未发现已实现的ModifierDependencyGraph，本方案只扩现有resolver产物/DrawRecord来源，不能引用不存在的图模块当作前置。
+本表固定四类展开的执行次序，不需要实施时再询问。当前已存在 `src/pagx/svg/SVGCoverageLedger.h:32` 的Supported/Planned/NotExpressible实现状态和 `src/pagx/svg/SVGAnimationPlan.cpp:67` 的白名单；它们不等同正文N/G/B/U能力分类。**当前白名单为14类/59项（含 SolidColor.color）**，Gradient、ColorStop、Path、Text及动态modifier尚未放行；不按旧7类/39项覆盖用户已有滤镜增量。未发现已实现的ModifierDependencyGraph，本方案只扩现有resolver产物/DrawRecord来源，不能引用不存在的图模块当作前置。
 
 共同前置Q：S1的实例/引用/Painter capture与宿主，S3的最终glyph及第2.8节ST21/ST22/ST28，S4的modifier顺序/来源，S5的静态ColorSource/defs/fit；M1的typed/contextDoc/Clock和M2的ordered pose/alpha；M3至少具备本子批次所需的关键帧、Hold、区间求值、序列化和预算门禁。**不要求先做完所有M3高级组合再做独立N轨道，但某条G轨道缺其误差/预算能力时必须保持Planned或明确拒绝，不能先放行再补证明。**
 
@@ -701,6 +701,7 @@ ToSVG严格失败返回空结果、ToFile返回false、CLI非零；warnings=null
 | 本轮 S6 预算（2026-11-11） | `SVGBudget.maxGeneratedElements` 接入 Resolver 的乘性展开上限；`maxOutputBytes` 超限时 ToSVG 返回空并写 `budget-exceeded` 诊断；`maxRasterPixels` 在层烘焙前检查，超限回退矢量并写诊断；新增预算回归 | samples / instances / encodedBytes 等其余预算字段未实现；D6、策略基线、ST32/41/44、C20—C24 未完成 |
 | 本轮 D6（2026-11-11） | 新增 `test/svg_browser_gate.js` 与 `SVGBrowserTest`：`pagx export` → 固定 Chromium 截图 → `pagx render` 参考 → pixel/SSIM 指标，固定 1400×900 / 白底 / scale 1 / pixelmatch 0.1；支持 `SVG_BROWSER_CASES` 与单例阈值覆盖；`constraint_textbox` 实测 pixelDiff 0.031、RGB 5.29、SSIM 0.416 | 默认阈值按首个文本样本标定为 0.05 / 10 / 0.4，仍需更多语料标定；Playwright 固定 Chromium 未在本机安装 |
 | 本轮 4.7 策略基线（2026-11-11） | 新增 `test/svg_policy_baseline.js` 与 `SVGPolicyBaseline` target，扫描 271 个 resources PAGX：vector-only 241 native / 4 bake / 26 reject（17 unsupported-feature、9 import/resource）、preserve 241 / 21 / 9、best-effort 256 / 6 / 9；生成 `docs/svg-policy-baseline.md` | bake 桶把作者图片的 PNG 也计入，是效果烘焙上界；真实 reject 比例仍需分离资源失败 |
+| 本轮 M4.1 部分（2026-11-11） | SolidColor.color 进入白名单；Fill/Stroke 的 painter 动画会向上解析共享 SolidColor 的绑定并各自发射 fill/stroke 轨道；`HasPainterAnimation` 同步识别源绑定；新增 SolidColor 驱动 Fill 回归 | ColorStop / Gradient 端点 / 多消费者去重像素未做；ledger 仍为 Planned |
 
 ### 4.8 S3 文字待办清单（下一批入口）
 

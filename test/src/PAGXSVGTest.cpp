@@ -4655,6 +4655,34 @@ PAGX_TEST(PAGXSVGTest, SVGExport_AnimationPolicyStrictRejectsUnsupportedChannel)
   EXPECT_FALSE(bestEffortSvg.empty());
 }
 
+// M4.1: a SolidColor resource binding drives every Fill / Stroke consumer.
+PAGX_TEST(PAGXSVGTest, SVGExport_AnimSolidColorSourceDrivesFill) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto* layer = doc->makeNode<pagx::Layer>("layer");
+  auto* rect = doc->makeNode<pagx::Rectangle>("rect");
+  rect->position = {50, 50};
+  rect->size = {80, 80};
+  auto* fill = doc->makeNode<pagx::Fill>("fill");
+  auto* solid = doc->makeNode<pagx::SolidColor>("color");
+  solid->color = {1, 0, 0, 1};
+  fill->color = solid;
+  layer->contents = {rect, fill};
+  doc->layers.push_back(layer);
+
+  auto* animation = MakeAnimation(doc.get(), 60, pagx::LoopMode::Once);
+  auto* object = MakeAnimationObject(doc.get(), animation, "color");
+  auto* channel = MakeChannel<pagx::Color>(doc.get(), object, "color");
+  channel->keyframes.push_back(
+      {0, pagx::Color{1, 0, 0, 1}, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  channel->keyframes.push_back(
+      {60, pagx::Color{0, 0, 1, 1}, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  AttachTimeline(layer, "anim");
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("attributeName=\"fill\""), std::string::npos);
+  EXPECT_NE(svg.find("dur=\"1s\""), std::string::npos);
+}
+
 // M1: Default selects the first declared Animation, Named selects one id, All exports every
 // top-level Animation. Timing comes from a mounted timeline when present and from animation
 // defaults otherwise.
