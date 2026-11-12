@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 # Runs the D6 SVG browser-fidelity gate over the supplied PAGX files (or a default layout sample).
+# A case may carry an animation seek time as `path.pagx@seconds`; the gate pauses SMIL, seeks to
+# that time in the browser and renders the reference with `pagx render --time`.
 # Requires a headless Chromium installed by Playwright (tools/html-snapshot).
 set -euo pipefail
 
@@ -19,16 +21,27 @@ fi
 
 STATUS=0
 for CASE in "${CASES[@]}"; do
-  if [ ! -f "$CASE" ]; then
-    echo "svg_browser_gate: missing case '$CASE'" >&2
+  CASE_FILE="$CASE"
+  CASE_TIME=""
+  if [[ "$CASE" == *@* ]]; then
+    CASE_FILE="${CASE%@*}"
+    CASE_TIME="${CASE##*@}"
+  fi
+  if [ ! -f "$CASE_FILE" ]; then
+    echo "svg_browser_gate: missing case '$CASE_FILE'" >&2
     STATUS=2
     continue
   fi
-  echo "svg_browser_gate: $CASE"
+  echo "svg_browser_gate: $CASE_FILE${CASE_TIME:+ @${CASE_TIME}s}"
+  TIME_ARGS=()
+  if [ -n "$CASE_TIME" ]; then
+    TIME_ARGS=(--time "$CASE_TIME")
+  fi
   node "$ROOT/test/svg_browser_gate.js" \
-    --pagx "$CASE" \
+    --pagx "$CASE_FILE" \
     --pagx-bin "$PAGX_BIN" \
-    --out "$OUT_DIR" || STATUS=$?
+    --out "$OUT_DIR" \
+    "${TIME_ARGS[@]}" || STATUS=$?
 done
 
 exit "$STATUS"

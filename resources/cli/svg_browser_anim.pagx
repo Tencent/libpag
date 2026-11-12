@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- D6 animated gate case: a solid fill lerps from red to blue over one second. The browser gate
+     pauses SMIL, seeks to 0.5s and compares against the runtime renderer at the same time. -->
+<pagx width="200" height="120">
+  <Layer x="20" y="20" width="160" height="80">
+    <Rectangle position="80,40" size="160,80"/>
+    <Fill>
+      <SolidColor id="fillColor" color="#FF0000"/>
+    </Fill>
+  </Layer>
+  <Animations>
+    <Animation id="pulse" duration="60" frameRate="60" loop="once">
+      <Object target="fillColor">
+        <Channel name="color" type="color">
+          <Key time="0" value="#FF0000" interpolation="linear"/>
+          <Key time="60" value="#0000FF" interpolation="linear"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>
