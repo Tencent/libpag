@@ -26,6 +26,7 @@
 #include "pagx/html/HTMLWriter.h"
 #include "pagx/nodes/BackgroundBlurStyle.h"
 #include "pagx/nodes/BlurFilter.h"
+#include "pagx/nodes/DropShadowFilter.h"
 #include "pagx/nodes/DropShadowStyle.h"
 #include "pagx/nodes/Ellipse.h"
 #include "pagx/nodes/Group.h"
@@ -2498,6 +2499,37 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
     std::string filterCSS = writeFilterDefs(layer->filters);
     if (!filterCSS.empty()) {
       filterValues += filterCSS;
+    }
+    // The frame rewrites `filter` every stop with CSS functions, which only cover blur and
+    // drop-shadow. Whatever else the chain holds (a blend, an inner shadow, a colour matrix) gets its
+    // own def so the frame can append it as `url(#id)` instead of dropping it - composite/08 lost its
+    // multiply blend that way. Emitted unconditionally: the animation pass resolves after the body is
+    // written, so "is anything animated?" is not answerable here; a static document simply carries an
+    // unreferenced def.
+    std::vector<LayerFilter*> residual = {};
+    if (_ctx->hasAnimations) {
+      for (auto* f : layer->filters) {
+        if (f == nullptr) {
+          continue;
+        }
+        auto type = f->nodeType();
+        bool cssAnimatable = false;
+        if (type == NodeType::BlurFilter) {
+          cssAnimatable = true;
+        } else if (type == NodeType::DropShadowFilter) {
+          auto* ds = static_cast<const DropShadowFilter*>(f);
+          cssAnimatable = ds->blurX == ds->blurY && !ds->shadowOnly;
+        }
+        if (!cssAnimatable) {
+          residual.push_back(f);
+        }
+      }
+    }
+    if (!residual.empty() && residual.size() != layer->filters.size()) {
+      std::string id = writeFilterDefs(residual);
+      if (!id.empty()) {
+        _ctx->animation.residualFilterIds[layer] = id;
+      }
     }
   }
 

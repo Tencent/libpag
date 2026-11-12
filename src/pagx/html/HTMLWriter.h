@@ -238,6 +238,10 @@ class HTMLWriterContext {
  public:
   float docWidth = 0;
   float docHeight = 0;
+  // True when the document carries keyframe animations and the caller asked for them. The body is
+  // written before the animation pass resolves, so this is the only "will anything animate?" signal
+  // available while emitting markup (a static export must stay byte-identical).
+  bool hasAnimations = false;
   std::unordered_set<const Composition*> visitedCompositions = {};
 
   // Guard against runaway recursion through writeLayer / writeGroup / writeComposition /
@@ -427,6 +431,10 @@ class HTMLWriterContext {
     // Gradient colour source -> id of the <linearGradient>/<radialGradient>/... element it paints
     // with. A gradient's coordinates are attributes, so the frame moves them with `transform`.
     std::unordered_map<const Node*, std::string> gradientIds = {};
+    // Layer -> id of a filter def holding only the filters CSS cannot rewrite per frame (a blend, an
+    // inner shadow, a colour matrix). The animated filter chain appends `url(#id)` after its
+    // `blur()` / `drop-shadow()` functions so the static stages stay in the chain.
+    std::unordered_map<const Node*, std::string> residualFilterIds = {};
     // DropShadowStyle -> id of the blurred sibling div that paints it. The div is a plain CSS box,
     // so offset / colour / spread animate as left, top, background-color, size and radius.
     std::unordered_map<const Node*, std::string> shadowStyleIds = {};
