@@ -528,14 +528,14 @@ class SVGWriter {
             std::vector<std::string>* warnings = nullptr,
             const SVGAnimationPlan* animation = nullptr, bool rejectUnsupported = false,
             bool animationStrict = false, std::vector<SVGDiagnostic>* diagnostics = nullptr,
-            size_t maxGeneratedElements = 200000, size_t maxRasterPixels = 0)
+            const SVGBudget& budget = {}, bool nativeText = false)
       : _defs(defs), _context(context), _indentSpaces(indentSpaces),
-        _convertTextToPath(convertTextToPath), _bakeUnsupported(bakeUnsupported),
-        _rejectUnsupported(rejectUnsupported), _animationStrict(animationStrict),
-        _rasterScale(rasterScale), _maxGeneratedElements(maxGeneratedElements),
-        _maxRasterPixels(maxRasterPixels), _warnings(warnings),
-        _diagnostics(diagnostics), _layoutContext(layoutContext),
-        _resolver(doc, maxGeneratedElements), _doc(doc), _animWriter(animation, warnings, doc) {
+        _convertTextToPath(convertTextToPath), _nativeText(nativeText),
+        _bakeUnsupported(bakeUnsupported), _rejectUnsupported(rejectUnsupported),
+        _animationStrict(animationStrict), _rasterScale(rasterScale), _budget(budget),
+        _warnings(warnings), _diagnostics(diagnostics), _layoutContext(layoutContext),
+        _resolver(doc, budget.maxGeneratedElements), _doc(doc),
+        _animWriter(animation, warnings, doc, budget.maxSamplesPerTrack) {
   }
 
   bool rejected() const {
@@ -549,13 +549,13 @@ class SVGWriter {
   SVGWriterContext* _context = nullptr;
   int _indentSpaces = 2;
   bool _convertTextToPath = true;
+  bool _nativeText = false;
   bool _bakeUnsupported = true;
   bool _rejectUnsupported = false;
   bool _animationStrict = false;
   bool _rejected = false;
   float _rasterScale = 2.0f;
-  size_t _maxGeneratedElements = 200000;
-  size_t _maxRasterPixels = 0;
+  SVGBudget _budget = {};
   std::vector<std::string>* _warnings = nullptr;
   std::vector<SVGDiagnostic>* _diagnostics = nullptr;
   LayoutContext* _layoutContext = nullptr;
@@ -610,6 +610,8 @@ class SVGWriter {
       diagnostic.reasonCode = reasonCode;
       diagnostic.message = std::move(message);
       diagnostic.action = action;
+      diagnostic.stateSource = "template-static";
+      diagnostic.outputClass = action == SVGDiagnosticAction::Rejected ? "none" : "native";
       _diagnostics->push_back(std::move(diagnostic));
     }
   }
@@ -972,8 +974,7 @@ void SVGWriter::finishGradientDef(const Node* gradient, const Matrix& matrix,
   if (!effectiveMatrix.isIdentity()) {
     _defs->addAttribute("gradientTransform", MatrixToSVGTransform(effectiveMatrix));
   }
-  bool animateGeometry =
-      gradient != nullptr && _animWriter.HasGradientGeometryAnimates(gradient);
+  bool animateGeometry = gradient != nullptr && _animWriter.HasGradientGeometryAnimates(gradient);
   if (stops.empty() && !animateGeometry) {
     _defs->closeElementSelfClosing();
   } else {
@@ -1523,7 +1524,7 @@ void SVGWriter::writeBlendFilter(const BlendFilter* blend, int& shadowIndex,
 //==============================================================================
 
 std::string SVGWriter::writeNoiseTurbulence(float size, float seed, const std::string& resultName,
-                                          const Node* owner) {
+                                            const Node* owner) {
   // SVG filter primitives operate in document units and do not receive the runtime content scale
   // used by GPU rasterization, so exported noise frequency intentionally derives from authoring size.
   auto freq = size > 0.0f ? 1.0f / size : 0.25f;
@@ -1689,7 +1690,8 @@ void SVGWriter::writeNoiseFilter(const NoiseFilter* noise, int& noiseIndex,
   std::string filterId = "noise" + std::to_string(noiseIndex++);
 
   if (noise->mode == NoiseMode::Mono) {
-    auto band = writeNoiseBand(noise->size, noise->density, noise->seed, true, "Dark" + filterId, noise);
+    auto band =
+        writeNoiseBand(noise->size, noise->density, noise->seed, true, "Dark" + filterId, noise);
     _defs->openElement("feFlood");
     _defs->addAttribute("result", "flood" + filterId);
     applyFloodColor(noise->color, noise, "color");
@@ -1713,7 +1715,8 @@ void SVGWriter::writeNoiseFilter(const NoiseFilter* noise, int& noiseIndex,
   }
 
   if (noise->mode == NoiseMode::Duo) {
-    auto dark = writeNoiseBand(noise->size, noise->density, noise->seed, true, "Dark" + filterId, noise);
+    auto dark =
+        writeNoiseBand(noise->size, noise->density, noise->seed, true, "Dark" + filterId, noise);
     auto bright =
         writeNoiseBand(noise->size, noise->density, noise->seed, false, "Bright" + filterId, noise);
 
@@ -1764,9 +1767,8 @@ void SVGWriter::writeNoiseFilter(const NoiseFilter* noise, int& noiseIndex,
     return;
   }
 
-  auto multiResult =
-      writeNoiseMultiCore(noise->size, noise->density, noise->seed, noise->opacity, filterId,
-                       noise);
+  auto multiResult = writeNoiseMultiCore(noise->size, noise->density, noise->seed, noise->opacity,
+                                         filterId, noise);
 
   _defs->openElement("feComposite");
   _defs->addAttribute("in", multiResult);
@@ -1785,7 +1787,8 @@ std::string SVGWriter::writeNoiseStyle(const NoiseStyle* noise, int& noiseStyleI
   std::string styleId = "noiseStyle" + std::to_string(noiseStyleIndex++);
 
   if (noise->mode == NoiseMode::Mono) {
-    auto band = writeNoiseBand(noise->size, noise->density, noise->seed, true, "Dark" + styleId, noise);
+    auto band =
+        writeNoiseBand(noise->size, noise->density, noise->seed, true, "Dark" + styleId, noise);
     _defs->openElement("feFlood");
     _defs->addAttribute("result", "flood" + styleId);
     applyFloodColor(noise->color, noise, "color");
@@ -1802,10 +1805,10 @@ std::string SVGWriter::writeNoiseStyle(const NoiseStyle* noise, int& noiseStyleI
   }
 
   if (noise->mode == NoiseMode::Duo) {
-    auto dark = writeNoiseBand(noise->size, noise->density, noise->seed, true, "Dark" + styleId, noise);
+    auto dark =
+        writeNoiseBand(noise->size, noise->density, noise->seed, true, "Dark" + styleId, noise);
     auto bright =
-        writeNoiseBand(noise->size, noise->density, noise->seed, false, "Bright" + styleId,
-                   noise);
+        writeNoiseBand(noise->size, noise->density, noise->seed, false, "Bright" + styleId, noise);
 
     _defs->openElement("feComposite");
     _defs->addAttribute("in", dark);
@@ -1848,8 +1851,7 @@ std::string SVGWriter::writeNoiseStyle(const NoiseStyle* noise, int& noiseStyleI
   }
 
   auto multiResult =
-      writeNoiseMultiCore(noise->size, noise->density, noise->seed, noise->opacity, styleId,
-                        noise);
+      writeNoiseMultiCore(noise->size, noise->density, noise->seed, noise->opacity, styleId, noise);
 
   writeNoiseStyleClip(multiResult, styleId);
   return "noiseStyleOut" + styleId;
@@ -2281,9 +2283,8 @@ std::string SVGWriter::writeMaskOrClipDef(const Layer* maskLayer, const Layer* o
   }
   _defs->closeElementStart();
   SVGWriter nestedWriter(&paintDefs, _context, _indentSpaces, _convertTextToPath, _layoutContext,
-                         _doc, _bakeUnsupported, _rasterScale, _warnings,
-                         _animWriter.plan(), _rejectUnsupported, _animationStrict, _diagnostics,
-                         _maxGeneratedElements, _maxRasterPixels);
+                         _doc, _bakeUnsupported, _rasterScale, _warnings, _animWriter.plan(),
+                         _rejectUnsupported, _animationStrict, _diagnostics, _budget, _nativeText);
   nestedWriter._maskContentTransform = maskRelativeMatrix(maskLayer, owner);
   nestedWriter._clipPathContent = isClipPath;
   (nestedWriter.*writer)(*_defs, maskLayer);
@@ -2866,8 +2867,7 @@ void SVGWriter::writePath(SVGBuilder& out, const Path* path, const FillStrokeInf
   if (!clipInside && !maskOutside && !adaptiveDash && _pendingPolystarAnimated == nullptr) {
     const Element* bakedSource = _resolver.sourceOf(path);
     auto scope = _elementScopes.find(path);
-    bool sourceAnimated =
-        bakedSource != nullptr && _animWriter.HasBakedShapeAnimates(bakedSource);
+    bool sourceAnimated = bakedSource != nullptr && _animWriter.HasBakedShapeAnimates(bakedSource);
     bool trimAnimated = scope != _elementScopes.end() && scope->second != nullptr &&
                         _animWriter.HasAnimatedModifierScope(*scope->second);
     if (bakedSource != nullptr && (sourceAnimated || trimAnimated) &&
@@ -4409,16 +4409,16 @@ bool SVGWriter::rasterizeLayerAsImage(SVGBuilder& out, const Layer* layer) {
     return false;
   }
   auto pixelScale = _rasterScale;
-  if (_maxRasterPixels > 0) {
-    double pixelWidth = std::ceil(static_cast<double>(bounds.width()) * pixelScale);
-    double pixelHeight = std::ceil(static_cast<double>(bounds.height()) * pixelScale);
-    if (pixelWidth * pixelHeight > static_cast<double>(_maxRasterPixels)) {
-      addWarning("rasterize skipped: layer '" +
-                     (layer->id.empty() ? std::string("(unnamed)") : layer->id) +
-                     "' exceeds the raster pixel budget; falling back to vector emission.",
-                 "budget-exceeded");
-      return false;
-    }
+  double pixelWidth = std::ceil(static_cast<double>(bounds.width()) * pixelScale);
+  double pixelHeight = std::ceil(static_cast<double>(bounds.height()) * pixelScale);
+  if (pixelWidth * pixelHeight > static_cast<double>(_budget.maxRasterPixels) ||
+      pixelWidth > static_cast<double>(_budget.maxRasterEdge) ||
+      pixelHeight > static_cast<double>(_budget.maxRasterEdge)) {
+    addWarning("rasterize skipped: layer '" +
+                   (layer->id.empty() ? std::string("(unnamed)") : layer->id) +
+                   "' exceeds the raster pixel budget; falling back to vector emission.",
+               "budget-exceeded");
+    return false;
   }
   auto pngData = RenderMaskedLayer(&_gpu, buildResult.root, tgfxLayer, coordinateSpace, pixelScale);
   if (!pngData || pngData->size() == 0) {
@@ -4482,8 +4482,8 @@ void SVGWriter::emitGeometryWithFs(SVGBuilder& out, const AccumulatedGeometry& e
                    "animation-rejected");
         _rejected = _rejected || _rejectUnsupported || _animationStrict;
       }
-      bool wrapPosition =
-          hasPositionAnimation && !hasTransforms && (!text->text.empty() || !text->glyphRuns.empty());
+      bool wrapPosition = hasPositionAnimation && !hasTransforms &&
+                          (!text->text.empty() || !text->glyphRuns.empty());
       if (wrapPosition) {
         out.openElement("g");
         out.closeElementStart();
@@ -4511,7 +4511,7 @@ void SVGWriter::emitGeometryWithFs(SVGBuilder& out, const AccumulatedGeometry& e
       // The convertTextToPath flag has the same effect, but only when GlyphRun
       // data is available to walk — without glyphRuns there is no geometry to
       // emit and we must fall back to native text anyway.
-      if (!emitted && !text->glyphRuns.empty()) {
+      if (!emitted && !_nativeText && !text->glyphRuns.empty()) {
         // Prefer the WOFF2 <text> path when the GlyphRun's font is registered as an embedded
         // vector font: the result is a real <text> element with PUA Unicode characters that
         // browsers / Inkscape / Preview render via the embedded @font-face, preserving text
@@ -5168,6 +5168,51 @@ std::string SVGWriter::writeScrollRectClipDef(const Layer* layer) {
 // Main Export function
 //==============================================================================
 
+static SVGBudget ResolveBudget(const SVGBudget& budget) {
+  const SVGBudget defaults = {};
+  SVGBudget resolved = budget;
+  if (resolved.maxReferenceDepth == 0) {
+    resolved.maxReferenceDepth = defaults.maxReferenceDepth;
+  }
+  if (resolved.maxInstances == 0) {
+    resolved.maxInstances = defaults.maxInstances;
+  }
+  if (resolved.maxGeometryPoints == 0) {
+    resolved.maxGeometryPoints = defaults.maxGeometryPoints;
+  }
+  if (resolved.maxGlyphs == 0) {
+    resolved.maxGlyphs = defaults.maxGlyphs;
+  }
+  if (resolved.maxGeneratedElements == 0) {
+    resolved.maxGeneratedElements = defaults.maxGeneratedElements;
+  }
+  if (resolved.maxSamplesPerTrack == 0) {
+    resolved.maxSamplesPerTrack = defaults.maxSamplesPerTrack;
+  }
+  if (resolved.maxTotalSamples == 0) {
+    resolved.maxTotalSamples = defaults.maxTotalSamples;
+  }
+  if (resolved.maxSubdivisionDepth == 0) {
+    resolved.maxSubdivisionDepth = defaults.maxSubdivisionDepth;
+  }
+  if (resolved.maxCommonPeriodSegments == 0) {
+    resolved.maxCommonPeriodSegments = defaults.maxCommonPeriodSegments;
+  }
+  if (resolved.maxRasterPixels == 0) {
+    resolved.maxRasterPixels = defaults.maxRasterPixels;
+  }
+  if (resolved.maxRasterEdge == 0) {
+    resolved.maxRasterEdge = defaults.maxRasterEdge;
+  }
+  if (resolved.maxEncodedBytes == 0) {
+    resolved.maxEncodedBytes = defaults.maxEncodedBytes;
+  }
+  if (resolved.maxOutputBytes == 0) {
+    resolved.maxOutputBytes = defaults.maxOutputBytes;
+  }
+  return resolved;
+}
+
 std::string SVGExporter::ToSVG(PAGXDocument& doc, const Options& options,
                                std::vector<std::string>* warnings) {
   // Mirror PPTExporter: resolve layout before reading the matrix helpers. BuildLayerMatrix composes
@@ -5177,31 +5222,28 @@ std::string SVGExporter::ToSVG(PAGXDocument& doc, const Options& options,
   // with a different FontConfig, or edited constraints since the first layout; skipping here would
   // serialize stale resolved geometry.
   doc.applyLayout(options.fontConfig);
-  bool bakeUnsupported = options.bakeUnsupported;
-  bool rejectUnsupported = !options.bakeUnsupported;
-  if (options.staticPolicy.has_value()) {
-    switch (*options.staticPolicy) {
-      case SVGStaticExportPolicy::VectorOnly:
-        bakeUnsupported = false;
-        rejectUnsupported = true;
-        break;
-      case SVGStaticExportPolicy::PreserveAppearance:
-        bakeUnsupported = true;
-        rejectUnsupported = false;
-        break;
-      case SVGStaticExportPolicy::BestEffort:
-        bakeUnsupported = false;
-        rejectUnsupported = false;
-        break;
-    }
+  const SVGBudget budget = ResolveBudget(options.budget);
+  bool bakeUnsupported = false;
+  bool rejectUnsupported = false;
+  switch (options.staticPolicy) {
+    case SVGStaticExportPolicy::VectorOnly:
+      bakeUnsupported = false;
+      rejectUnsupported = true;
+      break;
+    case SVGStaticExportPolicy::PreserveAppearance:
+      bakeUnsupported = true;
+      rejectUnsupported = false;
+      break;
+    case SVGStaticExportPolicy::BestEffort:
+      bakeUnsupported = false;
+      rejectUnsupported = false;
+      break;
   }
-  bool convertTextToPath = options.convertTextToPath;
-  if (options.textMode.has_value()) {
-    convertTextToPath = *options.textMode == SVGTextExportMode::Fidelity;
-  }
+  bool convertTextToPath = false;
+  bool nativeText = options.textMode == SVGTextExportMode::Native;
   // Clamp rasterScale to a sane range. 0 / negative would silently produce a zero-pixel surface
-  // (the bake then fails and the exporter falls through to the vector path, contradicting
-  // bakeUnsupported=true). The upper bound keeps `static_cast<int>(ceilf(width * rasterScale))`
+  // (the bake then fails and the exporter falls through to the vector path, contradicting the
+  // PreserveAppearance policy). The upper bound keeps `static_cast<int>(ceilf(width * rasterScale))`
   // away from float→int implementation-defined behaviour on huge canvases. Range matches
   // HTMLExportOptions::rasterScale.
   float safeRasterScale = std::clamp(options.rasterScale, 0.01f, 4.0f);
@@ -5227,6 +5269,9 @@ std::string SVGExporter::ToSVG(PAGXDocument& doc, const Options& options,
       if (options.diagnostics != nullptr) {
         SVGDiagnostic diagnostic = {};
         diagnostic.reasonCode = "animation-rejected";
+        diagnostic.channelOrOutput = "animation";
+        diagnostic.outputClass = "none";
+        diagnostic.stateSource = "template-static";
         diagnostic.message =
             "animation policy Strict rejected a channel SVG cannot express; nothing is emitted.";
         diagnostic.action = SVGDiagnosticAction::Rejected;
@@ -5244,7 +5289,7 @@ std::string SVGExporter::ToSVG(PAGXDocument& doc, const Options& options,
   // resource directory the HTML exporter writes alongside the document. The id-keyed mapping
   // is consumed by writeText / writeTextAsFont below to decide whether to emit <text> with
   // PUA Unicode characters (WOFF2 path) or the SVG <path> outline path.
-  if (options.embedFontsAsWoff2 && !convertTextToPath) {
+  if (options.embedFontsAsWoff2 && !convertTextToPath && !nativeText) {
     std::vector<Font*> fonts = {};
     std::unordered_set<const PAGXDocument*> visitedDocs = {};
     CollectDocumentFonts(&doc, &fonts, &visitedDocs);
@@ -5280,18 +5325,11 @@ std::string SVGExporter::ToSVG(PAGXDocument& doc, const Options& options,
     }
   }
 
-  if (!options.resolveModifiers && warnings != nullptr) {
-    warnings->push_back(
-        "resolveModifiers=false is ignored: SVG export always resolves path modifiers, because "
-        "dropping them removes Polystar / TrimPath / Repeater content from the output.");
-  }
-
-  SVGWriter writer(&defs, &context, options.indent, convertTextToPath, layoutContext.get(), &doc,
-                   bakeUnsupported, safeRasterScale, warnings, animationPlan.get(),
-                   rejectUnsupported, options.exportAnimation &&
-                                         options.animation.policy == SVGAnimationPolicy::Strict,
-                   options.diagnostics, options.budget.maxGeneratedElements,
-                   options.budget.maxRasterPixels);
+  SVGWriter writer(
+      &defs, &context, options.indent, convertTextToPath, layoutContext.get(), &doc,
+      bakeUnsupported, safeRasterScale, warnings, animationPlan.get(), rejectUnsupported,
+      options.exportAnimation && options.animation.policy == SVGAnimationPolicy::Strict,
+      options.diagnostics, budget, nativeText);
 
   if (options.xmlDeclaration) {
     svg.appendDeclaration();
@@ -5353,11 +5391,13 @@ std::string SVGExporter::ToSVG(PAGXDocument& doc, const Options& options,
   svg.closeElement();  // </svg>
 
   std::string result = svg.release();
-  if (options.budget.maxOutputBytes > 0 && result.size() > options.budget.maxOutputBytes) {
+  if (result.size() > budget.maxOutputBytes) {
     if (options.diagnostics != nullptr) {
       SVGDiagnostic diagnostic = {};
       diagnostic.reasonCode = "budget-exceeded";
       diagnostic.channelOrOutput = "totalOutputBytes";
+      diagnostic.outputClass = "none";
+      diagnostic.stateSource = "template-static";
       diagnostic.message = "SVG output exceeded maxOutputBytes; nothing is emitted.";
       diagnostic.action = SVGDiagnosticAction::Rejected;
       options.diagnostics->push_back(std::move(diagnostic));

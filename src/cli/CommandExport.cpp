@@ -254,9 +254,9 @@ static int ExportToSVG(const ExportOptions& options) {
   SVGExporter::Options svgOptions = {};
   svgOptions.indent = options.svgIndent;
   svgOptions.xmlDeclaration = !options.svgNoXmlDeclaration;
-  svgOptions.convertTextToPath = options.textToPath;
-  svgOptions.staticPolicy = options.svgStaticPolicy;
-  svgOptions.textMode = options.svgTextMode;
+  svgOptions.staticPolicy =
+      options.svgStaticPolicy.value_or(pagx::SVGStaticExportPolicy::PreserveAppearance);
+  svgOptions.textMode = options.svgTextMode.value_or(pagx::SVGTextExportMode::Fidelity);
   svgOptions.exportAnimation = !options.svgNoAnimation;
   svgOptions.animation.selection = options.svgAnimationSelection;
   svgOptions.animation.animationId = options.svgAnimationId;

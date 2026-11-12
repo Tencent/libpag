@@ -75,7 +75,7 @@ class SVGAnimationWriter {
  public:
   explicit SVGAnimationWriter(const SVGAnimationPlan* plan,
                               std::vector<std::string>* warnings = nullptr,
-                              PAGXDocument* document = nullptr);
+                              PAGXDocument* document = nullptr, size_t maxSamplesPerTrack = 4096);
 
   const SVGAnimationPlan* plan() const {
     return _plan;
@@ -380,6 +380,10 @@ class SVGAnimationWriter {
   // Used to allocate transient Polystar snapshots while sampling dynamic geometry. The document
   // owns them until the exporter's ModifierResolver cleans up its generated nodes.
   PAGXDocument* _document = nullptr;
+
+  size_t _maxSamplesPerTrack = 4096;
+
+  size_t MaxSamplesForTrack() const;
 
   bool WriteVisibilityAnimate(XMLBuilder& out, const Node* target);
 

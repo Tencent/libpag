@@ -187,9 +187,10 @@ void TextHolder::flush(FontConfig* fontConfig) {
     }
     auto textBlob = GlyphRunRenderer::BuildTextBlobFromLayoutRuns(runs, entry.inverseMatrix);
     if (textBlob == nullptr) {
-      LOGE("TextHolder::flush: shaping produced runs but no blob for Text '%s'; clearing the "
-           "stale glyphs.",
-           entry.node->id.c_str());
+      LOGE(
+          "TextHolder::flush: shaping produced runs but no blob for Text '%s'; clearing the "
+          "stale glyphs.",
+          entry.node->id.c_str());
       text->clearTextBlob();
       continue;
     }

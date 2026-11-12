@@ -90,8 +90,8 @@ tgfx::Path StarToTGFXPath(const PolystarSample& sample) {
         lastRoundness = outerRoundness;
         roundness = innerRoundness;
       }
-      AddPolystarCurve(&path, centerX, centerY, angleDelta * 0.5f, lastDx, lastDy, lastRoundness, dx,
-                       dy, roundness);
+      AddPolystarCurve(&path, centerX, centerY, angleDelta * 0.5f, lastDx, lastDy, lastRoundness,
+                       dx, dy, roundness);
       lastDx = dx;
       lastDy = dy;
     } else {

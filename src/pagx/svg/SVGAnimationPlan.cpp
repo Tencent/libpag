@@ -75,10 +75,9 @@ namespace {
 bool IsSupportedChannel(NodeType nodeType, const std::string& name) {
   switch (nodeType) {
     case NodeType::Layer:
-      return name == "alpha" || name == "visible" || IsLayerTransformChannel(name) ||
-             name == "x" || name == "y" || name == "rotation.z" || name == "scale.x" ||
-             name == "scale.y" || name == "skew.x" || name == "skew.y" || name == "anchor.x" ||
-             name == "anchor.y";
+      return name == "alpha" || name == "visible" || IsLayerTransformChannel(name) || name == "x" ||
+             name == "y" || name == "rotation.z" || name == "scale.x" || name == "scale.y" ||
+             name == "skew.x" || name == "skew.y" || name == "anchor.x" || name == "anchor.y";
     case NodeType::Group:
     case NodeType::TextBox:
       return name == "alpha" || IsGroupTransformChannel(name);
@@ -237,8 +236,7 @@ bool IsDegenerateGradient(const Node* target) {
   }
   if (target->nodeType() == NodeType::RadialGradient) {
     const auto* gradient = static_cast<const RadialGradient*>(target);
-    return gradient->colorStops.size() > 1 && gradient->radius < 1e-4f &&
-           gradient->radius >= 0.0f;
+    return gradient->colorStops.size() > 1 && gradient->radius < 1e-4f && gradient->radius >= 0.0f;
   }
   return false;
 }
@@ -394,8 +392,8 @@ std::unique_ptr<SVGAnimationPlan> SVGAnimationPlan::Build(PAGXDocument* document
              target->nodeType() == NodeType::RadialGradient) &&
             IsDegenerateGradient(target)) {
           plan->_rejected = plan->_rejected || strict;
-          std::string key = std::string(NodeTypeName(target->nodeType())) + ":degenerate:" +
-                            channel->name;
+          std::string key =
+              std::string(NodeTypeName(target->nodeType())) + ":degenerate:" + channel->name;
           if (reportedChannels.insert(key).second) {
             AddWarning(warnings, "channel '" + channel->name + "' on <" +
                                      NodeTypeName(target->nodeType()) + "> '" + target->id +

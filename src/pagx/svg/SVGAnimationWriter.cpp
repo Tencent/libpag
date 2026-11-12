@@ -45,10 +45,10 @@
 #include "pagx/runtime/MatrixDecompose.h"
 #include "pagx/svg/SVGAnimationPlan.h"
 #include "pagx/svg/SVGPathParser.h"
-#include "pagx/utils/ModifierResolver.h"
-#include "pagx/utils/PolystarPath.h"
 #include "pagx/types/Color.h"
 #include "pagx/utils/ExporterUtils.h"
+#include "pagx/utils/ModifierResolver.h"
+#include "pagx/utils/PolystarPath.h"
 #include "pagx/utils/StringParser.h"
 #include "pagx/utils/StrokeGeometryUtils.h"
 #include "pagx/xml/XMLBuilder.h"
@@ -731,9 +731,8 @@ bool SampleLayerTransform(const SVGAnimationPlan* plan, const Layer* layer,
     return false;
   }
   auto* matrixBinding = plan->Find(layer, "matrix");
-  static const char* componentNames[] = {"x",           "y",          "rotation.z",
-                                         "scale.x",     "scale.y",    "skew.x",
-                                         "skew.y",      "anchor.x",   "anchor.y"};
+  static const char* componentNames[] = {"x",      "y",      "rotation.z", "scale.x", "scale.y",
+                                         "skew.x", "skew.y", "anchor.x",   "anchor.y"};
   std::vector<std::pair<std::string, const SVGAnimationBinding*>> components;
   if (matrixBinding == nullptr) {
     for (const auto* name : componentNames) {
@@ -1058,9 +1057,14 @@ Matrix GroupMatrixAtFrame(const SVGAnimationPlan* plan, const Group* group, Fram
 }  // namespace
 
 SVGAnimationWriter::SVGAnimationWriter(const SVGAnimationPlan* plan,
-                                       std::vector<std::string>* warnings,
-                                       PAGXDocument* document)
-    : _plan(plan), _warnings(warnings), _document(document) {
+                                       std::vector<std::string>* warnings, PAGXDocument* document,
+                                       size_t maxSamplesPerTrack)
+    : _plan(plan), _warnings(warnings), _document(document),
+      _maxSamplesPerTrack(maxSamplesPerTrack) {
+}
+
+size_t SVGAnimationWriter::MaxSamplesForTrack() const {
+  return std::min(MaxPathDataSamples, _maxSamplesPerTrack);
 }
 
 void SVGAnimationWriter::AddWarning(std::string message) const {
@@ -1715,8 +1719,8 @@ bool SVGAnimationWriter::WriteElementTransformAnimates(XMLBuilder& out,
   if (animatedChannels == 1 && count == 1) {
     const auto* group = steps[0].group;
     auto* rotationBinding = _plan->Find(group, "rotation");
-    rotationOnly = rotationBinding != nullptr && group->scale.x == 1.0f &&
-                   group->scale.y == 1.0f && group->skew == 0.0f;
+    rotationOnly = rotationBinding != nullptr && group->scale.x == 1.0f && group->scale.y == 1.0f &&
+                   group->skew == 0.0f;
     if (rotationOnly) {
       rotationDegrees.reserve(frames.size());
       for (auto frame : frames) {
@@ -1773,7 +1777,7 @@ bool SVGAnimationWriter::WriteLayerTransformAnimates(XMLBuilder& out, const Laye
     rotationDegrees.reserve(frames.size());
     for (auto frame : frames) {
       rotationDegrees.push_back(EvaluateChannelFloat(rotationBinding->channel, frame) -
-                                 layer->rotationZ);
+                                layer->rotationZ);
     }
   }
   return WriteTransformTracks(out, matrices, keyTimes, timing, splines, useSpline,
@@ -2110,18 +2114,20 @@ bool SVGAnimationWriter::WritePathDataAnimates(XMLBuilder& out, const Node* node
   }
 
   std::vector<Point> points = path->data->points();
-  if (frames.size() > MaxPathDataSamples) {
+  const size_t maxSamples = MaxSamplesForTrack();
+  if (frames.size() > maxSamples) {
     std::vector<Frame> reduced;
-    reduced.reserve(MaxPathDataSamples);
-    for (size_t i = 0; i < MaxPathDataSamples; i++) {
-      size_t index = i * (frames.size() - 1) / (MaxPathDataSamples - 1);
+    reduced.reserve(maxSamples);
+    for (size_t i = 0; i < maxSamples; i++) {
+      size_t index = i * (frames.size() - 1) / (maxSamples - 1);
       reduced.push_back(frames[index]);
     }
     std::sort(reduced.begin(), reduced.end());
     reduced.erase(std::unique(reduced.begin(), reduced.end()), reduced.end());
     frames = std::move(reduced);
-    AddWarning("path point track on <Path> '" + node->id +
-               "' exceeded 512 samples and was downsampled; dense bezier segments lose some "
+    AddWarning("path point track on <Path> '" + node->id + "' exceeded " +
+               std::to_string(maxSamples) +
+               " samples and was downsampled; dense bezier segments lose some "
                "intermediate shape.");
   }
   SmilSequence sequence;
@@ -2141,8 +2147,7 @@ bool SVGAnimationWriter::WritePathDataAnimates(XMLBuilder& out, const Node* node
         points[binding.index].y = *coordinate;
       }
     }
-    sequence.values.push_back(
-        PathDataAtFrame(*path->data, points, renderPosition, renderScale));
+    sequence.values.push_back(PathDataAtFrame(*path->data, points, renderPosition, renderScale));
     sequence.keyTimes.push_back(std::clamp(static_cast<double>(frame) / span, 0.0, 1.0));
   }
   if (sequence.values.size() < 2) {
@@ -2321,18 +2326,20 @@ bool SVGAnimationWriter::WritePolystarDataAnimates(XMLBuilder& out, const Node* 
   if (frames.size() < 2) {
     return false;
   }
-  if (frames.size() > MaxPathDataSamples) {
+  const size_t maxSamples = MaxSamplesForTrack();
+  if (frames.size() > maxSamples) {
     std::vector<Frame> reduced;
-    reduced.reserve(MaxPathDataSamples);
-    for (size_t i = 0; i < MaxPathDataSamples; i++) {
-      size_t index = i * (frames.size() - 1) / (MaxPathDataSamples - 1);
+    reduced.reserve(maxSamples);
+    for (size_t i = 0; i < maxSamples; i++) {
+      size_t index = i * (frames.size() - 1) / (maxSamples - 1);
       reduced.push_back(frames[index]);
     }
     std::sort(reduced.begin(), reduced.end());
     reduced.erase(std::unique(reduced.begin(), reduced.end()), reduced.end());
     frames = std::move(reduced);
-    AddWarning("geometry track on <Polystar> '" + node->id +
-               "' exceeded 512 samples and was downsampled; dense bezier segments lose some "
+    AddWarning("geometry track on <Polystar> '" + node->id + "' exceeded " +
+               std::to_string(maxSamples) +
+               " samples and was downsampled; dense bezier segments lose some "
                "intermediate shape.");
   }
 
@@ -2627,19 +2634,20 @@ bool SVGAnimationWriter::BuildBakedShapeDataTrack(const Path* baked, ModifierRes
     return false;
   }
   // Each sample re-runs the whole modifier chain, so the grid stays small.
-  constexpr size_t MaxBakeSamples = 32;
-  if (frames.size() > MaxBakeSamples) {
+  const size_t maxBakeSamples = std::min<size_t>(32, _maxSamplesPerTrack);
+  if (frames.size() > maxBakeSamples) {
     std::vector<Frame> reduced;
-    reduced.reserve(MaxBakeSamples);
-    for (size_t i = 0; i < MaxBakeSamples; i++) {
-      size_t index = i * (frames.size() - 1) / (MaxBakeSamples - 1);
+    reduced.reserve(maxBakeSamples);
+    for (size_t i = 0; i < maxBakeSamples; i++) {
+      size_t index = i * (frames.size() - 1) / (maxBakeSamples - 1);
       reduced.push_back(frames[index]);
     }
     std::sort(reduced.begin(), reduced.end());
     reduced.erase(std::unique(reduced.begin(), reduced.end()), reduced.end());
     frames = std::move(reduced);
     AddWarning("geometry track on <" + std::string(NodeTypeName(source->nodeType())) + "> '" +
-               source->id + "' exceeded 32 re-bake samples and was downsampled.");
+               source->id + "' exceeded " + std::to_string(maxBakeSamples) +
+               " re-bake samples and was downsampled.");
   }
 
   struct TrimSnapshot {
@@ -3129,10 +3137,9 @@ bool SVGAnimationWriter::WritePaintAnimates(XMLBuilder& out, const Node* painter
         }
       } else {
         const auto* channel = static_cast<const TypedChannel<float>*>(alphaBinding->channel);
-        built = BuildFloatSequence(channel, alphaBinding->animation->duration,
-                                   colorAlpha * alphaMultiplier,
-                                   std::numeric_limits<float>::lowest(),
-                                   std::numeric_limits<float>::max(), &sequence);
+        built = BuildFloatSequence(
+            channel, alphaBinding->animation->duration, colorAlpha * alphaMultiplier,
+            std::numeric_limits<float>::lowest(), std::numeric_limits<float>::max(), &sequence);
       }
       if (built) {
         if (timing.mirror) {

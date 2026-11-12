@@ -38,8 +38,8 @@
 #include "pagx/nodes/TextModifier.h"
 #include "pagx/nodes/TrimPath.h"
 #include "pagx/types/MergePathMode.h"
-#include "pagx/utils/PolystarPath.h"
 #include "pagx/utils/ExporterUtils.h"
+#include "pagx/utils/PolystarPath.h"
 #include "pagx/utils/TextSelectorUtils.h"
 #include "pagx/utils/TextUtils.h"
 #include "renderer/ToTGFX.h"
@@ -718,8 +718,8 @@ bool ModifierResolver::CanBakeTextModifiers(const std::vector<Element*>& element
   return true;
 }
 
-std::vector<Element*> ModifierResolver::resolveWithOverride(
-    const std::vector<Element*>& elements, const ShapeGeometryOverride& override) {
+std::vector<Element*> ModifierResolver::resolveWithOverride(const std::vector<Element*>& elements,
+                                                            const ShapeGeometryOverride& override) {
   shapeOverride = override;
   auto result = resolve(elements);
   shapeOverride = {};

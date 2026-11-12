@@ -58,9 +58,9 @@
 #include "pagx/nodes/InnerShadowStyle.h"
 #include "pagx/nodes/LinearGradient.h"
 #include "pagx/nodes/MergePath.h"
-#include "pagx/nodes/Path.h"
 #include "pagx/nodes/NoiseFilter.h"
 #include "pagx/nodes/NoiseStyle.h"
+#include "pagx/nodes/Path.h"
 #include "pagx/nodes/PathData.h"
 #include "pagx/nodes/Polystar.h"
 #include "pagx/nodes/RadialGradient.h"
@@ -75,8 +75,8 @@
 #include "pagx/nodes/TextModifier.h"
 #include "pagx/nodes/TextPath.h"
 #include "pagx/nodes/TrimPath.h"
-#include "pagx/svg/SVGCoverageLedger.h"
 #include "pagx/svg/SVGAnimationPlan.h"
+#include "pagx/svg/SVGCoverageLedger.h"
 #include "pagx/svg/SVGPathParser.h"
 #include "pagx/svg/SVGTransformParser.h"
 #include "pagx/utils/StringParser.h"
@@ -1479,7 +1479,6 @@ PAGX_TEST(PAGXSVGTest, SVGExport_WritingModeVertical) {
   doc->layers.push_back(layer);
 
   pagx::SVGExportOptions options;
-  options.convertTextToPath = false;
   auto svg = pagx::SVGExporter::ToSVG(*doc, options);
   EXPECT_NE(svg.find("writing-mode=\"vertical-rl\""), std::string::npos);
   SaveFile(svg, "PAGXSVGTest/svg_export_writing_mode_vertical.svg");
@@ -1523,7 +1522,6 @@ PAGX_TEST(PAGXSVGTest, SVGExport_WritingModeVerticalJustifyEmitsTextLength) {
   doc->layers.push_back(layer);
 
   pagx::SVGExportOptions options;
-  options.convertTextToPath = false;
   auto svg = pagx::SVGExporter::ToSVG(*doc, options);
   EXPECT_NE(svg.find("writing-mode=\"vertical-rl\""), std::string::npos);
   EXPECT_NE(svg.find("textLength="), std::string::npos);
@@ -2393,7 +2391,6 @@ PAGX_TEST(PAGXSVGTest, SVGExport_ConicGradientDegradesToRadial) {
   doc->layers.push_back(layer);
 
   pagx::SVGExporter::Options opts;
-  opts.bakeUnsupported = false;
   opts.staticPolicy = pagx::SVGStaticExportPolicy::BestEffort;
   auto svg = pagx::SVGExporter::ToSVG(*doc, opts);
   EXPECT_NE(svg.find("<radialGradient"), std::string::npos);
@@ -2424,14 +2421,13 @@ PAGX_TEST(PAGXSVGTest, SVGExport_DiamondGradientDegradesToRadial) {
   doc->layers.push_back(layer);
 
   pagx::SVGExporter::Options opts;
-  opts.bakeUnsupported = false;
   opts.staticPolicy = pagx::SVGStaticExportPolicy::BestEffort;
   auto svg = pagx::SVGExporter::ToSVG(*doc, opts);
   EXPECT_NE(svg.find("<radialGradient"), std::string::npos);
   EXPECT_NE(svg.find("diamond gradient degraded"), std::string::npos);
 }
 
-// Coverage for bakeUnsupported=true (the default): conic / diamond gradient trips the SVG
+// Coverage for the default PreserveAppearance policy: conic / diamond gradient trips the SVG
 // feature probe and is baked to an embedded PNG patch via <image> instead of degrading to a
 // radial gradient.
 PAGX_TEST(PAGXSVGTest, SVGExport_BakeUnsupportedRastersConicGradient) {
@@ -2456,7 +2452,7 @@ PAGX_TEST(PAGXSVGTest, SVGExport_BakeUnsupportedRastersConicGradient) {
   layer->contents.push_back(fill);
   doc->layers.push_back(layer);
 
-  // Default options: bakeUnsupported=true. Expect an <image> with a PNG data URI to replace the
+  // Default options: PreserveAppearance. Expect an <image> with a PNG data URI to replace the
   // vector emission, and no <radialGradient> degrade fallback to slip through.
   auto svg = pagx::SVGExporter::ToSVG(*doc);
   EXPECT_NE(svg.find("<image"), std::string::npos);
@@ -2464,8 +2460,9 @@ PAGX_TEST(PAGXSVGTest, SVGExport_BakeUnsupportedRastersConicGradient) {
   EXPECT_EQ(svg.find("<radialGradient"), std::string::npos);
 }
 
-// S6: staticPolicy is authoritative over the deprecated bakeUnsupported flag.
-PAGX_TEST(PAGXSVGTest, SVGExport_StaticPolicyOverridesDeprecatedFlag) {
+// S6: VectorOnly rejects conic gradients that would need a baked patch, while
+// PreserveAppearance bakes them.
+PAGX_TEST(PAGXSVGTest, SVGExport_StaticPoliciesForConicGradient) {
   auto makeDoc = []() {
     auto doc = pagx::PAGXDocument::Make(200, 200);
     auto* layer = doc->makeNode<pagx::Layer>();
@@ -2490,7 +2487,6 @@ PAGX_TEST(PAGXSVGTest, SVGExport_StaticPolicyOverridesDeprecatedFlag) {
 
   auto vectorDoc = makeDoc();
   pagx::SVGExportOptions vectorOnly = {};
-  vectorOnly.bakeUnsupported = true;
   vectorOnly.staticPolicy = pagx::SVGStaticExportPolicy::VectorOnly;
   std::vector<std::string> warnings;
   std::vector<pagx::SVGDiagnostic> diagnostics;
@@ -2503,7 +2499,6 @@ PAGX_TEST(PAGXSVGTest, SVGExport_StaticPolicyOverridesDeprecatedFlag) {
 
   auto preserveDoc = makeDoc();
   pagx::SVGExportOptions preserve = {};
-  preserve.bakeUnsupported = false;
   preserve.staticPolicy = pagx::SVGStaticExportPolicy::PreserveAppearance;
   auto preserveSvg = pagx::SVGExporter::ToSVG(*preserveDoc, preserve);
   EXPECT_NE(preserveSvg.find("data:image/png;base64,"), std::string::npos);
@@ -2585,7 +2580,7 @@ PAGX_TEST(PAGXSVGTest, SVGExport_BakeUnsupportedHonoursScrollRect) {
 }
 
 // Coverage for the rasterScale clamp: 0 / negative / huge values must be clamped to a usable
-// range so bakeUnsupported=true still produces a non-empty <image>. The placed <image> always
+// range so the default PreserveAppearance policy still produces a non-empty <image>. The placed <image> always
 // keeps logical coordinates regardless of the chosen scale, but the PNG payload size scales.
 PAGX_TEST(PAGXSVGTest, SVGExport_RasterScaleDefaultProducesImage) {
   auto doc = pagx::PAGXDocument::Make(120, 120);
@@ -2630,8 +2625,8 @@ PAGX_TEST(PAGXSVGTest, SVGExport_RasterScaleClampsZeroAndNegative) {
   doc->layers.push_back(layer);
 
   // rasterScale=0 / negative would silently produce a zero-pixel surface and the bake would
-  // fall through to the vector path, contradicting bakeUnsupported=true. The clamp at the
-  // entry point keeps the bake alive.
+  // fall through to the vector path, contradicting the PreserveAppearance policy. The clamp at
+  // the entry point keeps the bake alive.
   pagx::SVGExporter::Options opts;
   opts.rasterScale = 0.0f;
   auto svg = pagx::SVGExporter::ToSVG(*doc, opts);
@@ -3038,7 +3033,7 @@ PAGX_TEST(PAGXSVGTest, SVGExport_FilterCombinationDropShadowPlusBlur) {
 }
 
 PAGX_TEST(PAGXSVGTest, SVGExport_ConvertTextToPathDisabled) {
-  // Exercises native <text> emission path (writeText) when convertTextToPath is off.
+  // Exercises native <text> emission path (writeText) for a Text without authored glyphs.
   auto doc = pagx::PAGXDocument::Make(300, 100);
   auto* layer = doc->makeNode<pagx::Layer>();
   auto* text = doc->makeNode<pagx::Text>();
@@ -3059,7 +3054,6 @@ PAGX_TEST(PAGXSVGTest, SVGExport_ConvertTextToPathDisabled) {
   doc->layers.push_back(layer);
 
   pagx::SVGExporter::Options opts;
-  opts.convertTextToPath = false;
   auto svg = pagx::SVGExporter::ToSVG(*doc, opts);
   EXPECT_NE(svg.find("<text"), std::string::npos);
   EXPECT_NE(svg.find("Native"), std::string::npos);
@@ -3385,7 +3379,6 @@ PAGX_TEST(PAGXSVGTest, SVGExport_TextMultiLine) {
   doc->layers.push_back(layer);
 
   pagx::SVGExporter::Options opts;
-  opts.convertTextToPath = false;
   auto svg = pagx::SVGExporter::ToSVG(*doc, opts);
   EXPECT_NE(svg.find("<text"), std::string::npos);
 }
@@ -3412,7 +3405,6 @@ PAGX_TEST(PAGXSVGTest, SVGExport_TextInContainer) {
   doc->layers.push_back(layer);
 
   pagx::SVGExporter::Options opts;
-  opts.convertTextToPath = false;
   auto svg = pagx::SVGExporter::ToSVG(*doc, opts);
   EXPECT_NE(svg.find("<text"), std::string::npos);
 }
@@ -3455,7 +3447,7 @@ PAGX_TEST(PAGXSVGTest, SVGExport_LayerMatrix3D) {
 // <style>@font-face{...}</style> declaration in <defs>. Text nodes whose GlyphRun references a
 // participating Font are emitted as a real <text> element with PUA Unicode characters mapped
 // 1:1 to glyph IDs (0xE000 + (gid-1)). The path output is reserved for cases the <text> element
-// cannot losslessly express: convertTextToPath=true, embedFontsAsWoff2=false, bitmap fonts, runs
+// cannot losslessly express: embedFontsAsWoff2=false, bitmap fonts, runs
 // with per-glyph scales/skews, and gradient fills.
 
 // Builds a minimal vector Font with two square-ish glyph paths plus a Text containing a single
@@ -3537,24 +3529,6 @@ PAGX_TEST(PAGXSVGTest, SVGExport_EmbedFontsAsWoff2_Disabled) {
   EXPECT_EQ(svg.find("pagx-font-"), std::string::npos);
   EXPECT_NE(svg.find("<path"), std::string::npos);
   SaveFile(svg, "PAGXSVGTest/svg_export_embed_fonts_woff2_disabled.svg");
-}
-
-/**
- * convertTextToPath=true is the user explicitly asking for outline geometry. The pre-pass must
- * skip WOFF2 generation regardless of embedFontsAsWoff2's value, and the GlyphRun must render
- * as a <path>.
- */
-PAGX_TEST(PAGXSVGTest, SVGExport_EmbedFontsAsWoff2_SuppressedByConvertTextToPath) {
-  auto doc = MakeVectorGlyphRunDocSVG();
-
-  pagx::SVGExporter::Options opts;
-  opts.embedFontsAsWoff2 = true;
-  opts.convertTextToPath = true;
-  auto svg = pagx::SVGExporter::ToSVG(*doc, opts);
-  EXPECT_EQ(svg.find("@font-face"), std::string::npos);
-  EXPECT_EQ(svg.find("data:font/woff2"), std::string::npos);
-  EXPECT_NE(svg.find("<path"), std::string::npos);
-  SaveFile(svg, "PAGXSVGTest/svg_export_embed_fonts_woff2_convert_to_path.svg");
 }
 
 /**
@@ -4602,7 +4576,6 @@ static std::shared_ptr<pagx::PAGXDocument> MakeRectDocument(pagx::Rectangle** ou
   return doc;
 }
 
-
 // F10: animations inside a mask layer reach the actual <mask>/<clipPath> host, and a Strict
 // rejection inside the mask propagates to the whole export.
 PAGX_TEST(PAGXSVGTest, SVGExport_AnimMaskContent) {
@@ -4859,7 +4832,6 @@ PAGX_TEST(PAGXSVGTest, SVGExport_AnimConicStopRejected) {
   pagx::SVGExportOptions bestEffort = {};
   bestEffort.animation.policy = pagx::SVGAnimationPolicy::BestEffort;
   bestEffort.staticPolicy = pagx::SVGStaticExportPolicy::BestEffort;
-  bestEffort.bakeUnsupported = false;
   auto bestEffortSvg = pagx::SVGExporter::ToSVG(*doc, bestEffort);
   EXPECT_NE(bestEffortSvg.find("<stop"), std::string::npos);
   EXPECT_EQ(bestEffortSvg.find("<animate"), std::string::npos);
@@ -5146,7 +5118,6 @@ PAGX_TEST(PAGXSVGTest, SVGExport_AnimNativeTextBoxPosition) {
   AttachTimeline(layer, "anim");
 
   pagx::SVGExportOptions options = {};
-  options.convertTextToPath = false;
   auto svg = pagx::SVGExporter::ToSVG(*doc, options);
   EXPECT_NE(svg.find("<text"), std::string::npos) << svg;
   EXPECT_NE(svg.find("animateTransform"), std::string::npos) << svg;
@@ -5180,7 +5151,6 @@ PAGX_TEST(PAGXSVGTest, SVGExport_AnimTextPositionEmitsTranslate) {
   AttachTimeline(layer, "anim");
 
   pagx::SVGExportOptions options = {};
-  options.convertTextToPath = false;
   auto svg = pagx::SVGExporter::ToSVG(*doc, options);
   EXPECT_NE(svg.find("<text"), std::string::npos) << svg;
   EXPECT_NE(svg.find("animateTransform"), std::string::npos) << svg;
@@ -6172,9 +6142,10 @@ PAGX_TEST(PAGXSVGTest, SVGCoverageLedgerIsComplete) {
 PAGX_TEST(PAGXSVGTest, SVGAnimationCapabilitiesDocIsCurrent) {
   std::string doc;
   doc += "# PAGX to SVG animation capability matrix\n\n";
-  doc += "Generated from `SVGChannelLedger()` in `src/pagx/svg/SVGCoverageLedger.cpp`. Do not edit "
-         "this file by hand: `PAGXSVGTest.SVGAnimationCapabilitiesDocIsCurrent` regenerates it "
-         "into `test/out/PAGXSVGTest/svg-animation-capabilities.md` whenever the ledger changes.\n\n";
+  doc +=
+      "Generated from `SVGChannelLedger()` in `src/pagx/svg/SVGCoverageLedger.cpp`. Do not edit "
+      "this file by hand: `PAGXSVGTest.SVGAnimationCapabilitiesDocIsCurrent` regenerates it "
+      "into `test/out/PAGXSVGTest/svg-animation-capabilities.md` whenever the ledger changes.\n\n";
   size_t supported = 0;
   size_t planned = 0;
   size_t notExpressible = 0;
@@ -6191,15 +6162,17 @@ PAGX_TEST(PAGXSVGTest, SVGAnimationCapabilitiesDocIsCurrent) {
         break;
     }
   }
-  doc += "- Reflective animatable channels: " + std::to_string(pagx::SVGChannelLedger().size()) +
-         "\n";
+  doc +=
+      "- Reflective animatable channels: " + std::to_string(pagx::SVGChannelLedger().size()) + "\n";
   doc += "- Supported: " + std::to_string(supported) + "\n";
   doc += "- Planned: " + std::to_string(planned) + "\n";
   doc += "- Not expressible: " + std::to_string(notExpressible) + "\n";
-  doc += "- Table-external family: Path `point{N}.x` / `point{N}.y` (not counted in the rows "
-         "above)\n";
-  doc += "- Browser gate cases: `SVGBrowserAnimTest` covers SolidColor, ColorStop, linear "
-         "endpoint, Text.x and Polystar roundness at a paused SMIL seek time.\n\n";
+  doc +=
+      "- Table-external family: Path `point{N}.x` / `point{N}.y` (not counted in the rows "
+      "above)\n";
+  doc +=
+      "- Browser gate cases: `SVGBrowserAnimTest` covers SolidColor, ColorStop, linear "
+      "endpoint, Text.x and Polystar roundness at a paused SMIL seek time.\n\n";
 
   pagx::NodeType currentType = pagx::NodeType::Document;
   bool firstType = true;
@@ -6325,8 +6298,7 @@ PAGX_TEST(PAGXSVGTest, SVGExport_AnimMultiChannelBezierIsDensified) {
   xChannel->keyframes.push_back(
       {60, 100.0f, pagx::KeyframeInterpolationType::Bezier, {}, {0.9f, 1.0f}});
   auto* rotationChannel = MakeChannel<float>(doc.get(), object, "rotation.z");
-  rotationChannel->keyframes.push_back(
-      {0, 0.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  rotationChannel->keyframes.push_back({0, 0.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
   rotationChannel->keyframes.push_back(
       {60, 90.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
   AttachTimeline(doc->layers[0], "anim");
@@ -6942,9 +6914,9 @@ PAGX_TEST(PAGXSVGTest, SVGExport_AntiAliasFalseUsesCrispEdges) {
   EXPECT_EQ(smoothSvg.find("shape-rendering"), std::string::npos);
 }
 
-// ST43: resolveModifiers=false used to drop Polystar / TrimPath / Repeater content silently. The
-// option is now ignored: modifiers are always resolved, and a false value only warns.
-PAGX_TEST(PAGXSVGTest, SVGExport_ResolveModifiersFalseIsIgnored) {
+// ST43 remainder: modifiers such as Polystar are always resolved; there is no option that drops
+// them.
+PAGX_TEST(PAGXSVGTest, SVGExport_AlwaysResolvesPolystar) {
   auto doc = pagx::PAGXDocument::Make(200, 200);
   auto* layer = doc->makeNode<pagx::Layer>("layer");
   auto* star = doc->makeNode<pagx::Polystar>();
@@ -6958,16 +6930,8 @@ PAGX_TEST(PAGXSVGTest, SVGExport_ResolveModifiersFalseIsIgnored) {
   layer->contents = {star, fill};
   doc->layers.push_back(layer);
 
-  pagx::SVGExporter::Options options;
-  options.resolveModifiers = false;
-  std::vector<std::string> warnings;
-  auto svg = pagx::SVGExporter::ToSVG(*doc, options, &warnings);
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
   EXPECT_NE(svg.find("<path"), std::string::npos);
-  bool warned = false;
-  for (const auto& warning : warnings) {
-    warned = warned || warning.find("resolveModifiers=false is ignored") != std::string::npos;
-  }
-  EXPECT_TRUE(warned) << (warnings.empty() ? "no warnings" : warnings[0]);
 }
 
 // ST6: filters form a chain. A blur placed after a drop shadow must consume the merged shadow
@@ -7299,7 +7263,6 @@ PAGX_TEST(PAGXSVGTest, SVGExport_TextBoxAnchorUsesResolvedWidth) {
   doc->applyLayout();
 
   pagx::SVGExportOptions options = {};
-  options.convertTextToPath = false;
   auto svg = pagx::SVGExporter::ToSVG(*doc, options);
   SaveFile(svg, "PAGXSVGTest/svg_export_textbox_resolved_width.svg");
   EXPECT_NE(svg.find(" x=\"240\""), std::string::npos);
@@ -7855,8 +7818,9 @@ PAGX_TEST(PAGXSVGTest, SVGExport_SingularGroupKeepsEmptyGeometry) {
   EXPECT_TRUE(keepsSingularTransform) << svg;
 }
 
-// S6: textMode is authoritative over the deprecated convertTextToPath flag.
-PAGX_TEST(PAGXSVGTest, SVGExport_TextModeOverridesDeprecatedFlag) {
+// Fidelity keeps the layout-resolved glyphs as the authoritative source, which embeds the shaped
+// vector font; Native keeps the authored string and must not embed the shaped font.
+PAGX_TEST(PAGXSVGTest, SVGExport_TextModeSelectsGlyphSource) {
   auto makeDoc = []() {
     auto doc = pagx::PAGXDocument::Make(100, 100);
     auto* font = MakeSquareGlyphFont(doc.get());
@@ -7870,19 +7834,18 @@ PAGX_TEST(PAGXSVGTest, SVGExport_TextModeOverridesDeprecatedFlag) {
 
   auto fidelityDoc = makeDoc();
   pagx::SVGExportOptions fidelity = {};
-  fidelity.convertTextToPath = false;
   fidelity.textMode = pagx::SVGTextExportMode::Fidelity;
   auto fidelitySvg = pagx::SVGExporter::ToSVG(*fidelityDoc, fidelity);
-  EXPECT_EQ(fidelitySvg.find("<text"), std::string::npos);
-  EXPECT_NE(fidelitySvg.find("<path"), std::string::npos);
+  EXPECT_NE(fidelitySvg.find("@font-face"), std::string::npos);
+  EXPECT_NE(fidelitySvg.find("<text"), std::string::npos);
 
   auto nativeDoc = makeDoc();
   pagx::SVGExportOptions native = {};
-  native.convertTextToPath = true;
   native.textMode = pagx::SVGTextExportMode::Native;
   auto nativeSvg = pagx::SVGExporter::ToSVG(*nativeDoc, native);
+  EXPECT_EQ(nativeSvg.find("@font-face"), std::string::npos);
   EXPECT_NE(nativeSvg.find("<text"), std::string::npos);
-  EXPECT_NE(nativeSvg.find("@font-face"), std::string::npos);
+  EXPECT_NE(nativeSvg.find(">A<"), std::string::npos);
 }
 
 // S3/S5: exporting after a constraint edit must re-run layout instead of serializing stale
@@ -7910,7 +7873,6 @@ PAGX_TEST(PAGXSVGTest, SVGExport_ReLayoutsAfterConstraintEdit) {
   doc->applyLayout();
 
   pagx::SVGExportOptions options = {};
-  options.convertTextToPath = false;
   auto before = pagx::SVGExporter::ToSVG(*doc, options);
   EXPECT_NE(before.find(" x=\"90\""), std::string::npos);
 
@@ -7940,7 +7902,6 @@ PAGX_TEST(PAGXSVGTest, SVGExport_EmbedsFontsFromExternalDocument) {
   root->layers.push_back(host);
 
   pagx::SVGExportOptions options = {};
-  options.convertTextToPath = false;
   options.embedFontsAsWoff2 = true;
   auto svg = pagx::SVGExporter::ToSVG(*root, options);
   EXPECT_NE(svg.find("@font-face"), std::string::npos);
@@ -7963,7 +7924,6 @@ PAGX_TEST(PAGXSVGTest, SVGExport_TextBoxPreservesWhitespace) {
   doc->layers.push_back(layer);
 
   pagx::SVGExportOptions options = {};
-  options.convertTextToPath = false;
   auto svg = pagx::SVGExporter::ToSVG(*doc, options);
   EXPECT_NE(svg.find("xml:space=\"preserve\""), std::string::npos);
   EXPECT_NE(svg.find("A  B"), std::string::npos);
@@ -7986,7 +7946,6 @@ PAGX_TEST(PAGXSVGTest, SVGExport_TextBoxTabUsesLayoutPosition) {
   doc->layers.push_back(layer);
 
   pagx::SVGExportOptions options = {};
-  options.convertTextToPath = false;
   auto svg = pagx::SVGExporter::ToSVG(*doc, options);
   EXPECT_EQ(svg.find('\t'), std::string::npos);
   size_t tspanCount = 0;
@@ -8014,7 +7973,6 @@ PAGX_TEST(PAGXSVGTest, SVGExport_TextBoxRTLBaseDirection) {
   doc->layers.push_back(layer);
 
   pagx::SVGExportOptions options = {};
-  options.convertTextToPath = false;
   auto svg = pagx::SVGExporter::ToSVG(*doc, options);
   EXPECT_NE(svg.find("direction=\"rtl\""), std::string::npos);
   EXPECT_NE(svg.find("x=\"100\""), std::string::npos);
@@ -8038,7 +7996,6 @@ PAGX_TEST(PAGXSVGTest, SVGExport_TextBoxCJKJustifyUsesTextLength) {
   doc->layers.push_back(layer);
 
   pagx::SVGExportOptions options = {};
-  options.convertTextToPath = false;
   auto svg = pagx::SVGExporter::ToSVG(*doc, options);
   EXPECT_NE(svg.find("textLength="), std::string::npos);
   EXPECT_NE(svg.find("lengthAdjust=\"spacing\""), std::string::npos);
@@ -8107,7 +8064,6 @@ PAGX_TEST(PAGXSVGTest, SVGExport_TextBoxRunKeepsGroupAlpha) {
   doc->layers.push_back(layer);
 
   pagx::SVGExportOptions options = {};
-  options.convertTextToPath = false;
   auto svg = pagx::SVGExporter::ToSVG(*doc, options);
   EXPECT_NE(svg.find("fill-opacity=\"0.5\""), std::string::npos);
 }
@@ -8381,7 +8337,6 @@ PAGX_TEST(PAGXSVGTest, SVGExport_StandaloneTextWhitespaceAndRTL) {
   doc->layers.push_back(layer);
 
   pagx::SVGExportOptions options = {};
-  options.convertTextToPath = false;
   auto svg = pagx::SVGExporter::ToSVG(*doc, options);
   EXPECT_NE(svg.find("xml:space=\"preserve\""), std::string::npos);
 
