@@ -2452,6 +2452,62 @@ bool SVGAnimationWriter::BuildBakedShapeDataTrack(const Path* baked, ModifierRes
   return true;
 }
 
+bool SVGAnimationWriter::WriteWrapTransformAnimates(XMLBuilder& out, const Node* node,
+                                                    const Matrix& parent,
+                                                    const Matrix& staticMatrix) {
+  if (_plan == nullptr || node == nullptr) {
+    return false;
+  }
+  const Animation* animation = nullptr;
+  const AnimationTimeline* timeline = nullptr;
+  const Channel* singleChannel = nullptr;
+  int animatedChannels = 0;
+  std::vector<Frame> frames;
+  for (int i = 0; i < GroupTransformChannelCount; ++i) {
+    auto* binding = _plan->Find(node, GroupTransformChannelNames[i]);
+    if (binding == nullptr) {
+      continue;
+    }
+    ++animatedChannels;
+    singleChannel = binding->channel;
+    if (animation == nullptr) {
+      animation = binding->animation;
+      timeline = binding->timeline;
+    } else if (animation != binding->animation) {
+      return false;
+    }
+    AppendTrackFrames(binding->channel, binding->animation->duration, &frames);
+  }
+  if (animation == nullptr) {
+    return false;
+  }
+  SmilTiming timing;
+  if (!ResolveTiming(animation, timeline, &timing)) {
+    return false;
+  }
+  std::sort(frames.begin(), frames.end());
+  frames.erase(std::unique(frames.begin(), frames.end()), frames.end());
+  auto span = static_cast<double>(animation->duration);
+  if (span <= 0 || frames.size() < 2) {
+    return false;
+  }
+  std::vector<SmilSpline> splines;
+  bool useSpline = false;
+  if (animatedChannels == 1) {
+    CollectSegmentSplines(singleChannel, frames, &splines, &useSpline);
+  }
+  const auto* group = static_cast<const Group*>(node);
+  Matrix inverseStatic = InvertAffine(staticMatrix);
+  std::vector<Matrix> matrices;
+  std::vector<double> keyTimes;
+  for (auto frame : frames) {
+    Matrix animated = parent * GroupMatrixAtFrame(_plan, group, frame);
+    matrices.push_back(animated * inverseStatic);
+    keyTimes.push_back(std::clamp(static_cast<double>(frame) / span, 0.0, 1.0));
+  }
+  return WriteTransformTracks(out, matrices, keyTimes, timing, splines, useSpline);
+}
+
 bool SVGAnimationWriter::WritePaintAnimates(XMLBuilder& out, const Node* painter,
                                             const char* paintAttribute, float alphaMultiplier) {
   auto* colorBinding = _plan->Find(painter, "color");

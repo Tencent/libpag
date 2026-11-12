@@ -5114,6 +5114,44 @@ PAGX_TEST(PAGXSVGTest, SVGExport_AnimPathPointHoldIsDiscrete) {
 }
 
 // M5.2: Text.x / Text.y translate the shaped run through a wrapping <g> without reshaping it.
+// F10: native TextBox rendering bakes the box transform into its <text> children, so an animated
+// box wraps them in a <g> whose delta track carries the motion.
+PAGX_TEST(PAGXSVGTest, SVGExport_AnimNativeTextBoxPosition) {
+  auto doc = pagx::PAGXDocument::Make(300, 100);
+  auto* layer = doc->makeNode<pagx::Layer>("layer");
+  auto* box = doc->makeNode<pagx::TextBox>("box");
+  box->left = 40;
+  box->top = 20;
+  box->width = 200;
+  box->height = 60;
+  auto* text = doc->makeNode<pagx::Text>("label");
+  text->text = "Hi";
+  text->fontFamily = "Arial";
+  text->fontSize = 20;
+  auto* fill = doc->makeNode<pagx::Fill>("fill");
+  auto* solid = doc->makeNode<pagx::SolidColor>("color");
+  solid->color = {0, 0, 0, 1};
+  fill->color = solid;
+  box->elements = {text, fill};
+  layer->contents = {box};
+  doc->layers.push_back(layer);
+
+  auto* animation = MakeAnimation(doc.get(), 60, pagx::LoopMode::Once);
+  auto* object = MakeAnimationObject(doc.get(), animation, "box");
+  auto* channel = MakeChannel<float>(doc.get(), object, "position.x");
+  channel->keyframes.push_back({0, 40.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  channel->keyframes.push_back({60, 120.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  AttachTimeline(layer, "anim");
+
+  pagx::SVGExportOptions options = {};
+  options.convertTextToPath = false;
+  auto svg = pagx::SVGExporter::ToSVG(*doc, options);
+  EXPECT_NE(svg.find("<text"), std::string::npos) << svg;
+  EXPECT_NE(svg.find("animateTransform"), std::string::npos) << svg;
+  EXPECT_NE(svg.find("type=\"translate\""), std::string::npos) << svg;
+  EXPECT_NE(svg.find("values=\"0 0;80 0\""), std::string::npos) << svg;
+}
+
 PAGX_TEST(PAGXSVGTest, SVGExport_AnimTextPositionEmitsTranslate) {
   auto doc = pagx::PAGXDocument::Make(300, 100);
   auto* layer = doc->makeNode<pagx::Layer>("layer");

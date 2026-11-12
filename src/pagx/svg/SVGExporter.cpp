@@ -4595,7 +4595,19 @@ void SVGWriter::processVectorScope(SVGBuilder& out, const std::vector<Element*>&
           // shaping and fill/stroke pairing. Don't add its child Text into the
           // surrounding accumulator. Resolve text modifiers nested inside the box first.
           const std::vector<Element*> innerWalked = resolveIfEnabled(tb->elements);
+          // The native path emits independent <text>/<tspan> elements with the box transform
+          // already baked in, so an animated box needs a wrapper that carries the delta between
+          // the animated and static transforms.
+          bool wrapTransform = _animWriter.HasGroupAnimates(tb);
+          if (wrapTransform) {
+            out.openElement("g");
+            out.closeElementStart();
+            _animWriter.WriteWrapTransformAnimates(out, tb, transform, tbMatrix);
+          }
           writeTextBoxGroup(out, tb, innerWalked, tbMatrix, tbAlpha);
+          if (wrapTransform) {
+            out.closeElement();
+          }
         }
         break;
       }

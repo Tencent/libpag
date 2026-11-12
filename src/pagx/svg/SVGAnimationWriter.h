@@ -232,6 +232,14 @@ class SVGAnimationWriter {
                                 const std::vector<Element*>& scope, SVGSampledDataTrack* track);
 
   /**
+   * Emits transform tracks for a wrapper <g> around content that already bakes `staticMatrix`
+   * (the TextBox native path). The tracks carry `animated * inverse(static)` so the wrapped
+   * children land on the animated transform.
+   */
+  bool WriteWrapTransformAnimates(XMLBuilder& out, const Node* group, const Matrix& parent,
+                                  const Matrix& staticMatrix);
+
+  /**
    * Emits a `d` track from geometry the exporter sampled by re-resolving the source's scope at
    * each frame. `keyTimes` are normalized to the animation duration.
    */
