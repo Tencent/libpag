@@ -2830,6 +2830,74 @@ bool SVGAnimationWriter::WriteWrapTransformAnimates(XMLBuilder& out, const Node*
   return WriteTransformTracks(out, matrices, keyTimes, timing, splines, useSpline);
 }
 
+namespace {
+
+std::string ShadowColorMatrixValue(const Color& color) {
+  std::string values;
+  values.reserve(80);
+  values += "0 0 0 0 ";
+  values += FloatToString(color.red);
+  values += " 0 0 0 0 ";
+  values += FloatToString(color.green);
+  values += " 0 0 0 0 ";
+  values += FloatToString(color.blue);
+  values += " 0 0 0 ";
+  values += FloatToString(color.alpha);
+  values += " 0";
+  return values;
+}
+
+}  // namespace
+
+bool SVGAnimationWriter::HasShadowColorAnimates(const Node* owner) const {
+  if (_plan == nullptr || owner == nullptr) {
+    return false;
+  }
+  auto* binding = _plan->Find(owner, "color");
+  return binding != nullptr && binding->channel->valueType() == ChannelValueType::Color;
+}
+
+bool SVGAnimationWriter::WriteShadowColorAnimates(XMLBuilder& out, const Node* owner) {
+  if (!HasShadowColorAnimates(owner)) {
+    return false;
+  }
+  auto* binding = _plan->Find(owner, "color");
+  SmilTiming timing;
+  if (!ResolveTiming(binding->animation, binding->timeline, &timing)) {
+    return false;
+  }
+  std::vector<double> times;
+  std::vector<Color> values;
+  std::vector<KeyframeInterpolationType> types;
+  std::vector<Point> bezierOuts;
+  std::vector<Point> bezierIns;
+  if (!BuildTypedTrack<Color>(binding->channel, binding->animation->duration, &times, &values,
+                              &types, &bezierOuts, &bezierIns)) {
+    return false;
+  }
+  std::vector<double> flatTimes;
+  std::vector<Color> flatValues;
+  std::vector<SmilSpline> flatSplines;
+  bool useSpline = false;
+  FlattenKeyframes(times, values, types, bezierOuts, bezierIns, &flatTimes, &flatValues,
+                   &flatSplines, &useSpline);
+  SmilSequence sequence;
+  sequence.useSpline = useSpline;
+  for (size_t i = 0; i < flatTimes.size(); ++i) {
+    sequence.values.push_back(ShadowColorMatrixValue(flatValues[i]));
+    sequence.keyTimes.push_back(flatTimes[i]);
+    if (i > 0) {
+      sequence.splines.push_back(flatSplines[i]);
+    }
+  }
+  if (timing.mirror) {
+    ApplyPingPong(&sequence);
+    timing.durationSeconds *= 2.0;
+  }
+  WriteAnimateElement(out, "values", nullptr, false, sequence, timing, nullptr, nullptr);
+  return true;
+}
+
 bool SVGAnimationWriter::WritePaintAnimates(XMLBuilder& out, const Node* painter,
                                             const char* paintAttribute, float alphaMultiplier) {
   auto* colorBinding = _plan->Find(painter, "color");

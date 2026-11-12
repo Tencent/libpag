@@ -6389,6 +6389,56 @@ PAGX_TEST(PAGXSVGTest, SVGExport_AnimGroupRotationKeepsTurns) {
   EXPECT_NE(svg.find("values=\"0;370\""), std::string::npos) << svg;
 }
 
+// M4.E: a shadow filter colour animates the feColorMatrix constant column.
+PAGX_TEST(PAGXSVGTest, SVGExport_AnimDropShadowFilterColor) {
+  auto doc = MakeRectDocument();
+  auto* filter = doc->makeNode<pagx::DropShadowFilter>("shadowFilter");
+  filter->color = {1, 0, 0, 1};
+  filter->offsetX = 4;
+  filter->offsetY = 4;
+  filter->blurX = 4;
+  filter->blurY = 4;
+  doc->layers[0]->filters.push_back(filter);
+
+  auto* animation = MakeAnimation(doc.get(), 60, pagx::LoopMode::Once);
+  auto* object = MakeAnimationObject(doc.get(), animation, "shadowFilter");
+  auto* channel = MakeChannel<pagx::Color>(doc.get(), object, "color");
+  channel->keyframes.push_back(
+      {0, pagx::Color{1, 0, 0, 1}, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  channel->keyframes.push_back(
+      {60, pagx::Color{0, 0, 1, 1}, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  AttachTimeline(doc->layers[0], "anim");
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("attributeName=\"values\""), std::string::npos) << svg;
+  EXPECT_NE(svg.find("0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0"), std::string::npos) << svg;
+}
+
+// M4.E: a shadow style colour animates the same feColorMatrix track.
+PAGX_TEST(PAGXSVGTest, SVGExport_AnimDropShadowStyleColor) {
+  auto doc = MakeRectDocument();
+  auto* style = doc->makeNode<pagx::DropShadowStyle>("shadowStyle");
+  style->color = {0, 1, 0, 1};
+  style->offsetX = 6;
+  style->offsetY = 6;
+  style->blurX = 6;
+  style->blurY = 6;
+  doc->layers[0]->styles.push_back(style);
+
+  auto* animation = MakeAnimation(doc.get(), 60, pagx::LoopMode::Once);
+  auto* object = MakeAnimationObject(doc.get(), animation, "shadowStyle");
+  auto* channel = MakeChannel<pagx::Color>(doc.get(), object, "color");
+  channel->keyframes.push_back(
+      {0, pagx::Color{0, 1, 0, 1}, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  channel->keyframes.push_back(
+      {60, pagx::Color{1, 0, 0, 1}, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  AttachTimeline(doc->layers[0], "anim");
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("attributeName=\"values\""), std::string::npos) << svg;
+  EXPECT_NE(svg.find("0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 1 0"), std::string::npos) << svg;
+}
+
 // Two animations driving the same attribute cannot share one SMIL track: Strict rejects, and// Two animations driving the same attribute cannot share one SMIL track: Strict rejects, and
 // BestEffort keeps the later animation's track (the runtime's last-writer-wins order).
 PAGX_TEST(PAGXSVGTest, SVGExport_AnimMultiClockChannelRejected) {

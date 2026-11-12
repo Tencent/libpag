@@ -218,6 +218,17 @@ class SVGAnimationWriter {
   bool HasNoiseSeedAnimates(const Node* noise) const;
 
   /**
+   * Returns true when a shadow filter / style animates its colour, which is baked into the
+   * feColorMatrix constant column.
+   */
+  bool HasShadowColorAnimates(const Node* owner) const;
+
+  /**
+   * Emits the `values` track of the feColorMatrix that colors a drop / inner shadow.
+   */
+  bool WriteShadowColorAnimates(XMLBuilder& out, const Node* owner);
+
+  /**
    * Emits the `seed` animation inside the current feTurbulence element.
    */
   bool WriteNoiseSeedAnimates(XMLBuilder& out, const Node* noise);

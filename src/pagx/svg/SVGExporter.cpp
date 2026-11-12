@@ -777,7 +777,7 @@ class SVGWriter {
                                 const std::string& blurResult, const std::string& offsetResult,
                                 const Node* owner, float spread);
   void writeShadowColorMatrix(const Color& c, const std::string& inResult,
-                              const std::string& outResult);
+                              const std::string& outResult, const Node* owner);
   // Emits a drop-shadow fragment (blur + offset + color matrix) and returns the
   // result name of the final colored shadow. Shared between DropShadowFilter and
   // DropShadowStyle which differ only in source node type.
@@ -1367,14 +1367,10 @@ void SVGWriter::writeShadowBlurAndOffset(float blurX, float blurY, float offsetX
   }
 }
 
-void SVGWriter::writeShadowColorMatrix(const Color& c, const std::string& inResult,
-                                       const std::string& outResult) {
-  _defs->openElement("feColorMatrix");
-  _defs->addAttribute("in", inResult);
-  _defs->addAttribute("type", "matrix");
-  // feColorMatrix row form: r g b a t — each row outputs <ch>*alpha + t.
-  // Here we drive only the constant column with the flood color so the source
-  // alpha is preserved in the output alpha channel.
+// feColorMatrix row form: r g b a t — each row outputs <ch>*alpha + t. Here we drive only the
+// constant column with the flood color so the source alpha is preserved in the output alpha
+// channel.
+static std::string ShadowColorMatrixValues(const Color& c) {
   std::string values;
   values.reserve(80);
   values += "0 0 0 0 ";
@@ -1386,9 +1382,23 @@ void SVGWriter::writeShadowColorMatrix(const Color& c, const std::string& inResu
   values += " 0 0 0 ";
   values += FloatToString(c.alpha);
   values += " 0";
-  _defs->addAttribute("values", values);
+  return values;
+}
+
+void SVGWriter::writeShadowColorMatrix(const Color& c, const std::string& inResult,
+                                       const std::string& outResult, const Node* owner) {
+  _defs->openElement("feColorMatrix");
+  _defs->addAttribute("in", inResult);
+  _defs->addAttribute("type", "matrix");
+  _defs->addAttribute("values", ShadowColorMatrixValues(c));
   _defs->addAttribute("result", outResult);
-  _defs->closeElementSelfClosing();
+  if (owner != nullptr && _animWriter.HasShadowColorAnimates(owner)) {
+    _defs->closeElementStart();
+    _animWriter.WriteShadowColorAnimates(*_defs, owner);
+    _defs->closeElement();
+  } else {
+    _defs->closeElementSelfClosing();
+  }
 }
 
 std::string SVGWriter::writeDropShadowFragment(float blurX, float blurY, float offsetX,
@@ -1399,7 +1409,7 @@ std::string SVGWriter::writeDropShadowFragment(float blurX, float blurY, float o
   std::string shadowResult = "shadow" + idx;
   writeShadowBlurAndOffset(blurX, blurY, offsetX, offsetY, "shadowBlur" + idx, offsetResult, owner,
                            spread);
-  writeShadowColorMatrix(color, offsetResult, shadowResult);
+  writeShadowColorMatrix(color, offsetResult, shadowResult, owner);
   return shadowResult;
 }
 
@@ -1426,7 +1436,7 @@ std::string SVGWriter::writeInnerShadowFragment(float blurX, float blurY, float 
   _defs->addAttribute("result", compositeResult);
   _defs->closeElementSelfClosing();
 
-  writeShadowColorMatrix(color, compositeResult, shadowResult);
+  writeShadowColorMatrix(color, compositeResult, shadowResult, owner);
   return shadowResult;
 }
 

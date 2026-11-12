@@ -124,9 +124,9 @@ bool IsSupportedChannel(NodeType nodeType, const std::string& name) {
     case NodeType::InnerShadowFilter:
     case NodeType::DropShadowStyle:
     case NodeType::InnerShadowStyle:
-      // `color` is not listed: the shadow colour is baked into feColorMatrix constants, so it has
-      // no single animatable attribute yet.
-      return name == "offsetX" || name == "offsetY" || name == "blurX" || name == "blurY";
+      // The shadow colour drives the feColorMatrix `values` track.
+      return name == "offsetX" || name == "offsetY" || name == "blurX" || name == "blurY" ||
+             name == "color";
     case NodeType::BlendFilter:
       return name == "color";
     case NodeType::NoiseFilter:
