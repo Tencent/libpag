@@ -6462,6 +6462,54 @@ PAGX_TEST(PAGXSVGTest, SVGExport_AnimNoiseStyleSeed) {
   EXPECT_NE(svg.find("values=\"2;5\""), std::string::npos) << svg;
 }
 
+// M4.E: noise colour channels animate the feFlood that tints the turbulence.
+PAGX_TEST(PAGXSVGTest, SVGExport_AnimNoiseColor) {
+  auto doc = MakeRectDocument();
+  auto* noise = doc->makeNode<pagx::NoiseFilter>("noise");
+  noise->mode = pagx::NoiseMode::Mono;
+  noise->size = 8;
+  noise->density = 0.5f;
+  noise->seed = 1;
+  noise->color = {1, 0, 0, 1};
+  doc->layers[0]->filters.push_back(noise);
+
+  auto* animation = MakeAnimation(doc.get(), 60, pagx::LoopMode::Once);
+  auto* object = MakeAnimationObject(doc.get(), animation, "noise");
+  auto* channel = MakeChannel<pagx::Color>(doc.get(), object, "color");
+  channel->keyframes.push_back(
+      {0, pagx::Color{1, 0, 0, 1}, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  channel->keyframes.push_back(
+      {60, pagx::Color{0, 1, 0, 1}, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  AttachTimeline(doc->layers[0], "anim");
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("attributeName=\"flood-color\""), std::string::npos) << svg;
+  EXPECT_NE(svg.find("values=\"#FF0000;#00FF00\""), std::string::npos) << svg;
+}
+
+PAGX_TEST(PAGXSVGTest, SVGExport_AnimNoiseDuoFirstColor) {
+  auto doc = MakeRectDocument();
+  auto* noise = doc->makeNode<pagx::NoiseStyle>("noise");
+  noise->mode = pagx::NoiseMode::Duo;
+  noise->size = 6;
+  noise->density = 0.4f;
+  noise->firstColor = {1, 0, 0, 1};
+  noise->secondColor = {0, 0, 1, 1};
+  doc->layers[0]->styles.push_back(noise);
+
+  auto* animation = MakeAnimation(doc.get(), 60, pagx::LoopMode::Once);
+  auto* object = MakeAnimationObject(doc.get(), animation, "noise");
+  auto* channel = MakeChannel<pagx::Color>(doc.get(), object, "firstColor");
+  channel->keyframes.push_back(
+      {0, pagx::Color{1, 0, 0, 1}, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  channel->keyframes.push_back(
+      {60, pagx::Color{0, 1, 0, 1}, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  AttachTimeline(doc->layers[0], "anim");
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("attributeName=\"flood-color\""), std::string::npos) << svg;
+}
+
 // Two animations driving the same attribute cannot share one SMIL track: Strict rejects, and// Two animations driving the same attribute cannot share one SMIL track: Strict rejects, and
 // BestEffort keeps the later animation's track (the runtime's last-writer-wins order).
 PAGX_TEST(PAGXSVGTest, SVGExport_AnimMultiClockChannelRejected) {

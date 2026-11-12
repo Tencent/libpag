@@ -875,7 +875,7 @@ class SVGWriter {
 
   // Writes flood-color (and optional flood-opacity) on the current feFlood element, with Display
   // P3 override when the color's colorSpace is DisplayP3.
-  void applyFloodColor(const Color& color);
+  void applyFloodColor(const Color& color, const Node* owner, const char* channelName);
 
   // Fill / stroke attribute helpers
   void applyFillAttributes(SVGBuilder& out, const Fill* fill, const Rect& shapeBounds = {},
@@ -1458,15 +1458,8 @@ void SVGWriter::writeBlendFilter(const BlendFilter* blend, int& shadowIndex,
   std::string idx = std::to_string(shadowIndex++);
   std::string floodResult = "blendFlood" + idx;
   _defs->openElement("feFlood");
-  applyFloodColor(blend->color);
   _defs->addAttribute("result", floodResult);
-  if (_animWriter.HasFilterAnimates(blend)) {
-    _defs->closeElementStart();
-    _animWriter.WriteFilterColorAnimates(*_defs, blend);
-    _defs->closeElement();
-  } else {
-    _defs->closeElementSelfClosing();
-  }
+  applyFloodColor(blend->color, blend, "color");
 
   // PAGX's BlendFilter treats the stored color as the source and the layer
   // content as the destination (backdrop) — see
@@ -1670,9 +1663,8 @@ void SVGWriter::writeNoiseFilter(const NoiseFilter* noise, int& noiseIndex,
   if (noise->mode == NoiseMode::Mono) {
     auto band = writeNoiseBand(noise->size, noise->density, noise->seed, true, "Dark" + filterId, noise);
     _defs->openElement("feFlood");
-    applyFloodColor(noise->color);
     _defs->addAttribute("result", "flood" + filterId);
-    _defs->closeElementSelfClosing();
+    applyFloodColor(noise->color, noise, "color");
 
     _defs->openElement("feComposite");
     _defs->addAttribute("in", "flood" + filterId);
@@ -1705,9 +1697,8 @@ void SVGWriter::writeNoiseFilter(const NoiseFilter* noise, int& noiseIndex,
     _defs->closeElementSelfClosing();
 
     _defs->openElement("feFlood");
-    applyFloodColor(noise->firstColor);
     _defs->addAttribute("result", "floodDark" + filterId);
-    _defs->closeElementSelfClosing();
+    applyFloodColor(noise->firstColor, noise, "firstColor");
 
     _defs->openElement("feComposite");
     _defs->addAttribute("in", "floodDark" + filterId);
@@ -1717,9 +1708,8 @@ void SVGWriter::writeNoiseFilter(const NoiseFilter* noise, int& noiseIndex,
     _defs->closeElementSelfClosing();
 
     _defs->openElement("feFlood");
-    applyFloodColor(noise->secondColor);
     _defs->addAttribute("result", "floodBright" + filterId);
-    _defs->closeElementSelfClosing();
+    applyFloodColor(noise->secondColor, noise, "secondColor");
 
     _defs->openElement("feComposite");
     _defs->addAttribute("in", "floodBright" + filterId);
@@ -1769,9 +1759,8 @@ std::string SVGWriter::writeNoiseStyle(const NoiseStyle* noise, int& noiseStyleI
   if (noise->mode == NoiseMode::Mono) {
     auto band = writeNoiseBand(noise->size, noise->density, noise->seed, true, "Dark" + styleId, noise);
     _defs->openElement("feFlood");
-    applyFloodColor(noise->color);
     _defs->addAttribute("result", "flood" + styleId);
-    _defs->closeElementSelfClosing();
+    applyFloodColor(noise->color, noise, "color");
 
     _defs->openElement("feComposite");
     _defs->addAttribute("in", "flood" + styleId);
@@ -1798,9 +1787,8 @@ std::string SVGWriter::writeNoiseStyle(const NoiseStyle* noise, int& noiseStyleI
     _defs->closeElementSelfClosing();
 
     _defs->openElement("feFlood");
-    applyFloodColor(noise->firstColor);
     _defs->addAttribute("result", "floodDark" + styleId);
-    _defs->closeElementSelfClosing();
+    applyFloodColor(noise->firstColor, noise, "firstColor");
 
     _defs->openElement("feComposite");
     _defs->addAttribute("in", "floodDark" + styleId);
@@ -1810,9 +1798,8 @@ std::string SVGWriter::writeNoiseStyle(const NoiseStyle* noise, int& noiseStyleI
     _defs->closeElementSelfClosing();
 
     _defs->openElement("feFlood");
-    applyFloodColor(noise->secondColor);
     _defs->addAttribute("result", "floodBright" + styleId);
-    _defs->closeElementSelfClosing();
+    applyFloodColor(noise->secondColor, noise, "secondColor");
 
     _defs->openElement("feComposite");
     _defs->addAttribute("in", "floodBright" + styleId);
@@ -2468,10 +2455,20 @@ void SVGWriter::applyP3Style(SVGBuilder& out, const std::string& p3Style) {
   }
 }
 
-void SVGWriter::applyFloodColor(const Color& color) {
+void SVGWriter::applyFloodColor(const Color& color, const Node* owner, const char* channelName) {
   _defs->addAttribute("flood-color", ColorToSVGString(color));
   if (color.alpha < 1.0f) {
     _defs->addAttribute("flood-opacity", FloatToString(color.alpha));
+  }
+  bool animated = owner != nullptr && channelName != nullptr &&
+                  _animWriter.HasFloodColorAnimates(owner, channelName);
+  if (animated) {
+    // A CSS declaration would bypass the SMIL track, so the static style is skipped; the track
+    // carries sRGB values and any wide-gamut loss is reported by the caller.
+    _defs->closeElementStart();
+    _animWriter.WriteFloodColorAnimates(*_defs, owner, channelName);
+    _defs->closeElement();
+    return;
   }
   if (color.colorSpace == ColorSpace::DisplayP3) {
     std::string style;
@@ -2485,6 +2482,7 @@ void SVGWriter::applyFloodColor(const Color& color) {
     style += ';';
     _defs->addAttribute("style", style);
   }
+  _defs->closeElementSelfClosing();
 }
 
 void SVGWriter::applyPainters(SVGBuilder& out, const FillStrokeInfo& fs, const Rect& shapeBounds,

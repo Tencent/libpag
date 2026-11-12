@@ -207,9 +207,9 @@ std::vector<SVGChannelEntry> BuildLedger() {
   entries.push_back({NodeType::NoiseStyle, "size", P, "non-linear baseFrequency mapping"});
   entries.push_back({NodeType::NoiseStyle, "density", P, "not implemented"});
   entries.push_back({NodeType::NoiseStyle, "seed", S, "animate feTurbulence seed"});
-  entries.push_back({NodeType::NoiseStyle, "color", P, "feFlood per mode"});
-  entries.push_back({NodeType::NoiseStyle, "firstColor", P, "feFlood per mode"});
-  entries.push_back({NodeType::NoiseStyle, "secondColor", P, "feFlood per mode"});
+  entries.push_back({NodeType::NoiseStyle, "color", S, "animate feFlood color"});
+  entries.push_back({NodeType::NoiseStyle, "firstColor", S, "animate feFlood color"});
+  entries.push_back({NodeType::NoiseStyle, "secondColor", S, "animate feFlood color"});
   entries.push_back({NodeType::NoiseStyle, "opacity", P, "feComponentTransfer per mode"});
 
   // Layer filters
@@ -235,9 +235,9 @@ std::vector<SVGChannelEntry> BuildLedger() {
   entries.push_back({NodeType::NoiseFilter, "size", P, "non-linear baseFrequency mapping"});
   entries.push_back({NodeType::NoiseFilter, "density", P, "not implemented"});
   entries.push_back({NodeType::NoiseFilter, "seed", S, "animate feTurbulence seed"});
-  entries.push_back({NodeType::NoiseFilter, "color", P, "feFlood per mode"});
-  entries.push_back({NodeType::NoiseFilter, "firstColor", P, "feFlood per mode"});
-  entries.push_back({NodeType::NoiseFilter, "secondColor", P, "feFlood per mode"});
+  entries.push_back({NodeType::NoiseFilter, "color", S, "animate feFlood color"});
+  entries.push_back({NodeType::NoiseFilter, "firstColor", S, "animate feFlood color"});
+  entries.push_back({NodeType::NoiseFilter, "secondColor", S, "animate feFlood color"});
   entries.push_back({NodeType::NoiseFilter, "opacity", P, "feComponentTransfer per mode"});
 
   return entries;

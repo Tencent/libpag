@@ -1375,11 +1375,24 @@ bool SVGAnimationWriter::WriteFilterOffsetAnimates(XMLBuilder& out, const Node* 
   return wrote;
 }
 
-bool SVGAnimationWriter::WriteFilterColorAnimates(XMLBuilder& out, const Node* node) {
-  if (_plan == nullptr || node == nullptr) {
+bool SVGAnimationWriter::HasFloodColorAnimates(const Node* node, const char* channelName) const {
+  if (_plan == nullptr || node == nullptr || channelName == nullptr) {
     return false;
   }
-  auto* binding = _plan->Find(node, "color");
+  auto* binding = _plan->Find(node, channelName);
+  return binding != nullptr && binding->channel->valueType() == ChannelValueType::Color;
+}
+
+bool SVGAnimationWriter::WriteFilterColorAnimates(XMLBuilder& out, const Node* node) {
+  return WriteFloodColorAnimates(out, node, "color");
+}
+
+bool SVGAnimationWriter::WriteFloodColorAnimates(XMLBuilder& out, const Node* node,
+                                                 const char* channelName) {
+  if (_plan == nullptr || node == nullptr || channelName == nullptr) {
+    return false;
+  }
+  auto* binding = _plan->Find(node, channelName);
   if (binding == nullptr || binding->channel->valueType() != ChannelValueType::Color) {
     return false;
   }

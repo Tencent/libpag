@@ -131,8 +131,9 @@ bool IsSupportedChannel(NodeType nodeType, const std::string& name) {
       return name == "color";
     case NodeType::NoiseFilter:
     case NodeType::NoiseStyle:
-      // feTurbulence exposes `seed` as an animatable attribute.
-      return name == "seed";
+      // `seed` animates feTurbulence; the colour channels animate feFlood.
+      return name == "seed" || name == "color" || name == "firstColor" ||
+             name == "secondColor";
     default:
       return false;
   }

@@ -315,6 +315,16 @@ class SVGAnimationWriter {
   bool WriteFilterColorAnimates(XMLBuilder& out, const Node* node);
 
   /**
+   * Returns true when `node` animates the colour channel that feeds a feFlood.
+   */
+  bool HasFloodColorAnimates(const Node* node, const char* channelName) const;
+
+  /**
+   * Emits flood-color / flood-opacity tracks for the named colour channel.
+   */
+  bool WriteFloodColorAnimates(XMLBuilder& out, const Node* node, const char* channelName);
+
+  /**
    * True when the filter / style node drives at least one of the primitives above, so the caller
    * must open the element instead of self-closing it.
    */
