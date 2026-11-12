@@ -62,6 +62,8 @@ jobs:
 
       - name: Generate the pinned ffmpeg manifest
         working-directory: cli/npm
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: npm run generate:ffmpeg-manifest
 
       - name: Test ffmpeg downloader
@@ -215,6 +217,8 @@ jobs:
 
       - name: Generate the pinned ffmpeg manifest
         working-directory: cli/npm
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: npm run generate:ffmpeg-manifest
 
       - name: Test ffmpeg downloader
