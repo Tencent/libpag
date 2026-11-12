@@ -26,8 +26,8 @@ const {
 } = require('./download-ffmpeg.js');
 
 const tests = [];
-function test(name, body) {
-  tests.push({ name, body });
+function test(name, body, timeoutMs) {
+  tests.push({ name, body, timeoutMs });
 }
 
 function tempDirectory() {
@@ -529,13 +529,31 @@ test('download failures explain manual recovery', () => {
   assert.match(message, /--ffmpeg <path>/);
 });
 
-async function runTestWithTimeout(name, body) {
+if (process.env.PAGX_FFMPEG_REAL_DOWNLOAD === '1') {
+  test('downloads and runs the pinned ffmpeg for this platform', async () => {
+    const root = tempDirectory();
+    try {
+      const executable = await ensureFFmpeg({ cacheRoot: root, env: {} });
+      const result = spawnSync(executable, ['-version'], {
+        encoding: 'utf8',
+        timeout: 10000,
+      });
+      if (result.error) throw result.error;
+      assert.strictEqual(result.status, 0, result.stderr);
+      assert.match(result.stdout, /ffmpeg version/);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  }, 180000);
+}
+
+async function runTestWithTimeout(name, body, timeoutMs = 15000) {
   let timer = null;
   try {
     await Promise.race([
       body(),
       new Promise((_, reject) => {
-        timer = setTimeout(() => reject(new Error(`test timed out: ${name}`)), 15000);
+        timer = setTimeout(() => reject(new Error(`test timed out: ${name}`)), timeoutMs);
       }),
     ]);
   } finally {
@@ -551,9 +569,9 @@ async function runTestWithTimeout(name, body) {
   }
   let failures = 0;
   try {
-    for (const { name, body } of tests) {
+    for (const { name, body, timeoutMs } of tests) {
       try {
-        await runTestWithTimeout(name, body);
+        await runTestWithTimeout(name, body, timeoutMs);
         console.log(`ok - ${name}`);
       } catch (error) {
         ++failures;

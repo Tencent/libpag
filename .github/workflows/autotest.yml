@@ -198,6 +198,12 @@ jobs:
           PAGX_SKIP_FFMPEG_DOWNLOAD: '1'
         run: npm install --include=dev
 
+      - name: Generate the pinned ffmpeg manifest
+        working-directory: cli/npm
+        run: npm run generate:ffmpeg-manifest
+
       - name: Test ffmpeg downloader
         working-directory: cli/npm
+        env:
+          PAGX_FFMPEG_REAL_DOWNLOAD: '1'
         run: npm run test:ffmpeg
