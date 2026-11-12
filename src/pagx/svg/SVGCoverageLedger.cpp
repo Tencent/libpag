@@ -206,7 +206,7 @@ std::vector<SVGChannelEntry> BuildLedger() {
   entries.push_back({NodeType::GlassStyle, "lightIntensity", P, "no glass primitive in SVG"});
   entries.push_back({NodeType::NoiseStyle, "size", P, "non-linear baseFrequency mapping"});
   entries.push_back({NodeType::NoiseStyle, "density", P, "not implemented"});
-  entries.push_back({NodeType::NoiseStyle, "seed", P, "animate feTurbulence seed"});
+  entries.push_back({NodeType::NoiseStyle, "seed", S, "animate feTurbulence seed"});
   entries.push_back({NodeType::NoiseStyle, "color", P, "feFlood per mode"});
   entries.push_back({NodeType::NoiseStyle, "firstColor", P, "feFlood per mode"});
   entries.push_back({NodeType::NoiseStyle, "secondColor", P, "feFlood per mode"});

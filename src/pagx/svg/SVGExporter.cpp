@@ -802,11 +802,11 @@ class SVGWriter {
   std::string mergeShadowIntoChain(const std::string& shadowResult, const std::string& source,
                                    bool shadowOnly);
   std::string writeNoiseTurbulence(float size, float seed, const std::string& resultName,
-                                   const NoiseFilter* owner);
+                                   const Node* owner);
   std::string writeNoiseBand(float size, float density, float seed, bool isDark,
-                             const std::string& label, const NoiseFilter* owner);
+                             const std::string& label, const Node* owner);
   std::string writeNoiseMultiCore(float size, float density, float seed, float opacity,
-                                  const std::string& id, const NoiseFilter* owner);
+                                  const std::string& id, const Node* owner);
   void writeNoiseFilter(const NoiseFilter* noise, int& noiseIndex, std::string& currentSource);
   void writeNoiseResultBlend(const std::string& clippedResult, const std::string& filterId,
                              BlendMode blendMode, std::string& currentSource);
@@ -1509,7 +1509,7 @@ void SVGWriter::writeBlendFilter(const BlendFilter* blend, int& shadowIndex,
 //==============================================================================
 
 std::string SVGWriter::writeNoiseTurbulence(float size, float seed, const std::string& resultName,
-                                          const NoiseFilter* owner) {
+                                          const Node* owner) {
   // SVG filter primitives operate in document units and do not receive the runtime content scale
   // used by GPU rasterization, so exported noise frequency intentionally derives from authoring size.
   auto freq = size > 0.0f ? 1.0f / size : 0.25f;
@@ -1531,7 +1531,7 @@ std::string SVGWriter::writeNoiseTurbulence(float size, float seed, const std::s
 }
 
 std::string SVGWriter::writeNoiseBand(float size, float density, float seed, bool isDark,
-                                      const std::string& label, const NoiseFilter* owner) {
+                                      const std::string& label, const Node* owner) {
   auto turbResult = writeNoiseTurbulence(size, seed, "turb" + label, owner);
 
   _defs->openElement("feColorMatrix");
@@ -1575,7 +1575,7 @@ std::string SVGWriter::writeNoiseBand(float size, float density, float seed, boo
 }
 
 std::string SVGWriter::writeNoiseMultiCore(float size, float density, float seed, float opacity,
-                                           const std::string& id, const NoiseFilter* owner) {
+                                           const std::string& id, const Node* owner) {
   auto turbResult = writeNoiseTurbulence(size, seed, "n" + id, owner);
 
   _defs->openElement("feComponentTransfer");
@@ -1767,7 +1767,7 @@ std::string SVGWriter::writeNoiseStyle(const NoiseStyle* noise, int& noiseStyleI
   std::string styleId = "noiseStyle" + std::to_string(noiseStyleIndex++);
 
   if (noise->mode == NoiseMode::Mono) {
-    auto band = writeNoiseBand(noise->size, noise->density, noise->seed, true, "Dark" + styleId, nullptr);
+    auto band = writeNoiseBand(noise->size, noise->density, noise->seed, true, "Dark" + styleId, noise);
     _defs->openElement("feFlood");
     applyFloodColor(noise->color);
     _defs->addAttribute("result", "flood" + styleId);
@@ -1785,10 +1785,10 @@ std::string SVGWriter::writeNoiseStyle(const NoiseStyle* noise, int& noiseStyleI
   }
 
   if (noise->mode == NoiseMode::Duo) {
-    auto dark = writeNoiseBand(noise->size, noise->density, noise->seed, true, "Dark" + styleId, nullptr);
+    auto dark = writeNoiseBand(noise->size, noise->density, noise->seed, true, "Dark" + styleId, noise);
     auto bright =
         writeNoiseBand(noise->size, noise->density, noise->seed, false, "Bright" + styleId,
-                   nullptr);
+                   noise);
 
     _defs->openElement("feComposite");
     _defs->addAttribute("in", dark);
@@ -1834,7 +1834,7 @@ std::string SVGWriter::writeNoiseStyle(const NoiseStyle* noise, int& noiseStyleI
 
   auto multiResult =
       writeNoiseMultiCore(noise->size, noise->density, noise->seed, noise->opacity, styleId,
-                        nullptr);
+                        noise);
 
   writeNoiseStyleClip(multiResult, styleId);
   return "noiseStyleOut" + styleId;

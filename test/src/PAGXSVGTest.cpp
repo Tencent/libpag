@@ -59,6 +59,7 @@
 #include "pagx/nodes/MergePath.h"
 #include "pagx/nodes/Path.h"
 #include "pagx/nodes/NoiseFilter.h"
+#include "pagx/nodes/NoiseStyle.h"
 #include "pagx/nodes/PathData.h"
 #include "pagx/nodes/Polystar.h"
 #include "pagx/nodes/RadialGradient.h"
@@ -6437,6 +6438,28 @@ PAGX_TEST(PAGXSVGTest, SVGExport_AnimDropShadowStyleColor) {
   auto svg = pagx::SVGExporter::ToSVG(*doc);
   EXPECT_NE(svg.find("attributeName=\"values\""), std::string::npos) << svg;
   EXPECT_NE(svg.find("0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 1 0"), std::string::npos) << svg;
+}
+
+// M4.E: a noise style animates the same feTurbulence seed track as the filter.
+PAGX_TEST(PAGXSVGTest, SVGExport_AnimNoiseStyleSeed) {
+  auto doc = MakeRectDocument();
+  auto* noise = doc->makeNode<pagx::NoiseStyle>("noise");
+  noise->mode = pagx::NoiseMode::Mono;
+  noise->size = 6;
+  noise->density = 0.4f;
+  noise->seed = 2;
+  doc->layers[0]->styles.push_back(noise);
+
+  auto* animation = MakeAnimation(doc.get(), 60, pagx::LoopMode::Once);
+  auto* object = MakeAnimationObject(doc.get(), animation, "noise");
+  auto* channel = MakeChannel<float>(doc.get(), object, "seed");
+  channel->keyframes.push_back({0, 2.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  channel->keyframes.push_back({60, 5.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  AttachTimeline(doc->layers[0], "anim");
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("attributeName=\"seed\""), std::string::npos) << svg;
+  EXPECT_NE(svg.find("values=\"2;5\""), std::string::npos) << svg;
 }
 
 // Two animations driving the same attribute cannot share one SMIL track: Strict rejects, and// Two animations driving the same attribute cannot share one SMIL track: Strict rejects, and

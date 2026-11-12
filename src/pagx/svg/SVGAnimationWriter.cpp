@@ -2373,7 +2373,10 @@ bool SVGAnimationWriter::WritePolystarDataAnimates(XMLBuilder& out, const Node* 
 }
 
 bool SVGAnimationWriter::HasNoiseSeedAnimates(const Node* noise) const {
-  if (_plan == nullptr || noise == nullptr || noise->nodeType() != NodeType::NoiseFilter) {
+  if (_plan == nullptr || noise == nullptr) {
+    return false;
+  }
+  if (noise->nodeType() != NodeType::NoiseFilter && noise->nodeType() != NodeType::NoiseStyle) {
     return false;
   }
   return _plan->Find(noise, "seed") != nullptr;
