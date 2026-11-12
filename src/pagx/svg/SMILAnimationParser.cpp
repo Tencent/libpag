@@ -2676,11 +2676,15 @@ std::vector<Channel*> SMILAnimationParser::parseAnimate(
   // fill="freeze" keeps the last animated value, which is PAGX's natural post-endframe behavior.
   auto fillStr = ctx.getAttribute(animElement, "fill");
   bool fillFreeze = (fillStr == "freeze") || IsIndefiniteRepeat(animElement);
-  KeyValue baseValue = ReadBaseValue(target);
   const bool additiveTrack = IsAdditiveDeltaTrack(ctx, animElement);
   for (auto* ch : channels) {
-    AddBaseValueKeyframes(ch, target.valueType, baseValue, beginFrames, outEndFrame, fillFreeze,
-                          additiveTrack);
+    // One attribute can drive several channels whose static values differ: stdDeviation feeds
+    // blurX and blurY, `r` feeds both axes. Re-read the base per channel, otherwise the companion
+    // channel reverts to the primary one's value before the animation starts and after it ends.
+    ChannelTarget channelTarget = target;
+    channelTarget.channelName = ch->name;
+    AddBaseValueKeyframes(ch, target.valueType, ReadBaseValue(channelTarget), beginFrames,
+                          outEndFrame, fillFreeze, additiveTrack);
   }
 
   AppendSizeAnchorChannel(doc, nodeInfo, attributeName, channels);
@@ -2764,11 +2768,14 @@ std::vector<Channel*> SMILAnimationParser::parseSet(SVGParserContext& ctx, PAGXD
   }
   outEndFrame = endFrame;
 
-  // Add base-value keyframes for begin-offset and fill="remove" semantics.
-  KeyValue baseValue = ReadBaseValue(target);
+  // Add base-value keyframes for begin-offset and fill="remove" semantics. The base is read per
+  // channel: an attribute like `r` drives several channels with different static values.
+  const bool setAdditive = IsAdditiveDeltaTrack(ctx, setElement);
   for (auto* setChannel : setChannels) {
-    AddBaseValueKeyframes(setChannel, target.valueType, baseValue, beginFrames, endFrame,
-                          fillFreeze, IsAdditiveDeltaTrack(ctx, setElement));
+    ChannelTarget channelTarget = target;
+    channelTarget.channelName = setChannel->name;
+    AddBaseValueKeyframes(setChannel, target.valueType, ReadBaseValue(channelTarget), beginFrames,
+                          endFrame, fillFreeze, setAdditive);
   }
 
   AppendSizeAnchorChannel(doc, nodeInfo, attributeName, setChannels);

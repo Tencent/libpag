@@ -3887,20 +3887,12 @@ void SVGParserContext::collectSMILAnimations(const std::shared_ptr<DOMNode>& nod
   }
 
   // Non-graphics subtrees cannot host SMIL animations on their children, so skip them entirely.
-  // Note: <filter> is NOT skipped — its fe* primitives (feGaussianBlur/feOffset) can carry
-  // <animate> elements that drive the filter's blur/offset channels (see registerAnimatedElement's
-  // fe* branch and SMILAnimationParser::resolveAnimateTarget's filter attributeName mapping).
-  // Non-graphics subtrees cannot host SMIL animations on their children, so skip them entirely.
-  // Note: <defs> is NOT skipped — it contains <filter> definitions whose fe* primitives can
-  // carry <animate> elements that drive the filter's blur/offset channels. Other defs children
-  // that cannot host animations (gradients, masks, clipPath, patterns) are skipped by their own
-  // entries below.
-  // Note: <filter> is NOT skipped — its fe* primitives (feGaussianBlur/feOffset) can carry
-  // <animate> elements that drive the filter's blur/offset channels (see registerAnimatedElement's
-  // fe* branch and SMILAnimationParser::resolveAnimateTarget's filter attributeName mapping).
+  // <defs>, <filter> and <mask> are NOT skipped: filter primitives carry <animate> elements that
+  // drive blur/offset channels (see registerAnimatedElement's fe* branch and
+  // SMILAnimationParser::resolveAnimateTarget's filter mapping), and mask content can animate too.
+  // Definitions that never host animations (gradients, patterns, markers, clipPath) are skipped by
+  // their own entries below.
   const auto& name = node->name;
-  // <mask> is not skipped: its content can carry SMIL animations, and skipping it would
-  // drop them.
   if (name == "style" || name == "title" || name == "desc" || name == "metadata" ||
       name == "clipPath" || name == "marker" || name == "linearGradient" ||
       name == "radialGradient" || name == "pattern") {

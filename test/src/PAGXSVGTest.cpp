@@ -7558,4 +7558,31 @@ PAGX_TEST(PAGXSVGTest, SVGImport_TextBoundsCountsCodePointsAndAnchor) {
   EXPECT_NEAR(gradient->endPoint.x - gradient->startPoint.x, 80.0f, 3.0f);
 }
 
+/**
+ * stdDeviation drives both blur channels; each keeps its own static value in the frame-0 hold
+ * instead of reusing the primary channel's base.
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_StdDeviationKeepsPerChannelBase) {
+  std::string svg =
+      "<svg width=\"100\" height=\"100\" viewBox=\"0 0 100 100\">"
+      "<defs><filter id=\"f\"><feGaussianBlur stdDeviation=\"2 5\">"
+      "<animate attributeName=\"stdDeviation\" values=\"4 10;0 0\" begin=\"1s\" dur=\"1s\"/>"
+      "</feGaussianBlur></filter></defs>"
+      "<rect width=\"50\" height=\"50\" fill=\"red\" filter=\"url(#f)\"/>"
+      "</svg>";
+  auto doc = pagx::SVGImporter::ParseString(svg);
+  ASSERT_NE(doc, nullptr);
+  ASSERT_FALSE(doc->animations.empty());
+  auto* anim = static_cast<pagx::Animation*>(doc->animations[0]);
+  auto* blurX = FindFloatChannel(anim, "blurX");
+  auto* blurY = FindFloatChannel(anim, "blurY");
+  ASSERT_NE(blurX, nullptr);
+  ASSERT_NE(blurY, nullptr);
+  // begin="1s" prepends each channel's own static value so the blur does not jump at start / end.
+  EXPECT_NEAR(blurX->keyframes.front().value, 2.0f, 1e-4f);
+  EXPECT_NEAR(blurY->keyframes.front().value, 5.0f, 1e-4f);
+  EXPECT_NEAR(blurX->keyframes.back().value, 2.0f, 1e-4f);
+  EXPECT_NEAR(blurY->keyframes.back().value, 5.0f, 1e-4f);
+}
+
 }  // namespace pag
