@@ -707,6 +707,7 @@ ToSVG严格失败返回空结果、ToFile返回false、CLI非零；warnings=null
 | 本轮 M5.0/M5.1 部分（2026-11-12） | 新增 Path `point{N}.x/y` 表外通道族（不进入 175 条账本）：Plan 按实例校验 float 类型与点索引，导出在 `<path>` 上发射 `d` 轨道，逐帧求值点数组后按原 verb 结构重建，静态 renderPosition/renderScale 烘入每帧；Hold → discrete，单一或一致 Bezier → keySplines，混合缓动按 8 段降采样并告警；被 path modifier 烘焙、stroke align、adaptive dash 改写的 path 在 Strict 下拒绝并告警；新增 d 轨道 / Hold / modifier 拒绝三回归 | Polystar/Trim/Round 的逐帧重烘焙、point 原始空间与动态 bounds、Mask+modifier 的 d 轨道与浏览器像素门禁未做 |
 | 本轮 M5.2（2026-11-12） | Text.x/y 进入白名单；导出在 Text 外层插入无静态 transform 的 `<g>`，用 animateTransform type="translate" 发射相对 authored position 的位移，原生 `<text>`、WOFF2、glyph path 三个出口共用；TextPath 重排与 TextBox 容器内的 Text 不假成功，Strict 拒绝并告警；新增 standalone translate 回归 | TextPath normal 沿曲线重求值未实现；TextBox 内逐 run 位移留待 M5.4 |
 | 本轮 M5.3（2026-11-12） | TextHolder flush 改为 `TextLayout::Layout(..., false)` 强制从有效 TextGlyphParams 塑形，all-embedded 不再走 bounds fast path；有效空（runs 为空）调用新增的 tgfx `Text::clearTextBlob()` 清空 blob/anchors 并保留对象与 position；塑形失败清空并 LOGE，不再保留旧 glyph；显式 anchors 按 glyph 序截断/补零后随 setTextBlob 保留；新增空→非空、anchor 重排、embedded→新文字三回归 | tgfx `clearTextBlob()` 只在本地 `third_party/tgfx` 实现并重编验证，尚未回填上游依赖版本；ST21/ST22 新 glyph 像素门禁未做 |
+| 本轮 M5.4 部分（2026-11-12） | 同一 node+channel 被多个 Animation 驱动时按同属性多 Clock 分类：BestEffort 保留后写轨道并告警，Strict 拒绝；Path point `d` 轨道增加 512 采样上限并按 budget 降采样告警；Text.x/y ledger 升级 Supported；新增 Plan 白名单↔ledger 双向门禁（Path point 族表外豁免）与 multi-clock 回归 | 动态 bounds 与 stop/d 联动的浏览器像素门禁、TextModifier/RangeSelector 动画、Repeater 拓扑变化、A12—A20 组合矩阵未做 |
 
 ### 4.8 S3 文字待办清单（下一批入口）
 

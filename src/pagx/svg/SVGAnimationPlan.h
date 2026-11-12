@@ -114,6 +114,13 @@ class SVGAnimationPlan {
    */
   static bool IsTransformChannel(NodeType nodeType, const std::string& channelName);
 
+  /**
+   * Type-level answer to "can the SVG writer express this channel as native SMIL". Instance-level
+   * restrictions (ColorStop host gradient kind, degenerate gradients, Path point indices) are
+   * applied separately by Build and by the writer.
+   */
+  static bool SupportsChannel(NodeType nodeType, const std::string& channelName);
+
  private:
   SVGAnimationPlan() = default;
 

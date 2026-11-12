@@ -73,6 +73,7 @@
 #include "pagx/nodes/TextPath.h"
 #include "pagx/nodes/TrimPath.h"
 #include "pagx/svg/SVGCoverageLedger.h"
+#include "pagx/svg/SVGAnimationPlan.h"
 #include "pagx/svg/SVGPathParser.h"
 #include "pagx/svg/SVGTransformParser.h"
 #include "pagx/utils/StringParser.h"
@@ -5730,6 +5731,82 @@ PAGX_TEST(PAGXSVGTest, SVGCoverageLedgerIsComplete) {
     EXPECT_TRUE(pagx::IsAnimatableChannel(entry.type, entry.channel))
         << "stale ledger row: " << pagx::NodeTypeName(entry.type) << "." << entry.channel;
     EXPECT_NE(entry.note, nullptr);
+  }
+}
+
+// Two animations driving the same attribute cannot share one SMIL track: Strict rejects, and
+// BestEffort keeps the later animation's track (the runtime's last-writer-wins order).
+PAGX_TEST(PAGXSVGTest, SVGExport_AnimMultiClockChannelRejected) {
+  auto doc = MakeRectDocument();
+  auto* first = doc->makeNode<pagx::Animation>("a1");
+  first->duration = 60;
+  first->frameRate = 60.0f;
+  first->loop = pagx::LoopMode::Once;
+  doc->animations.push_back(first);
+  auto* firstObject = MakeAnimationObject(doc.get(), first, "fill");
+  auto* firstChannel = MakeChannel<float>(doc.get(), firstObject, "alpha");
+  firstChannel->keyframes.push_back({0, 0.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  firstChannel->keyframes.push_back({60, 0.5f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+
+  auto* second = doc->makeNode<pagx::Animation>("a2");
+  second->duration = 60;
+  second->frameRate = 60.0f;
+  second->loop = pagx::LoopMode::Once;
+  doc->animations.push_back(second);
+  auto* secondObject = MakeAnimationObject(doc.get(), second, "fill");
+  auto* secondChannel = MakeChannel<float>(doc.get(), secondObject, "alpha");
+  secondChannel->keyframes.push_back({0, 1.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  secondChannel->keyframes.push_back({60, 0.6f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+
+  std::vector<std::string> warnings;
+  pagx::SVGExportOptions strict = {};
+  strict.animation.selection = pagx::SVGAnimationSelection::All;
+  strict.animation.policy = pagx::SVGAnimationPolicy::Strict;
+  auto strictSvg = pagx::SVGExporter::ToSVG(*doc, strict, &warnings);
+  EXPECT_TRUE(strictSvg.empty());
+  bool reported = false;
+  for (const auto& warning : warnings) {
+    reported = reported || warning.find("multiple animations") != std::string::npos;
+  }
+  EXPECT_TRUE(reported) << (warnings.empty() ? "no warnings" : warnings[0]);
+
+  pagx::SVGExportOptions bestEffort = {};
+  bestEffort.animation.selection = pagx::SVGAnimationSelection::All;
+  bestEffort.animation.policy = pagx::SVGAnimationPolicy::BestEffort;
+  auto bestEffortSvg = pagx::SVGExporter::ToSVG(*doc, bestEffort);
+  EXPECT_NE(bestEffortSvg.find("attributeName=\"fill-opacity\""), std::string::npos);
+  EXPECT_NE(bestEffortSvg.find("values=\"1;0.6"), std::string::npos) << bestEffortSvg;
+  size_t occurrences = 0;
+  for (size_t pos = bestEffortSvg.find("attributeName=\"fill-opacity\""); pos != std::string::npos;
+       pos = bestEffortSvg.find("attributeName=\"fill-opacity\"", pos + 1)) {
+    ++occurrences;
+  }
+  EXPECT_EQ(occurrences, 1u);
+}
+
+// The Plan whitelist and the coverage ledger must agree in both directions. The Path point family
+// is table-external: the plan accepts it while the 175-row ledger stays untouched.
+PAGX_TEST(PAGXSVGTest, SVGAnimationPlanWhitelistMatchesLedger) {
+  for (const auto& entry : pagx::SVGChannelLedger()) {
+    bool supported = pagx::SVGAnimationPlan::SupportsChannel(entry.type, entry.channel);
+    if (entry.status == pagx::SVGChannelStatus::Supported) {
+      EXPECT_TRUE(supported) << "ledger Supported but Plan rejects: "
+                             << pagx::NodeTypeName(entry.type) << "." << entry.channel;
+    } else {
+      EXPECT_FALSE(supported) << "ledger not Supported but Plan accepts: "
+                              << pagx::NodeTypeName(entry.type) << "." << entry.channel;
+    }
+  }
+  EXPECT_TRUE(pagx::SVGAnimationPlan::SupportsChannel(pagx::NodeType::Path, "point0.x"));
+  EXPECT_TRUE(pagx::SVGAnimationPlan::SupportsChannel(pagx::NodeType::Path, "point12.y"));
+  EXPECT_FALSE(pagx::SVGAnimationPlan::SupportsChannel(pagx::NodeType::Path, "point.x"));
+  EXPECT_FALSE(pagx::SVGAnimationPlan::SupportsChannel(pagx::NodeType::Path, "point0.z"));
+  for (const auto& entry : pagx::SVGChannelLedger()) {
+    if (entry.type != pagx::NodeType::Path) {
+      continue;
+    }
+    EXPECT_TRUE(std::string(entry.channel).rfind("point", 0) != 0)
+        << "the point family must stay out of the reflective ledger";
   }
 }
 

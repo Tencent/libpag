@@ -56,6 +56,9 @@ namespace {
 constexpr double HoldGapRatio = 0.0001;
 constexpr double HoldGapFloor = 0.00001;
 constexpr double HoldGapCeiling = 0.01;
+// A `d` track carries one full path string per sample, so the grid is capped to keep a dense point
+// or bezier track from growing the SVG without bound.
+constexpr size_t MaxPathDataSamples = 512;
 
 struct SmilSpline {
   double x1 = 0;
@@ -1844,6 +1847,20 @@ bool SVGAnimationWriter::WritePathDataAnimates(XMLBuilder& out, const Node* node
   }
 
   std::vector<Point> points = path->data->points();
+  if (frames.size() > MaxPathDataSamples) {
+    std::vector<Frame> reduced;
+    reduced.reserve(MaxPathDataSamples);
+    for (size_t i = 0; i < MaxPathDataSamples; i++) {
+      size_t index = i * (frames.size() - 1) / (MaxPathDataSamples - 1);
+      reduced.push_back(frames[index]);
+    }
+    std::sort(reduced.begin(), reduced.end());
+    reduced.erase(std::unique(reduced.begin(), reduced.end()), reduced.end());
+    frames = std::move(reduced);
+    AddWarning("path point track on <Path> '" + node->id +
+               "' exceeded 512 samples and was downsampled; dense bezier segments lose some "
+               "intermediate shape.");
+  }
   SmilSequence sequence;
   for (auto frame : frames) {
     for (const auto& binding : bindings) {

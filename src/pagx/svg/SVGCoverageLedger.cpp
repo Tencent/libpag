@@ -91,8 +91,8 @@ std::vector<SVGChannelEntry> BuildLedger() {
 
   // Text
   entries.push_back({NodeType::Text, "text", P, "layout reshape, bake only"});
-  entries.push_back({NodeType::Text, "x", P, "layout driven"});
-  entries.push_back({NodeType::Text, "y", P, "layout driven"});
+  entries.push_back({NodeType::Text, "x", S, "wrapping g translate, no reshape"});
+  entries.push_back({NodeType::Text, "y", S, "wrapping g translate, no reshape"});
   entries.push_back({NodeType::Text, "fontFamily", P, "layout reshape, bake only"});
   entries.push_back({NodeType::Text, "fontStyle", P, "layout reshape, bake only"});
   entries.push_back({NodeType::Text, "fontSize", P, "layout reshape, bake only"});

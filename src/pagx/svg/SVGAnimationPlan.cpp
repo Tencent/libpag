@@ -420,13 +420,27 @@ std::unique_ptr<SVGAnimationPlan> SVGAnimationPlan::Build(PAGXDocument* document
         }
         auto& list = plan->_bindings[target];
         bool replaced = false;
+        bool multiClock = false;
         for (auto& existing : list) {
           if (existing.channel->name == channel->name) {
+            multiClock = existing.animation != animation;
             existing.channel = channel;
             existing.animation = animation;
             existing.timeline = timeline;
             replaced = true;
             break;
+          }
+        }
+        if (multiClock) {
+          // Two animations driving the same attribute cannot both be expressed by one SMIL
+          // track. Keep the runtime's last-writer-wins order in BestEffort and reject in Strict.
+          plan->_rejected = plan->_rejected || strict;
+          std::string key = "multi-clock:" + target->id + ":" + channel->name;
+          if (reportedChannels.insert(key).second) {
+            AddWarning(warnings, "channel '" + channel->name + "' on <" +
+                                     NodeTypeName(target->nodeType()) + "> '" + target->id +
+                                     "' is driven by multiple animations; the later animation "
+                                     "wins and the earlier track is dropped.");
           }
         }
         if (!replaced) {
@@ -515,6 +529,16 @@ bool SVGAnimationPlan::HasPainterAnimation(const Node* fill, const Node* stroke)
     }
   }
   return false;
+}
+
+bool SVGAnimationPlan::SupportsChannel(NodeType nodeType, const std::string& channelName) {
+  if (nodeType == NodeType::Path) {
+    size_t pointIndex = 0;
+    if (ParsePathPointChannel(channelName, &pointIndex)) {
+      return true;
+    }
+  }
+  return IsSupportedChannel(nodeType, channelName);
 }
 
 }  // namespace pagx
