@@ -537,10 +537,13 @@ async function ensureFFmpeg(options = {}) {
       const extract = options.extractArchive || extractArchive;
       await extract(archivePath, extractDir, target.platform);
       const extractedExecutable = path.join(extractDir, 'bin', target.executableName);
-      if (!isExecutable(extractedExecutable, target.platform)) {
+      if (!fs.existsSync(extractedExecutable)) {
         throw new Error(`the downloaded archive does not contain bin/${target.executableName}`);
       }
       if (target.platform !== 'win32') fs.chmodSync(extractedExecutable, 0o755);
+      if (!isExecutable(extractedExecutable, target.platform)) {
+        throw new Error(`the downloaded bin/${target.executableName} is not executable`);
+      }
       assertInstallLockOwner(releaseLock);
       if (fs.existsSync(installDir)) fs.rmSync(installDir, { recursive: true, force: true });
       fs.renameSync(extractDir, installDir);

@@ -290,6 +290,34 @@ test('validates real ZIP entries and rejects symlink metadata', async () => {
   }
 });
 
+test('installs an executable extracted from a real tar archive', async () => {
+  if (process.platform === 'win32') return;
+  const root = tempDirectory();
+  const downloads = [];
+  try {
+    const source = path.join(root, 'source');
+    const executable = path.join(source, 'bin', 'ffmpeg');
+    fs.mkdirSync(path.dirname(executable), { recursive: true });
+    fs.writeFileSync(executable, '#!/bin/sh\nexit 0\n');
+    const archivePath = path.join(root, 'ffmpeg.tar.gz');
+    await tar.c({ cwd: source, gzip: true, portable: true, file: archivePath }, ['bin']);
+    const installer = fakeInstaller({ archive: fs.readFileSync(archivePath), downloads });
+    delete installer.extractArchive;
+    const installed = await ensureFFmpeg({
+      platform: 'darwin',
+      arch: 'arm64',
+      cacheRoot: path.join(root, 'cache'),
+      baseURL: 'https://example.test',
+      env: {},
+      ...installer,
+    });
+    fs.accessSync(installed, fs.constants.X_OK);
+    assert.strictEqual(downloads.length, 1);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test('installs atomically and reuses the cache', async () => {
   const root = tempDirectory();
   const archive = Buffer.from('verified archive');
