@@ -382,6 +382,7 @@ std::string HTMLExporter::ToHTML(PAGXDocument& doc, const std::string& resourceD
   HTMLWriterContext ctx;
   ctx.docWidth = doc.width;
   ctx.docHeight = doc.height;
+  ctx.hasAnimations = options.exportAnimations && !doc.animations.empty();
   ctx.staticImgDir = resourceDir;
   ctx.staticImgUrlPrefix = urlPrefix;
   ctx.rasterScale = std::clamp(options.rasterScale, 0.01f, 4.0f);
@@ -449,6 +450,7 @@ std::shared_ptr<Data> HTMLExporter::ToData(PAGXDocument& document, const Options
   HTMLWriterContext ctx;
   ctx.docWidth = document.width;
   ctx.docHeight = document.height;
+  ctx.hasAnimations = options.exportAnimations && !document.animations.empty();
   ctx.zipWriter = &zipWriter;
   ctx.staticImgUrlPrefix = "assets/";
   ctx.rasterScale = std::clamp(options.rasterScale, 0.01f, 4.0f);

@@ -23,6 +23,7 @@
 #include <set>
 #include <sstream>
 #include "base/utils/MathUtil.h"
+#include "pagx/SystemFonts.h"
 #include "pagx/html/HTMLWriter.h"
 #include "pagx/nodes/Animation.h"
 #include "pagx/nodes/AnimationObject.h"
@@ -60,12 +61,64 @@
 #include "pagx/utils/ExporterUtils.h"
 #include "pagx/utils/LayerTransformUtils.h"
 #include "pagx/utils/StringParser.h"
+#include "tgfx/core/Font.h"
 
 namespace pagx {
 
 namespace {
 
 using pag::FloatNearlyZero;
+using pag::RadiansToDegrees;
+
+// PAGX fakes bold by stroking the Regular outline with a width of
+// `fontSize * FauxBoldScale(fontSize)` and unioning the result with the original path
+// (PathUserTypeface::generatePath). CSS `-webkit-text-stroke-width` is also the total width of a
+// band centred on the outline, so the PAGX width transfers one to one and no measurement is needed.
+float FauxBoldStrokeWidth(float fontSize) {
+  // Mirrors tgfx's FauxBoldScale: 1/24 up to 9px, 1/32 from 36px, linear in between.
+  if (fontSize <= 9.0f) {
+    return fontSize / 24.0f;
+  }
+  if (fontSize >= 36.0f) {
+    return fontSize / 32.0f;
+  }
+  auto t = (fontSize - 9.0f) / 27.0f;
+  auto scale = (1.0f / 24.0f) + ((1.0f / 32.0f) - (1.0f / 24.0f)) * t;
+  return fontSize * scale;
+}
+
+// tgfx fakes italic by shearing the chosen face with Matrix::postSkew(ITALIC_SKEW = -0.2, 0) about
+// the baseline, so the CSS equivalent is a skew of atan(0.2) pivoting on that same baseline.
+float FauxItalicSkewDegrees() {
+  return RadiansToDegrees(std::atan(-0.2f));
+}
+
+// Distance from the top of the span's line box down to its baseline. HTMLWriterText sizes that box
+// so the browser baseline lands on PAGX's row; the shear has to pivot there, not at the box bottom.
+bool TextBaselineOffset(const Text* text, float* offset) {
+  auto typeface = SystemFonts::ResolveTypeface(text->fontFamily, text->fontStyle);
+  if (typeface == nullptr) {
+    return false;
+  }
+  auto metrics = tgfx::Font(typeface, text->renderFontSize()).getMetrics();
+  auto ascent = fabsf(metrics.ascent);
+  auto descent = metrics.descent;
+  auto leading = std::max(0.0f, metrics.leading);
+  auto metricsHeight = ascent + descent + leading;
+  if (metricsHeight <= 0.0f) {
+    return false;
+  }
+  auto lineBox = roundf(metricsHeight);
+  if (text->text.find('\n') == std::string::npos) {
+    // Single line: the static span uses the height that already puts the baseline on PAGX's row.
+    auto halfLeading = (lineBox - metricsHeight) / 2;
+    *offset = roundf((halfLeading + ascent) * (lineBox / metricsHeight));
+  } else {
+    // Multi-line: the box is PAGX's line advance, so the first baseline is half-leading + ascent.
+    *offset = (lineBox - (roundf(ascent) + roundf(descent))) / 2 + roundf(ascent);
+  }
+  return true;
+}
 
 std::string StripAtPrefix(const std::string& ref) {
   if (!ref.empty() && ref[0] == '@') {
@@ -1012,6 +1065,9 @@ struct DomTargetBundle {
   int repeaterIndex = -1;
   // Set for a RangeSelector glyph bundle: index into AnimationState::rangeSelectorGlyphs.
   int rangeGlyphIndex = -1;
+  // Set when the layer's filter chain has stages CSS cannot rewrite per frame: the frame appends
+  // this def to its own `blur()` / `drop-shadow()` chain.
+  std::string residualFilterId = {};
   // Set for a DropShadowStyle bundle: the box its shadow div was emitted for.
   bool hasShadowBox = false;
   HTMLWriterContext::AnimationState::ShadowBox shadowBox = {};
@@ -2458,6 +2514,15 @@ void EmitFilterCssAtFrame(const DomTargetBundle& bundle, const BundleChannelSet&
                    CssFloatToString(std::max(bx, by)) + "px " + ColorToRGBA(col, a) + ")";
     }
   }
+  // The stages CSS cannot rewrite per frame (a blend, an inner shadow) ride along as an SVG filter
+  // reference at the end of the chain, where their authored order put them.
+  if (!bundle.residualFilterId.empty()) {
+    // Stored as the ready-made `url(#id)` reference the static writer produced.
+    if (!filterVal.empty()) {
+      filterVal += ' ';
+    }
+    filterVal += bundle.residualFilterId;
+  }
   if (!filterVal.empty()) {
     AppendCssDecl(decls, "filter", filterVal);
   }
@@ -2666,11 +2731,19 @@ std::string EvaluateKeyframeCssDecls(const DomTargetBundle& bundle, const Bundle
           ? static_cast<const Text*>(bundle.primaryHost)
           : nullptr;
   if (animatedText != nullptr && chSet.fauxItalicCh != nullptr) {
-    // A synthetic italic shears the glyph around the baseline; `font-style: italic` would swap the
-    // face instead (measured 0.84 vs 0.93), and the angle is size independent.
+    // A synthetic italic shears the glyph; `font-style: italic` would swap the face instead
+    // (measured 0.84 vs 0.93). Both the angle and the pivot have to match tgfx's postSkew about
+    // the baseline, otherwise the glyphs slide sideways as they tilt.
     bool italic = EvalBoolChannel(chSet.fauxItalicCh, t, animatedText->fauxItalic);
-    AppendCssDecl(decls, "transform", italic ? "skewX(-6.5deg)" : "skewX(0deg)");
-    AppendCssDecl(decls, "transform-origin", "left bottom");
+    AppendCssDecl(
+        decls, "transform",
+        italic ? "skewX(" + CssFloatToString(FauxItalicSkewDegrees()) + "deg)" : "skewX(0deg)");
+    float baselineOffset = 0.0f;
+    if (italic && TextBaselineOffset(animatedText, &baselineOffset)) {
+      AppendCssDecl(decls, "transform-origin", "0px " + CssFloatToString(baselineOffset) + "px");
+    } else {
+      AppendCssDecl(decls, "transform-origin", "left bottom");
+    }
   }
   if (animatedText != nullptr && chSet.fontFamilyCh != nullptr) {
     std::string family = EvalStringChannel(chSet.fontFamilyCh, t, animatedText->fontFamily);
@@ -2687,11 +2760,12 @@ std::string EvaluateKeyframeCssDecls(const DomTargetBundle& bundle, const Bundle
   if (animatedText != nullptr && chSet.fauxBoldCh != nullptr) {
     auto* text = animatedText;
     bool bold = EvalBoolChannel(chSet.fauxBoldCh, t, text->fauxBold);
-    // 0.09em: the middle of the flat 0.08-0.10 band measured across Arial / Times / Courier at
-    // 40px and 80px. Plain `font-weight: bold` renders identically to regular here, so the outline
-    // has to be stroked.
-    constexpr float kFauxBoldStrokeEm = 0.09f;
-    float width = bold ? kFauxBoldStrokeEm * text->renderFontSize() : 0.0f;
+    // PAGX emboldens by stroking the outline, so the CSS stroke must use PAGX's stroke width
+    // rather than an eyeballed constant: a measured 0.09em is almost 3x too wide for large sizes.
+    float size = chSet.fontSizeCh != nullptr
+                     ? EvalFloatChannel(chSet.fontSizeCh, t, text->renderFontSize())
+                     : text->renderFontSize();
+    float width = bold ? FauxBoldStrokeWidth(size) : 0.0f;
     AppendCssDecl(decls, "-webkit-text-stroke-width", CssFloatToString(width) + "px");
     AppendCssDecl(decls, "-webkit-text-stroke-color", "currentColor");
   }
@@ -2991,10 +3065,24 @@ std::vector<DomTargetBundle> GroupObjectsIntoDomBundles(
       DomTargetBundle b;
       b.domId = domId;
       b.primaryHost = primaryHost;
+      if (primaryHost != nullptr && primaryHost->nodeType() == NodeType::Layer) {
+        auto residualIt = ctx.animation.residualFilterIds.find(primaryHost);
+        if (residualIt != ctx.animation.residualFilterIds.end()) {
+          b.residualFilterId = residualIt->second;
+        }
+      }
       b.objects.push_back(obj);
       bundles.push_back(std::move(b));
     } else {
       bundles[bIt->second].objects.push_back(obj);
+      DomTargetBundle& existing = bundles[bIt->second];
+      if (existing.residualFilterId.empty() && primaryHost != nullptr &&
+          primaryHost->nodeType() == NodeType::Layer) {
+        auto residualIt = ctx.animation.residualFilterIds.find(primaryHost);
+        if (residualIt != ctx.animation.residualFilterIds.end()) {
+          existing.residualFilterId = residualIt->second;
+        }
+      }
     }
   }
   return bundles;
