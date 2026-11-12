@@ -6936,6 +6936,32 @@ PAGX_TEST(PAGXSVGTest, SVGExport_BudgetsCapOutputAndRepeaterCopies) {
   EXPECT_LE(rectCount, 5u);
 }
 
+// ST30: standalone native Text also needs preserved whitespace and an RTL base direction.
+PAGX_TEST(PAGXSVGTest, SVGExport_StandaloneTextWhitespaceAndRTL) {
+  auto doc = pagx::PAGXDocument::Make(200, 100);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* text = doc->makeNode<pagx::Text>();
+  text->text = "A  B";
+  text->fontFamily = "Arial";
+  text->fontSize = 20;
+  layer->contents = {text, MakeSolidFillSVG(doc.get(), 0, 0, 0)};
+  doc->layers.push_back(layer);
+
+  pagx::SVGExportOptions options = {};
+  options.convertTextToPath = false;
+  auto svg = pagx::SVGExporter::ToSVG(*doc, options);
+  EXPECT_NE(svg.find("xml:space=\"preserve\""), std::string::npos);
+
+  auto* rtlText = doc->makeNode<pagx::Text>();
+  rtlText->text = "שלום";
+  rtlText->fontFamily = "Arial";
+  rtlText->fontSize = 20;
+  layer->contents = {rtlText, MakeSolidFillSVG(doc.get(), 0, 0, 0)};
+  auto rtlSvg = pagx::SVGExporter::ToSVG(*doc, options);
+  EXPECT_NE(rtlSvg.find("direction=\"rtl\""), std::string::npos);
+  EXPECT_EQ(rtlSvg.find("text-anchor=\"end\""), std::string::npos);
+}
+
 // A Group's alpha has to survive until the painter that draws its geometry, even when that painter
 // sits outside the Group.
 PAGX_TEST(PAGXSVGTest, SVGExport_GroupAlphaReachesOuterPainter) {

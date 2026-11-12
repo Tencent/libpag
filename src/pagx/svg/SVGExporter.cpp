@@ -3210,6 +3210,19 @@ bool SVGWriter::writeTextAsFont(SVGBuilder& out, const Text* text, const FillStr
 
 // ── writeText ───────────────────────────────────────────────────────────────
 
+static TextAnchor SvgAnchorForDirection(TextAnchor anchor, bool rtl) {
+  if (!rtl) {
+    return anchor;
+  }
+  if (anchor == TextAnchor::Start) {
+    return TextAnchor::End;
+  }
+  if (anchor == TextAnchor::End) {
+    return TextAnchor::Start;
+  }
+  return anchor;
+}
+
 static void WriteSharedTextAttrs(SVGBuilder& out, const Text* text, TextAnchor anchor) {
   // Browser-first bold/italic mapping. A real Bold / Italic face (the PAGX
   // Text carries fontStyle="Bold" / "Italic" / "Bold Italic") is encoded by
@@ -3608,6 +3621,7 @@ void SVGWriter::writeTextWithLayout(SVGBuilder& out, const Text* text, const Fil
       if (!transform.empty()) {
         out.addAttribute("transform", transform);
       }
+      out.addAttribute("xml:space", "preserve");
       // Suppress the resolved text-anchor here: inline alignment is baked
       // into columnY above, and emitting text-anchor on a vertical <text>
       // either has no effect (Chrome) or shifts glyphs the wrong way
@@ -3644,7 +3658,11 @@ void SVGWriter::writeTextWithLayout(SVGBuilder& out, const Text* text, const Fil
     if (!transform.empty()) {
       out.addAttribute("transform", transform);
     }
-    WriteSharedTextAttrs(out, text, anchoring.anchor);
+    out.addAttribute("xml:space", "preserve");
+    if (rtl) {
+      out.addAttribute("direction", "rtl");
+    }
+    WriteSharedTextAttrs(out, text, SvgAnchorForDirection(anchoring.anchor, rtl));
     ApplyTextBoxBodyAttrs(out, fs.textBox);
     applyPainters(out, fs, {}, alpha);
     out.addRequiredAttribute("x", anchoring.anchorX);
@@ -3671,7 +3689,11 @@ void SVGWriter::writeTextWithLayout(SVGBuilder& out, const Text* text, const Fil
     if (!transform.empty()) {
       out.addAttribute("transform", transform);
     }
-    WriteSharedTextAttrs(out, text, anchoring.anchor);
+    out.addAttribute("xml:space", "preserve");
+    if (rtl) {
+      out.addAttribute("direction", "rtl");
+    }
+    WriteSharedTextAttrs(out, text, SvgAnchorForDirection(anchoring.anchor, rtl));
     ApplyTextBoxBodyAttrs(out, fs.textBox);
     applyPainters(out, fs, {}, alpha);
     out.addRequiredAttribute("x", anchoring.anchorX);
@@ -4105,7 +4127,12 @@ void SVGWriter::writeText(SVGBuilder& out, const Text* text, const FillStrokeInf
   if (!transform.empty()) {
     out.addAttribute("transform", transform);
   }
-  WriteSharedTextAttrs(out, text, ResolveLogicalAnchor(text->textAnchor, rtl));
+  out.addAttribute("xml:space", "preserve");
+  if (rtl) {
+    out.addAttribute("direction", "rtl");
+  }
+  WriteSharedTextAttrs(out, text,
+                       SvgAnchorForDirection(ResolveLogicalAnchor(text->textAnchor, rtl), rtl));
   ApplyTextBoxBodyAttrs(out, fs.textBox);
   applyPainters(out, fs, {}, alpha);
   auto renderPos = text->renderPosition();

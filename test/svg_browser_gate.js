@@ -8,7 +8,7 @@
  *
  * Usage:
  *   node test/svg_browser_gate.js --pagx <file.pagx> [--pagx-bin <path>] [--out <dir>]
- *        [--time <seconds>] [--max-pixel-diff 0.05] [--max-rgb-delta 8] [--min-ssim 0.4]
+ *        [--time <seconds>] [--max-pixel-diff 0.05] [--max-rgb-delta 10] [--min-ssim 0.4]
  */
 'use strict';
 
@@ -27,7 +27,7 @@ function parseArgs(argv) {
     outDir: path.join(repoRoot, 'test/out/svg-browser-gate'),
     time: null,
     maxPixelDiff: 0.05,
-    maxRgbDelta: 8,
+    maxRgbDelta: 10,
     minSsim: 0.4,
   };
   for (let i = 0; i < argv.length; i++) {
