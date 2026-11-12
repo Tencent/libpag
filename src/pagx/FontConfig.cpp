@@ -117,6 +117,16 @@ void FontConfig::registerFont(const std::string& path, int ttcIndex, const std::
   }
 }
 
+void FontConfig::unregisterFont(const PAGFont& font) {
+  if (font.fontFamily.empty()) {
+    return;
+  }
+  Data::FontKey key = {};
+  key.family = font.fontFamily;
+  key.style = NormalizeStyle(font.fontStyle);
+  data->registeredTypefaces.erase(key);
+}
+
 void FontConfig::registerFont(const void* bytes, size_t length, int ttcIndex,
                               const std::string& fontFamily, const std::string& fontStyle) {
   if (fontFamily.empty()) {

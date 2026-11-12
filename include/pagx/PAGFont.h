@@ -41,7 +41,8 @@ class PAGFont {
    * documents laid out or re-shaped afterwards renders as designed. The registration key
    * (fontFamily and fontStyle) is read from the font file itself. Fonts registered here are
    * visible to every PAGX document: each document's own FontConfig takes precedence, then this
-   * registry, then system fonts.
+   * registry. Unregistered families are not substituted from the system; the shaper's
+   * per-character fallback covers them with the fallback list, matching the legacy runtime.
    * @param fontPath The font file path (TTF, OTF, or the first face of a TTC collection).
    * @return True if the font file was parsed and registered successfully.
    */

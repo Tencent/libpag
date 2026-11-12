@@ -26,10 +26,12 @@
 namespace pagx {
 
 /**
- * Process-wide font registry backing pagx::PAGFont::RegisterFont / SetFallbackFontNames
- * (interface draft §3). LayoutContext consults it after the document's own FontConfig and
- * before system fonts, so hosts only need the global calls to feed every document. All access
- * is serialized by an internal mutex.
+ * Process-wide font registry backing pagx::PAGFont::RegisterFont / SetFallbackFontNames and
+ * mirroring the legacy pag::PAGFont global API (interface draft §3). LayoutContext consults it
+ * after the document's own FontConfig, so hosts only need the global calls to feed every
+ * document — legacy and PAGX alike. Unregistered families resolve to null (no system
+ * substitution by name, matching the legacy runtime); the shaper's per-character fallback
+ * covers them with the fallback list. All access is serialized by an internal mutex.
  */
 class GlobalFontRegistry {
  public:

@@ -20,7 +20,6 @@
 
 #include <memory>
 #include <string>
-#include <unordered_map>
 #include <vector>
 #include "TypefaceHolder.h"
 #include "pagx/FontConfig.h"
@@ -40,8 +39,9 @@ class LayoutContext {
   explicit LayoutContext(FontConfig* fontConfig);
 
   // Finds a typeface for the given family/style. Searches the document's registered fonts
-  // first, then the process-wide registry (PAGFont::RegisterFont / SetFallbackFontNames), then
-  // falls back to system font lookup via MakeFromName.
+  // first, then the process-wide registry (PAGFont::RegisterFont / SetFallbackFontNames).
+  // Unregistered families resolve to null: like the legacy runtime, no system font is ever
+  // substituted by name; the shaper's per-character fallback covers the text instead.
   std::shared_ptr<tgfx::Typeface> findTypeface(const std::string& fontFamily,
                                                const std::string& fontStyle);
 
@@ -65,10 +65,6 @@ class LayoutContext {
   FontConfig* fontConfig = nullptr;
   std::vector<TypefaceHolder> systemFallbacks = {};
   bool systemFallbacksLoaded = false;
-  // System lookups are cached so that every text that asks for the same family and style shares
-  // one typeface instance. Glyph collection keys glyphs by typeface identity, so a fresh instance
-  // per text node would store the same outline once per text.
-  std::unordered_map<std::string, std::shared_ptr<tgfx::Typeface>> systemTypefaceCache = {};
 };
 
 }  // namespace pagx

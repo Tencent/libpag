@@ -350,7 +350,7 @@ CLI_TEST(PAGTypefaceCacheTest, FontConfigCoversRegistrationFallbackAndValueSeman
   }
 }
 
-CLI_TEST(PAGTypefaceCacheTest, SystemTypefaceFallsBackWithinRequestedFamily) {
+CLI_TEST(PAGTypefaceCacheTest, SystemTypefaceResolvesOnlyWhenRegistered) {
   auto request = FindSystemFamilyWithUnavailableStyle();
   if (request.fontFamily.empty()) {
     GTEST_SKIP() << "No loadable system font family is available";
@@ -361,11 +361,11 @@ CLI_TEST(PAGTypefaceCacheTest, SystemTypefaceFallsBackWithinRequestedFamily) {
   EXPECT_TRUE(FontNamesMatch(request.fontFamily, typeface->fontFamily()));
   EXPECT_FALSE(FontNamesMatch(request.fontStyle, typeface->fontStyle()));
 
+  // findTypeface never substitutes a system font by name: an unregistered family resolves to
+  // null and the shaper's per-character fallback covers it, matching the legacy runtime.
   pagx::FontConfig emptyConfig;
   pagx::LayoutContext systemContext(&emptyConfig);
-  auto systemTypeface = systemContext.findTypeface(request.fontFamily, request.fontStyle);
-  ASSERT_NE(systemTypeface, nullptr);
-  EXPECT_TRUE(FontNamesMatch(request.fontFamily, systemTypeface->fontFamily()));
+  EXPECT_EQ(systemContext.findTypeface(request.fontFamily, request.fontStyle), nullptr);
 
   pagx::FontConfig registeredConfig;
   EXPECT_TRUE(registeredConfig.registerSystemFont(request));
