@@ -281,7 +281,7 @@ test('validates real ZIP entries and rejects symlink metadata', async () => {
     await createZipArchive(linkArchive, [{
       name: 'bin/ffmpeg-link',
       contents: 'ffmpeg.exe',
-      options: { externalFileAttributes: (0o120777 << 16) >>> 0 },
+      options: { mode: 0o120777 },
     }]);
     await assert.rejects(extractArchive(linkArchive, path.join(root, 'link'), 'win32'),
       /unsafe ZIP entry type/);
