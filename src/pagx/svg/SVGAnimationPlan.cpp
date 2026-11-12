@@ -85,6 +85,8 @@ bool IsSupportedChannel(NodeType nodeType, const std::string& name) {
     case NodeType::TrimPath:
       // Bakeable into a sibling shape's d track by the per-frame re-resolve sampler.
       return name == "start" || name == "end" || name == "offset";
+    case NodeType::RoundCorner:
+      return name == "radius";
     case NodeType::Polystar:
       // Fixed-topology geometry channels are sampled per frame and re-baked into a d track; the
       // content bounds (and therefore render scale) are recomputed from the sampled fields.

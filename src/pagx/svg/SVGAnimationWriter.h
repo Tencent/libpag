@@ -229,15 +229,15 @@ class SVGAnimationWriter {
   bool HasBakedShapeAnimates(const Node* source) const;
 
   /**
-   * Returns true when `trim` only drives start / end / offset, the channels the exporter bakes
-   * into a sibling shape's `d` track.
+   * Returns true when the modifier (TrimPath / RoundCorner) only drives channels the exporter
+   * bakes into a sibling shape's `d` track.
    */
-  static bool CanBakeTrim(const Node* trim);
+  static bool CanBakeModifier(const Node* modifier);
 
   /**
-   * Returns true when the scope contains a TrimPath with at least one bakeable channel.
+   * Returns true when the scope contains a TrimPath or RoundCorner with bakeable channels.
    */
-  bool HasAnimatedTrimScope(const std::vector<Element*>& scope) const;
+  bool HasAnimatedModifierScope(const std::vector<Element*>& scope) const;
 
   /**
    * Samples the source through the modifier chain by writing each frame's channel values onto the

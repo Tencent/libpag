@@ -37,6 +37,7 @@
 #include "pagx/nodes/PathData.h"
 #include "pagx/nodes/Polystar.h"
 #include "pagx/nodes/Rectangle.h"
+#include "pagx/nodes/RoundCorner.h"
 #include "pagx/nodes/SolidColor.h"
 #include "pagx/nodes/Stroke.h"
 #include "pagx/nodes/Text.h"
@@ -2195,21 +2196,23 @@ bool SVGAnimationWriter::WriteNoiseSeedAnimates(XMLBuilder& out, const Node* noi
   return WriteChannelAnimate(out, noise, "seed", "seed");
 }
 
-bool SVGAnimationWriter::CanBakeTrim(const Node* trim) {
-  if (trim == nullptr || trim->nodeType() != NodeType::TrimPath) {
+bool SVGAnimationWriter::CanBakeModifier(const Node* modifier) {
+  if (modifier == nullptr) {
     return false;
   }
-  return true;
+  return modifier->nodeType() == NodeType::TrimPath ||
+         modifier->nodeType() == NodeType::RoundCorner;
 }
 
-bool SVGAnimationWriter::HasAnimatedTrimScope(const std::vector<Element*>& scope) const {
+bool SVGAnimationWriter::HasAnimatedModifierScope(const std::vector<Element*>& scope) const {
   if (_plan == nullptr) {
     return false;
   }
   for (auto* element : scope) {
-    if (element == nullptr || element->nodeType() != NodeType::TrimPath) {
+    if (element == nullptr) {
       continue;
     }
+    auto type = element->nodeType();
     auto* list = _plan->BindingsFor(element);
     if (list == nullptr || list->empty()) {
       continue;
@@ -2217,8 +2220,14 @@ bool SVGAnimationWriter::HasAnimatedTrimScope(const std::vector<Element*>& scope
     bool ok = true;
     for (const auto& binding : *list) {
       const auto& name = binding.channel->name;
-      if (name != "start" && name != "end" && name != "offset") {
+      if (type == NodeType::TrimPath) {
+        ok = name == "start" || name == "end" || name == "offset";
+      } else if (type == NodeType::RoundCorner) {
+        ok = name == "radius";
+      } else {
         ok = false;
+      }
+      if (!ok) {
         break;
       }
     }
@@ -2300,6 +2309,7 @@ bool SVGAnimationWriter::BuildBakedShapeDataTrack(const Path* baked, ModifierRes
   };
   std::vector<SampledBinding> sampled;
   std::vector<TrimPath*> animatedTrims;
+  std::vector<RoundCorner*> animatedCorners;
   if (HasBakedShapeAnimates(source)) {
     auto* list = _plan->BindingsFor(source);
     if (list != nullptr) {
@@ -2309,9 +2319,10 @@ bool SVGAnimationWriter::BuildBakedShapeDataTrack(const Path* baked, ModifierRes
     }
   }
   for (auto* element : scope) {
-    if (element == nullptr || element->nodeType() != NodeType::TrimPath) {
+    if (element == nullptr) {
       continue;
     }
+    auto type = element->nodeType();
     auto* list = _plan->BindingsFor(element);
     if (list == nullptr || list->empty()) {
       continue;
@@ -2319,8 +2330,14 @@ bool SVGAnimationWriter::BuildBakedShapeDataTrack(const Path* baked, ModifierRes
     bool bakeable = true;
     for (const auto& binding : *list) {
       const auto& name = binding.channel->name;
-      if (name != "start" && name != "end" && name != "offset") {
+      if (type == NodeType::TrimPath) {
+        bakeable = name == "start" || name == "end" || name == "offset";
+      } else if (type == NodeType::RoundCorner) {
+        bakeable = name == "radius";
+      } else {
         bakeable = false;
+      }
+      if (!bakeable) {
         break;
       }
     }
@@ -2330,7 +2347,11 @@ bool SVGAnimationWriter::BuildBakedShapeDataTrack(const Path* baked, ModifierRes
     for (const auto& binding : *list) {
       sampled.push_back({element, &binding});
     }
-    animatedTrims.push_back(static_cast<TrimPath*>(element));
+    if (type == NodeType::TrimPath) {
+      animatedTrims.push_back(static_cast<TrimPath*>(element));
+    } else {
+      animatedCorners.push_back(static_cast<RoundCorner*>(element));
+    }
   }
   if (sampled.empty()) {
     return false;
@@ -2421,6 +2442,10 @@ bool SVGAnimationWriter::BuildBakedShapeDataTrack(const Path* baked, ModifierRes
     float end = 1;
     float offset = 0;
   };
+  struct CornerSnapshot {
+    RoundCorner* corner = nullptr;
+    float radius = 0;
+  };
   track->values.clear();
   track->keyTimes.clear();
   for (auto frame : frames) {
@@ -2508,6 +2533,15 @@ bool SVGAnimationWriter::BuildBakedShapeDataTrack(const Path* baked, ModifierRes
         }
       }
     }
+    std::vector<CornerSnapshot> savedCorners;
+    for (auto* corner : animatedCorners) {
+      savedCorners.push_back({corner, corner->radius});
+      for (const auto& entry : sampled) {
+        if (entry.target == corner) {
+          corner->radius = EvaluateChannelFloat(entry.binding->channel, frame);
+        }
+      }
+    }
     std::string d;
     auto resolved = resolver->resolveWithOverride(scope, override);
     if (savedData != nullptr) {
@@ -2517,6 +2551,9 @@ bool SVGAnimationWriter::BuildBakedShapeDataTrack(const Path* baked, ModifierRes
       snapshot.trim->start = snapshot.start;
       snapshot.trim->end = snapshot.end;
       snapshot.trim->offset = snapshot.offset;
+    }
+    for (const auto& snapshot : savedCorners) {
+      snapshot.corner->radius = snapshot.radius;
     }
     for (auto* element : resolved) {
       if (element->nodeType() != NodeType::Path) {

@@ -663,8 +663,9 @@ class SVGWriter {
           }
         }
       }
-      // An animated TrimPath is consumed by the re-baked `d` track of the shape it trims.
-      if (!kept && element->nodeType() == NodeType::TrimPath && _animWriter.CanBakeTrim(element)) {
+      // An animated TrimPath / RoundCorner is consumed by the re-baked `d` track of the shape it
+      // modifies.
+      if (!kept && _animWriter.CanBakeModifier(element)) {
         kept = true;
       }
       if (kept) {
@@ -2832,7 +2833,7 @@ void SVGWriter::writePath(SVGBuilder& out, const Path* path, const FillStrokeInf
     bool sourceAnimated =
         bakedSource != nullptr && _animWriter.HasBakedShapeAnimates(bakedSource);
     bool trimAnimated = scope != _elementScopes.end() && scope->second != nullptr &&
-                        _animWriter.HasAnimatedTrimScope(*scope->second);
+                        _animWriter.HasAnimatedModifierScope(*scope->second);
     if (bakedSource != nullptr && (sourceAnimated || trimAnimated) &&
         scope != _elementScopes.end() && scope->second != nullptr) {
       if (!_animWriter.BuildBakedShapeDataTrack(path, &_resolver, *scope->second,

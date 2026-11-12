@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- D6 animated gate case: a rounded square grows its corner radius from 4 to 24 over one
+     second. The browser gate pauses SMIL, seeks to 0.5s and compares the re-baked d track
+     against the runtime renderer at the same time. -->
+<pagx width="200" height="200">
+  <Layer x="0" y="0" width="200" height="200">
+    <Rectangle position="100,100" size="100,100"/>
+    <RoundCorner id="corner" radius="4"/>
+    <Stroke width="8">
+      <SolidColor color="#2266CC"/>
+    </Stroke>
+  </Layer>
+  <Animations>
+    <Animation id="round" duration="60" frameRate="60" loop="once">
+      <Object target="corner">
+        <Channel name="radius" type="float">
+          <Key time="0" value="4" interpolation="linear"/>
+          <Key time="60" value="24" interpolation="linear"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>

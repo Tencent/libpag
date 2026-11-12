@@ -115,7 +115,7 @@ std::vector<SVGChannelEntry> BuildLedger() {
   entries.push_back({NodeType::TrimPath, "start", S, "baked into the sibling shape d track"});
   entries.push_back({NodeType::TrimPath, "end", S, "baked into the sibling shape d track"});
   entries.push_back({NodeType::TrimPath, "offset", S, "baked into the sibling shape d track"});
-  entries.push_back({NodeType::RoundCorner, "radius", P, "needs a d track"});
+  entries.push_back({NodeType::RoundCorner, "radius", S, "baked into the sibling shape d track"});
   entries.push_back({NodeType::Repeater, "copies", P, "structural, bake only"});
   entries.push_back({NodeType::Repeater, "offset", P, "per-copy transform, not implemented"});
   entries.push_back({NodeType::Repeater, "anchor.x", P, "per-copy transform, not implemented"});
