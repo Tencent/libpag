@@ -348,8 +348,7 @@ test('replaces an interrupted cache installation', async () => {
   const downloads = [];
   try {
     const damagedInstall = path.join(root, 'v1.0.0', 'darwin-arm64');
-    fs.mkdirSync(path.join(damagedInstall, 'bin'), { recursive: true });
-    fs.writeFileSync(path.join(damagedInstall, 'bin', 'ffmpeg'), 'not executable');
+    fs.mkdirSync(path.join(damagedInstall, 'bin', 'ffmpeg'), { recursive: true });
     const executable = await ensureFFmpeg({
       platform: 'darwin',
       arch: 'arm64',
