@@ -172,3 +172,32 @@ jobs:
           name: mac_metal_result
           path: result
           include-hidden-files: true
+
+  pagx_ffmpeg_downloader:
+    name: pagx ffmpeg downloader (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - macos-14
+          - ubuntu-latest
+          - windows-latest
+    steps:
+      - name: Check Out Repo
+        uses: actions/checkout@v4
+
+      - name: Set Up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install pagx test dependencies
+        working-directory: cli/npm
+        env:
+          PAGX_SKIP_FFMPEG_DOWNLOAD: '1'
+        run: npm install --include=dev
+
+      - name: Test ffmpeg downloader
+        working-directory: cli/npm
+        run: npm run test:ffmpeg

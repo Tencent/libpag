@@ -27,8 +27,10 @@
 #include <cstdlib>
 #include <cstring>
 #include <filesystem>
+#include <iomanip>
 #include <iostream>
 #include <memory>
+#include <sstream>
 #include <string>
 #include <vector>
 #include "cli/CliUtils.h"
@@ -298,8 +300,8 @@ static bool WriteDataToFile(const std::string& filePath, const std::shared_ptr<t
     return false;
   }
   auto written = fwrite(data->data(), 1, data->size(), file);
-  fclose(file);
-  return written == data->size();
+  auto closeResult = fclose(file);
+  return written == data->size() && closeResult == 0;
 }
 
 struct ImageFrameContext {
@@ -309,6 +311,8 @@ struct ImageFrameContext {
   int quality = 100;
   std::string framesDir = {};
   std::string extension = {};
+  int fileNameWidth = 6;
+  std::vector<std::string> writtenFiles = {};
 };
 
 static bool WriteImageFrame(const VideoFrameView& frame, void* context, std::string* errorMsg) {
@@ -321,13 +325,25 @@ static bool WriteImageFrame(const VideoFrameView& frame, void* context, std::str
     *errorMsg = "failed to encode frame " + std::to_string(frame.index);
     return false;
   }
-  char fileName[32] = {};
-  snprintf(fileName, sizeof(fileName), "f_%04lld.%s", static_cast<long long>(frame.index),
-           output->extension.c_str());
-  if (!WriteDataToFile(output->framesDir + "/" + fileName, encodedData)) {
+  std::ostringstream fileName = {};
+  fileName << "f_" << std::setw(output->fileNameWidth) << std::setfill('0') << frame.index << "."
+           << output->extension;
+  auto outputPath = output->framesDir + "/" + fileName.str();
+  auto temporaryPath = outputPath + ".tmp";
+  std::error_code error = {};
+  if (!WriteDataToFile(temporaryPath, encodedData)) {
+    std::filesystem::remove(temporaryPath, error);
     *errorMsg = "failed to write frame " + std::to_string(frame.index);
     return false;
   }
+  std::filesystem::rename(temporaryPath, outputPath, error);
+  if (error) {
+    std::error_code cleanupError = {};
+    std::filesystem::remove(temporaryPath, cleanupError);
+    *errorMsg = "failed to publish frame " + std::to_string(frame.index) + ": " + error.message();
+    return false;
+  }
+  output->writtenFiles.emplace_back(std::move(outputPath));
   return true;
 }
 
@@ -580,26 +596,48 @@ static int RenderFrameSequence(const RenderOptions& options) {
   std::string errorMsg = {};
   auto source = VideoFrameSource::Make(document, videoOptions, &errorMsg);
   if (source == nullptr) {
-    CommandError("pagx render") << "" << errorMsg << "\n";
+    CommandError("pagx render") << errorMsg << "\n";
     return 1;
   }
   const auto& exporter = source->exporter();
 
   std::error_code createError = {};
   std::filesystem::create_directories(options.framesDir, createError);
-  if (createError) {
+  if (createError || !std::filesystem::is_directory(options.framesDir)) {
     CommandError("pagx render") << "failed to create directory '" << options.framesDir << "'\n";
+    return 1;
+  }
+  auto isEmpty = std::filesystem::is_empty(options.framesDir, createError);
+  if (createError) {
+    CommandError("pagx render") << "failed to inspect directory '" << options.framesDir << "'\n";
+    return 1;
+  }
+  if (!isEmpty) {
+    CommandError("pagx render") << "frame directory '" << options.framesDir << "' must be empty\n";
     return 1;
   }
 
   auto width = exporter->width();
   auto height = exporter->height();
   auto frameCount = exporter->frameCount();
-  ImageFrameContext frameContext = {
-      width,         height, GetEncodedFormat(options.format), options.quality, options.framesDir,
-      options.format};
+  int fileNameWidth = 6;
+  for (auto index = frameCount - 1; index >= 10; index /= 10) {
+    ++fileNameWidth;
+  }
+  ImageFrameContext frameContext = {};
+  frameContext.width = width;
+  frameContext.height = height;
+  frameContext.format = GetEncodedFormat(options.format);
+  frameContext.quality = options.quality;
+  frameContext.framesDir = options.framesDir;
+  frameContext.extension = options.format;
+  frameContext.fileNameWidth = fileNameWidth;
   if (!RunVideoFrames(*source, "pagx render", "pagx render: error: ", WriteImageFrame,
                       &frameContext, &errorMsg)) {
+    for (const auto& file : frameContext.writtenFiles) {
+      std::error_code cleanupError = {};
+      std::filesystem::remove(file, cleanupError);
+    }
     return 1;
   }
 

@@ -147,20 +147,21 @@ struct VideoExportOptions {
  * top-level or mounted nested timelines draw and read back only the first frame; later frames reuse
  * the same RGBA buffer.
  *
- * The exporter only renders. Encoding and muxing are the host's responsibility: an external ffmpeg
- * process on native platforms, WebCodecs on the web. No video codec ships inside pagx.
+ * The exporter only renders. Encoding and muxing are the host's responsibility; the current
+ * implementation is built only for native hosts and uses an external ffmpeg process. WebAssembly
+ * builds exclude this implementation, so a future WebCodecs host would need its own frame-source
+ * adapter. No video codec ships inside pagx.
  *
  * Frames are pulled one at a time so that hosts can interleave other work (a UI thread, an encoder
  * queue) between frames. Rendering the whole sequence in a single call is not supported because a
- * 1080p frame costs roughly 50ms and would block a browser main thread for tens of seconds.
+ * 1080p frame can be expensive to draw and read back.
  *
  * Frames are premultiplied RGBA8888. Containers that carry alpha need the host to unpremultiply;
  * opaque output (the mp4 path) can pass the pixels through unchanged.
  *
  * Thread safety: an instance is not thread-safe. Make() must run on a thread that owns a GPU
- * context; on wasm that means the main thread, because Devices::MakeDefault() only returns a
- * device already bound to the calling thread. Callers must not hold the same device's context lock
- * while calling nextFrame(), since draw() and readPixels() acquire it internally.
+ * context. Callers must not hold the same device's context lock while calling nextFrame(), since
+ * draw() and readPixels() acquire it internally.
  *
  * Layout: PAGScene::Make() applies layout automatically when the document has not applied it yet,
  * so callers only need to register fonts on PAGXDocument::fontConfig() beforehand when the
