@@ -432,6 +432,14 @@ float EvaluateChannelFloat(const Channel* channel, Frame frame) {
   return result != nullptr ? *result : 0.0f;
 }
 
+Color EvaluateChannelColor(const Channel* channel, Frame frame) {
+  auto value = channel->evaluateAt(frame);
+  if (const auto* color = std::get_if<Color>(&value)) {
+    return *color;
+  }
+  return {};
+}
+
 Matrix EvaluateChannelMatrix(const Channel* channel, Frame frame) {
   auto value = channel->evaluateAt(frame);
   auto* result = std::get_if<Matrix>(&value);
@@ -2566,12 +2574,50 @@ bool SVGAnimationWriter::WritePaintAnimates(XMLBuilder& out, const Node* painter
   if (alphaBinding != nullptr) {
     SmilTiming timing;
     if (ResolveTiming(alphaBinding->animation, alphaBinding->timeline, &timing)) {
-      const auto* channel = static_cast<const TypedChannel<float>*>(alphaBinding->channel);
       SmilSequence sequence;
-      if (BuildFloatSequence(channel, alphaBinding->animation->duration,
-                             colorAlpha * alphaMultiplier,
-                             std::numeric_limits<float>::lowest(),
-                             std::numeric_limits<float>::max(), &sequence)) {
+      bool built = false;
+      bool colorAlphaAnimated =
+          colorBinding != nullptr && colorBinding->channel->valueType() == ChannelValueType::Color;
+      if (colorAlphaAnimated) {
+        // Both the painter alpha and the colour's own alpha animate, and SMIL owns a single
+        // opacity attribute. Sample the product on a densified union grid so the non-linear
+        // product of two linear alphas is not flattened to the endpoint values.
+        std::vector<Frame> frames;
+        AppendTrackFrames(alphaBinding->channel, alphaBinding->animation->duration, &frames);
+        AppendTrackFrames(colorBinding->channel, alphaBinding->animation->duration, &frames);
+        std::sort(frames.begin(), frames.end());
+        frames.erase(std::unique(frames.begin(), frames.end()), frames.end());
+        std::vector<Frame> dense;
+        constexpr int SubSamples = 8;
+        for (size_t i = 0; i + 1 < frames.size(); i++) {
+          dense.push_back(frames[i]);
+          Frame step = frames[i + 1] - frames[i];
+          for (int s = 1; s < SubSamples; s++) {
+            dense.push_back(frames[i] + step * s / SubSamples);
+          }
+        }
+        dense.push_back(frames.back());
+        std::sort(dense.begin(), dense.end());
+        dense.erase(std::unique(dense.begin(), dense.end()), dense.end());
+        auto span = static_cast<double>(alphaBinding->animation->duration);
+        if (span > 0) {
+          for (auto frame : dense) {
+            float painterValue = EvaluateChannelFloat(alphaBinding->channel, frame);
+            Color colorValue = EvaluateChannelColor(colorBinding->channel, frame);
+            sequence.values.push_back(
+                FloatToString(painterValue * colorValue.alpha * alphaMultiplier));
+            sequence.keyTimes.push_back(std::clamp(static_cast<double>(frame) / span, 0.0, 1.0));
+          }
+          built = !sequence.values.empty();
+        }
+      } else {
+        const auto* channel = static_cast<const TypedChannel<float>*>(alphaBinding->channel);
+        built = BuildFloatSequence(channel, alphaBinding->animation->duration,
+                                   colorAlpha * alphaMultiplier,
+                                   std::numeric_limits<float>::lowest(),
+                                   std::numeric_limits<float>::max(), &sequence);
+      }
+      if (built) {
         if (timing.mirror) {
           ApplyPingPong(&sequence);
           timing.durationSeconds *= 2.0;

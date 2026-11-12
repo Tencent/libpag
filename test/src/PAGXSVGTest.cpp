@@ -5474,6 +5474,43 @@ PAGX_TEST(PAGXSVGTest, SVGExport_AnimPolystarPointCountRejected) {
   EXPECT_EQ(bestEffortSvg.find("<animate"), std::string::npos);
 }
 
+// F8: when the colour's alpha and the painter alpha both animate, fill-opacity carries their
+// product on a densified grid instead of losing the colour alpha.
+PAGX_TEST(PAGXSVGTest, SVGExport_AnimColorAlphaTimesPainterAlpha) {
+  auto doc = MakeRectDocument();
+  auto* color = doc->makeNode<pagx::SolidColor>("sharedColor");
+  color->color = {1, 0, 0, 1};
+  auto* painter = doc->makeNode<pagx::Fill>("painted");
+  painter->color = color;
+  doc->layers[0]->contents.push_back(painter);
+
+  auto* animation = doc->makeNode<pagx::Animation>("fadeBoth");
+  animation->duration = 8;
+  animation->frameRate = 60.0f;
+  animation->loop = pagx::LoopMode::Once;
+  doc->animations.push_back(animation);
+
+  auto* colorObject = MakeAnimationObject(doc.get(), animation, "sharedColor");
+  auto* colorChannel = MakeChannel<pagx::Color>(doc.get(), colorObject, "color");
+  colorChannel->keyframes.push_back(
+      {0, pagx::Color{1, 0, 0, 1}, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  colorChannel->keyframes.push_back(
+      {8, pagx::Color{1, 0, 0, 0.5f}, pagx::KeyframeInterpolationType::Linear, {}, {}});
+
+  auto* fillObject = MakeAnimationObject(doc.get(), animation, "painted");
+  auto* alphaChannel = MakeChannel<float>(doc.get(), fillObject, "alpha");
+  alphaChannel->keyframes.push_back({0, 1.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  alphaChannel->keyframes.push_back({8, 0.5f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  AttachTimeline(doc->layers[0], "fadeBoth");
+
+  pagx::SVGExportOptions options = {};
+  options.animation.selection = pagx::SVGAnimationSelection::All;
+  auto svg = pagx::SVGExporter::ToSVG(*doc, options);
+  EXPECT_NE(svg.find("attributeName=\"fill\""), std::string::npos) << svg;
+  EXPECT_NE(svg.find("attributeName=\"fill-opacity\""), std::string::npos) << svg;
+  EXPECT_NE(svg.find("0.5625"), std::string::npos) << svg;
+}
+
 // M1: Default selects the first declared Animation, Named selects one id, All exports every
 // top-level Animation. Timing comes from a mounted timeline when present and from animation
 // defaults otherwise.
