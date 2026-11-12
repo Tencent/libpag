@@ -744,6 +744,9 @@ ToSVG严格失败返回空结果、ToFile返回false、CLI非零；warnings=null
 | 本轮 M5.3（2026-11-12） | TextHolder flush 改为 `TextLayout::Layout(..., false)` 强制从有效 TextGlyphParams 塑形，all-embedded 不再走 bounds fast path；有效空（runs 为空）调用新增的 tgfx `Text::clearTextBlob()` 清空 blob/anchors 并保留对象与 position；塑形失败清空并 LOGE，不再保留旧 glyph；显式 anchors 按 glyph 序截断/补零后随 setTextBlob 保留；新增空→非空、anchor 重排、embedded→新文字三回归 | tgfx `clearTextBlob()` 只在本地 `third_party/tgfx` 实现并重编验证，尚未回填上游依赖版本；ST21/ST22 新 glyph 像素门禁未做 |
 | 本轮 M5.4 部分（2026-11-12） | 同一 node+channel 被多个 Animation 驱动时按同属性多 Clock 分类：BestEffort 保留后写轨道并告警，Strict 拒绝；Path point `d` 轨道增加 512 采样上限并按 budget 降采样告警；Text.x/y ledger 升级 Supported；新增 Plan 白名单↔ledger 双向门禁（Path point 族表外豁免）与 multi-clock 回归；任何被 path modifier / reversed 烘焙替换的动画元素不再静默冻结，Strict 拒绝且 BestEffort 告警保留静态；新增 A14 rect+Trim 回归 |
 | 本轮 M5.4 Polystar（2026-11-12） | Polystar→Path 转换抽到共享的 `PolystarPath`（resolver 与导出共用），resolver 记录 bake→source 映射；rotation / 内外 radius / position.x/y / 内外 roundness 进入白名单并在烘焙后的 `<path>` 上发射 `d` 轨道；每帧用临时 Polystar 快照重算 content bounds、renderScale 与 renderPosition，逐帧强制 cubic verb 列表保持结构稳定；pointCount / reversed 仍按拓扑变化拒绝；新增 rotation d 轨道、roundness d 轨道与 pointCount 拒绝回归 | Repeater 拓扑、TextModifier/RangeSelector、动画 Text 的 flow/region 未做 |
+| 本轮 T00 部分（2026-11-12） | tgfx 分支 `feature/lifengdy_svg_export`：`clearTextBlob`（`a9672fcd3`）与 `VectorLayer::prepareDraws` / `VectorDrawSink`（`75efe5d75`）；同步本地 vendor 后编译并通过 PAGX 相关测试 | DEPS 未回填精确 SHA、tgfx 单元测试未在独立构建中运行、未推送，正式依赖交付仍 Blocked |
+| 本轮 T01 部分（2026-11-12） | 删除 `bakeUnsupported` / `convertTextToPath` / `resolveModifiers` 及 optional 映射；`staticPolicy` 默认 PreserveAppearance、`textMode` 默认 Fidelity；`SVGBudget` 增加实例、点、glyph、采样、细分、编码、边长与输出上限并在动画 writer 接入每轨采样预算；`SVGDiagnostic` 增加 outputClass / stateSource / consumedRangeOrFreezeTime 并在告警与拒绝站点填充；Native 模式跳过 WOFF2 预扫并在逐 glyph 场景回退布局字形并告警；`PAGXSVGTest` 280 / 281（唯一失败为既有未接受基线 `GroupAlphaRoundTrip`） | typed schema 区分作者类型/runtime payload、全会话计数与其余预算站点、Native TextBox 全出口未完成；`PAGXTest.SVGToPAGXAll` 为既有基线失败 |
+| 本轮 T02 部分（2026-11-12） | tgfx 把 `Painter::draw` 抽成 `PainterSink` 遍历，`VectorLayer::onUpdateContent` 与 `prepareDraws` 共用同一准备流程；静态/导出构建新增会话内 TextBlob 与 Typeface 缓存，不再写回 `Text.glyphData` / `Font.renderCache`，runtime 构建保持原节点缓存契约；新增 tgfx `PrepareDraws` 与 `PAGXTest.StaticBuildDoesNotWriteTextProductsToTemplate`；`PAGXTest` 367 / 368、SVG/Utils 909 中仅两处既有基线失败 | 逐实例 actors、SVG 导出消费 prepared draws、Group 上行 alpha 与背景消费、Merge/Repeater 完整生命周期仍未完成 |
 
 ### 4.8 S3 文字待办清单（下一批入口）
 
@@ -1581,9 +1584,9 @@ cmake --build cmake-build-debug --target HTMLTest
 
 | 执行项 | 覆盖原方案 | 启动时状态 / 不可跳过的余项 |
 |---|---|---|
-| T00 | tgfx交付、ST44、M5.3 | Pending：本地clearBlob已有，正式依赖/窄prepare接口尚未交付 |
-| T01 | S0/S6、ST32/37/41/43/46、F13 | Pending：schema/policy/global budgets/失败分类完整入口 |
-| T02 | S1/S4、ST1/5/8/12/16/21/23/24/33/34/35/45、F5/F9 | Pending：实例actors和源共用final prepares；即时Painter输出与外alpha仍错 |
+| T00 | tgfx交付、ST44、M5.3 | ImplementedUnverified：`clearTextBlob` 与 `prepareDraws` 已在 tgfx 分支本地提交（`a9672fcd3`、`75efe5d75`），vendor 同步验证编译；DEPS 回填与正式发布仍 Pending |
+| T01 | S0/S6、ST32/37/41/43/46、F13 | ImplementedUnverified：旧三字段与 optional 映射已删除，policy/textMode 默认值与预算/诊断结构已落地；typed schema、全会话计数与其余预算站点 Pending |
+| T02 | S1/S4、ST1/5/8/12/16/21/23/24/33/34/35/45、F5/F9 | ImplementedUnverified：tgfx prepared 出口与静态构建会话缓存已完成；逐实例 actors、SVG 导出消费 prepared draws、背景消费 Pending |
 | T03 | S3、ST9/10/18/20/22/28/29/30/31/36/44 | Pending：最终glyphscope/units/Selector/Native全出口，ST28已有正修复保留 |
 | T04 | S4、ST11/12/16/23/24/27/42/45 | Pending：所有primitive/glyph描边、append/跨scope、精度及临时归属 |
 | T05 | S1/S2、ST2/3/4/5/6/7/17/38/39/40 | Pending：完整Mask/effect/背景prefix/3D与采样；不以已有标签证明 |

@@ -4373,7 +4373,7 @@ void SVGWriter::writeText(SVGBuilder& out, const Text* text, const FillStrokeInf
 
 const LayerBuildResult& SVGWriter::ensureBuildResult() {
   if (!_buildResultReady) {
-    _buildResult = LayerBuilder::BuildWithMap(_doc);
+    _buildResult = LayerBuilder::BuildWithMap(_doc, true);
     _buildResultReady = true;
   }
   return _buildResult;
@@ -4475,6 +4475,12 @@ void SVGWriter::emitGeometryWithFs(SVGBuilder& out, const AccumulatedGeometry& e
       auto* text = static_cast<const Text*>(entry.element);
       bool hasTransforms = !entry.glyphTransforms.empty();
       bool hasPositionAnimation = _animWriter.HasTextPositionAnimates(text);
+      if (_nativeText && (hasTransforms || !entry.glyphStyles.empty())) {
+        addWarning("Text '" + (text->id.empty() ? std::string("(unnamed)") : text->id) +
+                       "' uses per-glyph placement or paint; Native mode emits the layout glyphs "
+                       "to keep the result correct.",
+                   "text-native-fallback", SVGDiagnosticAction::Approximated);
+      }
       if (hasPositionAnimation && hasTransforms) {
         addWarning("channels 'x'/'y' on <Text> '" + text->id +
                        "' are dropped: TextPath re-places the glyphs, so a whole-text translation "

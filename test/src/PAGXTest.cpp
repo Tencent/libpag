@@ -1012,7 +1012,7 @@ PAGX_TEST(PAGXTest, StaticBuildDoesNotWriteTextProductsToTemplate) {
   doc->applyLayout();
 
   ASSERT_EQ(text->glyphData->textBlob, nullptr);
-  auto staticBuild = pagx::LayerBuilder::Build(doc.get());
+  auto staticBuild = pagx::LayerBuilder::Build(doc.get(), true);
   ASSERT_TRUE(staticBuild != nullptr);
   EXPECT_EQ(text->glyphData->textBlob, nullptr);
   EXPECT_EQ(font->renderCache, nullptr);

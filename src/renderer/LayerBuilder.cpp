@@ -678,7 +678,8 @@ static std::shared_ptr<tgfx::Image> ImageFromDataURI(const std::string& dataURI)
 // their contents in place.
 class LayerBuilderContext {
  public:
-  LayerBuilderContext() = default;
+  explicit LayerBuilderContext(bool exportSession = false) : _exportSession(exportSession) {
+  }
   virtual ~LayerBuilderContext() = default;
 
   void setDocument(const PAGXDocument* document) {
@@ -1332,10 +1333,10 @@ class LayerBuilderContext {
     return prepared;
   }
 
-  // Runtime builds keep the text blob on the shared Text node so notifyChange can reuse it.
-  // Static and export builds keep every render-time product in this build context instead.
-  virtual bool usesSharedTextCache() const {
-    return false;
+  // Export builds keep every render-time product in this context so the template document stays
+  // unchanged. Render builds keep the node-cache contract used by notifyChange and the CLI.
+  bool usesSharedTextCache() const {
+    return !_exportSession;
   }
 
   // FNV-1a 64-bit mixing step over a raw byte range. Kept as an explicit helper (no lambda)
@@ -3626,6 +3627,7 @@ class LayerBuilderContext {
   // structural changes (node additions/removals via notifyChange), callers must call
   // invalidateAllImages() to prevent dangling-pointer lookups.
   const PAGXDocument* _document = nullptr;
+  bool _exportSession = false;
   std::unordered_map<const Image*, std::shared_ptr<tgfx::Image>> _imageCache = {};
   // TextBlob fingerprint cache. Keyed by FNV-1a 64-bit hash over every BuildTextBlob input.
   // glyphSum acts as a secondary check guarding against the (vanishingly rare) hash collision.
@@ -3648,10 +3650,6 @@ class LayerBuilderContext {
 // RefreshLayerInPlace). The static base is used for one-shot rendering (CLI / optimizer / export).
 class RuntimeLayerBuilderContext : public LayerBuilderContext {
  protected:
-  bool usesSharedTextCache() const override {
-    return true;
-  }
-
   std::shared_ptr<tgfx::Layer> convertComposition(const Composition* comp) override {
     if (!comp) {
       return nullptr;
@@ -3725,7 +3723,7 @@ class RuntimeLayerBuilderContext : public LayerBuilderContext {
 
 // Public API implementation
 
-std::shared_ptr<tgfx::Layer> LayerBuilder::Build(PAGXDocument* document) {
+std::shared_ptr<tgfx::Layer> LayerBuilder::Build(PAGXDocument* document, bool exportSession) {
   if (document == nullptr) {
     return nullptr;
   }
@@ -3735,11 +3733,11 @@ std::shared_ptr<tgfx::Layer> LayerBuilder::Build(PAGXDocument* document) {
     return nullptr;
   }
 
-  LayerBuilderContext context;
+  LayerBuilderContext context(exportSession);
   return context.build(*document);
 }
 
-LayerBuildResult LayerBuilder::BuildWithMap(PAGXDocument* document) {
+LayerBuildResult LayerBuilder::BuildWithMap(PAGXDocument* document, bool exportSession) {
   if (document == nullptr) {
     return {};
   }
@@ -3751,7 +3749,7 @@ LayerBuildResult LayerBuilder::BuildWithMap(PAGXDocument* document) {
     return {};
   }
 
-  LayerBuilderContext context;
+  LayerBuilderContext context(exportSession);
   return context.buildWithMap(*document);
 }
 
