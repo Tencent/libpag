@@ -24,7 +24,10 @@
 #include "pagx/nodes/AnimationTimeline.h"
 #include "pagx/nodes/Composition.h"
 #include "pagx/nodes/Fill.h"
+#include "pagx/nodes/Gradient.h"
 #include "pagx/nodes/Layer.h"
+#include "pagx/nodes/LinearGradient.h"
+#include "pagx/nodes/RadialGradient.h"
 #include "pagx/nodes/SolidColor.h"
 #include "pagx/nodes/Stroke.h"
 #include "pagx/nodes/Timeline.h"
@@ -84,6 +87,13 @@ bool IsSupportedChannel(NodeType nodeType, const std::string& name) {
       return name == "color" || name == "alpha";
     case NodeType::SolidColor:
       return name == "color";
+    case NodeType::ColorStop:
+      return name == "offset" || name == "color";
+    case NodeType::LinearGradient:
+      return name == "startPoint.x" || name == "startPoint.y" || name == "endPoint.x" ||
+             name == "endPoint.y";
+    case NodeType::RadialGradient:
+      return name == "center.x" || name == "center.y" || name == "radius";
     case NodeType::Stroke:
       return name == "color" || name == "alpha" || name == "width" || name == "dashOffset" ||
              name == "miterLimit";
@@ -119,6 +129,63 @@ void CollectTimelines(const std::vector<Layer*>& layers,
       CollectTimelines(layer->composition->layers, out);
     }
   }
+}
+
+// A ColorStop's SMIL host is the <stop> element inside the gradient def SVG writes for a
+// consumer. Conic and diamond gradients have no SVG primitive: they degrade to a radial
+// approximation, so their stops are not a faithful native host. This map records which kinds of
+// gradient actually reference each stop so the channel loop can classify the instance.
+struct StopOwnership {
+  bool nativeGradient = false;
+  bool degradedGradient = false;
+};
+
+void CollectStopOwners(PAGXDocument* document,
+                       std::unordered_map<const Node*, StopOwnership>* out) {
+  for (const auto& node : document->nodes) {
+    if (node == nullptr) {
+      continue;
+    }
+    auto type = node->nodeType();
+    bool native = type == NodeType::LinearGradient || type == NodeType::RadialGradient;
+    if (!native && type != NodeType::ConicGradient && type != NodeType::DiamondGradient) {
+      continue;
+    }
+    const auto* gradient = static_cast<const Gradient*>(node.get());
+    for (const auto* stop : gradient->colorStops) {
+      if (stop == nullptr) {
+        continue;
+      }
+      auto& owner = (*out)[stop];
+      if (native) {
+        owner.nativeGradient = true;
+      } else {
+        owner.degradedGradient = true;
+      }
+    }
+  }
+}
+
+// SVG collapses a zero-length linear gradient to its first stop and a zero-radius radial gradient
+// to its last stop. That static collapse cannot follow a moving endpoint, so a gradient whose
+// authored geometry is already degenerate stays a static collapsed paint instead of gaining a
+// track the browser would evaluate with different semantics.
+bool IsDegenerateGradient(const Node* target) {
+  if (target->nodeType() == NodeType::LinearGradient) {
+    const auto* gradient = static_cast<const LinearGradient*>(target);
+    if (gradient->colorStops.size() <= 1) {
+      return false;
+    }
+    float dx = gradient->endPoint.x - gradient->startPoint.x;
+    float dy = gradient->endPoint.y - gradient->startPoint.y;
+    return dx * dx + dy * dy < 1e-8f;
+  }
+  if (target->nodeType() == NodeType::RadialGradient) {
+    const auto* gradient = static_cast<const RadialGradient*>(target);
+    return gradient->colorStops.size() > 1 && gradient->radius < 1e-4f &&
+           gradient->radius >= 0.0f;
+  }
+  return false;
 }
 
 }  // namespace
@@ -205,6 +272,8 @@ std::unique_ptr<SVGAnimationPlan> SVGAnimationPlan::Build(PAGXDocument* document
 
   std::unordered_set<const Animation*> visited = {};
   std::unordered_set<std::string> reportedChannels = {};
+  std::unordered_map<const Node*, StopOwnership> stopOwners = {};
+  CollectStopOwners(document, &stopOwners);
   for (const auto* animation : selected) {
     if (animation == nullptr || !visited.insert(animation).second) {
       continue;
@@ -233,6 +302,52 @@ std::unique_ptr<SVGAnimationPlan> SVGAnimationPlan::Build(PAGXDocument* document
       }
       for (const auto* channel : object->channels) {
         if (channel == nullptr || channel->name.empty()) {
+          continue;
+        }
+        if (target->nodeType() == NodeType::ColorStop) {
+          auto owner = stopOwners.find(target);
+          bool supported = owner != stopOwners.end() && owner->second.nativeGradient;
+          if (!supported) {
+            plan->_rejected = plan->_rejected || strict;
+            std::string key = std::string("ColorStop:") + channel->name;
+            if (reportedChannels.insert(key).second) {
+              if (owner == stopOwners.end()) {
+                AddWarning(warnings, "channel '" + channel->name + "' on <ColorStop> '" +
+                                         target->id +
+                                         "' is dropped: the stop is not referenced by any "
+                                         "gradient, so no <stop> host exists.");
+              } else {
+                AddWarning(warnings, "channel '" + channel->name + "' on <ColorStop> '" +
+                                         target->id +
+                                         "' is dropped: conic and diamond gradients degrade to a "
+                                         "radial approximation, which is not a native stop host.");
+              }
+            }
+            continue;
+          }
+          if (owner->second.degradedGradient) {
+            plan->_rejected = plan->_rejected || strict;
+            std::string key = std::string("ColorStop:degraded:") + channel->name;
+            if (reportedChannels.insert(key).second) {
+              AddWarning(warnings, "channel '" + channel->name + "' on <ColorStop> '" + target->id +
+                                       "' is exported for its linear/radial gradients only; the "
+                                       "conic/diamond consumers keep static stops.");
+            }
+          }
+        }
+        if ((target->nodeType() == NodeType::LinearGradient ||
+             target->nodeType() == NodeType::RadialGradient) &&
+            IsDegenerateGradient(target)) {
+          plan->_rejected = plan->_rejected || strict;
+          std::string key = std::string(NodeTypeName(target->nodeType())) + ":degenerate:" +
+                            channel->name;
+          if (reportedChannels.insert(key).second) {
+            AddWarning(warnings, "channel '" + channel->name + "' on <" +
+                                     NodeTypeName(target->nodeType()) + "> '" + target->id +
+                                     "' is dropped: the gradient is degenerate before the "
+                                     "animation starts, so SVG cannot keep the static collapse "
+                                     "semantics while its geometry moves.");
+          }
           continue;
         }
         if (!IsSupportedChannel(target->nodeType(), channel->name)) {

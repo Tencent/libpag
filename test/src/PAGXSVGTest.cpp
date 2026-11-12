@@ -4683,6 +4683,338 @@ PAGX_TEST(PAGXSVGTest, SVGExport_AnimSolidColorSourceDrivesFill) {
   EXPECT_NE(svg.find("dur=\"1s\""), std::string::npos);
 }
 
+// M4.2: ColorStop offset and color are written on the <stop> host of the linear/radial def.
+PAGX_TEST(PAGXSVGTest, SVGExport_AnimGradientStopOffsetAndColor) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto* layer = doc->makeNode<pagx::Layer>("layer");
+  auto* rect = doc->makeNode<pagx::Rectangle>("rect");
+  rect->position = {50, 50};
+  rect->size = {80, 80};
+  auto* gradient = doc->makeNode<pagx::LinearGradient>("grad");
+  gradient->startPoint = {0, 0};
+  gradient->endPoint = {1, 0};
+  auto* first = doc->makeNode<pagx::ColorStop>("stop0");
+  first->offset = 0.0f;
+  first->color = {1, 0, 0, 1};
+  auto* second = doc->makeNode<pagx::ColorStop>("stop1");
+  second->offset = 1.0f;
+  second->color = {0, 0, 1, 1};
+  gradient->colorStops = {first, second};
+  auto* fill = doc->makeNode<pagx::Fill>("fill");
+  fill->color = gradient;
+  layer->contents = {rect, fill};
+  doc->layers.push_back(layer);
+
+  auto* animation = MakeAnimation(doc.get(), 60, pagx::LoopMode::Once);
+  auto* object = MakeAnimationObject(doc.get(), animation, "stop0");
+  auto* offset = MakeChannel<float>(doc.get(), object, "offset");
+  offset->keyframes.push_back({0, 0.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  offset->keyframes.push_back({60, 0.5f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  auto* color = MakeChannel<pagx::Color>(doc.get(), object, "color");
+  color->keyframes.push_back(
+      {0, pagx::Color{1, 0, 0, 1}, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  color->keyframes.push_back(
+      {60, pagx::Color{0, 1, 0, 1}, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  AttachTimeline(layer, "anim");
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("<linearGradient"), std::string::npos);
+  EXPECT_NE(svg.find("attributeName=\"offset\""), std::string::npos);
+  EXPECT_NE(svg.find("values=\"0;0.5\""), std::string::npos);
+  EXPECT_NE(svg.find("attributeName=\"stop-color\""), std::string::npos);
+  EXPECT_NE(svg.find("values=\"#FF0000;#00FF00\""), std::string::npos);
+  EXPECT_NE(svg.find("attributeName=\"stop-opacity\""), std::string::npos);
+  EXPECT_NE(svg.find("</stop>"), std::string::npos);
+  EXPECT_EQ(svg.find("attributeName=\"fill\""), std::string::npos);
+}
+
+// M4.2: one stop shared by two gradients receives a track in every def it is written into.
+PAGX_TEST(PAGXSVGTest, SVGExport_AnimGradientStopSharedAcrossDefs) {
+  auto doc = pagx::PAGXDocument::Make(200, 100);
+  auto* layer = doc->makeNode<pagx::Layer>("layer");
+  auto* left = doc->makeNode<pagx::Rectangle>("left");
+  left->position = {50, 50};
+  left->size = {80, 80};
+  auto* right = doc->makeNode<pagx::Rectangle>("right");
+  right->position = {150, 50};
+  right->size = {80, 80};
+  auto* shared = doc->makeNode<pagx::ColorStop>("shared");
+  shared->offset = 0.0f;
+  shared->color = {1, 0, 0, 1};
+  auto* end = doc->makeNode<pagx::ColorStop>("end");
+  end->offset = 1.0f;
+  end->color = {0, 0, 1, 1};
+  auto* firstGradient = doc->makeNode<pagx::LinearGradient>("g1");
+  firstGradient->startPoint = {0, 0};
+  firstGradient->endPoint = {1, 0};
+  firstGradient->colorStops = {shared, end};
+  auto* secondGradient = doc->makeNode<pagx::RadialGradient>("g2");
+  secondGradient->center = {0.5f, 0.5f};
+  secondGradient->radius = 0.5f;
+  secondGradient->colorStops = {shared, end};
+  auto* firstFill = doc->makeNode<pagx::Fill>("f1");
+  firstFill->color = firstGradient;
+  auto* secondFill = doc->makeNode<pagx::Fill>("f2");
+  secondFill->color = secondGradient;
+  auto* firstGroup = doc->makeNode<pagx::Group>("group1");
+  firstGroup->elements = {left, firstFill};
+  auto* secondGroup = doc->makeNode<pagx::Group>("group2");
+  secondGroup->elements = {right, secondFill};
+  layer->contents = {firstGroup, secondGroup};
+  doc->layers.push_back(layer);
+
+  auto* animation = MakeAnimation(doc.get(), 60, pagx::LoopMode::Once);
+  auto* object = MakeAnimationObject(doc.get(), animation, "shared");
+  auto* offset = MakeChannel<float>(doc.get(), object, "offset");
+  offset->keyframes.push_back({0, 0.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  offset->keyframes.push_back({60, 0.25f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  AttachTimeline(layer, "anim");
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  size_t occurrences = 0;
+  for (size_t pos = svg.find("attributeName=\"offset\""); pos != std::string::npos;
+       pos = svg.find("attributeName=\"offset\"", pos + 1)) {
+    ++occurrences;
+  }
+  EXPECT_EQ(occurrences, 2u) << svg;
+}
+
+// M4.2: conic / diamond gradients degrade to radial, which is not a native stop host, so their
+// stop channels are rejected instead of silently written into the approximation.
+PAGX_TEST(PAGXSVGTest, SVGExport_AnimConicStopRejected) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto* layer = doc->makeNode<pagx::Layer>("layer");
+  auto* rect = doc->makeNode<pagx::Rectangle>("rect");
+  rect->position = {100, 100};
+  rect->size = {180, 180};
+  auto* gradient = doc->makeNode<pagx::ConicGradient>("grad");
+  gradient->center = {100, 100};
+  auto* stop = doc->makeNode<pagx::ColorStop>("stop");
+  stop->offset = 0.0f;
+  stop->color = {1, 0, 0, 1};
+  auto* end = doc->makeNode<pagx::ColorStop>("end");
+  end->offset = 1.0f;
+  end->color = {0, 0, 1, 1};
+  gradient->colorStops = {stop, end};
+  auto* fill = doc->makeNode<pagx::Fill>("fill");
+  fill->color = gradient;
+  layer->contents = {rect, fill};
+  doc->layers.push_back(layer);
+
+  auto* animation = MakeAnimation(doc.get(), 60, pagx::LoopMode::Once);
+  auto* object = MakeAnimationObject(doc.get(), animation, "stop");
+  auto* offset = MakeChannel<float>(doc.get(), object, "offset");
+  offset->keyframes.push_back({0, 0.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  offset->keyframes.push_back({60, 0.5f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  AttachTimeline(layer, "anim");
+
+  std::vector<std::string> strictWarnings;
+  pagx::SVGExportOptions strict = {};
+  strict.animation.policy = pagx::SVGAnimationPolicy::Strict;
+  auto strictSvg = pagx::SVGExporter::ToSVG(*doc, strict, &strictWarnings);
+  EXPECT_TRUE(strictSvg.empty());
+  bool reported = false;
+  for (const auto& warning : strictWarnings) {
+    reported = reported || warning.find("not a native stop host") != std::string::npos;
+  }
+  EXPECT_TRUE(reported) << (strictWarnings.empty() ? "no warnings" : strictWarnings[0]);
+
+  pagx::SVGExportOptions bestEffort = {};
+  bestEffort.animation.policy = pagx::SVGAnimationPolicy::BestEffort;
+  bestEffort.staticPolicy = pagx::SVGStaticExportPolicy::BestEffort;
+  bestEffort.bakeUnsupported = false;
+  auto bestEffortSvg = pagx::SVGExporter::ToSVG(*doc, bestEffort);
+  EXPECT_NE(bestEffortSvg.find("<stop"), std::string::npos);
+  EXPECT_EQ(bestEffortSvg.find("<animate"), std::string::npos);
+}
+
+// M4.2: SMIL colour values are sRGB, so a P3 stop animation reports the gamut loss and drops the
+// CSS declaration that would otherwise bypass the track.
+PAGX_TEST(PAGXSVGTest, SVGExport_AnimGradientStopWideGamutIsReported) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto* layer = doc->makeNode<pagx::Layer>("layer");
+  auto* rect = doc->makeNode<pagx::Rectangle>("rect");
+  rect->position = {50, 50};
+  rect->size = {80, 80};
+  auto* gradient = doc->makeNode<pagx::LinearGradient>("grad");
+  gradient->startPoint = {0, 0};
+  gradient->endPoint = {1, 0};
+  auto* first = doc->makeNode<pagx::ColorStop>("stop0");
+  first->offset = 0.0f;
+  first->color = {1, 0, 0, 1};
+  first->color.colorSpace = pagx::ColorSpace::DisplayP3;
+  gradient->colorStops = {first};
+  auto* fill = doc->makeNode<pagx::Fill>("fill");
+  fill->color = gradient;
+  layer->contents = {rect, fill};
+  doc->layers.push_back(layer);
+
+  auto* animation = MakeAnimation(doc.get(), 60, pagx::LoopMode::Once);
+  auto* object = MakeAnimationObject(doc.get(), animation, "stop0");
+  auto* color = MakeChannel<pagx::Color>(doc.get(), object, "color");
+  color->keyframes.push_back(
+      {0, pagx::Color{1, 0, 0, 1}, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  color->keyframes.push_back(
+      {60, pagx::Color{0, 0, 1, 1}, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  AttachTimeline(layer, "anim");
+
+  std::vector<pagx::SVGDiagnostic> diagnostics;
+  pagx::SVGExportOptions options = {};
+  options.diagnostics = &diagnostics;
+  auto svg = pagx::SVGExporter::ToSVG(*doc, options);
+  EXPECT_NE(svg.find("attributeName=\"stop-color\""), std::string::npos);
+  EXPECT_EQ(svg.find("display-p3"), std::string::npos);
+  bool reported = false;
+  for (const auto& diagnostic : diagnostics) {
+    if (diagnostic.reasonCode == "color-space") {
+      reported = true;
+      EXPECT_EQ(diagnostic.action, pagx::SVGDiagnosticAction::Approximated);
+    }
+  }
+  EXPECT_TRUE(reported);
+}
+
+// M4.3: linear endpoint channels animate x1 / y1 / x2 / y2, and a gradient shared by the fill and
+// the stroke of one shape gets a track in each def it is written into.
+PAGX_TEST(PAGXSVGTest, SVGExport_AnimLinearGradientEndpointsSharedByPainters) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto* layer = doc->makeNode<pagx::Layer>("layer");
+  auto* rect = doc->makeNode<pagx::Rectangle>("rect");
+  rect->position = {50, 50};
+  rect->size = {80, 80};
+  auto* gradient = doc->makeNode<pagx::LinearGradient>("grad");
+  gradient->startPoint = {0, 0};
+  gradient->endPoint = {1, 0};
+  auto* first = doc->makeNode<pagx::ColorStop>("stop0");
+  first->offset = 0.0f;
+  first->color = {1, 0, 0, 1};
+  auto* second = doc->makeNode<pagx::ColorStop>("stop1");
+  second->offset = 1.0f;
+  second->color = {0, 0, 1, 1};
+  gradient->colorStops = {first, second};
+  auto* fill = doc->makeNode<pagx::Fill>("fill");
+  fill->color = gradient;
+  auto* stroke = doc->makeNode<pagx::Stroke>("stroke");
+  stroke->color = gradient;
+  stroke->width = 4.0f;
+  layer->contents = {rect, fill, stroke};
+  doc->layers.push_back(layer);
+
+  auto* animation = MakeAnimation(doc.get(), 60, pagx::LoopMode::Once);
+  auto* object = MakeAnimationObject(doc.get(), animation, "grad");
+  auto* endX = MakeChannel<float>(doc.get(), object, "endPoint.x");
+  endX->keyframes.push_back({0, 0.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  endX->keyframes.push_back({60, 1.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  auto* startY = MakeChannel<float>(doc.get(), object, "startPoint.y");
+  startY->keyframes.push_back({0, 0.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  startY->keyframes.push_back({60, 0.5f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  AttachTimeline(layer, "anim");
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  size_t x2Count = 0;
+  for (size_t pos = svg.find("attributeName=\"x2\""); pos != std::string::npos;
+       pos = svg.find("attributeName=\"x2\"", pos + 1)) {
+    ++x2Count;
+  }
+  EXPECT_EQ(x2Count, 2u) << svg;
+  EXPECT_NE(svg.find("values=\"0;1\""), std::string::npos);
+  EXPECT_NE(svg.find("attributeName=\"y1\""), std::string::npos);
+  EXPECT_NE(svg.find("values=\"0;0.5\""), std::string::npos);
+  EXPECT_EQ(svg.find("attributeName=\"x1\""), std::string::npos);
+}
+
+// M4.3: radial centre and radius tracks animate cx / cy / r, and negative radius samples are
+// clamped because SVG rejects a negative r.
+PAGX_TEST(PAGXSVGTest, SVGExport_AnimRadialGradientCenterAndClampedRadius) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto* layer = doc->makeNode<pagx::Layer>("layer");
+  auto* rect = doc->makeNode<pagx::Rectangle>("rect");
+  rect->position = {50, 50};
+  rect->size = {80, 80};
+  auto* gradient = doc->makeNode<pagx::RadialGradient>("grad");
+  gradient->center = {0.5f, 0.5f};
+  gradient->radius = 0.5f;
+  auto* first = doc->makeNode<pagx::ColorStop>("stop0");
+  first->offset = 0.0f;
+  first->color = {1, 0, 0, 1};
+  auto* second = doc->makeNode<pagx::ColorStop>("stop1");
+  second->offset = 1.0f;
+  second->color = {0, 0, 1, 1};
+  gradient->colorStops = {first, second};
+  auto* fill = doc->makeNode<pagx::Fill>("fill");
+  fill->color = gradient;
+  layer->contents = {rect, fill};
+  doc->layers.push_back(layer);
+
+  auto* animation = MakeAnimation(doc.get(), 60, pagx::LoopMode::Once);
+  auto* object = MakeAnimationObject(doc.get(), animation, "grad");
+  auto* centerX = MakeChannel<float>(doc.get(), object, "center.x");
+  centerX->keyframes.push_back({0, 0.25f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  centerX->keyframes.push_back({60, 0.75f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  auto* radius = MakeChannel<float>(doc.get(), object, "radius");
+  radius->keyframes.push_back({0, 0.5f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  radius->keyframes.push_back({60, -0.5f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  AttachTimeline(layer, "anim");
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("attributeName=\"cx\""), std::string::npos);
+  EXPECT_NE(svg.find("values=\"0.25;0.75\""), std::string::npos);
+  EXPECT_NE(svg.find("attributeName=\"r\""), std::string::npos);
+  EXPECT_NE(svg.find("values=\"0.5;0\""), std::string::npos) << svg;
+  EXPECT_EQ(svg.find("values=\"0.5;-0.5\""), std::string::npos);
+}
+
+// M4.3: a gradient that is already degenerate before the animation starts keeps the static
+// collapse and the moving geometry is rejected instead of emitting a track with different
+// semantics.
+PAGX_TEST(PAGXSVGTest, SVGExport_AnimDegenerateGradientGeometryRejected) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto* layer = doc->makeNode<pagx::Layer>("layer");
+  auto* rect = doc->makeNode<pagx::Rectangle>("rect");
+  rect->position = {50, 50};
+  rect->size = {80, 80};
+  auto* gradient = doc->makeNode<pagx::LinearGradient>("grad");
+  gradient->startPoint = {0.5f, 0.5f};
+  gradient->endPoint = {0.5f, 0.5f};
+  auto* first = doc->makeNode<pagx::ColorStop>("stop0");
+  first->offset = 0.0f;
+  first->color = {1, 0, 0, 1};
+  auto* second = doc->makeNode<pagx::ColorStop>("stop1");
+  second->offset = 1.0f;
+  second->color = {0, 0, 1, 1};
+  gradient->colorStops = {first, second};
+  auto* fill = doc->makeNode<pagx::Fill>("fill");
+  fill->color = gradient;
+  layer->contents = {rect, fill};
+  doc->layers.push_back(layer);
+
+  auto* animation = MakeAnimation(doc.get(), 60, pagx::LoopMode::Once);
+  auto* object = MakeAnimationObject(doc.get(), animation, "grad");
+  auto* endX = MakeChannel<float>(doc.get(), object, "endPoint.x");
+  endX->keyframes.push_back({0, 0.5f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  endX->keyframes.push_back({60, 1.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  AttachTimeline(layer, "anim");
+
+  std::vector<std::string> strictWarnings;
+  pagx::SVGExportOptions strict = {};
+  strict.animation.policy = pagx::SVGAnimationPolicy::Strict;
+  auto strictSvg = pagx::SVGExporter::ToSVG(*doc, strict, &strictWarnings);
+  EXPECT_TRUE(strictSvg.empty());
+  bool reported = false;
+  for (const auto& warning : strictWarnings) {
+    reported = reported || warning.find("degenerate before the animation") != std::string::npos;
+  }
+  EXPECT_TRUE(reported) << (strictWarnings.empty() ? "no warnings" : strictWarnings[0]);
+
+  pagx::SVGExportOptions bestEffort = {};
+  bestEffort.animation.policy = pagx::SVGAnimationPolicy::BestEffort;
+  auto bestEffortSvg = pagx::SVGExporter::ToSVG(*doc, bestEffort);
+  EXPECT_EQ(bestEffortSvg.find("<animate"), std::string::npos);
+  EXPECT_NE(bestEffortSvg.find("<stop"), std::string::npos);
+  EXPECT_NE(bestEffortSvg.find("stop-color=\"#FF0000\""), std::string::npos);
+  EXPECT_EQ(bestEffortSvg.find("stop-color=\"#0000FF\""), std::string::npos);
+}
+
 // M1: Default selects the first declared Animation, Named selects one id, All exports every
 // top-level Animation. Timing comes from a mounted timeline when present and from animation
 // defaults otherwise.

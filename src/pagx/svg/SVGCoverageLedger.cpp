@@ -148,23 +148,34 @@ std::vector<SVGChannelEntry> BuildLedger() {
   entries.push_back({NodeType::RangeSelector, "weight", P, "glyph factor, not implemented"});
 
   // Color sources
-  entries.push_back({NodeType::SolidColor, "color", P, "shared colour source, not implemented"});
-  entries.push_back({NodeType::LinearGradient, "startPoint.x", P, "animate x1"});
-  entries.push_back({NodeType::LinearGradient, "startPoint.y", P, "animate y1"});
-  entries.push_back({NodeType::LinearGradient, "endPoint.x", P, "animate x2"});
-  entries.push_back({NodeType::LinearGradient, "endPoint.y", P, "animate y2"});
-  entries.push_back({NodeType::RadialGradient, "center.x", P, "animate cx"});
-  entries.push_back({NodeType::RadialGradient, "center.y", P, "animate cy"});
-  entries.push_back({NodeType::RadialGradient, "radius", P, "animate r"});
-  entries.push_back({NodeType::ConicGradient, "center.x", P, "conic has no SVG primitive"});
-  entries.push_back({NodeType::ConicGradient, "center.y", P, "conic has no SVG primitive"});
-  entries.push_back({NodeType::ConicGradient, "startAngle", P, "conic has no SVG primitive"});
-  entries.push_back({NodeType::ConicGradient, "endAngle", P, "conic has no SVG primitive"});
-  entries.push_back({NodeType::DiamondGradient, "center.x", P, "diamond has no SVG primitive"});
-  entries.push_back({NodeType::DiamondGradient, "center.y", P, "diamond has no SVG primitive"});
-  entries.push_back({NodeType::DiamondGradient, "radius", P, "diamond has no SVG primitive"});
-  entries.push_back({NodeType::ColorStop, "offset", P, "animate stop offset"});
-  entries.push_back({NodeType::ColorStop, "color", P, "animate stop-color and stop-opacity"});
+  entries.push_back(
+      {NodeType::SolidColor, "color", S, "shared source drives every Fill/Stroke consumer"});
+  entries.push_back({NodeType::LinearGradient, "startPoint.x", S, "animate x1"});
+  entries.push_back({NodeType::LinearGradient, "startPoint.y", S, "animate y1"});
+  entries.push_back({NodeType::LinearGradient, "endPoint.x", S, "animate x2"});
+  entries.push_back({NodeType::LinearGradient, "endPoint.y", S, "animate y2"});
+  entries.push_back({NodeType::RadialGradient, "center.x", S, "animate cx"});
+  entries.push_back({NodeType::RadialGradient, "center.y", S, "animate cy"});
+  entries.push_back({NodeType::RadialGradient, "radius", S, "animate r, negative samples clamped"});
+  entries.push_back(
+      {NodeType::ConicGradient, "center.x", X, "conic degrades to a radial approximation"});
+  entries.push_back(
+      {NodeType::ConicGradient, "center.y", X, "conic degrades to a radial approximation"});
+  entries.push_back(
+      {NodeType::ConicGradient, "startAngle", X, "conic degrades to a radial approximation"});
+  entries.push_back(
+      {NodeType::ConicGradient, "endAngle", X, "conic degrades to a radial approximation"});
+  entries.push_back(
+      {NodeType::DiamondGradient, "center.x", X, "diamond degrades to a radial approximation"});
+  entries.push_back(
+      {NodeType::DiamondGradient, "center.y", X, "diamond degrades to a radial approximation"});
+  entries.push_back(
+      {NodeType::DiamondGradient, "radius", X, "diamond degrades to a radial approximation"});
+  entries.push_back(
+      {NodeType::ColorStop, "offset", S, "animate stop offset in linear/radial defs"});
+  entries.push_back({NodeType::ColorStop, "color", S,
+                     "stop-color/stop-opacity in linear/radial; conic/diamond "
+                     "consumers are rejected"});
 
   // Layer styles
   entries.push_back({NodeType::DropShadowStyle, "offsetX", S, "animate feOffset dx"});

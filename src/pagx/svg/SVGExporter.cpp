@@ -689,9 +689,10 @@ class SVGWriter {
                          float alpha);
 
   // Gradient / pattern defs (write to _defs)
-  void writeGradientStops(const std::vector<ColorStop*>& stops);
-  void finishGradientDef(const Matrix& matrix, const std::vector<ColorStop*>& stops,
-                         bool fitsToGeometry);
+  void writeGradientStops(const std::vector<ColorStop*>& stops, bool animateStops);
+  void finishGradientDef(const Node* gradient, const Matrix& matrix,
+                         const std::vector<ColorStop*>& stops, bool fitsToGeometry,
+                         bool animateStops);
   void writeColorSourceDef(const ColorSource* source, const std::string& id);
   std::string writeImagePatternDef(const ImagePattern* pattern, const Rect& shapeBounds);
   std::string getColorSourceRef(const ColorSource* source, float* outAlpha,
@@ -824,7 +825,7 @@ class SVGWriter {
 // SVGWriter – gradient / pattern defs
 //==============================================================================
 
-void SVGWriter::writeGradientStops(const std::vector<ColorStop*>& stops) {
+void SVGWriter::writeGradientStops(const std::vector<ColorStop*>& stops, bool animateStops) {
   for (const auto* stop : stops) {
     _defs->openElement("stop");
     _defs->addAttribute("offset", FloatToString(stop->offset));
@@ -834,7 +835,17 @@ void SVGWriter::writeGradientStops(const std::vector<ColorStop*>& stops) {
     if (alpha < 1.0f) {
       _defs->addAttribute("stop-opacity", FloatToString(alpha));
     }
-    if (stop->color.colorSpace == ColorSpace::DisplayP3) {
+    bool colorAnimated = animateStops && _animWriter.HasStopColorAnimates(stop);
+    bool wideGamut = stop->color.colorSpace == ColorSpace::DisplayP3 ||
+                     (animateStops && _animWriter.StopColorTrackIsWideGamut(stop));
+    if (colorAnimated && wideGamut) {
+      // SMIL colour values are sRGB and a CSS declaration would bypass the animation entirely, so
+      // the static P3 style is dropped and the gamut loss is reported.
+      addWarning("ColorStop '" + stop->id +
+                     "' animates a Display P3 colour: SMIL tracks are sRGB, so the wide gamut is "
+                     "lost for this stop.",
+                 "color-space", SVGDiagnosticAction::Approximated);
+    } else if (stop->color.colorSpace == ColorSpace::DisplayP3) {
       std::string style;
       style.reserve(120);
       style += "stop-color:";
@@ -846,12 +857,19 @@ void SVGWriter::writeGradientStops(const std::vector<ColorStop*>& stops) {
       style += ';';
       _defs->addAttribute("style", style);
     }
-    _defs->closeElementSelfClosing();
+    if (animateStops && _animWriter.HasStopAnimates(stop)) {
+      _defs->closeElementStart();
+      _animWriter.WriteStopAnimates(*_defs, stop);
+      _defs->closeElement();
+    } else {
+      _defs->closeElementSelfClosing();
+    }
   }
 }
 
-void SVGWriter::finishGradientDef(const Matrix& matrix, const std::vector<ColorStop*>& stops,
-                                  bool fitsToGeometry) {
+void SVGWriter::finishGradientDef(const Node* gradient, const Matrix& matrix,
+                                  const std::vector<ColorStop*>& stops, bool fitsToGeometry,
+                                  bool animateStops) {
   // When fitsToGeometry is true the gradient coordinates live in normalized
   // (0-1) space mapped to each geometry's bounding box — SVG's
   // objectBoundingBox mode provides exactly this semantic. When false the
@@ -879,11 +897,18 @@ void SVGWriter::finishGradientDef(const Matrix& matrix, const std::vector<ColorS
   if (!effectiveMatrix.isIdentity()) {
     _defs->addAttribute("gradientTransform", MatrixToSVGTransform(effectiveMatrix));
   }
-  if (stops.empty()) {
+  bool animateGeometry =
+      gradient != nullptr && _animWriter.HasGradientGeometryAnimates(gradient);
+  if (stops.empty() && !animateGeometry) {
     _defs->closeElementSelfClosing();
   } else {
     _defs->closeElementStart();
-    writeGradientStops(stops);
+    if (animateGeometry) {
+      _animWriter.WriteGradientGeometryAnimates(*_defs, gradient);
+    }
+    if (!stops.empty()) {
+      writeGradientStops(stops, animateStops);
+    }
     _defs->closeElement();
   }
 }
@@ -906,7 +931,7 @@ void SVGWriter::writeColorSourceDef(const ColorSource* source, const std::string
         // last stop instead.
         stops = {stops.front()};
       }
-      finishGradientDef(grad->matrix, stops, grad->fitsToGeometry);
+      finishGradientDef(grad, grad->matrix, stops, grad->fitsToGeometry, true);
       break;
     }
     case NodeType::RadialGradient: {
@@ -921,7 +946,7 @@ void SVGWriter::writeColorSourceDef(const ColorSource* source, const std::string
         // A near-zero radial gradient collapses to its last color in tgfx.
         stops = {stops.back()};
       }
-      finishGradientDef(grad->matrix, stops, grad->fitsToGeometry);
+      finishGradientDef(grad, grad->matrix, stops, grad->fitsToGeometry, true);
       break;
     }
     case NodeType::ConicGradient: {
@@ -939,7 +964,7 @@ void SVGWriter::writeColorSourceDef(const ColorSource* source, const std::string
       _defs->addRequiredAttribute("cx", grad->center.x);
       _defs->addRequiredAttribute("cy", grad->center.y);
       _defs->addAttribute("r", grad->fitsToGeometry ? 0.5f : 100.0f);
-      finishGradientDef(grad->matrix, grad->colorStops, grad->fitsToGeometry);
+      finishGradientDef(grad, grad->matrix, grad->colorStops, grad->fitsToGeometry, false);
       break;
     }
     case NodeType::DiamondGradient: {
@@ -953,7 +978,7 @@ void SVGWriter::writeColorSourceDef(const ColorSource* source, const std::string
       _defs->addRequiredAttribute("cx", grad->center.x);
       _defs->addRequiredAttribute("cy", grad->center.y);
       _defs->addRequiredAttribute("r", grad->radius);
-      finishGradientDef(grad->matrix, grad->colorStops, grad->fitsToGeometry);
+      finishGradientDef(grad, grad->matrix, grad->colorStops, grad->fitsToGeometry, false);
       break;
     }
     default:

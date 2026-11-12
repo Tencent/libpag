@@ -25,6 +25,7 @@
 namespace pagx {
 
 class ColorSource;
+class ColorStop;
 class Fill;
 class Group;
 class Layer;
@@ -114,6 +115,42 @@ class SVGAnimationWriter {
                                      size_t count, const Matrix& staticTransform);
 
   /**
+   * Returns true when the gradient color stop owns an exportable offset or colour animation.
+   */
+  bool HasStopAnimates(const ColorStop* stop) const;
+
+  /**
+   * Returns true when the stop's colour channel is animated, which means the stop's `stop-color`
+   * and `stop-opacity` are driven by SMIL instead of a static declaration.
+   */
+  bool HasStopColorAnimates(const ColorStop* stop) const;
+
+  /**
+   * Returns true when the stop colour track carries a Display P3 keyframe. SMIL values are sRGB,
+   * so the caller has to report the gamut loss instead of writing a P3 CSS declaration that the
+   * animation would bypass.
+   */
+  bool StopColorTrackIsWideGamut(const ColorStop* stop) const;
+
+  /**
+   * Emits the SMIL children of a <stop> element: the `offset` track plus the `stop-color` /
+   * `stop-opacity` pair. Returns false when the stop has no exportable animation.
+   */
+  bool WriteStopAnimates(XMLBuilder& out, const ColorStop* stop);
+
+  /**
+   * Returns true when a linear or radial gradient drives at least one geometry channel
+   * (endpoints, centre, radius).
+   */
+  bool HasGradientGeometryAnimates(const Node* gradient) const;
+
+  /**
+   * Emits the geometry tracks of a linear gradient (`x1` / `y1` / `x2` / `y2`) or a radial
+   * gradient (`cx` / `cy` / `r`). Must be called inside the open gradient def, before its stops.
+   */
+  bool WriteGradientGeometryAnimates(XMLBuilder& out, const Node* gradient);
+
+  /**
    * Emits the opacity animation for a geometry element that sits under animated Group alpha
    * channels. The group alpha is already folded into `baseAlpha`, so the emitted values are the
    * animated ratio applied on top of it.
@@ -186,6 +223,9 @@ class SVGAnimationWriter {
 
   bool WriteChannelAnimate(XMLBuilder& out, const Node* target, const char* channelName,
                            const char* attributeName);
+
+  bool WriteChannelAnimateClamped(XMLBuilder& out, const Node* target, const char* channelName,
+                                  const char* attributeName, float minValue, float maxValue);
 
   bool WritePaintAnimates(XMLBuilder& out, const Node* painter, const char* paintAttribute,
                           float alphaMultiplier);

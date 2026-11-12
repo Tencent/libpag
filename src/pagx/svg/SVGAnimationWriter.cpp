@@ -20,12 +20,14 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <limits>
 #include "base/utils/MathUtil.h"
 #include "pagx/PAGXNodeChannel.h"
 #include "pagx/nodes/Animation.h"
 #include "pagx/nodes/AnimationTimeline.h"
 #include "pagx/nodes/Channel.h"
 #include "pagx/nodes/ColorSource.h"
+#include "pagx/nodes/ColorStop.h"
 #include "pagx/nodes/Ellipse.h"
 #include "pagx/nodes/Fill.h"
 #include "pagx/nodes/Layer.h"
@@ -341,8 +343,8 @@ void AppendFloatSequence(const std::vector<double>& flatTimes, const std::vector
   }
 }
 
-bool BuildFloatSequence(const Channel* channel, Frame duration, float scale,
-                        SmilSequence* sequence) {
+bool BuildFloatSequence(const Channel* channel, Frame duration, float scale, float minValue,
+                        float maxValue, SmilSequence* sequence) {
   std::vector<double> times;
   std::vector<float> values;
   std::vector<KeyframeInterpolationType> types;
@@ -362,7 +364,8 @@ bool BuildFloatSequence(const Channel* channel, Frame duration, float scale,
   if (discrete) {
     sequence->discrete = true;
     for (size_t i = 0; i < times.size(); ++i) {
-      sequence->values.push_back(FloatToString(values[i] * scale));
+      float value = std::clamp(values[i] * scale, minValue, maxValue);
+      sequence->values.push_back(FloatToString(value));
       sequence->keyTimes.push_back(times[i]);
     }
     return true;
@@ -372,10 +375,8 @@ bool BuildFloatSequence(const Channel* channel, Frame duration, float scale,
   std::vector<SmilSpline> flatSplines;
   FlattenKeyframes(times, values, types, bezierOuts, bezierIns, &flatTimes, &flatValues,
                    &flatSplines, &sequence->useSpline);
-  if (scale != 1.0f) {
-    for (auto& value : flatValues) {
-      value *= scale;
-    }
+  for (auto& value : flatValues) {
+    value = std::clamp(value * scale, minValue, maxValue);
   }
   AppendFloatSequence(flatTimes, flatValues, flatSplines, sequence->useSpline, sequence);
   return true;
@@ -1458,6 +1459,15 @@ bool SVGAnimationWriter::WriteVisibilityAnimate(XMLBuilder& out, const Node* tar
 
 bool SVGAnimationWriter::WriteChannelAnimate(XMLBuilder& out, const Node* target,
                                              const char* channelName, const char* attributeName) {
+  return WriteChannelAnimateClamped(out, target, channelName, attributeName,
+                                    std::numeric_limits<float>::lowest(),
+                                    std::numeric_limits<float>::max());
+}
+
+bool SVGAnimationWriter::WriteChannelAnimateClamped(XMLBuilder& out, const Node* target,
+                                                    const char* channelName,
+                                                    const char* attributeName, float minValue,
+                                                    float maxValue) {
   auto* binding = _plan->Find(target, channelName);
   if (binding == nullptr || binding->channel->valueType() != ChannelValueType::Float) {
     return false;
@@ -1468,7 +1478,8 @@ bool SVGAnimationWriter::WriteChannelAnimate(XMLBuilder& out, const Node* target
   }
   const auto* channel = static_cast<const TypedChannel<float>*>(binding->channel);
   SmilSequence sequence;
-  if (!BuildFloatSequence(channel, binding->animation->duration, 1.0f, &sequence)) {
+  if (!BuildFloatSequence(channel, binding->animation->duration, 1.0f, minValue, maxValue,
+                          &sequence)) {
     return false;
   }
   if (timing.mirror) {
@@ -1495,6 +1506,105 @@ bool SVGAnimationWriter::WritePainterAnimates(XMLBuilder& out, const Fill* fill,
     wrote = WriteChannelAnimate(out, stroke, "miterLimit", "stroke-miterlimit") || wrote;
   }
   return wrote;
+}
+
+bool SVGAnimationWriter::HasStopAnimates(const ColorStop* stop) const {
+  if (_plan == nullptr || stop == nullptr) {
+    return false;
+  }
+  return _plan->Find(stop, "offset") != nullptr || _plan->Find(stop, "color") != nullptr;
+}
+
+bool SVGAnimationWriter::HasStopColorAnimates(const ColorStop* stop) const {
+  return _plan != nullptr && stop != nullptr && _plan->Find(stop, "color") != nullptr;
+}
+
+bool SVGAnimationWriter::StopColorTrackIsWideGamut(const ColorStop* stop) const {
+  if (!HasStopColorAnimates(stop)) {
+    return false;
+  }
+  auto* binding = _plan->Find(stop, "color");
+  if (binding->channel->valueType() != ChannelValueType::Color) {
+    return false;
+  }
+  const auto* channel = static_cast<const TypedChannel<Color>*>(binding->channel);
+  for (const auto& keyframe : channel->keyframes) {
+    if (keyframe.value.colorSpace != ColorSpace::SRGB) {
+      return true;
+    }
+  }
+  return false;
+}
+
+bool SVGAnimationWriter::WriteStopAnimates(XMLBuilder& out, const ColorStop* stop) {
+  if (_plan == nullptr || stop == nullptr) {
+    return false;
+  }
+  bool wrote = WriteChannelAnimate(out, stop, "offset", "offset");
+  auto* colorBinding = _plan->Find(stop, "color");
+  if (colorBinding == nullptr || colorBinding->channel->valueType() != ChannelValueType::Color) {
+    return wrote;
+  }
+  SmilTiming timing;
+  if (!ResolveTiming(colorBinding->animation, colorBinding->timeline, &timing)) {
+    return wrote;
+  }
+  const auto* channel = static_cast<const TypedChannel<Color>*>(colorBinding->channel);
+  SmilSequence colorSequence;
+  SmilSequence alphaSequence;
+  if (!BuildColorSequences(channel, colorBinding->animation->duration, 1.0f, &colorSequence,
+                           &alphaSequence)) {
+    return wrote;
+  }
+  if (timing.mirror) {
+    ApplyPingPong(&colorSequence);
+    ApplyPingPong(&alphaSequence);
+    timing.durationSeconds *= 2.0;
+  }
+  WriteAnimateElement(out, "stop-color", nullptr, false, colorSequence, timing, nullptr, nullptr);
+  WriteAnimateElement(out, "stop-opacity", nullptr, false, alphaSequence, timing, nullptr, nullptr);
+  return true;
+}
+
+bool SVGAnimationWriter::HasGradientGeometryAnimates(const Node* gradient) const {
+  if (_plan == nullptr || gradient == nullptr) {
+    return false;
+  }
+  if (gradient->nodeType() == NodeType::LinearGradient) {
+    static const char* names[] = {"startPoint.x", "startPoint.y", "endPoint.x", "endPoint.y"};
+    for (const auto* name : names) {
+      if (_plan->Find(gradient, name) != nullptr) {
+        return true;
+      }
+    }
+    return false;
+  }
+  if (gradient->nodeType() == NodeType::RadialGradient) {
+    return _plan->Find(gradient, "center.x") != nullptr ||
+           _plan->Find(gradient, "center.y") != nullptr ||
+           _plan->Find(gradient, "radius") != nullptr;
+  }
+  return false;
+}
+
+bool SVGAnimationWriter::WriteGradientGeometryAnimates(XMLBuilder& out, const Node* gradient) {
+  if (!HasGradientGeometryAnimates(gradient)) {
+    return false;
+  }
+  if (gradient->nodeType() == NodeType::LinearGradient) {
+    bool wrote = WriteChannelAnimate(out, gradient, "startPoint.x", "x1");
+    wrote = WriteChannelAnimate(out, gradient, "startPoint.y", "y1") || wrote;
+    wrote = WriteChannelAnimate(out, gradient, "endPoint.x", "x2") || wrote;
+    wrote = WriteChannelAnimate(out, gradient, "endPoint.y", "y2") || wrote;
+    return wrote;
+  }
+  bool wrote = WriteChannelAnimate(out, gradient, "center.x", "cx");
+  wrote = WriteChannelAnimate(out, gradient, "center.y", "cy") || wrote;
+  // A negative radius is invalid in SVG; the sampled keyframes are clamped so the track never
+  // carries a value the browser would reject.
+  return WriteChannelAnimateClamped(out, gradient, "radius", "r", 0.0f,
+                                    std::numeric_limits<float>::max()) ||
+         wrote;
 }
 
 bool SVGAnimationWriter::WritePaintAnimates(XMLBuilder& out, const Node* painter,
@@ -1558,7 +1668,9 @@ bool SVGAnimationWriter::WritePaintAnimates(XMLBuilder& out, const Node* painter
       const auto* channel = static_cast<const TypedChannel<float>*>(alphaBinding->channel);
       SmilSequence sequence;
       if (BuildFloatSequence(channel, alphaBinding->animation->duration,
-                             colorAlpha * alphaMultiplier, &sequence)) {
+                             colorAlpha * alphaMultiplier,
+                             std::numeric_limits<float>::lowest(),
+                             std::numeric_limits<float>::max(), &sequence)) {
         if (timing.mirror) {
           ApplyPingPong(&sequence);
           timing.durationSeconds *= 2.0;
