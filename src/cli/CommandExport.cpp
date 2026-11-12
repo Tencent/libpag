@@ -262,9 +262,17 @@ static int ExportToSVG(const ExportOptions& options) {
   svgOptions.animation.animationId = options.svgAnimationId;
   svgOptions.animation.policy = options.svgAnimationPolicy;
 
-  if (!SVGExporter::ToFile(*document, options.outputFile, svgOptions)) {
-    std::cerr << "pagx export: error: failed to write '" << options.outputFile << "'\n";
+  std::vector<std::string> warnings;
+  if (!SVGExporter::ToFile(*document, options.outputFile, svgOptions, &warnings)) {
+    for (const auto& warning : warnings) {
+      std::cerr << "pagx export: warning: " << warning << "\n";
+    }
+    std::cerr << "pagx export: error: failed to write '" << options.outputFile
+              << "' (see warnings above)\n";
     return 1;
+  }
+  for (const auto& warning : warnings) {
+    std::cerr << "pagx export: warning: " << warning << "\n";
   }
 
   std::cout << "pagx export: wrote " << options.outputFile << "\n";

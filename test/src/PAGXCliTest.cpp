@@ -164,6 +164,20 @@ CLI_TEST(PAGXCliTest, Format_PreserveNewline) {
   EXPECT_TRUE(output.find("Hello&#10;World") != std::string::npos);
 }
 
+// F12: a Strict animation rejection must report its warnings on stderr, exit non-zero and leave
+// no output file behind.
+CLI_TEST(PAGXCliTest, Export_SvgStrictWarningsGoToStderr) {
+  auto pagxPath = TestResourcePath("svg_strict_reject.pagx");
+  auto svgPath = TempDir() + "/svg_strict_reject.svg";
+  std::filesystem::remove(svgPath);
+  StreamCapture err(std::cerr);
+  auto ret = CallRun(pagx::cli::RunExport, {"export", "--input", pagxPath, "--output", svgPath});
+  auto stderrText = err.str();
+  EXPECT_NE(ret, 0);
+  EXPECT_NE(stderrText.find("warning:"), std::string::npos) << stderrText;
+  EXPECT_FALSE(std::filesystem::exists(svgPath));
+}
+
 //==============================================================================
 // Format tests
 //==============================================================================
