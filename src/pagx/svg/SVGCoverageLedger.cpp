@@ -204,7 +204,7 @@ std::vector<SVGChannelEntry> BuildLedger() {
   entries.push_back({NodeType::GlassStyle, "splay", P, "no glass primitive in SVG"});
   entries.push_back({NodeType::GlassStyle, "lightAngle", P, "no glass primitive in SVG"});
   entries.push_back({NodeType::GlassStyle, "lightIntensity", P, "no glass primitive in SVG"});
-  entries.push_back({NodeType::NoiseStyle, "size", P, "non-linear baseFrequency mapping"});
+  entries.push_back({NodeType::NoiseStyle, "size", S, "animate baseFrequency (1/size)"});
   entries.push_back({NodeType::NoiseStyle, "density", P, "not implemented"});
   entries.push_back({NodeType::NoiseStyle, "seed", S, "animate feTurbulence seed"});
   entries.push_back({NodeType::NoiseStyle, "color", S, "animate feFlood color"});
@@ -232,7 +232,7 @@ std::vector<SVGChannelEntry> BuildLedger() {
   entries.push_back({NodeType::InnerShadowFilter, "color", S, "animate feColorMatrix values"});
   entries.push_back({NodeType::InnerShadowFilter, "shadowOnly", P, "structural, feMerge order"});
   entries.push_back({NodeType::BlendFilter, "color", S, "animate feFlood flood-color"});
-  entries.push_back({NodeType::NoiseFilter, "size", P, "non-linear baseFrequency mapping"});
+  entries.push_back({NodeType::NoiseFilter, "size", S, "animate baseFrequency (1/size)"});
   entries.push_back({NodeType::NoiseFilter, "density", P, "not implemented"});
   entries.push_back({NodeType::NoiseFilter, "seed", S, "animate feTurbulence seed"});
   entries.push_back({NodeType::NoiseFilter, "color", S, "animate feFlood color"});

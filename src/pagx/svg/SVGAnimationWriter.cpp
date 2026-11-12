@@ -2984,6 +2984,55 @@ bool SVGAnimationWriter::WriteSpreadRadiusAnimates(XMLBuilder& out, const Node* 
   return true;
 }
 
+bool SVGAnimationWriter::HasNoiseSizeAnimates(const Node* noise) const {
+  if (_plan == nullptr || noise == nullptr) {
+    return false;
+  }
+  if (noise->nodeType() != NodeType::NoiseFilter && noise->nodeType() != NodeType::NoiseStyle) {
+    return false;
+  }
+  return _plan->Find(noise, "size") != nullptr;
+}
+
+bool SVGAnimationWriter::WriteNoiseSizeAnimates(XMLBuilder& out, const Node* noise) {
+  if (!HasNoiseSizeAnimates(noise)) {
+    return false;
+  }
+  auto* binding = _plan->Find(noise, "size");
+  SmilTiming timing;
+  if (!ResolveTiming(binding->animation, binding->timeline, &timing)) {
+    return false;
+  }
+  std::vector<Frame> frames;
+  AppendTrackFrames(binding->channel, binding->animation->duration, &frames);
+  std::sort(frames.begin(), frames.end());
+  frames.erase(std::unique(frames.begin(), frames.end()), frames.end());
+  auto span = static_cast<double>(binding->animation->duration);
+  if (span <= 0 || frames.size() < 2) {
+    return false;
+  }
+  std::vector<SmilSpline> splines;
+  bool useSpline = false;
+  CollectSegmentSplines(binding->channel, frames, &splines, &useSpline);
+  SmilSequence sequence;
+  sequence.useSpline = useSpline;
+  for (size_t i = 0; i < frames.size(); i++) {
+    float size = EvaluateChannelFloat(binding->channel, frames[i]);
+    float frequency = size > 0.0f ? 1.0f / size : 0.25f;
+    sequence.values.push_back(FloatToString(frequency));
+    sequence.keyTimes.push_back(std::clamp(static_cast<double>(frames[i]) / span, 0.0, 1.0));
+    if (i > 0) {
+      sequence.splines.push_back(splines.empty() ? SmilSpline{} : splines[i]);
+    }
+  }
+  if (timing.mirror) {
+    ApplyPingPong(&sequence);
+    timing.durationSeconds *= 2.0;
+  }
+  WriteAnimateElement(out, "baseFrequency", nullptr, false, sequence, timing, nullptr, nullptr);
+  return true;
+}
+
 bool SVGAnimationWriter::WritePaintAnimates(XMLBuilder& out, const Node* painter,
                                             const char* paintAttribute, float alphaMultiplier) {
   auto* colorBinding = _plan->Find(painter, "color");

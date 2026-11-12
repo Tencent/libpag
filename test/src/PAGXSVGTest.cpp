@@ -6565,6 +6565,28 @@ PAGX_TEST(PAGXSVGTest, SVGExport_AnimShadowSpreadCrossingZeroRejected) {
   EXPECT_TRUE(reported) << (warnings.empty() ? "no warnings" : warnings[0]);
 }
 
+// M4.E: a noise size animation drives feTurbulence baseFrequency as 1/size.
+PAGX_TEST(PAGXSVGTest, SVGExport_AnimNoiseSize) {
+  auto doc = MakeRectDocument();
+  auto* noise = doc->makeNode<pagx::NoiseStyle>("noise");
+  noise->mode = pagx::NoiseMode::Mono;
+  noise->size = 4;
+  noise->density = 0.5f;
+  noise->seed = 1;
+  doc->layers[0]->styles.push_back(noise);
+
+  auto* animation = MakeAnimation(doc.get(), 60, pagx::LoopMode::Once);
+  auto* object = MakeAnimationObject(doc.get(), animation, "noise");
+  auto* channel = MakeChannel<float>(doc.get(), object, "size");
+  channel->keyframes.push_back({0, 4.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  channel->keyframes.push_back({60, 8.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  AttachTimeline(doc->layers[0], "anim");
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("attributeName=\"baseFrequency\""), std::string::npos) << svg;
+  EXPECT_NE(svg.find("values=\"0.25;0.125\""), std::string::npos) << svg;
+}
+
 // Two animations driving the same attribute cannot share one SMIL track: Strict rejects, and// Two animations driving the same attribute cannot share one SMIL track: Strict rejects, and
 // BestEffort keeps the later animation's track (the runtime's last-writer-wins order).
 PAGX_TEST(PAGXSVGTest, SVGExport_AnimMultiClockChannelRejected) {

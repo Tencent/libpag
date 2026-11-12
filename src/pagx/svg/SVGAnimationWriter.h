@@ -250,6 +250,17 @@ class SVGAnimationWriter {
   bool WriteNoiseSeedAnimates(XMLBuilder& out, const Node* noise);
 
   /**
+   * Returns true when a noise filter / style animates its authoring size, which drives the
+   * feTurbulence baseFrequency.
+   */
+  bool HasNoiseSizeAnimates(const Node* noise) const;
+
+  /**
+   * Emits the baseFrequency track derived from the animated size (frequency = 1 / size).
+   */
+  bool WriteNoiseSizeAnimates(XMLBuilder& out, const Node* noise);
+
+  /**
    * Returns true when every channel bound to a Rectangle / Ellipse / Path source is a geometry
    * channel the exporter can re-bake through the document's modifiers per frame.
    */

@@ -1534,9 +1534,16 @@ std::string SVGWriter::writeNoiseTurbulence(float size, float seed, const std::s
   _defs->addAttribute("numOctaves", "3");
   _defs->addAttribute("seed", FloatToString(seed));
   _defs->addAttribute("result", resultName);
-  if (owner != nullptr && _animWriter.HasNoiseSeedAnimates(owner)) {
+  bool sizeAnimated = owner != nullptr && _animWriter.HasNoiseSizeAnimates(owner);
+  bool seedAnimated = owner != nullptr && _animWriter.HasNoiseSeedAnimates(owner);
+  if (sizeAnimated || seedAnimated) {
     _defs->closeElementStart();
-    _animWriter.WriteNoiseSeedAnimates(*_defs, owner);
+    if (sizeAnimated) {
+      _animWriter.WriteNoiseSizeAnimates(*_defs, owner);
+    }
+    if (seedAnimated) {
+      _animWriter.WriteNoiseSeedAnimates(*_defs, owner);
+    }
     _defs->closeElement();
   } else {
     _defs->closeElementSelfClosing();
