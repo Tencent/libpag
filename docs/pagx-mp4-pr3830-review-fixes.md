@@ -285,7 +285,7 @@
 ### 37：运行时 CI 与下载器 CI 覆盖不足
 
 - [ ] **结论：部分采纳。**
-- 修复：在同一 macOS、Linux、Windows matrix 任务中运行本地 Node 下载器安全测试，并生成正式 manifest、下载当前平台的固定 Release、执行 `ffmpeg -version` 验证；本地测试仍不依赖公网，真实下载仅在 CI 显式启用。
+- 修复：在 Linux/Windows matrix 和现有 macOS native 任务中运行同一套 Node 下载器测试，生成正式 manifest、下载当前平台的固定 Release 并执行 `ffmpeg -version`；本地测试仍不依赖公网，真实下载仅在 CI 显式启用。macOS 复用已验证可用的 `macos-14` runner，避免独立镜像排队。
 - 说明：现有 macOS native 全量测试保持不变；本任务不宣称新增 Linux/Windows native 运行时覆盖。
 
 ### 38：PAGXCliTest 文件过大
