@@ -566,7 +566,7 @@ MB范围包含3D、conic/diamond、noise、backdrop/Glass、复杂shape/text/eff
 
 #### M4/M5：固定展开顺序、前置依赖与台账准入
 
-本表固定四类展开的执行次序，不需要实施时再询问。当前已存在 `src/pagx/svg/SVGCoverageLedger.h:32` 的Supported/Planned/NotExpressible实现状态和 `src/pagx/svg/SVGAnimationPlan.cpp:67` 的白名单；它们不等同正文N/G/B/U能力分类。**当前白名单为18类/100项（另含 NoiseFilter/NoiseStyle 的 seed 与 color/firstColor/secondColor）**，Path point 族按表外通道单列，其余 Text shaping 与动态 modifier 尚未放行；不按旧7类/39项覆盖用户已有滤镜增量。未发现已实现的ModifierDependencyGraph，本方案只扩现有resolver产物/DrawRecord来源，不能引用不存在的图模块当作前置。
+本表固定四类展开的执行次序，不需要实施时再询问。当前已存在 `src/pagx/svg/SVGCoverageLedger.h:32` 的Supported/Planned/NotExpressible实现状态和 `src/pagx/svg/SVGAnimationPlan.cpp:67` 的白名单；它们不等同正文N/G/B/U能力分类。**当前白名单为18类/102项（另含 NoiseFilter/NoiseStyle 的 seed 与 color/firstColor/secondColor、shadow style spread）**，Path point 族按表外通道单列，其余 Text shaping 与动态 modifier 尚未放行；不按旧7类/39项覆盖用户已有滤镜增量。未发现已实现的ModifierDependencyGraph，本方案只扩现有resolver产物/DrawRecord来源，不能引用不存在的图模块当作前置。
 
 共同前置Q：S1的实例/引用/Painter capture与宿主，S3的最终glyph及第2.8节ST21/ST22/ST28，S4的modifier顺序/来源，S5的静态ColorSource/defs/fit；M1的typed/contextDoc/Clock和M2的ordered pose/alpha；M3至少具备本子批次所需的关键帧、Hold、区间求值、序列化和预算门禁。**不要求先做完所有M3高级组合再做独立N轨道，但某条G轨道缺其误差/预算能力时必须保持Planned或明确拒绝，不能先放行再补证明。**
 
@@ -732,6 +732,7 @@ ToSVG严格失败返回空结果、ToFile返回false、CLI非零；warnings=null
 | 本轮 M4.E shadow color（2026-11-12） | DropShadowFilter / InnerShadowFilter / DropShadowStyle / InnerShadowStyle 的 `color` 进入白名单与 Supported；`feColorMatrix` 的 20 项常量行由静态值改为可动画的 `values` 轨道，逐帧编码 RGBA（保留 source alpha 语义）；新增 filter/style 两个单测与 0.5s 浏览器门禁（0 / 0.24 / 0.999） | spread/showBehindLayer、NoiseStyle color 与 P3 shadow 未覆盖 |
 | 本轮 M4.E NoiseStyle seed（2026-11-12） | `NoiseStyle.seed` 进入白名单与 Supported；`feTurbulence` 的 owner 由 NoiseFilter 泛化为 Node，style 的 dark/bright/multi 三路 turbulence 共用同一 seed 轨道；新增 style seed 回归 | NoiseStyle 的 color/firstColor/secondColor/opacity 与 filter spread 未覆盖 |
 | 本轮 M4.E noise color（2026-11-12） | NoiseFilter / NoiseStyle 的 color、firstColor、secondColor 进入白名单与 Supported；`applyFloodColor` 带 owner/channel 并在动画时改发 `flood-color`/`flood-opacity` 轨道，BlendFilter 与 Mono/Duo 两种噪声共用；P3 静态声明在动画时跳过；新增 Mono color 与 Duo firstColor 回归 | NoiseStyle/Filter 的 opacity（Multi）与 spread 未覆盖 |
+| 本轮 M4.E spread（2026-11-12） | DropShadowStyle / InnerShadowStyle 的 `spread` 进入白名单与 Supported；`feMorphology` 的 radius 变为绝对值轨道，operator 取 keyframe 共同符号；跨零的 spread 在 Strict 下拒绝并告警（operator 离散不可动画），BestEffort 保留静态；filter 侧 regions 已按全时段 |spread| 预留；新增正向轨道与跨零拒绝回归 | 无浏览器门禁；filter 无 spread 通道 |
 | 本轮 M6 能力文档（2026-11-12） | 新增 `docs/pagx-svg-animation-capabilities.md`，由 `SVGChannelLedger()` 生成（175 通道：77 Supported / 90 Planned / 8 NotExpressible），并新增 `SVGAnimationCapabilitiesDocIsCurrent` 门禁：ledger 改动后文档不更新即失败；表外 Path point 族与动效门禁用例一并记录 | 文档仅覆盖通道级状态，F1—F18/A12—A20 的场景矩阵仍待逐条落表 |
 | 本轮 M6 动效门禁（2026-11-12） | 浏览器门禁支持 `case.pagx@seconds`：暂停 SMIL、`setCurrentTime(seconds)` 后截图，并与 `pagx render --time` 参考比较；新增 `SVGBrowserAnimTest` 与十三个 0.5s 用例：SolidColor 红→蓝（pixelDiff 0 / RGB 0 / SSIM 1）、ColorStop 红→绿（0 / 0.14 / 0.99999）、linear endPoint.x 160→80（0 / 0.06 / 1）、Text.x 平移（0.00007 / 0.63 / 0.983）、Polystar outerRoundness 0→1（0 / 0.14 / 0.9994）、Rect size+Trim 的 d 轨道（0 / 0 / 1）、Rect size+RoundCorner（0 / 0.07 / 0.999）、Ellipse size+Trim（0 / 0.24 / 0.994）、TrimPath end 0.3→0.9（0.024 / 4.22 / 0.795）、RoundCorner radius 4→24（0 / 0.09 / 0.999）、Layer.x 0→100（0 / 0 / 1）、Layer rotation.z 0→360（0.25s，0 / 0 / 1）、DropShadowFilter color 红→蓝（0 / 0.24 / 0.999）；门禁发现并修复 Text 包装 `<g>` 未先闭合 start tag 导致 `<g  <animateTransform` 的非法结构，单元测试补结构断言 | d 轨道的浏览器 seek 对照（运行时无普通 Path point writer）与更多语料阈值未做 |
 | 本轮 M4.1（2026-11-11） | SolidColor.color 进入白名单；Fill/Stroke 的 painter 动画会向上解析共享 SolidColor 的绑定并各自发射 fill/stroke 轨道；`HasPainterAnimation` 同步识别源绑定；ledger 的 SolidColor 升级为 Supported；新增 SolidColor 驱动 Fill 回归 | 多消费者去重像素与源/Painter 同有绑定的真实顺序未做 |
@@ -1259,7 +1260,7 @@ F1—F12 原 ID 全保留；F13—F18 是动态补审。除历史官方样例证
 | F14 | `src/pagx/PAGAnimation.cpp:59`、`src/pagx/PAGAnimation.cpp:111`merge/filter；`src/renderer/LayerBuilder.cpp:192`、`src/renderer/LayerBuilder.cpp:267`shared pose | 静态masked/同anim跨Object/跨anim ordered mix三层，matrix不屏z/anchor、后component decompose；M2 |
 | F15 | `src/pagx/runtime/KeyframeEvaluatorImpl.h:106`T{}、`src/pagx/svg/SVGAnimationWriter.cpp:129`clamp key、`src/pagx/svg/SVGAnimationWriter.cpp:191`Hold近似；`src/pagx/runtime/BezierEasing.cpp:104`、`src/pagx/utils/ColorSpaceUtils.cpp:78`overshoot | 跨duration t0=50、空≠无、单/1-frame/D1/D0/nonfinite/duplicate ordered keys、float不clamp/Color分量clamp、No epsilon；M3 |
 | F16 | `src/pagx/runtime/PAGComposition.cpp:57`、`src/pagx/runtime/PAGComposition.cpp:130`paused IDs共享 | 同slot同ID任paused禁全advance但apply全执行，兄弟slot独立、ordinal≠pause scope；M1 |
-| F17 | `src/pagx/PAGXNodeChannel.cpp:486`175/30 registry；本次 `src/pagx/svg/SVGAnimationPlan.cpp:67`100/18白名单与 `src/pagx/svg/SVGCoverageLedger.cpp:30`实现状态 | M4.0—M5.4逐子集同步Plan、ledger和输出/拒绝门禁；颜色、stop、d、Text完整依赖不漏，Planned/Supported≠N/G证明；M0/M4/M5/M6 |
+| F17 | `src/pagx/PAGXNodeChannel.cpp:486`175/30 registry；本次 `src/pagx/svg/SVGAnimationPlan.cpp:67`102/18白名单与 `src/pagx/svg/SVGCoverageLedger.cpp:30`实现状态 | M4.0—M5.4逐子集同步Plan、ledger和输出/拒绝门禁；颜色、stop、d、Text完整依赖不漏，Planned/Supported≠N/G证明；M0/M4/M5/M6 |
 | F18 | `src/pagx/PAGAnimation.cpp:274`Clock、`src/pagx/PAGScene.cpp:514`宿主flush、`src/pagx/utils/RasterUtils.cpp:351`背景合成契约 | 多Clock无公周期、finite事件/3D/noise/complex fallback；D8禁用拒绝、明确MB初态/window/resources/resolution/sampling/tail/repeat/预算，无界U；M3/MB/M6 |
 
 ### 5.1 只读 coverage 校验与维护门禁
@@ -1304,7 +1305,7 @@ F1—F12 原 ID 全保留；F13—F18 是动态补审。除历史官方样例证
 
 ### 6.1 基点、现状和必须完成的边界
 
-本节依据 `aeb346c05` 整体核查；编写期间新增 `c60e9e2e2`，已接入四种阴影的color轨道，续作应保留。启动时重新读取HEAD和相关diff；进度日记与ledger是线索，不是验收结果。本次只整理文档，未执行源码修复或渲染。
+本节依据 `aeb346c05` 整体核查；编写期间新增 `c60e9e2e2`（四种阴影color）与 `6a0d91368`（NoiseStyle.seed），已接入的子集续作保留。335字段计数已按此阶段声明含Layer.scrollRectFromLayout重新核对，不沿用历史334。启动时重新读取HEAD和相关diff；进度日记与ledger是线索，不是验收结果。本次只整理文档，未执行源码修复或渲染。
 
 当前需要保留的有效进展：Default/Named/All入口、全反射ledger与白名单双向检查、CLI warnings、三静态policy与文字mode、ST28最终尺寸/空子盒分配、TextHolder强制塑形/清空/保anchor、颜色源/stop/渐变参数、固定拓扑Polystar/Path/Rectangle/Ellipse+Trim/Round重烘焙、纯旋转整圈、Bezier加密采样、Mask上下文、Native TextBox变换、同目录文件替换和少量浏览器门禁。
 
@@ -1546,13 +1547,13 @@ for interval I:
 2. T01—T10所有ImplementedUnverified条目写完整有效正例、复杂组合限制与拒绝测试；统一T12通过才Verified。没有真实输出的Planned不提Supported；已Supported但回丢轨道/失败或误差未知的场景在实例级拒绝并修算法，不隐藏在note。
 3. SDK/CLI选相同root/nested/状态、调用方fontconfig同源、static/animationpolicy完整正交；所有子Writer/Mask/tile/bake拒绝上抛Failed，diagnostics实例/node/时间/预算真实填，不只有“animation rejected”总句。
 4. ToFile使用同目录独占、不可预测且本执行者持有的临时文件；checkedwrite+实际flush/close结果都检查，成功后atomicrename；失败/replace失败清理自己的temp，不覆盖/删除别人的`.tmp`。不承诺崩溃durability，跨filesystem/权限等外部失败确定保旧文件。
-5. 禁止在完成函数里print逐步进度给用户；工具测试日志自然保留。所有本地commit按项目规则和 `/commit` 流程，只含会话改动，不为显示进度而每修一行提交并结束。
+5. 禁止在完成函数里print逐步进度给用户；工具测试日志自然保留。所有本地commit按项目规则和 `/commit` 流程，只含会话改动，不为显示进度而每修一行提交并结束。`commit --only`按文件不按hunk隔离：若源文件本来就有用户未提交改动且本批要重构，不在混合文件上自动提交；T00选择隔离worktree保留已授权输入，或取得该hunk范围专项授权。不能仅凭文件名符合本轮就把用户修改夹入commit。
 
 **测试：** Plan/ledger/生成文档双向完整、所有Writer有效输出或确定拒绝、enum/类型/unsupportedreason、全选项CLI冲突/Named未知、无sink结果一致、两同时ToFile不同temp归属、write/flush/close/replace各失败旧bytes不变；空输出/部分reject不落成功文件。
 
 ### 6.8 T12：统一构建、完整矩阵和新工作区复现
 
-先检查本轮源码diff及注释/规范，运行项目code-style、修改语言对应comment guard和change-report；只对本轮改动承担修复，不格式化后混入别人的工作。正式命令按项目既定流程：
+先检查本轮源码diff及注释/规范，运行项目code-style、修改语言对应comment guard和change-report。**格式化前Read codeformat.sh**：核实是否调用brew/pipx等安装、是否全仓改用户文件；需要系统安装走授权，不能预先无沙箱执行。有用户未提交/非本轮源码且脚本可能重写时，先按项目worktree规则隔离本轮版本与所需依赖/测试资源，再在隔离目录运行；不在格式化后恢复用户文件或将其hunk混入提交。普通本地工具已具备且工作区干净时按如下项目流程，格式化报错按规则忽略但不跳安装权限：
 
 ```bash
 ./codeformat.sh 2>/dev/null; true
@@ -1581,12 +1582,12 @@ cmake --build cmake-build-debug --target HTMLTest
 |---|---|---|
 | T00 | tgfx交付、ST44、M5.3 | Pending：本地clearBlob已有，正式依赖/窄prepare接口尚未交付 |
 | T01 | S0/S6、ST32/37/41/43/46、F13 | Pending：schema/policy/global budgets/失败分类完整入口 |
-| T02 | S1/S4、ST1/5/8/12/16/21/23/24/33/34/45 | Pending：实例actors和源共用final prepares；即时Painter输出与外alpha仍错 |
+| T02 | S1/S4、ST1/5/8/12/16/21/23/24/33/34/35/45、F5/F9 | Pending：实例actors和源共用final prepares；即时Painter输出与外alpha仍错 |
 | T03 | S3、ST9/10/18/20/22/28/29/30/31/36/44 | Pending：最终glyphscope/units/Selector/Native全出口，ST28已有正修复保留 |
 | T04 | S4、ST11/12/16/23/24/27/42/45 | Pending：所有primitive/glyph描边、append/跨scope、精度及临时归属 |
 | T05 | S1/S2、ST2/3/4/5/6/7/17/38/39/40 | Pending：完整Mask/effect/背景prefix/3D与采样；不以已有标签证明 |
 | T06 | S5、ST13/14/15/19/25/26/36/37/42 | Pending：实资源/sampling/fit/空间色彩完整性 |
-| T07 | M1/M2/M4.0、F1/2/4/13/14/16/17 | Pending：逐实例graph、oracle/clock/资源fanout/mix |
+| T07 | M1/M2/M4.0、F1/2/3/4/13/14/16/17 | Pending：逐实例graph、oracle/clock/资源fanout/mix |
 | T08 | M2/M3、F6/7/8/14/15/18 | Pending：精确操作链/事件、连续证书/global sample budget |
 | T09 | M4/M5.4、F8/10/11/17 | Pending：所有consumer颜色/effect/full bounds及dynamic closure |
 | T10 | M5.0—M5.4、F10/11/13/17/18 | Pending：全部最终d/shaping/Modifier/Selector/有限结构正例 |
@@ -1595,9 +1596,26 @@ cmake --build cmake-build-debug --target HTMLTest
 
 每项Pending包含已有代码需保留的部分；不能机械删除重写，也不能把Pending理解为所有函数从零开始。启动时代码变化使状态表过时，核实对应diff后更新，但只在Verified证据足够时完成。
 
+**原组合编号到续作批次的完整映射（每项都需T12统一实测）：**
+
+| 原验收范围 | 实现责任 | 验收状态规则 |
+|---|---|---|
+| C01/C02/C03 | T01/T02/T05/T06 | 布局/组件/实例/资源，含ST35现有生成scroll状态；正确部分保留并补组合 |
+| C04/C05/C06 | T02/T03/T04/T05 | Mask/捕获/生命周期，不能用静态布局图替代真正source动作 |
+| C07/C08/C09/C10/C11 | T02/T05/T09 | 离屏/effect/bucket/背景，不切开未闭合合成栈 |
+| C12/C13/C14/C15/C19 | T03/T06/T10 | 字形/容器/沿线/选择/资源，TP01—TP16全部由T03负责 |
+| C16/C17/C18/C21 | T04/T06/T09 | 描边/颜色/图片/合法缓存重复导出，warm不可变资源与局部cache同源 |
+| C20 | T01/T02/T07/T11 | TemplateStatic为本轮正例；默认host/已有快照/开放事件只验证主动排除或确定拒绝，不要求新增快照。保留已有runtime VM链/身份回归，不改变默认业务语义 |
+| C22/C23/C24 | T01/T06/T08/T11 | policy/预算/源导入边界，MB禁用、未保存参数不逆推 |
+| A01/A02/A03/A04/A05 | T01/T07/T08 | root/nested/typed/pause/offset/priority；含F3全部镜像正例，已修也补接缝 |
+| A06/A07/A08/A09/A10/A11 | T02/T07/T08/T09 | fullturns/alpha/关键帧/误差/独立clock/endpoint，含F5/F9现有正确子集不回归 |
+| A12/A13/A14/A15/A16/A17/A18/A19/A20 | T03/T04/T06/T09/T10 | source/stop/最终geometry/glyph/动态结构联合，不局部单轨替代 |
+| A21/A22 | T01/T08/T11 | D8禁用/无界宿主、证明与资源预算失败确定拒绝，不执行MB |
+| ST35/F3/F5/F9的已修子项 | T02/T07/T09 | 不是删掉重写；verify原正确行为、补方案残余及最终矩阵，没有“日记说已修所以不测试” |
+
 ### 6.10 唯一完成标准、不可声称完成的情况与最终交付
 
-- [ ] T00—T12全部Verified，或明确外部Blocked未伪装完成；任务表、完整ST/F/C/A/TP及descriptor覆盖关系一致。
+- [ ] T00—T12全部Verified，任务表、完整ST/F/C/A/TP及descriptor覆盖关系一致。存在任何外部Blocked时本轮只能交付准确阻塞报告，不能勾选此项或声称全部完成。
 - [ ] 所有承诺N/G都有实际可运行正例与联合场景，没有新增无理由NotExpressible/B化；B/U和policy拒绝是原定有效限制，不是代替实现。
 - [ ] 正规3静态policy、2文字模式、3选择集合、offset/paused、正式typed/resource/mix/priority及dependencyclosure全部对应同一真实sourceactor。
 - [ ] Prepared出口与renderer使用同一最终shape/glyph/Painter准备，mutable source/临时Fill/即遇即画旧路径不残留；所有副本、alpha、矩阵、fit、coverage与order正确定义。

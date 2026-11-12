@@ -124,9 +124,10 @@ bool IsSupportedChannel(NodeType nodeType, const std::string& name) {
     case NodeType::InnerShadowFilter:
     case NodeType::DropShadowStyle:
     case NodeType::InnerShadowStyle:
-      // The shadow colour drives the feColorMatrix `values` track.
+      // The shadow colour drives feColorMatrix `values`; style spread drives the feMorphology
+      // radius (filters do not expose a spread channel).
       return name == "offsetX" || name == "offsetY" || name == "blurX" || name == "blurY" ||
-             name == "color";
+             name == "color" || name == "spread";
     case NodeType::BlendFilter:
       return name == "color";
     case NodeType::NoiseFilter:

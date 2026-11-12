@@ -184,7 +184,7 @@ std::vector<SVGChannelEntry> BuildLedger() {
   entries.push_back({NodeType::DropShadowStyle, "offsetY", S, "animate feOffset dy"});
   entries.push_back({NodeType::DropShadowStyle, "blurX", S, "animate feGaussianBlur stdDeviation"});
   entries.push_back({NodeType::DropShadowStyle, "blurY", S, "animate feGaussianBlur stdDeviation"});
-  entries.push_back({NodeType::DropShadowStyle, "spread", P, "spread is not exported at all"});
+  entries.push_back({NodeType::DropShadowStyle, "spread", S, "animate feMorphology radius"});
   entries.push_back({NodeType::DropShadowStyle, "color", S, "animate feColorMatrix values"});
   entries.push_back({NodeType::DropShadowStyle, "showBehindLayer", P, "structural, feMerge order"});
   entries.push_back({NodeType::InnerShadowStyle, "offsetX", S, "animate feOffset dx"});
@@ -193,7 +193,7 @@ std::vector<SVGChannelEntry> BuildLedger() {
       {NodeType::InnerShadowStyle, "blurX", S, "animate feGaussianBlur stdDeviation"});
   entries.push_back(
       {NodeType::InnerShadowStyle, "blurY", S, "animate feGaussianBlur stdDeviation"});
-  entries.push_back({NodeType::InnerShadowStyle, "spread", P, "spread is not exported at all"});
+  entries.push_back({NodeType::InnerShadowStyle, "spread", S, "animate feMorphology radius"});
   entries.push_back({NodeType::InnerShadowStyle, "color", S, "animate feColorMatrix values"});
   entries.push_back({NodeType::BackgroundBlurStyle, "blurX", P, "no backdrop blur in SVG"});
   entries.push_back({NodeType::BackgroundBlurStyle, "blurY", P, "no backdrop blur in SVG"});

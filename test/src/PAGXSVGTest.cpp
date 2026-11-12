@@ -55,6 +55,7 @@
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/ImagePattern.h"
 #include "pagx/nodes/InnerShadowFilter.h"
+#include "pagx/nodes/InnerShadowStyle.h"
 #include "pagx/nodes/LinearGradient.h"
 #include "pagx/nodes/MergePath.h"
 #include "pagx/nodes/Path.h"
@@ -6508,6 +6509,60 @@ PAGX_TEST(PAGXSVGTest, SVGExport_AnimNoiseDuoFirstColor) {
 
   auto svg = pagx::SVGExporter::ToSVG(*doc);
   EXPECT_NE(svg.find("attributeName=\"flood-color\""), std::string::npos) << svg;
+}
+
+// M4.E: a shadow style spread animates the feMorphology radius.
+PAGX_TEST(PAGXSVGTest, SVGExport_AnimShadowSpread) {
+  auto doc = MakeRectDocument();
+  auto* style = doc->makeNode<pagx::DropShadowStyle>("shadowStyle");
+  style->offsetX = 6;
+  style->offsetY = 6;
+  style->blurX = 6;
+  style->blurY = 6;
+  style->spread = 4;
+  doc->layers[0]->styles.push_back(style);
+
+  auto* animation = MakeAnimation(doc.get(), 60, pagx::LoopMode::Once);
+  auto* object = MakeAnimationObject(doc.get(), animation, "shadowStyle");
+  auto* channel = MakeChannel<float>(doc.get(), object, "spread");
+  channel->keyframes.push_back({0, 4.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  channel->keyframes.push_back({60, 10.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  AttachTimeline(doc->layers[0], "anim");
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("<feMorphology"), std::string::npos) << svg;
+  EXPECT_NE(svg.find("attributeName=\"radius\""), std::string::npos) << svg;
+  EXPECT_NE(svg.find("values=\"4;10\""), std::string::npos) << svg;
+}
+
+// A spread track that crosses zero cannot animate feMorphology's discrete operator; Strict
+// rejects instead of freezing it.
+PAGX_TEST(PAGXSVGTest, SVGExport_AnimShadowSpreadCrossingZeroRejected) {
+  auto doc = MakeRectDocument();
+  auto* style = doc->makeNode<pagx::InnerShadowStyle>("shadowStyle");
+  style->offsetX = 4;
+  style->offsetY = 4;
+  style->blurX = 4;
+  style->blurY = 4;
+  doc->layers[0]->styles.push_back(style);
+
+  auto* animation = MakeAnimation(doc.get(), 60, pagx::LoopMode::Once);
+  auto* object = MakeAnimationObject(doc.get(), animation, "shadowStyle");
+  auto* channel = MakeChannel<float>(doc.get(), object, "spread");
+  channel->keyframes.push_back({0, -4.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  channel->keyframes.push_back({60, 4.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  AttachTimeline(doc->layers[0], "anim");
+
+  std::vector<std::string> warnings;
+  pagx::SVGExportOptions strict = {};
+  strict.animation.policy = pagx::SVGAnimationPolicy::Strict;
+  auto strictSvg = pagx::SVGExporter::ToSVG(*doc, strict, &warnings);
+  EXPECT_TRUE(strictSvg.empty());
+  bool reported = false;
+  for (const auto& warning : warnings) {
+    reported = reported || warning.find("changes sign") != std::string::npos;
+  }
+  EXPECT_TRUE(reported) << (warnings.empty() ? "no warnings" : warnings[0]);
 }
 
 // Two animations driving the same attribute cannot share one SMIL track: Strict rejects, and// Two animations driving the same attribute cannot share one SMIL track: Strict rejects, and

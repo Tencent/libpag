@@ -229,6 +229,22 @@ class SVGAnimationWriter {
   bool WriteShadowColorAnimates(XMLBuilder& out, const Node* owner);
 
   /**
+   * Returns true when a shadow filter / style animates its spread.
+   */
+  bool HasSpreadAnimates(const Node* owner) const;
+
+  /**
+   * Sign shared by every sampled spread value: 1 (dilate), -1 (erode) or 0 when the values
+   * straddle zero and the feMorphology operator cannot be animated.
+   */
+  int SpreadDirection(const Node* owner) const;
+
+  /**
+   * Emits the non-negative `radius` track of the feMorphology that implements spread.
+   */
+  bool WriteSpreadRadiusAnimates(XMLBuilder& out, const Node* owner);
+
+  /**
    * Emits the `seed` animation inside the current feTurbulence element.
    */
   bool WriteNoiseSeedAnimates(XMLBuilder& out, const Node* noise);

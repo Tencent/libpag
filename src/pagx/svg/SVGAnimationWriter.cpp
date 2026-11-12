@@ -2914,6 +2914,76 @@ bool SVGAnimationWriter::WriteShadowColorAnimates(XMLBuilder& out, const Node* o
   return true;
 }
 
+bool SVGAnimationWriter::HasSpreadAnimates(const Node* owner) const {
+  if (_plan == nullptr || owner == nullptr) {
+    return false;
+  }
+  auto* binding = _plan->Find(owner, "spread");
+  return binding != nullptr && binding->channel->valueType() == ChannelValueType::Float;
+}
+
+int SVGAnimationWriter::SpreadDirection(const Node* owner) const {
+  if (!HasSpreadAnimates(owner)) {
+    return 0;
+  }
+  auto* binding = _plan->Find(owner, "spread");
+  const auto* typed = static_cast<const TypedChannel<float>*>(binding->channel);
+  bool hasPositive = false;
+  bool hasNegative = false;
+  for (const auto& keyframe : typed->keyframes) {
+    if (keyframe.value > 0) {
+      hasPositive = true;
+    } else if (keyframe.value < 0) {
+      hasNegative = true;
+    }
+  }
+  if (hasPositive && hasNegative) {
+    return 0;
+  }
+  if (hasNegative) {
+    return -1;
+  }
+  return 1;
+}
+
+bool SVGAnimationWriter::WriteSpreadRadiusAnimates(XMLBuilder& out, const Node* owner) {
+  if (!HasSpreadAnimates(owner)) {
+    return false;
+  }
+  auto* binding = _plan->Find(owner, "spread");
+  SmilTiming timing;
+  if (!ResolveTiming(binding->animation, binding->timeline, &timing)) {
+    return false;
+  }
+  std::vector<Frame> frames;
+  AppendTrackFrames(binding->channel, binding->animation->duration, &frames);
+  std::sort(frames.begin(), frames.end());
+  frames.erase(std::unique(frames.begin(), frames.end()), frames.end());
+  auto span = static_cast<double>(binding->animation->duration);
+  if (span <= 0 || frames.size() < 2) {
+    return false;
+  }
+  std::vector<SmilSpline> splines;
+  bool useSpline = false;
+  CollectSegmentSplines(binding->channel, frames, &splines, &useSpline);
+  SmilSequence sequence;
+  sequence.useSpline = useSpline;
+  for (size_t i = 0; i < frames.size(); i++) {
+    sequence.values.push_back(
+        FloatToString(std::fabs(EvaluateChannelFloat(binding->channel, frames[i]))));
+    sequence.keyTimes.push_back(std::clamp(static_cast<double>(frames[i]) / span, 0.0, 1.0));
+    if (i > 0) {
+      sequence.splines.push_back(splines.empty() ? SmilSpline{} : splines[i]);
+    }
+  }
+  if (timing.mirror) {
+    ApplyPingPong(&sequence);
+    timing.durationSeconds *= 2.0;
+  }
+  WriteAnimateElement(out, "radius", nullptr, false, sequence, timing, nullptr, nullptr);
+  return true;
+}
+
 bool SVGAnimationWriter::WritePaintAnimates(XMLBuilder& out, const Node* painter,
                                             const char* paintAttribute, float alphaMultiplier) {
   auto* colorBinding = _plan->Find(painter, "color");

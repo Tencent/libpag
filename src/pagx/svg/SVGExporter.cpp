@@ -1330,14 +1330,35 @@ void SVGWriter::writeShadowBlurAndOffset(float blurX, float blurY, float offsetX
   // A non-zero spread grows or shrinks the shadow silhouette before it is blurred, which is what
   // feMorphology does; without it a spread style renders like a plain shadow.
   std::string blurInput = "SourceAlpha";
-  if (spread != 0.0f) {
+  bool spreadAnimated = owner != nullptr && _animWriter.HasSpreadAnimates(owner);
+  int spreadDirection = spread > 0.0f ? 1 : (spread < 0.0f ? -1 : 1);
+  if (spreadAnimated) {
+    spreadDirection = _animWriter.SpreadDirection(owner);
+    if (spreadDirection == 0) {
+      // feMorphology's operator is discrete and the radius is unsigned, so a track that crosses
+      // zero has no faithful animation.
+      addWarning("shadow spread on '" + owner->id +
+                     "' changes sign; the animated track is dropped and the static spread is used.",
+                 "animation-rejected");
+      _rejected = _rejected || _rejectUnsupported || _animationStrict;
+      spreadAnimated = false;
+      spreadDirection = spread > 0.0f ? 1 : (spread < 0.0f ? -1 : 1);
+    }
+  }
+  if (spread != 0.0f || spreadAnimated) {
     std::string morphResult = blurResult + "Spread";
     _defs->openElement("feMorphology");
     _defs->addAttribute("in", "SourceAlpha");
-    _defs->addAttribute("operator", spread > 0.0f ? "dilate" : "erode");
+    _defs->addAttribute("operator", spreadDirection > 0 ? "dilate" : "erode");
     _defs->addAttribute("radius", FloatToString(std::fabs(spread)));
     _defs->addAttribute("result", morphResult);
-    _defs->closeElementSelfClosing();
+    if (spreadAnimated) {
+      _defs->closeElementStart();
+      _animWriter.WriteSpreadRadiusAnimates(*_defs, owner);
+      _defs->closeElement();
+    } else {
+      _defs->closeElementSelfClosing();
+    }
     blurInput = morphResult;
   }
 
