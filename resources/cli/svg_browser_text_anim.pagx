@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- D6 animated gate case: a standalone text slides 100px right over one second through the
+     Text.x channel. The browser gate pauses SMIL, seeks to 0.5s and compares against the runtime
+     renderer at the same time. -->
+<pagx width="300" height="100">
+  <Layer x="0" y="0" width="300" height="100">
+    <Text id="label" text="Hello" fontFamily="Arial" fontSize="32" position="20,60"/>
+    <Fill>
+      <SolidColor color="#000000"/>
+    </Fill>
+  </Layer>
+  <Animations>
+    <Animation id="slide" duration="60" frameRate="60" loop="once">
+      <Object target="label">
+        <Channel name="x" type="float">
+          <Key time="0" value="20" interpolation="linear"/>
+          <Key time="60" value="120" interpolation="linear"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>

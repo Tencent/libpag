@@ -4391,8 +4391,8 @@ void SVGWriter::emitGeometryWithFs(SVGBuilder& out, const AccumulatedGeometry& e
           hasPositionAnimation && !hasTransforms && (!text->text.empty() || !text->glyphRuns.empty());
       if (wrapPosition) {
         out.openElement("g");
-        _animWriter.WriteTextPositionAnimates(out, text);
         out.closeElementStart();
+        _animWriter.WriteTextPositionAnimates(out, text);
       }
       bool emitted = false;
       if ((!entry.glyphStyles.empty() || hasTransforms) && !text->glyphRuns.empty() &&

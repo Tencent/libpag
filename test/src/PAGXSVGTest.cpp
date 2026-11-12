@@ -5201,6 +5201,9 @@ PAGX_TEST(PAGXSVGTest, SVGExport_AnimTextPositionEmitsTranslate) {
   EXPECT_NE(svg.find("animateTransform"), std::string::npos) << svg;
   EXPECT_NE(svg.find("type=\"translate\""), std::string::npos) << svg;
   EXPECT_NE(svg.find("values=\"0 0;70 20\""), std::string::npos) << svg;
+  // The translate track is a child of the wrapper, so the start tag must close before it.
+  EXPECT_EQ(svg.find("<g  <"), std::string::npos) << svg;
+  EXPECT_NE(svg.find("</g>"), std::string::npos) << svg;
 }
 
 // M5.4 / A14: Polystar roundness keeps the vertex count and content bounds, so the baked path can
