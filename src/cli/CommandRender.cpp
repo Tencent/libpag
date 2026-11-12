@@ -34,7 +34,9 @@
 #include <string>
 #include <vector>
 #include "cli/CliUtils.h"
+#ifdef PAG_BUILD_VIDEO_EXPORTER
 #include "cli/VideoFrameSource.h"
+#endif
 #include "cli/XPathQuery.h"
 #include "pagx/FontConfig.h"
 #include "pagx/PAGDisplayOptions.h"
@@ -304,6 +306,7 @@ static bool WriteDataToFile(const std::string& filePath, const std::shared_ptr<t
   return written == data->size() && closeResult == 0;
 }
 
+#ifdef PAG_BUILD_VIDEO_EXPORTER
 struct ImageFrameContext {
   int width = 0;
   int height = 0;
@@ -346,6 +349,7 @@ static bool WriteImageFrame(const VideoFrameView& frame, void* context, std::str
   output->writtenFiles.emplace_back(std::move(outputPath));
   return true;
 }
+#endif
 
 // Renders a single animation frame through the runtime animation path. The document's top-level
 // timelines are all seeked to `options.timeSeconds` and applied before drawing, and the timelines
@@ -576,6 +580,7 @@ static tgfx::Bitmap RenderCore(const RenderOptions& options) {
   return bitmap;
 }
 
+#ifdef PAG_BUILD_VIDEO_EXPORTER
 // Renders the document's animations as an image sequence into options.framesDir. Frame production
 // is delegated to VideoExporter so that the timeline semantics stay identical to the video path.
 static int RenderFrameSequence(const RenderOptions& options) {
@@ -648,6 +653,7 @@ static int RenderFrameSequence(const RenderOptions& options) {
             << durationSeconds << "s)\n";
   return 0;
 }
+#endif
 
 tgfx::Bitmap RenderToBitmap(int argc, char* argv[]) {
   RenderOptions options = {};
@@ -664,9 +670,16 @@ int RunRender(int argc, char* argv[]) {
   if (parseResult != 0) {
     return parseResult == -1 ? 0 : parseResult;
   }
+#ifdef PAG_BUILD_VIDEO_EXPORTER
   if (!options.framesDir.empty()) {
     return RenderFrameSequence(options);
   }
+#else
+  if (!options.framesDir.empty()) {
+    CommandError("pagx render") << "--frames-dir requires PAG_BUILD_VIDEO_EXPORTER=ON\n";
+    return 1;
+  }
+#endif
   auto bitmap = RenderCore(options);
   if (bitmap.isEmpty()) {
     return 1;

@@ -42,9 +42,6 @@ std::shared_ptr<PAGXDocument> LoadVideoDocument(const std::string& inputFile,
                                                 const std::vector<std::string>& fallbacks,
                                                 const std::string& command);
 
-/** Parses a positive integer or numerator/denominator frame rate within VideoExporter limits. */
-bool ParseVideoFrameRate(const char* text, VideoFrameRate* frameRate);
-
 /** Owns the document and exporter shared by the MP4 and image-sequence command paths. */
 class VideoFrameSource {
  public:

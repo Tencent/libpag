@@ -30,8 +30,51 @@
 
 namespace pagx::cli {
 
+namespace {
+
+bool ParseInt64(const std::string& text, int64_t* value) {
+  if (text.empty()) {
+    return false;
+  }
+  char* endPtr = nullptr;
+  errno = 0;
+  auto parsed = std::strtoll(text.c_str(), &endPtr, 10);
+  if (errno != 0 || endPtr == text.c_str() || *endPtr != '\0') {
+    return false;
+  }
+  *value = parsed;
+  return true;
+}
+
+}  // namespace
+
 std::ostream& CommandError(const std::string& command) {
   return std::cerr << command << ": error: ";
+}
+
+bool ParseVideoFrameRate(const char* text, VideoFrameRate* frameRate) {
+  if (text == nullptr || frameRate == nullptr) {
+    return false;
+  }
+  std::string input = text;
+  auto slash = input.find('/');
+  std::string numeratorText = slash == std::string::npos ? input : input.substr(0, slash);
+  std::string denominatorText = slash == std::string::npos ? "1" : input.substr(slash + 1);
+  if (slash != std::string::npos && input.find('/', slash + 1) != std::string::npos) {
+    return false;
+  }
+  int64_t numerator = 0;
+  int64_t denominator = 1;
+  if (!ParseInt64(numeratorText, &numerator) || !ParseInt64(denominatorText, &denominator) ||
+      numerator < VideoExporter::MIN_FRAME_RATE || denominator <= 0) {
+    return false;
+  }
+  VideoFrameRate parsed = {numerator, denominator};
+  if (!parsed.isWithin(VideoExporter::MIN_FRAME_RATE, VideoExporter::MAX_FRAME_RATE)) {
+    return false;
+  }
+  *frameRate = parsed;
+  return true;
 }
 
 #ifdef _WIN32

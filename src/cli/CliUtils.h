@@ -31,6 +31,7 @@
 #include "pagx/FontConfig.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/SystemFonts.h"
+#include "pagx/VideoExporter.h"
 #include "pagx/nodes/Layer.h"
 #include "pagx/utils/VerifyUtils.h"
 #include "tgfx/core/Typeface.h"
@@ -39,6 +40,9 @@ namespace pagx::cli {
 
 /** Returns an error stream prefixed with "<command>: error: " for one diagnostic message. */
 std::ostream& CommandError(const std::string& command);
+
+/** Parses an integer or numerator/denominator frame rate within VideoExporter's supported limits. */
+bool ParseVideoFrameRate(const char* text, VideoFrameRate* frameRate);
 
 inline size_t FindLastPathSeparator(const std::string& path) {
   auto slash = path.rfind('/');
