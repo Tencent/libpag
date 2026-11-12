@@ -977,6 +977,53 @@ PAGX_TEST(PAGXTest, NotifyChangeRebuildsTextBlobOnFontEdit) {
 }
 
 /**
+ * T02: a one-shot static build must keep every render-time product in its own context instead of
+ * writing the shaped blob or the built typeface back into the shared template nodes. The runtime
+ * build keeps the previous node-cache contract, so notifyChange can reuse the cached blob.
+ */
+PAGX_TEST(PAGXTest, StaticBuildDoesNotWriteTextProductsToTemplate) {
+  auto doc = pagx::PAGXDocument::Make(200, 100);
+  auto* font = doc->makeNode<pagx::Font>();
+  font->unitsPerEm = 100;
+  auto* glyph = doc->makeNode<pagx::Glyph>();
+  glyph->path = doc->makeNode<pagx::PathData>();
+  *glyph->path = pagx::PathDataFromSVGString("M 0,0 L 20,0 L 20,-20 L 0,-20 Z");
+  glyph->advance = 20;
+  font->glyphs.push_back(glyph);
+
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* group = doc->makeNode<pagx::Group>();
+  auto* text = doc->makeNode<pagx::Text>();
+  text->position = {20, 40};
+  text->fontSize = 100;
+  auto* run = doc->makeNode<pagx::GlyphRun>();
+  run->font = font;
+  run->fontSize = 100;
+  run->glyphs = {1};
+  run->positions = {{0, 0}};
+  text->glyphRuns.push_back(run);
+  auto* fill = doc->makeNode<pagx::Fill>();
+  auto* solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {0, 0, 0, 1};
+  fill->color = solid;
+  group->elements = {text, fill};
+  layer->contents = {group};
+  doc->layers.push_back(layer);
+  doc->applyLayout();
+
+  ASSERT_EQ(text->glyphData->textBlob, nullptr);
+  auto staticBuild = pagx::LayerBuilder::Build(doc.get());
+  ASSERT_TRUE(staticBuild != nullptr);
+  EXPECT_EQ(text->glyphData->textBlob, nullptr);
+  EXPECT_EQ(font->renderCache, nullptr);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+  EXPECT_NE(text->glyphData->textBlob, nullptr);
+  EXPECT_NE(font->renderCache, nullptr);
+}
+
+/**
  * Test case: Font and GlyphRun XML round-trip
  */
 PAGX_TEST(PAGXTest, FontGlyphRoundTrip) {
