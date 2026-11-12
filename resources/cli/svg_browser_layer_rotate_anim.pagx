@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- D6 animated gate case: a layer spins a full 360 degrees over one second. The browser gate
+     pauses SMIL, seeks to 0.25s (90 degrees) and compares against the runtime renderer. -->
+<pagx width="300" height="300">
+  <Layer id="layer" x="0" y="0" width="300" height="300">
+    <Rectangle position="150,150" size="120,60"/>
+    <Fill>
+      <SolidColor color="#2266CC"/>
+    </Fill>
+  </Layer>
+  <Animations>
+    <Animation id="spin" duration="60" frameRate="60" loop="once">
+      <Object target="layer">
+        <Channel name="rotation.z" type="float">
+          <Key time="0" value="0" interpolation="linear"/>
+          <Key time="60" value="360" interpolation="linear"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>

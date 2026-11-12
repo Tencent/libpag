@@ -812,7 +812,8 @@ bool SampleLayerTransform(const SVGAnimationPlan* plan, const Layer* layer,
 // independently and still reproduce the sampled pose at every keyframe.
 bool WriteTransformTracks(XMLBuilder& out, const std::vector<Matrix>& matrices,
                           const std::vector<double>& keyTimes, SmilTiming timing,
-                          const std::vector<SmilSpline>& splines, bool useSpline) {
+                          const std::vector<SmilSpline>& splines, bool useSpline,
+                          const std::vector<float>* rotationDegrees = nullptr) {
   std::vector<DecomposedMatrix> decomposed;
   decomposed.reserve(matrices.size());
   for (const auto& matrix : matrices) {
@@ -826,12 +827,18 @@ bool WriteTransformTracks(XMLBuilder& out, const std::vector<Matrix>& matrices,
   bool rotateVaries = false;
   bool skewVaries = false;
   bool scaleVaries = false;
-  for (const auto& values : decomposed) {
+  for (size_t i = 0; i < decomposed.size(); ++i) {
+    const auto& values = decomposed[i];
     if (std::fabs(values.translateX) > PositionEpsilon ||
         std::fabs(values.translateY) > PositionEpsilon) {
       translateVaries = true;
     }
-    if (std::fabs(values.rotation) > AngleEpsilon) {
+    if (rotationDegrees != nullptr && rotationDegrees->size() == decomposed.size()) {
+      // A full turn decomposes back to zero, so variation must come from the continuous track.
+      if (std::fabs((*rotationDegrees)[i]) > AngleEpsilon) {
+        rotateVaries = true;
+      }
+    } else if (std::fabs(values.rotation) > AngleEpsilon) {
       rotateVaries = true;
     }
     if (std::fabs(values.skew) > AngleEpsilon) {
@@ -856,8 +863,13 @@ bool WriteTransformTracks(XMLBuilder& out, const std::vector<Matrix>& matrices,
     translateSequence.values.push_back(FloatToString(values.translateX) + " " +
                                        FloatToString(values.translateY));
     translateSequence.keyTimes.push_back(keyTimes[i]);
-    rotateSequence.values.push_back(
-        FloatToString(static_cast<float>(values.rotation * RadiansToDegrees)));
+    float rotationValue = static_cast<float>(values.rotation * RadiansToDegrees);
+    if (rotationDegrees != nullptr && rotationDegrees->size() == decomposed.size()) {
+      // A scalar rotation channel can wind past 180°; the decomposed angle would wrap and
+      // interpolate the short way, so the caller supplies the continuous track.
+      rotationValue = (*rotationDegrees)[i];
+    }
+    rotateSequence.values.push_back(FloatToString(rotationValue));
     rotateSequence.keyTimes.push_back(keyTimes[i]);
     skewSequence.values.push_back(
         FloatToString(static_cast<float>(values.skew * RadiansToDegrees)));
@@ -1621,7 +1633,23 @@ bool SVGAnimationWriter::WriteElementTransformAnimates(XMLBuilder& out,
   for (auto frame : frames) {
     keyTimes.push_back(std::clamp(static_cast<double>(frame) / span, 0.0, 1.0));
   }
-  return WriteTransformTracks(out, matrices, keyTimes, timing, splines, useSpline);
+  std::vector<float> rotationDegrees;
+  bool rotationOnly = false;
+  if (animatedChannels == 1 && count == 1) {
+    const auto* group = steps[0].group;
+    auto* rotationBinding = _plan->Find(group, "rotation");
+    rotationOnly = rotationBinding != nullptr && group->scale.x == 1.0f &&
+                   group->scale.y == 1.0f && group->skew == 0.0f;
+    if (rotationOnly) {
+      rotationDegrees.reserve(frames.size());
+      for (auto frame : frames) {
+        rotationDegrees.push_back(EvaluateChannelFloat(rotationBinding->channel, frame) -
+                                  group->rotation);
+      }
+    }
+  }
+  return WriteTransformTracks(out, matrices, keyTimes, timing, splines, useSpline,
+                              rotationOnly ? &rotationDegrees : nullptr);
 }
 
 bool SVGAnimationWriter::WriteLayerOuterAnimates(XMLBuilder& out, const Layer* layer) {
@@ -1654,7 +1682,25 @@ bool SVGAnimationWriter::WriteLayerTransformAnimates(XMLBuilder& out, const Laye
   for (auto frame : frames) {
     keyTimes.push_back(std::clamp(static_cast<double>(frame) / span, 0.0, 1.0));
   }
-  return WriteTransformTracks(out, matrices, keyTimes, timing, splines, useSpline);
+  std::vector<float> rotationDegrees;
+  auto* rotationBinding = _plan->Find(layer, "rotation.z");
+  bool rotationOnly =
+      rotationBinding != nullptr && _plan->Find(layer, "matrix") == nullptr &&
+      _plan->Find(layer, "x") == nullptr && _plan->Find(layer, "y") == nullptr &&
+      _plan->Find(layer, "scale.x") == nullptr && _plan->Find(layer, "scale.y") == nullptr &&
+      _plan->Find(layer, "skew.x") == nullptr && _plan->Find(layer, "skew.y") == nullptr &&
+      _plan->Find(layer, "anchor.x") == nullptr && _plan->Find(layer, "anchor.y") == nullptr &&
+      layer->scaleX == 1.0f && layer->scaleY == 1.0f && layer->skewX == 0.0f &&
+      layer->skewY == 0.0f;
+  if (rotationOnly) {
+    rotationDegrees.reserve(frames.size());
+    for (auto frame : frames) {
+      rotationDegrees.push_back(EvaluateChannelFloat(rotationBinding->channel, frame) -
+                                 layer->rotationZ);
+    }
+  }
+  return WriteTransformTracks(out, matrices, keyTimes, timing, splines, useSpline,
+                              rotationOnly ? &rotationDegrees : nullptr);
 }
 
 Matrix SVGAnimationWriter::LayerTransformBaseMatrix(const Layer* layer) const {
