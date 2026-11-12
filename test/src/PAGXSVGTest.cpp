@@ -6311,6 +6311,44 @@ PAGX_TEST(PAGXSVGTest, SVGExport_AnimLayerRotationComponent) {
   EXPECT_NE(svg.find("90"), std::string::npos) << svg;
 }
 
+// F7: a multi-channel track with bezier easing is densified so the shared linear track follows
+// the per-channel curve instead of only its endpoints.
+PAGX_TEST(PAGXSVGTest, SVGExport_AnimMultiChannelBezierIsDensified) {
+  auto doc = MakeRectDocument();
+  auto* animation = MakeAnimation(doc.get(), 60, pagx::LoopMode::Once);
+  auto* object = MakeAnimationObject(doc.get(), animation, "layer");
+  auto* xChannel = MakeChannel<float>(doc.get(), object, "x");
+  xChannel->keyframes.push_back(
+      {0, 0.0f, pagx::KeyframeInterpolationType::Bezier, {0.9f, 0.0f}, {}});
+  xChannel->keyframes.push_back(
+      {60, 100.0f, pagx::KeyframeInterpolationType::Bezier, {}, {0.9f, 1.0f}});
+  auto* rotationChannel = MakeChannel<float>(doc.get(), object, "rotation.z");
+  rotationChannel->keyframes.push_back(
+      {0, 0.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  rotationChannel->keyframes.push_back(
+      {60, 90.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  AttachTimeline(doc->layers[0], "anim");
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  auto marker = svg.find("type=\"translate\"");
+  ASSERT_NE(marker, std::string::npos) << svg;
+  auto valuesStart = svg.find("values=\"", marker);
+  ASSERT_NE(valuesStart, std::string::npos);
+  valuesStart += 8;
+  auto valuesEnd = svg.find('"', valuesStart);
+  ASSERT_NE(valuesEnd, std::string::npos);
+  auto values = svg.substr(valuesStart, valuesEnd - valuesStart);
+  size_t separators = 0;
+  for (char c : values) {
+    if (c == ';') {
+      ++separators;
+    }
+  }
+  EXPECT_GE(separators, 7u) << values;
+  // Bezier ease-in at the midpoint is well below the linear 50.
+  EXPECT_EQ(values.find("50 0"), std::string::npos) << values;
+}
+
 // F6: a scalar rotation past 180 degrees keeps winding instead of taking the short way back.
 PAGX_TEST(PAGXSVGTest, SVGExport_AnimLayerRotationKeepsTurns) {
   auto doc = MakeRectDocument();

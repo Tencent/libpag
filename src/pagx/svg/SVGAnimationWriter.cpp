@@ -99,6 +99,44 @@ std::string FormatSeconds(double value) {
   return FormatNumber(value) + "s";
 }
 
+bool HasBezierKeyframes(const Channel* channel) {
+  if (channel == nullptr) {
+    return false;
+  }
+  if (channel->valueType() == ChannelValueType::Float) {
+    const auto* typed = static_cast<const TypedChannel<float>*>(channel);
+    for (const auto& keyframe : typed->keyframes) {
+      if (keyframe.interpolation == KeyframeInterpolationType::Bezier) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+// Adds interior samples between consecutive frames so a multi-channel track can approximate
+// per-channel bezier easing with linear interpolation. Hold segments evaluate to a constant, so
+// extra samples inside them do not change the result.
+void DensifyFrames(std::vector<Frame>* frames, int subSamples) {
+  if (frames->size() < 2 || subSamples < 2) {
+    return;
+  }
+  std::vector<Frame> dense;
+  dense.reserve(frames->size() * static_cast<size_t>(subSamples));
+  for (size_t i = 0; i + 1 < frames->size(); i++) {
+    Frame start = (*frames)[i];
+    Frame step = (*frames)[i + 1] - start;
+    dense.push_back(start);
+    for (int s = 1; s < subSamples; s++) {
+      dense.push_back(start + step * s / subSamples);
+    }
+  }
+  dense.push_back(frames->back());
+  std::sort(dense.begin(), dense.end());
+  dense.erase(std::unique(dense.begin(), dense.end()), dense.end());
+  *frames = std::move(dense);
+}
+
 bool IsHold(KeyframeInterpolationType type) {
   return type == KeyframeInterpolationType::Hold || type == KeyframeInterpolationType::None;
 }
@@ -744,6 +782,13 @@ bool SampleLayerTransform(const SVGAnimationPlan* plan, const Layer* layer,
     CollectSegmentSplines(matrixBinding->channel, *frames, splines, useSpline);
   } else if (components.size() == 1) {
     CollectSegmentSplines(components.front().second->channel, *frames, splines, useSpline);
+  } else {
+    for (const auto& entry : components) {
+      if (HasBezierKeyframes(entry.second->channel)) {
+        DensifyFrames(frames, 8);
+        break;
+      }
+    }
   }
 
   matrices->clear();
@@ -1454,6 +1499,14 @@ bool SVGAnimationWriter::WriteShapeGeometryAnimates(XMLBuilder& out, const Node*
   bool useSpline = false;
   if (animatedCount == 1) {
     CollectSegmentSplines(singleChannel, frames, &splines, &useSpline);
+  } else {
+    for (int i = 0; i < count; ++i) {
+      auto* binding = _plan->Find(element, names[i]);
+      if (binding != nullptr && HasBezierKeyframes(binding->channel)) {
+        DensifyFrames(&frames, 8);
+        break;
+      }
+    }
   }
 
   const auto* rect = isRectangle ? static_cast<const Rectangle*>(element) : nullptr;
@@ -1610,6 +1663,17 @@ bool SVGAnimationWriter::WriteElementTransformAnimates(XMLBuilder& out,
   bool useSpline = false;
   if (animatedChannels == 1) {
     CollectSegmentSplines(singleChannel, frames, &splines, &useSpline);
+  } else {
+    for (size_t i = 0; i < count; ++i) {
+      for (int c = 0; c < GroupTransformChannelCount; ++c) {
+        auto* binding = _plan->Find(steps[i].group, GroupTransformChannelNames[c]);
+        if (binding != nullptr && HasBezierKeyframes(binding->channel)) {
+          DensifyFrames(&frames, 8);
+          i = count;
+          break;
+        }
+      }
+    }
   }
 
   // Rebuilding the chain from the recorded prefixes replaces each animated Group matrix with its
