@@ -444,6 +444,10 @@ function takeStaleInstallLock(lockPath, stale) {
     fs.renameSync(lockPath, quarantine);
   } catch (error) {
     if (error.code === 'ENOENT') return;
+    if (process.platform === 'win32' &&
+        (error.code === 'EPERM' || error.code === 'EBUSY' || error.code === 'EACCES')) {
+      return;
+    }
     throw error;
   }
   if (matchesLockOwner(quarantine, expected)) {
@@ -460,10 +464,18 @@ function takeStaleInstallLock(lockPath, stale) {
 function releaseInstallLock(lock) {
   clearInterval(lock.heartbeat);
   const releasePath = `${lock.path}.release-${lock.token}`;
+  let expected = null;
   try {
-    assertInstallLockOwner(lock);
+    const stat = fs.fstatSync(lock.handle);
+    expected = { token: lock.token, dev: stat.dev, ino: stat.ino };
+    if (!matchesLockOwner(lock.path, expected)) {
+      throw new Error('the ffmpeg installation lock is no longer owned by this process');
+    }
+    // Windows cannot rename a directory while one of its files is open.
+    fs.closeSync(lock.handle);
+    lock.handle = null;
     fs.renameSync(lock.path, releasePath);
-    if (!ownsInstallLock({ ...lock, path: releasePath })) {
+    if (!matchesLockOwner(releasePath, expected)) {
       try {
         if (!fs.existsSync(lock.path)) fs.renameSync(releasePath, lock.path);
       } catch {
@@ -473,7 +485,7 @@ function releaseInstallLock(lock) {
     }
     fs.rmSync(releasePath, { recursive: true, force: true });
   } finally {
-    fs.closeSync(lock.handle);
+    if (lock.handle !== null) fs.closeSync(lock.handle);
   }
 }
 
