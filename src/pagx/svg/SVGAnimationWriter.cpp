@@ -36,6 +36,7 @@
 #include "pagx/nodes/Rectangle.h"
 #include "pagx/nodes/SolidColor.h"
 #include "pagx/nodes/Stroke.h"
+#include "pagx/nodes/Text.h"
 #include "pagx/runtime/MatrixDecompose.h"
 #include "pagx/svg/SVGAnimationPlan.h"
 #include "pagx/svg/SVGPathParser.h"
@@ -1878,6 +1879,76 @@ bool SVGAnimationWriter::WritePathDataAnimates(XMLBuilder& out, const Node* node
     timing.durationSeconds *= 2.0;
   }
   WriteAnimateElement(out, "d", nullptr, false, sequence, timing, nullptr, nullptr);
+  return true;
+}
+
+bool SVGAnimationWriter::HasTextPositionAnimates(const Node* text) const {
+  if (_plan == nullptr || text == nullptr || text->nodeType() != NodeType::Text) {
+    return false;
+  }
+  return _plan->Find(text, "x") != nullptr || _plan->Find(text, "y") != nullptr;
+}
+
+bool SVGAnimationWriter::WriteTextPositionAnimates(XMLBuilder& out, const Node* node) {
+  if (!HasTextPositionAnimates(node)) {
+    return false;
+  }
+  auto* xBinding = _plan->Find(node, "x");
+  auto* yBinding = _plan->Find(node, "y");
+  if (xBinding != nullptr && yBinding != nullptr && xBinding->animation != yBinding->animation) {
+    AddWarning("channels 'x' and 'y' on <Text> '" + node->id +
+               "' belong to different animations; the translate track is dropped.");
+    return false;
+  }
+  const auto* primary = xBinding != nullptr ? xBinding : yBinding;
+  SmilTiming timing;
+  if (!ResolveTiming(primary->animation, primary->timeline, &timing)) {
+    return false;
+  }
+  auto span = static_cast<double>(primary->animation->duration);
+  if (span <= 0) {
+    return false;
+  }
+  std::vector<Frame> frames;
+  if (xBinding != nullptr) {
+    AppendTrackFrames(xBinding->channel, primary->animation->duration, &frames);
+  }
+  if (yBinding != nullptr) {
+    AppendTrackFrames(yBinding->channel, primary->animation->duration, &frames);
+  }
+  std::sort(frames.begin(), frames.end());
+  frames.erase(std::unique(frames.begin(), frames.end()), frames.end());
+  if (frames.size() < 2) {
+    return false;
+  }
+
+  const auto* text = static_cast<const Text*>(node);
+  SmilSequence sequence;
+  for (auto frame : frames) {
+    float x = text->position.x;
+    float y = text->position.y;
+    if (xBinding != nullptr) {
+      auto value = xBinding->channel->evaluateAt(frame);
+      if (const auto* coordinate = std::get_if<float>(&value)) {
+        x = *coordinate;
+      }
+    }
+    if (yBinding != nullptr) {
+      auto value = yBinding->channel->evaluateAt(frame);
+      if (const auto* coordinate = std::get_if<float>(&value)) {
+        y = *coordinate;
+      }
+    }
+    sequence.values.push_back(FloatToString(x - text->position.x) + " " +
+                              FloatToString(y - text->position.y));
+    sequence.keyTimes.push_back(std::clamp(static_cast<double>(frame) / span, 0.0, 1.0));
+  }
+  if (timing.mirror) {
+    ApplyPingPong(&sequence);
+    timing.durationSeconds *= 2.0;
+  }
+  // The host <g> carries no static transform, so the animation replaces an empty transform.
+  WriteAnimateElement(out, "transform", "translate", true, sequence, timing, nullptr, nullptr);
   return true;
 }
 

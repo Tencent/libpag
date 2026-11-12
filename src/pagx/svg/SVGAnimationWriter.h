@@ -166,6 +166,18 @@ class SVGAnimationWriter {
                              float renderScale);
 
   /**
+   * Returns true when the Text drives an `x` / `y` channel. Those channels translate the shaped
+   * run without reshaping it.
+   */
+  bool HasTextPositionAnimates(const Node* text) const;
+
+  /**
+   * Emits a translate track that carries the animated Text position relative to its authored
+   * position. The caller hosts it on a throwaway <g> wrapping the emitted text.
+   */
+  bool WriteTextPositionAnimates(XMLBuilder& out, const Node* text);
+
+  /**
    * Emits the opacity animation for a geometry element that sits under animated Group alpha
    * channels. The group alpha is already folded into `baseAlpha`, so the emitted values are the
    * animated ratio applied on top of it.

@@ -5123,6 +5123,41 @@ PAGX_TEST(PAGXSVGTest, SVGExport_AnimPathPointWithModifierIsRejected) {
   EXPECT_EQ(bestEffortSvg.find("attributeName=\"d\""), std::string::npos);
 }
 
+// M5.2: Text.x / Text.y translate the shaped run through a wrapping <g> without reshaping it.
+PAGX_TEST(PAGXSVGTest, SVGExport_AnimTextPositionEmitsTranslate) {
+  auto doc = pagx::PAGXDocument::Make(300, 100);
+  auto* layer = doc->makeNode<pagx::Layer>("layer");
+  auto* text = doc->makeNode<pagx::Text>("text");
+  text->text = "Hi";
+  text->position = {50, 50};
+  text->fontFamily = "Arial";
+  text->fontSize = 24;
+  auto* fill = doc->makeNode<pagx::Fill>("fill");
+  auto* solid = doc->makeNode<pagx::SolidColor>("color");
+  solid->color = {0, 0, 0, 1};
+  fill->color = solid;
+  layer->contents = {text, fill};
+  doc->layers.push_back(layer);
+
+  auto* animation = MakeAnimation(doc.get(), 60, pagx::LoopMode::Once);
+  auto* object = MakeAnimationObject(doc.get(), animation, "text");
+  auto* xChannel = MakeChannel<float>(doc.get(), object, "x");
+  xChannel->keyframes.push_back({0, 50.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  xChannel->keyframes.push_back({60, 120.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  auto* yChannel = MakeChannel<float>(doc.get(), object, "y");
+  yChannel->keyframes.push_back({0, 50.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  yChannel->keyframes.push_back({60, 70.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  AttachTimeline(layer, "anim");
+
+  pagx::SVGExportOptions options = {};
+  options.convertTextToPath = false;
+  auto svg = pagx::SVGExporter::ToSVG(*doc, options);
+  EXPECT_NE(svg.find("<text"), std::string::npos) << svg;
+  EXPECT_NE(svg.find("animateTransform"), std::string::npos) << svg;
+  EXPECT_NE(svg.find("type=\"translate\""), std::string::npos) << svg;
+  EXPECT_NE(svg.find("values=\"0 0;70 20\""), std::string::npos) << svg;
+}
+
 // M1: Default selects the first declared Animation, Named selects one id, All exports every
 // top-level Animation. Timing comes from a mounted timeline when present and from animation
 // defaults otherwise.

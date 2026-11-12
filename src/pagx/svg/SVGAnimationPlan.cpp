@@ -78,6 +78,10 @@ bool IsSupportedChannel(NodeType nodeType, const std::string& name) {
     case NodeType::Group:
     case NodeType::TextBox:
       return name == "alpha" || IsGroupTransformChannel(name);
+    case NodeType::Text:
+      // Text.x / Text.y translate the shaped run without reshaping it, so the exporter wraps the
+      // emitted text in a <g> that carries the translation track.
+      return name == "x" || name == "y";
     case NodeType::Rectangle:
       return name == "position.x" || name == "position.y" || name == "size.width" ||
              name == "size.height" || name == "roundness";

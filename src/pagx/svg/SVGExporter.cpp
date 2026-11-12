@@ -3881,6 +3881,17 @@ void SVGWriter::writeTextBoxGroup(SVGBuilder& out, const TextBox* textBox,
   if (runs.empty()) {
     return;
   }
+  // The box owns line placement, so a per-Text x/y translation has no host in the emitted
+  // line/tspan structure. Report the drop instead of leaving a static run.
+  for (const auto& run : runs) {
+    if (run.text == nullptr || !_animWriter.HasTextPositionAnimates(run.text)) {
+      continue;
+    }
+    addWarning("channels 'x'/'y' on <Text> '" + run.text->id + "' inside TextBox '" + textBox->id +
+                   "' are dropped: the box owns line placement.",
+               "animation-rejected");
+    _rejected = _rejected || _rejectUnsupported || _animationStrict;
+  }
   TextPaintStyleMap stylesByText = {};
   CollectTextBoxPaintStyles(elements, &stylesByText);
   std::vector<Text*> mutableTexts;
@@ -4335,6 +4346,22 @@ void SVGWriter::emitGeometryWithFs(SVGBuilder& out, const AccumulatedGeometry& e
     case NodeType::Text: {
       auto* text = static_cast<const Text*>(entry.element);
       bool hasTransforms = !entry.glyphTransforms.empty();
+      bool hasPositionAnimation = _animWriter.HasTextPositionAnimates(text);
+      if (hasPositionAnimation && hasTransforms) {
+        addWarning("channels 'x'/'y' on <Text> '" + text->id +
+                       "' are dropped: TextPath re-places the glyphs, so a whole-text translation "
+                       "does not reproduce the authored result.",
+                   "animation-rejected");
+        _rejected = _rejected || _rejectUnsupported || _animationStrict;
+      }
+      bool wrapPosition =
+          hasPositionAnimation && !hasTransforms && (!text->text.empty() || !text->glyphRuns.empty());
+      if (wrapPosition) {
+        out.openElement("g");
+        _animWriter.WriteTextPositionAnimates(out, text);
+        out.closeElementStart();
+      }
+      bool emitted = false;
       if ((!entry.glyphStyles.empty() || hasTransforms) && !text->glyphRuns.empty() &&
           !_animWriter.HasPainterAnimates(localFs.fill, localFs.stroke)) {
         std::vector<GlyphPaintStyle> styles = entry.glyphStyles;
@@ -4344,7 +4371,7 @@ void SVGWriter::emitGeometryWithFs(SVGBuilder& out, const AccumulatedGeometry& e
         }
         writeTextWithGlyphStyles(out, text, localFs, entry.transform, alpha, styles,
                                  entry.glyphTransforms);
-        break;
+        emitted = true;
       }
       // Any Text that carries GlyphRun elements is treated as the authoritative
       // geometry: SVG's native <text> can't express arbitrary glyph IDs /
@@ -4356,7 +4383,7 @@ void SVGWriter::emitGeometryWithFs(SVGBuilder& out, const AccumulatedGeometry& e
       // The convertTextToPath flag has the same effect, but only when GlyphRun
       // data is available to walk — without glyphRuns there is no geometry to
       // emit and we must fall back to native text anyway.
-      if (!text->glyphRuns.empty()) {
+      if (!emitted && !text->glyphRuns.empty()) {
         // Prefer the WOFF2 <text> path when the GlyphRun's font is registered as an embedded
         // vector font: the result is a real <text> element with PUA Unicode characters that
         // browsers / Inkscape / Preview render via the embedded @font-face, preserving text
@@ -4373,14 +4400,17 @@ void SVGWriter::emitGeometryWithFs(SVGBuilder& out, const AccumulatedGeometry& e
         if (font != nullptr) {
           auto it = _context->woff2Fonts.find(font);
           if (it != _context->woff2Fonts.end()) {
-            if (writeTextAsFont(out, text, localFs, entry.transform, alpha, it->second)) {
-              break;
-            }
+            emitted = writeTextAsFont(out, text, localFs, entry.transform, alpha, it->second);
           }
         }
-        writeTextAsPath(out, text, localFs, entry.transform, alpha);
-      } else {
+        if (!emitted) {
+          writeTextAsPath(out, text, localFs, entry.transform, alpha);
+        }
+      } else if (!emitted) {
         writeText(out, text, localFs, entry.transform, alpha);
+      }
+      if (wrapPosition) {
+        out.closeElement();
       }
       break;
     }
