@@ -1042,14 +1042,15 @@ void MigrateDropShadowStyleAnimation(pag::DropShadowStyle* style, float frameRat
   if (style->size != nullptr && style->size->animatable()) {
     auto* animatable = dynamic_cast<pag::AnimatableProperty<float>*>(style->size);
     if (animatable != nullptr && !animatable->keyframes.empty()) {
-      auto spread = style->spread != nullptr ? style->spread->getValueAt(0) : 0.0f;
       auto* channelX = document->makeNode<TypedChannel<float>>();
       channelX->name = "blurX";
       auto* channelY = document->makeNode<TypedChannel<float>>();
       channelY->name = "blurY";
       for (auto frame = animatable->keyframes.front()->startTime;
            frame < animatable->keyframes.back()->endTime; frame++) {
-        auto blur = style->size->getValueAt(frame) * (1.0f - spread) / 2.0f;
+        // The node stores the pre-spread blur (half the legacy size); the spread channel drives
+        // the core/falloff split at render time, so the blur no longer bakes the spread factor.
+        auto blur = style->size->getValueAt(frame) / 2.0f;
         Keyframe<float> keyX = {};
         keyX.time = frame;
         keyX.value = blur;
@@ -1063,6 +1064,31 @@ void MigrateDropShadowStyleAnimation(pag::DropShadowStyle* style, float frameRat
       }
       object->channels.push_back(channelX);
       object->channels.push_back(channelY);
+    }
+  }
+  if (style->spread != nullptr && style->spread->animatable()) {
+    auto* animatable = dynamic_cast<pag::AnimatableProperty<pag::Percent>*>(style->spread);
+    if (animatable != nullptr && !animatable->keyframes.empty()) {
+      auto* channel = document->makeNode<TypedChannel<float>>();
+      channel->name = "spread";
+      for (auto* legacyKeyframe : animatable->keyframes) {
+        Keyframe<float> keyframe = {};
+        keyframe.time = legacyKeyframe->startTime;
+        keyframe.value = legacyKeyframe->startValue * 100.0f;
+        keyframe.interpolation = ConvertInterpolation(legacyKeyframe->interpolationType);
+        ConvertEase(legacyKeyframe->bezierOut, legacyKeyframe->bezierIn, &keyframe);
+        channel->keyframes.push_back(keyframe);
+      }
+      auto* last = animatable->keyframes.back();
+      if (last->endTime > last->startTime) {
+        Keyframe<float> keyframe = {};
+        keyframe.time = last->endTime;
+        keyframe.value = last->endValue * 100.0f;
+        keyframe.interpolation = ConvertInterpolation(last->interpolationType);
+        ConvertEase(last->bezierOut, last->bezierIn, &keyframe);
+        channel->keyframes.push_back(keyframe);
+      }
+      object->channels.push_back(channel);
     }
   }
   auto* colorAnimatable = style->color != nullptr && style->color->animatable()

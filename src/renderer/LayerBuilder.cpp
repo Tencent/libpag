@@ -92,6 +92,7 @@
 #include "renderer/BulgeLayerFilter.h"
 #include "renderer/CornerPinLayerFilter.h"
 #include "renderer/DisplacementMapLayerFilter.h"
+#include "renderer/DropShadowLayerFilter.h"
 #include "renderer/GlowLayerFilter.h"
 #include "renderer/GlyphRunRenderer.h"
 #include "renderer/GradientOverlayLayerFilter.h"
@@ -2877,6 +2878,33 @@ class LayerBuilderContext {
         filters.push_back(tgfxFilter);
       }
     }
+    // Spread drop shadows ride the filter chain like the blow-position styles below: the tgfx
+    // native DropShadowStyle derives the spread from the layer's vector contour, which text and
+    // group layers cannot provide (the shadow would be skipped entirely), so the legacy
+    // SolidStroke core path runs instead. Spread-less shadows stay on the native binding.
+#if !PAG_DISABLE_SHADOW_STYLES
+    for (const auto& style : node->styles) {
+      if (style == nullptr || style->nodeType() != NodeType::DropShadowStyle) {
+        continue;
+      }
+      auto* shadowNode = static_cast<const DropShadowStyle*>(style);
+      if (shadowNode->spread <= 0.0f) {
+        continue;
+      }
+      auto shadowFilter = std::make_shared<DropShadowLayerFilter>();
+      shadowFilter->setOffsetX(shadowNode->offsetX);
+      shadowFilter->setOffsetY(shadowNode->offsetY);
+      shadowFilter->setBlurX(shadowNode->blurX);
+      shadowFilter->setBlurY(shadowNode->blurY);
+      shadowFilter->setSpread(shadowNode->spread);
+      shadowFilter->setColor(ToTGFX(shadowNode->color));
+      shadowFilter->setBlendMode(ToTGFX(shadowNode->blendMode));
+      shadowFilter->setShowBehindLayer(shadowNode->showBehindLayer);
+      filters.push_back(shadowFilter);
+      _result.binding.set(shadowNode, shadowFilter);
+      bindDropShadowSpreadChannels(shadowNode);
+    }
+#endif  // !PAG_DISABLE_SHADOW_STYLES
     // Outer glow styles have no tgfx-native equivalent and ride the layer filter chain ahead
     // of the over-content styles: the legacy LayerStylesFilter draws blow-position styles
     // (outer glow) first and the source image last, so the halo composites behind every later
@@ -2972,6 +3000,10 @@ class LayerBuilderContext {
         return nullptr;
 #else
         auto style = static_cast<const DropShadowStyle*>(node);
+        if (style->spread > 0.0f) {
+          // Spread shadows ride the layer filter chain instead (see the filters section).
+          return nullptr;
+        }
         auto tgfxStyle =
             tgfx::DropShadowStyle::Make(style->offsetX, style->offsetY, style->blurX, style->blurY,
                                         ToTGFX(style->color), style->showBehindLayer);
@@ -3265,6 +3297,88 @@ class LayerBuilderContext {
                                 ReadScalar<StrokeLayerFilter, &StrokeLayerFilter::size>);
     _result.binding.setAccessor(node, "position", WriteStrokeLayerStylePosition,
                                 ReadInteger<StrokeLayerFilter, &StrokeLayerFilter::position>);
+  }
+
+  static void WriteDropShadowSpreadOffsetX(void* object, const KeyValue& value, float mix) {
+    auto* v = std::get_if<float>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    auto* filter = static_cast<DropShadowLayerFilter*>(object);
+    filter->setOffsetX(MixFloat(filter->offsetX(), *v, mix));
+  }
+
+  static void WriteDropShadowSpreadOffsetY(void* object, const KeyValue& value, float mix) {
+    auto* v = std::get_if<float>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    auto* filter = static_cast<DropShadowLayerFilter*>(object);
+    filter->setOffsetY(MixFloat(filter->offsetY(), *v, mix));
+  }
+
+  static void WriteDropShadowSpreadBlurX(void* object, const KeyValue& value, float mix) {
+    auto* v = std::get_if<float>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    auto* filter = static_cast<DropShadowLayerFilter*>(object);
+    filter->setBlurX(MixFloat(filter->blurX(), *v, mix));
+  }
+
+  static void WriteDropShadowSpreadBlurY(void* object, const KeyValue& value, float mix) {
+    auto* v = std::get_if<float>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    auto* filter = static_cast<DropShadowLayerFilter*>(object);
+    filter->setBlurY(MixFloat(filter->blurY(), *v, mix));
+  }
+
+  static void WriteDropShadowSpreadSpread(void* object, const KeyValue& value, float mix) {
+    auto* v = std::get_if<float>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    auto* filter = static_cast<DropShadowLayerFilter*>(object);
+    filter->setSpread(MixFloat(filter->spread(), *v, mix));
+  }
+
+  static void WriteDropShadowSpreadColor(void* object, const KeyValue& value, float mix) {
+    auto* v = std::get_if<Color>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    auto* filter = static_cast<DropShadowLayerFilter*>(object);
+    auto target = ToTGFX(*v);
+    filter->setColor(MixTGFXColor(filter->color(), target, mix));
+  }
+
+  static void WriteDropShadowSpreadShowBehindLayer(void* object, const KeyValue& value, float) {
+    auto* v = std::get_if<bool>(&value);
+    if (v == nullptr) {
+      return;
+    }
+    static_cast<DropShadowLayerFilter*>(object)->setShowBehindLayer(*v);
+  }
+
+  void bindDropShadowSpreadChannels(const DropShadowStyle* node) {
+    _result.binding.setAccessor(node, "offsetX", WriteDropShadowSpreadOffsetX,
+                                ReadScalar<DropShadowLayerFilter, &DropShadowLayerFilter::offsetX>);
+    _result.binding.setAccessor(node, "offsetY", WriteDropShadowSpreadOffsetY,
+                                ReadScalar<DropShadowLayerFilter, &DropShadowLayerFilter::offsetY>);
+    _result.binding.setAccessor(node, "blurX", WriteDropShadowSpreadBlurX,
+                                ReadScalar<DropShadowLayerFilter, &DropShadowLayerFilter::blurX>);
+    _result.binding.setAccessor(node, "blurY", WriteDropShadowSpreadBlurY,
+                                ReadScalar<DropShadowLayerFilter, &DropShadowLayerFilter::blurY>);
+    _result.binding.setAccessor(node, "spread", WriteDropShadowSpreadSpread,
+                                ReadScalar<DropShadowLayerFilter, &DropShadowLayerFilter::spread>);
+    _result.binding.setAccessor(
+        node, "color", WriteDropShadowSpreadColor,
+        ReadColorChannel<DropShadowLayerFilter, &DropShadowLayerFilter::color>);
+    _result.binding.setAccessor(
+        node, "showBehindLayer", WriteDropShadowSpreadShowBehindLayer,
+        ReadBoolean<DropShadowLayerFilter, &DropShadowLayerFilter::showBehindLayer>);
   }
 
   void bindOuterGlowStyleChannels(const OuterGlowStyle* node) {

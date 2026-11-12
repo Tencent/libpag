@@ -1,0 +1,133 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx width="720" height="1280" viewModel="@pag-editable-vm">
+  <Layer width="720" height="1280" composition="@pag-legacy-comp-1"/>
+  <Animations>
+    <Animation id="pag-legacy-root" duration="1800" frameRate="30" loop="once">
+    </Animation>
+  </Animations>
+  <Resources>
+    <Composition id="pag-legacy-comp-1" width="720" height="1280">
+      <Layer id="pag-legacy-16" name="Medium Cyan Solid 3" x="360" y="640" anchor="360,640">
+        <Rectangle position="360,640" size="720,1280"/>
+        <Fill color="#3CCEEE"/>
+      </Layer>
+      <Layer id="pag-legacy-14" name="扩散1.0，大小25" x="69.3906" y="1092">
+        <TextBox lineHeight="96">
+          <Text id="pag-editable-text-0" text="扩散1.0，大小25" fontFamily="Hei" fontStyle="Regular" fontSize="80" baseline="alphabetic"/>
+          <Fill color="#FFFFFF"/>
+        </TextBox>
+        <DropShadowStyle id="pag-legacy-drop-shadow-15" blurX="15" blurY="15" color="#0C4CCCBF" spread="100"/>
+      </Layer>
+      <Layer id="pag-legacy-12" name="扩散1.0，大小12" x="69.3906" y="954">
+        <TextBox lineHeight="96">
+          <Text id="pag-editable-text-1" text="扩散1.0，大小12" fontFamily="Hei" fontStyle="Regular" fontSize="80" baseline="alphabetic"/>
+          <Fill color="#FFFFFF"/>
+        </TextBox>
+        <DropShadowStyle id="pag-legacy-drop-shadow-13" blendMode="multiply" blurX="6" blurY="6" color="#000000BF" spread="100"/>
+      </Layer>
+      <Layer id="pag-legacy-10" name="扩散0.5，大小31" x="68.8047" y="827.43">
+        <TextBox lineHeight="96">
+          <Text id="pag-editable-text-2" text="扩散0.5，大小30" fontFamily="Hei" fontStyle="Regular" fontSize="80" baseline="alphabetic"/>
+          <Fill color="#FFFFFF"/>
+        </TextBox>
+        <DropShadowStyle id="pag-legacy-drop-shadow-11" blurX="15" blurY="15" color="#000000BF" spread="50"/>
+      </Layer>
+      <Layer id="pag-legacy-8" name="扩散0.5，大小30" x="64.8047" y="705.43">
+        <TextBox lineHeight="96">
+          <Text id="pag-editable-text-3" text="扩散0.5，大小30" fontFamily="Hei" fontStyle="Regular" fontSize="80" baseline="alphabetic"/>
+          <Fill color="#FFFFFF"/>
+        </TextBox>
+        <DropShadowStyle id="pag-legacy-drop-shadow-9" blurX="15" blurY="15" color="#E92D69BF" spread="50"/>
+      </Layer>
+      <Layer id="pag-legacy-6" name="扩散0.0，大小30" x="73.9609" y="579.914">
+        <TextBox lineHeight="96">
+          <Text id="pag-editable-text-4" text="扩散0.0，大小30" fontFamily="Hei" fontStyle="Regular" fontSize="80" baseline="alphabetic"/>
+          <Fill color="#FFFFFF"/>
+        </TextBox>
+        <DropShadowStyle id="pag-legacy-drop-shadow-7" blurX="15" blurY="15" color="#000000"/>
+      </Layer>
+      <Layer id="pag-legacy-4" name="默认投影。" x="200.391" y="460">
+        <TextBox lineHeight="96">
+          <Text id="pag-editable-text-5" text="默认投影。" fontFamily="Hei" fontStyle="Regular" fontSize="80" baseline="alphabetic"/>
+          <Fill color="#FFFFFF"/>
+        </TextBox>
+        <DropShadowStyle id="pag-legacy-drop-shadow-5" blendMode="multiply" offsetX="2.5" offsetY="4.33013" blurX="2.5" blurY="2.5" color="#000000BF"/>
+      </Layer>
+      <Layer id="pag-legacy-2" name="DropShadow" x="34" y="264" rotation="-7.59747">
+        <TextBox lineHeight="128.4">
+          <Text id="pag-editable-text-6" text="DropShadow" fontFamily="Hei" fontStyle="Regular" fontSize="107" baseline="alphabetic"/>
+          <Fill color="#FFFFFF"/>
+        </TextBox>
+        <DropShadowStyle id="pag-legacy-drop-shadow-3" blendMode="multiply" offsetX="6" offsetY="10.3923" blurX="10" blurY="10" color="#000000BF" spread="100"/>
+      </Layer>
+      <Animations>
+        <Animation id="pag-legacy-anim-1" duration="60" frameRate="30" loop="once">
+          <Object target="pag-legacy-16">
+            <Channel name="visible" type="bool">
+              <Key time="0" value="true" interpolation="hold"/>
+              <Key time="60" value="false" interpolation="hold"/>
+            </Channel>
+          </Object>
+          <Object target="pag-legacy-14">
+            <Channel name="visible" type="bool">
+              <Key time="0" value="true" interpolation="hold"/>
+              <Key time="60" value="false" interpolation="hold"/>
+            </Channel>
+          </Object>
+          <Object target="pag-legacy-12">
+            <Channel name="visible" type="bool">
+              <Key time="0" value="true" interpolation="hold"/>
+              <Key time="60" value="false" interpolation="hold"/>
+            </Channel>
+          </Object>
+          <Object target="pag-legacy-10">
+            <Channel name="visible" type="bool">
+              <Key time="0" value="true" interpolation="hold"/>
+              <Key time="60" value="false" interpolation="hold"/>
+            </Channel>
+          </Object>
+          <Object target="pag-legacy-8">
+            <Channel name="visible" type="bool">
+              <Key time="0" value="true" interpolation="hold"/>
+              <Key time="60" value="false" interpolation="hold"/>
+            </Channel>
+          </Object>
+          <Object target="pag-legacy-6">
+            <Channel name="visible" type="bool">
+              <Key time="0" value="true" interpolation="hold"/>
+              <Key time="60" value="false" interpolation="hold"/>
+            </Channel>
+          </Object>
+          <Object target="pag-legacy-4">
+            <Channel name="visible" type="bool">
+              <Key time="0" value="true" interpolation="hold"/>
+              <Key time="60" value="false" interpolation="hold"/>
+            </Channel>
+          </Object>
+          <Object target="pag-legacy-2">
+            <Channel name="visible" type="bool">
+              <Key time="0" value="true" interpolation="hold"/>
+              <Key time="60" value="false" interpolation="hold"/>
+            </Channel>
+          </Object>
+        </Animation>
+      </Animations>
+      <DataBind source="$vm.text0" target="@pag-editable-text-6" channel="text"/>
+      <DataBind source="$vm.text1" target="@pag-editable-text-5" channel="text"/>
+      <DataBind source="$vm.text2" target="@pag-editable-text-4" channel="text"/>
+      <DataBind source="$vm.text3" target="@pag-editable-text-3" channel="text"/>
+      <DataBind source="$vm.text4" target="@pag-editable-text-2" channel="text"/>
+      <DataBind source="$vm.text5" target="@pag-editable-text-1" channel="text"/>
+      <DataBind source="$vm.text6" target="@pag-editable-text-0" channel="text"/>
+    </Composition>
+    <ViewModel id="pag-editable-vm">
+      <Property name="text0" type="String" default="DropShadow"/>
+      <Property name="text1" type="String" default="默认投影。"/>
+      <Property name="text2" type="String" default="扩散0.0，大小30"/>
+      <Property name="text3" type="String" default="扩散0.5，大小30"/>
+      <Property name="text4" type="String" default="扩散0.5，大小30"/>
+      <Property name="text5" type="String" default="扩散1.0，大小12"/>
+      <Property name="text6" type="String" default="扩散1.0，大小25"/>
+    </ViewModel>
+  </Resources>
+</pagx>

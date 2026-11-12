@@ -39,13 +39,16 @@ class DropShadowStyle : public LayerStyle {
   float offsetY = 0.0f;
 
   /**
-   * The horizontal blur radius of the shadow in pixels. The default value is 0.
+   * The horizontal blur radius of the shadow in pixels, before the spread converts part of it
+   * into the solid core. The default value is 0.
    */
   float blurX = 0.0f;
 
   /**
    * The shadow spread percentage (spec 7.4): grows the solid core of the shadow before the
-   * blur falloff, matching the legacy AE spread. The default is 0.
+   * blur falloff, matching the legacy AE spread. The renderer splits the stored blur radius
+   * into the core (2 x blur x spread) and the effective falloff (blur x (1 - spread)), so a
+   * spread of 100 percent renders a fully solid shadow. The default is 0.
    */
   float spread = 0.0f;
 

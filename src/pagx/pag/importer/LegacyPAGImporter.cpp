@@ -973,9 +973,13 @@ void ConvertLayerStyles(ConvertState* state, pag::Layer* legacyLayer, Layer* lay
       }
       auto size = PropertyValueAtStart(legacy->size, startFrame, nullptr);
       auto spread = PropertyValueAtStart(legacy->spread, startFrame, nullptr);
-      shadow->blurX = size * (1.0f - spread) / 2.0f;
+      // The node stores the pre-spread blur radius (half the legacy size): the renderer splits
+      // it into the solid core and the blur falloff from the spread, which keeps the size
+      // recoverable at every spread value (a baked size*(1-spread)/2 blur would lose it at
+      // spread 1, where the shadow is a pure solid silhouette).
+      shadow->blurX = size / 2.0f;
       shadow->blurY = shadow->blurX;
-      shadow->spread = spread;
+      shadow->spread = spread * 100.0f;
       auto color = PropertyValueAtStart(legacy->color, startFrame, nullptr);
       auto opacity = PropertyValueAtStart(legacy->opacity, startFrame, nullptr);
       shadow->color = ConvertColor(color);
@@ -984,9 +988,6 @@ void ConvertLayerStyles(ConvertState* state, pag::Layer* legacyLayer, Layer* lay
           ConvertBlendMode(PropertyValueAtStart(legacy->blendMode, startFrame, nullptr));
       shadow->showBehindLayer = true;
       layer->styles.push_back(shadow);
-      if (legacy->spread != nullptr && legacy->spread->animatable()) {
-        state->warn(PAGExportWarning::UnsupportedColorSource, "animated drop shadow spread");
-      }
       if (state->currentAnimation != nullptr) {
         auto* object = state->document->makeNode<AnimationObject>();
         object->target = shadow->id;
