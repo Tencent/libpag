@@ -6962,6 +6962,41 @@ PAGX_TEST(PAGXSVGTest, SVGExport_StandaloneTextWhitespaceAndRTL) {
   EXPECT_EQ(rtlSvg.find("text-anchor=\"end\""), std::string::npos);
 }
 
+// S6: a raster pixel budget rejects the bake and falls back to vector emission.
+PAGX_TEST(PAGXSVGTest, SVGExport_RasterPixelBudgetSkipsBake) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {100, 100};
+  rect->size = {180, 180};
+  auto* grad = doc->makeNode<pagx::ConicGradient>();
+  grad->center = {100, 100};
+  auto* first = doc->makeNode<pagx::ColorStop>();
+  first->offset = 0.0f;
+  first->color = {1, 0, 0, 1};
+  auto* second = doc->makeNode<pagx::ColorStop>();
+  second->offset = 1.0f;
+  second->color = {0, 0, 1, 1};
+  grad->colorStops = {first, second};
+  auto* fill = doc->makeNode<pagx::Fill>();
+  fill->color = grad;
+  layer->contents = {rect, fill};
+  doc->layers.push_back(layer);
+
+  pagx::SVGExportOptions options = {};
+  options.staticPolicy = pagx::SVGStaticExportPolicy::PreserveAppearance;
+  options.budget.maxRasterPixels = 1;
+  std::vector<pagx::SVGDiagnostic> diagnostics;
+  options.diagnostics = &diagnostics;
+  auto svg = pagx::SVGExporter::ToSVG(*doc, options);
+  EXPECT_EQ(svg.find("data:image/png;base64,"), std::string::npos);
+  bool found = false;
+  for (const auto& diagnostic : diagnostics) {
+    found = found || diagnostic.reasonCode == "budget-exceeded";
+  }
+  EXPECT_TRUE(found);
+}
+
 // A Group's alpha has to survive until the painter that draws its geometry, even when that painter
 // sits outside the Group.
 PAGX_TEST(PAGXSVGTest, SVGExport_GroupAlphaReachesOuterPainter) {

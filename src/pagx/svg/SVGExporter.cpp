@@ -527,12 +527,14 @@ class SVGWriter {
             PAGXDocument* doc = nullptr, bool bakeUnsupported = true, float rasterScale = 2.0f,
             std::vector<std::string>* warnings = nullptr,
             const SVGAnimationPlan* animation = nullptr, bool rejectUnsupported = false,
-            std::vector<SVGDiagnostic>* diagnostics = nullptr, size_t maxGeneratedElements = 200000)
+            std::vector<SVGDiagnostic>* diagnostics = nullptr, size_t maxGeneratedElements = 200000,
+            size_t maxRasterPixels = 0)
       : _defs(defs), _context(context), _indentSpaces(indentSpaces),
         _convertTextToPath(convertTextToPath), _bakeUnsupported(bakeUnsupported),
-        _rejectUnsupported(rejectUnsupported), _rasterScale(rasterScale), _warnings(warnings),
-        _diagnostics(diagnostics), _layoutContext(layoutContext),
-        _resolver(doc, maxGeneratedElements), _doc(doc), _animWriter(animation, warnings) {
+        _rejectUnsupported(rejectUnsupported), _rasterScale(rasterScale),
+        _maxRasterPixels(maxRasterPixels), _warnings(warnings), _diagnostics(diagnostics),
+        _layoutContext(layoutContext), _resolver(doc, maxGeneratedElements), _doc(doc),
+        _animWriter(animation, warnings) {
   }
 
   bool rejected() const {
@@ -550,6 +552,7 @@ class SVGWriter {
   bool _rejectUnsupported = false;
   bool _rejected = false;
   float _rasterScale = 2.0f;
+  size_t _maxRasterPixels = 0;
   std::vector<std::string>* _warnings = nullptr;
   std::vector<SVGDiagnostic>* _diagnostics = nullptr;
   LayoutContext* _layoutContext = nullptr;
@@ -4183,6 +4186,17 @@ bool SVGWriter::rasterizeLayerAsImage(SVGBuilder& out, const Layer* layer) {
     return false;
   }
   auto pixelScale = _rasterScale;
+  if (_maxRasterPixels > 0) {
+    double pixelWidth = std::ceil(static_cast<double>(bounds.width()) * pixelScale);
+    double pixelHeight = std::ceil(static_cast<double>(bounds.height()) * pixelScale);
+    if (pixelWidth * pixelHeight > static_cast<double>(_maxRasterPixels)) {
+      addWarning("rasterize skipped: layer '" +
+                     (layer->id.empty() ? std::string("(unnamed)") : layer->id) +
+                     "' exceeds the raster pixel budget; falling back to vector emission.",
+                 "budget-exceeded");
+      return false;
+    }
+  }
   auto pngData = RenderMaskedLayer(&_gpu, buildResult.root, tgfxLayer, coordinateSpace, pixelScale);
   if (!pngData || pngData->size() == 0) {
     addWarning("rasterize failed: PNG bake for layer '" +
@@ -5020,7 +5034,8 @@ std::string SVGExporter::ToSVG(PAGXDocument& doc, const Options& options,
 
   SVGWriter writer(&defs, &context, options.indent, convertTextToPath, layoutContext.get(), &doc,
                    bakeUnsupported, safeRasterScale, warnings, animationPlan.get(),
-                   rejectUnsupported, options.diagnostics, options.budget.maxGeneratedElements);
+                   rejectUnsupported, options.diagnostics, options.budget.maxGeneratedElements,
+                   options.budget.maxRasterPixels);
 
   if (options.xmlDeclaration) {
     svg.appendDeclaration();

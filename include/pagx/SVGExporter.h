@@ -120,6 +120,7 @@ struct SVGDiagnostic {
 struct SVGBudget {
   size_t maxGeneratedElements = 200000;
   size_t maxOutputBytes = 0;
+  size_t maxRasterPixels = 0;
 };
 
 /**
