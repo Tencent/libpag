@@ -1177,6 +1177,8 @@ if (PAG_BUILD_CLI)
             SVG_BROWSER_OUT=${CMAKE_CURRENT_SOURCE_DIR}/test/out/svg-browser-anim-gate
             bash ${CMAKE_CURRENT_SOURCE_DIR}/test/run_svg_browser_gate.sh
             ${CMAKE_CURRENT_SOURCE_DIR}/resources/cli/svg_browser_anim.pagx@0.5
+            ${CMAKE_CURRENT_SOURCE_DIR}/resources/cli/svg_browser_stop_anim.pagx@0.5
+            ${CMAKE_CURRENT_SOURCE_DIR}/resources/cli/svg_browser_grad_anim.pagx@0.5
             DEPENDS pagx-cli
             WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
             USES_TERMINAL
