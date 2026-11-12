@@ -80,12 +80,12 @@ std::vector<SVGChannelEntry> BuildLedger() {
   entries.push_back({NodeType::Ellipse, "size.height", S, "animate r or ry"});
 
   // Polystar
-  entries.push_back({NodeType::Polystar, "position.x", P, "needs a d track"});
-  entries.push_back({NodeType::Polystar, "position.y", P, "needs a d track"});
+  entries.push_back({NodeType::Polystar, "position.x", S, "d track with recomputed placement"});
+  entries.push_back({NodeType::Polystar, "position.y", S, "d track with recomputed placement"});
   entries.push_back({NodeType::Polystar, "pointCount", P, "topology change, needs a d track"});
-  entries.push_back({NodeType::Polystar, "outerRadius", P, "needs a d track"});
-  entries.push_back({NodeType::Polystar, "innerRadius", P, "needs a d track"});
-  entries.push_back({NodeType::Polystar, "rotation", P, "needs a d track"});
+  entries.push_back({NodeType::Polystar, "outerRadius", S, "d track, fixed topology"});
+  entries.push_back({NodeType::Polystar, "innerRadius", S, "d track, fixed topology"});
+  entries.push_back({NodeType::Polystar, "rotation", S, "d track, fixed topology"});
   entries.push_back(
       {NodeType::Polystar, "outerRoundness", S, "d track on the baked path, fixed topology"});
   entries.push_back(

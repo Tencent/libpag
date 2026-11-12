@@ -83,10 +83,12 @@ bool IsSupportedChannel(NodeType nodeType, const std::string& name) {
       // emitted text in a <g> that carries the translation track.
       return name == "x" || name == "y";
     case NodeType::Polystar:
-      // Roundness keeps the vertex count and content bounds, so the baked path can carry a `d`
-      // track without re-running layout. Radii / rotation / pointCount change the bounds and stay
-      // classified as unsupported for now.
-      return name == "outerRoundness" || name == "innerRoundness";
+      // Fixed-topology geometry channels are sampled per frame and re-baked into a d track; the
+      // content bounds (and therefore render scale) are recomputed from the sampled fields.
+      // pointCount / reversed change the vertex list and stay unsupported.
+      return name == "rotation" || name == "outerRadius" || name == "innerRadius" ||
+             name == "outerRoundness" || name == "innerRoundness" || name == "position.x" ||
+             name == "position.y";
     case NodeType::Rectangle:
       return name == "position.x" || name == "position.y" || name == "size.width" ||
              name == "size.height" || name == "roundness";

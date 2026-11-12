@@ -5241,9 +5241,9 @@ PAGX_TEST(PAGXSVGTest, SVGExport_AnimPolystarRoundnessEmitsDataTrack) {
   EXPECT_NE(values.find('C'), std::string::npos) << values;
 }
 
-// A Polystar rotation changes the content bounds (and therefore renderScale), so it stays
-// classified as unsupported instead of freezing silently.
-PAGX_TEST(PAGXSVGTest, SVGExport_AnimPolystarRotationRejected) {
+// A Polystar rotation changes the content bounds, so each frame re-runs the layout placement and
+// the d track still carries the moving outline.
+PAGX_TEST(PAGXSVGTest, SVGExport_AnimPolystarRotationEmitsDataTrack) {
   auto doc = pagx::PAGXDocument::Make(200, 200);
   auto* layer = doc->makeNode<pagx::Layer>("layer");
   auto* star = doc->makeNode<pagx::Polystar>("star");
@@ -5264,6 +5264,46 @@ PAGX_TEST(PAGXSVGTest, SVGExport_AnimPolystarRotationRejected) {
   auto* channel = MakeChannel<float>(doc.get(), object, "rotation");
   channel->keyframes.push_back({0, 0.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
   channel->keyframes.push_back({60, 45.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  AttachTimeline(layer, "anim");
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  auto marker = svg.find("attributeName=\"d\"");
+  ASSERT_NE(marker, std::string::npos) << svg;
+  auto valuesStart = svg.find("values=\"", marker);
+  ASSERT_NE(valuesStart, std::string::npos);
+  valuesStart += 8;
+  auto valuesEnd = svg.find('"', valuesStart);
+  ASSERT_NE(valuesEnd, std::string::npos);
+  auto values = svg.substr(valuesStart, valuesEnd - valuesStart);
+  EXPECT_EQ(values.find(';'), values.rfind(';'));
+  ASSERT_NE(values.find(';'), std::string::npos);
+  auto firstValue = values.substr(0, values.find(';'));
+  auto secondValue = values.substr(values.find(';') + 1);
+  EXPECT_NE(firstValue, secondValue);
+}
+
+// pointCount changes the vertex list, which one interpolated d track cannot carry.
+PAGX_TEST(PAGXSVGTest, SVGExport_AnimPolystarPointCountRejected) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto* layer = doc->makeNode<pagx::Layer>("layer");
+  auto* star = doc->makeNode<pagx::Polystar>("star");
+  star->type = pagx::PolystarType::Star;
+  star->pointCount = 5;
+  star->outerRadius = 40;
+  star->innerRadius = 20;
+  star->position = {100, 100};
+  auto* fill = doc->makeNode<pagx::Fill>("fill");
+  auto* solid = doc->makeNode<pagx::SolidColor>("color");
+  solid->color = {1, 0, 0, 1};
+  fill->color = solid;
+  layer->contents = {star, fill};
+  doc->layers.push_back(layer);
+
+  auto* animation = MakeAnimation(doc.get(), 60, pagx::LoopMode::Once);
+  auto* object = MakeAnimationObject(doc.get(), animation, "star");
+  auto* channel = MakeChannel<float>(doc.get(), object, "pointCount");
+  channel->keyframes.push_back({0, 5.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  channel->keyframes.push_back({60, 7.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
   AttachTimeline(layer, "anim");
 
   std::vector<std::string> warnings;

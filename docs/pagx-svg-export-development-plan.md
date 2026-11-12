@@ -552,7 +552,7 @@ MB范围包含3D、conic/diamond、noise、backdrop/Glass、复杂shape/text/eff
 
 #### M4/M5：固定展开顺序、前置依赖与台账准入
 
-本表固定四类展开的执行次序，不需要实施时再询问。当前已存在 `src/pagx/svg/SVGCoverageLedger.h:32` 的Supported/Planned/NotExpressible实现状态和 `src/pagx/svg/SVGAnimationPlan.cpp:67` 的白名单；它们不等同正文N/G/B/U能力分类。**当前白名单为16类/70项（含 SolidColor.color、ColorStop.offset/color、linear 四端点、radial 中心/半径、Text.x/y、Polystar 内外 roundness）**，Path point 族按表外通道单列，其余 Text shaping 与动态 modifier 尚未放行；不按旧7类/39项覆盖用户已有滤镜增量。未发现已实现的ModifierDependencyGraph，本方案只扩现有resolver产物/DrawRecord来源，不能引用不存在的图模块当作前置。
+本表固定四类展开的执行次序，不需要实施时再询问。当前已存在 `src/pagx/svg/SVGCoverageLedger.h:32` 的Supported/Planned/NotExpressible实现状态和 `src/pagx/svg/SVGAnimationPlan.cpp:67` 的白名单；它们不等同正文N/G/B/U能力分类。**当前白名单为16类/75项（含 SolidColor.color、ColorStop.offset/color、linear 四端点、radial 中心/半径、Text.x/y、Polystar 固定拓扑六通道）**，Path point 族按表外通道单列，其余 Text shaping 与动态 modifier 尚未放行；不按旧7类/39项覆盖用户已有滤镜增量。未发现已实现的ModifierDependencyGraph，本方案只扩现有resolver产物/DrawRecord来源，不能引用不存在的图模块当作前置。
 
 共同前置Q：S1的实例/引用/Painter capture与宿主，S3的最终glyph及第2.8节ST21/ST22/ST28，S4的modifier顺序/来源，S5的静态ColorSource/defs/fit；M1的typed/contextDoc/Clock和M2的ordered pose/alpha；M3至少具备本子批次所需的关键帧、Hold、区间求值、序列化和预算门禁。**不要求先做完所有M3高级组合再做独立N轨道，但某条G轨道缺其误差/预算能力时必须保持Planned或明确拒绝，不能先放行再补证明。**
 
@@ -708,7 +708,7 @@ ToSVG严格失败返回空结果、ToFile返回false、CLI非零；warnings=null
 | 本轮 M5.2（2026-11-12） | Text.x/y 进入白名单；导出在 Text 外层插入无静态 transform 的 `<g>`，用 animateTransform type="translate" 发射相对 authored position 的位移，原生 `<text>`、WOFF2、glyph path 三个出口共用；TextPath 重排与 TextBox 容器内的 Text 不假成功，Strict 拒绝并告警；新增 standalone translate 回归 | TextPath normal 沿曲线重求值未实现；TextBox 内逐 run 位移留待 M5.4 |
 | 本轮 M5.3（2026-11-12） | TextHolder flush 改为 `TextLayout::Layout(..., false)` 强制从有效 TextGlyphParams 塑形，all-embedded 不再走 bounds fast path；有效空（runs 为空）调用新增的 tgfx `Text::clearTextBlob()` 清空 blob/anchors 并保留对象与 position；塑形失败清空并 LOGE，不再保留旧 glyph；显式 anchors 按 glyph 序截断/补零后随 setTextBlob 保留；新增空→非空、anchor 重排、embedded→新文字三回归 | tgfx `clearTextBlob()` 只在本地 `third_party/tgfx` 实现并重编验证，尚未回填上游依赖版本；ST21/ST22 新 glyph 像素门禁未做 |
 | 本轮 M5.4 部分（2026-11-12） | 同一 node+channel 被多个 Animation 驱动时按同属性多 Clock 分类：BestEffort 保留后写轨道并告警，Strict 拒绝；Path point `d` 轨道增加 512 采样上限并按 budget 降采样告警；Text.x/y ledger 升级 Supported；新增 Plan 白名单↔ledger 双向门禁（Path point 族表外豁免）与 multi-clock 回归；任何被 path modifier / reversed 烘焙替换的动画元素不再静默冻结，Strict 拒绝且 BestEffort 告警保留静态；新增 A14 rect+Trim 回归 |
-| 本轮 M5.4 Polystar（2026-11-12） | Polystar→Path 转换抽到共享的 `PolystarPath`（resolver 与导出共用），resolver 记录 bake→source 映射；内外 roundness 进入白名单并在烘焙后的 `<path>` 上发射 `d` 轨道，逐帧强制 cubic verb 列表保持结构稳定（0 roundness 的 cubic 退化为直线）；rotation/radius/pointCount 仍按动态 bounds 拒绝；新增 roundness d 轨道与 rotation 拒绝回归 | 动态 bounds 下 rotation/radius 的逐帧重烘焙、Repeater 拓扑、TextModifier/RangeSelector 未做 |
+| 本轮 M5.4 Polystar（2026-11-12） | Polystar→Path 转换抽到共享的 `PolystarPath`（resolver 与导出共用），resolver 记录 bake→source 映射；rotation / 内外 radius / position.x/y / 内外 roundness 进入白名单并在烘焙后的 `<path>` 上发射 `d` 轨道；每帧用临时 Polystar 快照重算 content bounds、renderScale 与 renderPosition，逐帧强制 cubic verb 列表保持结构稳定；pointCount / reversed 仍按拓扑变化拒绝；新增 rotation d 轨道、roundness d 轨道与 pointCount 拒绝回归 | Repeater 拓扑、TextModifier/RangeSelector、动画 Text 的 flow/region 未做 |
 
 ### 4.8 S3 文字待办清单（下一批入口）
 
@@ -1232,7 +1232,7 @@ F1—F12 原 ID 全保留；F13—F18 是动态补审。除历史官方样例证
 | F14 | `src/pagx/PAGAnimation.cpp:59`、`src/pagx/PAGAnimation.cpp:111`merge/filter；`src/renderer/LayerBuilder.cpp:192`、`src/renderer/LayerBuilder.cpp:267`shared pose | 静态masked/同anim跨Object/跨anim ordered mix三层，matrix不屏z/anchor、后component decompose；M2 |
 | F15 | `src/pagx/runtime/KeyframeEvaluatorImpl.h:106`T{}、`src/pagx/svg/SVGAnimationWriter.cpp:129`clamp key、`src/pagx/svg/SVGAnimationWriter.cpp:191`Hold近似；`src/pagx/runtime/BezierEasing.cpp:104`、`src/pagx/utils/ColorSpaceUtils.cpp:78`overshoot | 跨duration t0=50、空≠无、单/1-frame/D1/D0/nonfinite/duplicate ordered keys、float不clamp/Color分量clamp、No epsilon；M3 |
 | F16 | `src/pagx/runtime/PAGComposition.cpp:57`、`src/pagx/runtime/PAGComposition.cpp:130`paused IDs共享 | 同slot同ID任paused禁全advance但apply全执行，兄弟slot独立、ordinal≠pause scope；M1 |
-| F17 | `src/pagx/PAGXNodeChannel.cpp:486`175/30 registry；本次 `src/pagx/svg/SVGAnimationPlan.cpp:67`70/16白名单与 `src/pagx/svg/SVGCoverageLedger.cpp:30`实现状态 | M4.0—M5.4逐子集同步Plan、ledger和输出/拒绝门禁；颜色、stop、d、Text完整依赖不漏，Planned/Supported≠N/G证明；M0/M4/M5/M6 |
+| F17 | `src/pagx/PAGXNodeChannel.cpp:486`175/30 registry；本次 `src/pagx/svg/SVGAnimationPlan.cpp:67`75/16白名单与 `src/pagx/svg/SVGCoverageLedger.cpp:30`实现状态 | M4.0—M5.4逐子集同步Plan、ledger和输出/拒绝门禁；颜色、stop、d、Text完整依赖不漏，Planned/Supported≠N/G证明；M0/M4/M5/M6 |
 | F18 | `src/pagx/PAGAnimation.cpp:274`Clock、`src/pagx/PAGScene.cpp:514`宿主flush、`src/pagx/utils/RasterUtils.cpp:351`背景合成契约 | 多Clock无公周期、finite事件/3D/noise/complex fallback；D8禁用拒绝、明确MB初态/window/resources/resolution/sampling/tail/repeat/预算，无界U；M3/MB/M6 |
 
 ### 5.1 只读 coverage 校验与维护门禁

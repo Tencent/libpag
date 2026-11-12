@@ -22,6 +22,7 @@
 #include <cstdio>
 #include <limits>
 #include "base/utils/MathUtil.h"
+#include "pagx/PAGXDocument.h"
 #include "pagx/PAGXNodeChannel.h"
 #include "pagx/nodes/Animation.h"
 #include "pagx/nodes/AnimationTimeline.h"
@@ -868,8 +869,9 @@ Matrix GroupMatrixAtFrame(const SVGAnimationPlan* plan, const Group* group, Fram
 }  // namespace
 
 SVGAnimationWriter::SVGAnimationWriter(const SVGAnimationPlan* plan,
-                                       std::vector<std::string>* warnings)
-    : _plan(plan), _warnings(warnings) {
+                                       std::vector<std::string>* warnings,
+                                       PAGXDocument* document)
+    : _plan(plan), _warnings(warnings), _document(document) {
 }
 
 void SVGAnimationWriter::AddWarning(std::string message) const {
@@ -1981,7 +1983,11 @@ bool SVGAnimationWriter::HasPolystarDataAnimates(const Node* polystar) const {
   }
   for (const auto& binding : *list) {
     const auto& name = binding.channel->name;
-    if (name != "outerRoundness" && name != "innerRoundness") {
+    // pointCount and reversed change the vertex list or its direction, so they cannot be carried
+    // by one interpolated d track.
+    if (name != "rotation" && name != "outerRadius" && name != "innerRadius" &&
+        name != "outerRoundness" && name != "innerRoundness" && name != "position.x" &&
+        name != "position.y") {
       return false;
     }
   }
@@ -1989,7 +1995,7 @@ bool SVGAnimationWriter::HasPolystarDataAnimates(const Node* polystar) const {
 }
 
 bool SVGAnimationWriter::WritePolystarDataAnimates(XMLBuilder& out, const Node* node) {
-  if (!HasPolystarDataAnimates(node)) {
+  if (!HasPolystarDataAnimates(node) || _document == nullptr) {
     return false;
   }
   const auto* polystar = static_cast<const Polystar*>(node);
@@ -1997,7 +2003,7 @@ bool SVGAnimationWriter::WritePolystarDataAnimates(XMLBuilder& out, const Node* 
   const Animation* animation = list->front().animation;
   for (const auto& binding : *list) {
     if (binding.animation != animation) {
-      AddWarning("roundness channels on <Polystar> '" + node->id +
+      AddWarning("geometry channels on <Polystar> '" + node->id +
                  "' span multiple animations; the d track is dropped.");
       return false;
     }
@@ -2045,7 +2051,7 @@ bool SVGAnimationWriter::WritePolystarDataAnimates(XMLBuilder& out, const Node* 
     }
   }
   if (hasCurve) {
-    AddWarning("roundness channels on <Polystar> '" + node->id +
+    AddWarning("geometry channels on <Polystar> '" + node->id +
                "' use bezier easing; the d track is sampled linearly.");
   }
   if (!detail.empty()) {
@@ -2066,27 +2072,43 @@ bool SVGAnimationWriter::WritePolystarDataAnimates(XMLBuilder& out, const Node* 
     std::sort(reduced.begin(), reduced.end());
     reduced.erase(std::unique(reduced.begin(), reduced.end()), reduced.end());
     frames = std::move(reduced);
-    AddWarning("roundness track on <Polystar> '" + node->id +
+    AddWarning("geometry track on <Polystar> '" + node->id +
                "' exceeded 512 samples and was downsampled; dense bezier segments lose some "
                "intermediate shape.");
   }
 
-  PolystarSample sample = SamplePolystar(polystar);
-  sample.forceCurves = true;
   SmilSequence sequence;
   for (auto frame : frames) {
+    // Radii, rotation and position all move the content bounds, so the layout-resolved placement
+    // is recomputed from a snapshot instead of reusing the static render scale.
+    auto* snapshot = _document->makeNode<Polystar>();
+    *snapshot = *polystar;
+    snapshot->id.clear();
     for (const auto& binding : *list) {
       auto value = binding.channel->evaluateAt(frame);
-      const auto* roundness = std::get_if<float>(&value);
-      if (roundness == nullptr) {
+      const auto* number = std::get_if<float>(&value);
+      if (number == nullptr) {
         continue;
       }
-      if (binding.channel->name == "outerRoundness") {
-        sample.outerRoundness = *roundness;
-      } else {
-        sample.innerRoundness = *roundness;
+      const auto& name = binding.channel->name;
+      if (name == "rotation") {
+        snapshot->rotation = *number;
+      } else if (name == "outerRadius") {
+        snapshot->outerRadius = *number;
+      } else if (name == "innerRadius") {
+        snapshot->innerRadius = *number;
+      } else if (name == "outerRoundness") {
+        snapshot->outerRoundness = *number;
+      } else if (name == "innerRoundness") {
+        snapshot->innerRoundness = *number;
+      } else if (name == "position.x") {
+        snapshot->position.x = *number;
+      } else if (name == "position.y") {
+        snapshot->position.y = *number;
       }
     }
+    PolystarSample sample = SamplePolystar(snapshot);
+    sample.forceCurves = true;
     sequence.values.push_back(TGFXPathToSVGString(PolystarToTGFXPath(sample)));
     sequence.keyTimes.push_back(std::clamp(static_cast<double>(frame) / span, 0.0, 1.0));
   }

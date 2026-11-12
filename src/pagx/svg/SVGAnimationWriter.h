@@ -30,6 +30,7 @@ class Fill;
 class Group;
 class Layer;
 class Node;
+class PAGXDocument;
 class Stroke;
 class SVGAnimationPlan;
 class XMLBuilder;
@@ -53,7 +54,8 @@ struct SVGGroupTransformStep {
 class SVGAnimationWriter {
  public:
   explicit SVGAnimationWriter(const SVGAnimationPlan* plan,
-                              std::vector<std::string>* warnings = nullptr);
+                              std::vector<std::string>* warnings = nullptr,
+                              PAGXDocument* document = nullptr);
 
   const SVGAnimationPlan* plan() const {
     return _plan;
@@ -258,6 +260,9 @@ class SVGAnimationWriter {
  private:
   const SVGAnimationPlan* _plan = nullptr;
   std::vector<std::string>* _warnings = nullptr;
+  // Used to allocate transient Polystar snapshots while sampling dynamic geometry. The document
+  // owns them until the exporter's ModifierResolver cleans up its generated nodes.
+  PAGXDocument* _document = nullptr;
 
   bool WriteVisibilityAnimate(XMLBuilder& out, const Node* target);
 

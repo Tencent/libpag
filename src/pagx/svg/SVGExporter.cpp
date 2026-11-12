@@ -534,7 +534,7 @@ class SVGWriter {
         _rejectUnsupported(rejectUnsupported), _animationStrict(animationStrict),
         _rasterScale(rasterScale), _maxRasterPixels(maxRasterPixels), _warnings(warnings),
         _diagnostics(diagnostics), _layoutContext(layoutContext),
-        _resolver(doc, maxGeneratedElements), _doc(doc), _animWriter(animation, warnings) {
+        _resolver(doc, maxGeneratedElements), _doc(doc), _animWriter(animation, warnings, doc) {
   }
 
   bool rejected() const {
