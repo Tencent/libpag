@@ -34,22 +34,22 @@ std::vector<SVGChannelEntry> BuildLedger() {
   entries.push_back({NodeType::Layer, "visible", S, "animate visibility discrete"});
   entries.push_back({NodeType::Layer, "alpha", S, "animate opacity on the wrapping g"});
   entries.push_back({NodeType::Layer, "blendMode", X, "mix-blend-mode is a CSS property"});
-  entries.push_back({NodeType::Layer, "x", P, "needs the full transform model"});
-  entries.push_back({NodeType::Layer, "y", P, "needs the full transform model"});
+  entries.push_back({NodeType::Layer, "x", S, "sampled into the layer matrix"});
+  entries.push_back({NodeType::Layer, "y", S, "sampled into the layer matrix"});
   entries.push_back({NodeType::Layer, "z", P, "3D, bake only"});
   entries.push_back({NodeType::Layer, "rotation.x", P, "3D, bake only"});
   entries.push_back({NodeType::Layer, "rotation.y", P, "3D, bake only"});
-  entries.push_back({NodeType::Layer, "rotation.z", P, "needs the full transform model"});
-  entries.push_back({NodeType::Layer, "scale.x", P, "needs the full transform model"});
-  entries.push_back({NodeType::Layer, "scale.y", P, "needs the full transform model"});
+  entries.push_back({NodeType::Layer, "rotation.z", S, "sampled into the layer matrix"});
+  entries.push_back({NodeType::Layer, "scale.x", S, "sampled into the layer matrix"});
+  entries.push_back({NodeType::Layer, "scale.y", S, "sampled into the layer matrix"});
   entries.push_back({NodeType::Layer, "scale.z", P, "3D, bake only"});
-  entries.push_back({NodeType::Layer, "skew.x", P, "needs the full transform model"});
-  entries.push_back({NodeType::Layer, "skew.y", P, "needs the full transform model"});
+  entries.push_back({NodeType::Layer, "skew.x", S, "sampled into the layer matrix"});
+  entries.push_back({NodeType::Layer, "skew.y", S, "sampled into the layer matrix"});
   entries.push_back({NodeType::Layer, "perspective", P, "3D, bake only"});
   entries.push_back({NodeType::Layer, "matrix", S, "decomposed into four animateTransform tracks"});
   entries.push_back({NodeType::Layer, "matrix3D", P, "3D, bake only"});
-  entries.push_back({NodeType::Layer, "anchor.x", P, "needs the full transform model"});
-  entries.push_back({NodeType::Layer, "anchor.y", P, "needs the full transform model"});
+  entries.push_back({NodeType::Layer, "anchor.x", S, "sampled into the layer matrix"});
+  entries.push_back({NodeType::Layer, "anchor.y", S, "sampled into the layer matrix"});
   entries.push_back({NodeType::Layer, "anchor.z", P, "3D, bake only"});
 
   // Group / TextBox share the same animation contract.

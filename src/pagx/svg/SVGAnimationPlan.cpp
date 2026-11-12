@@ -45,10 +45,11 @@ void AddWarning(std::vector<std::string>* warnings, std::string message) {
 }
 
 bool IsLayerTransformChannel(const std::string& name) {
-  // This exporter's transform model projects matrix3D / matrix / renderPosition only, so `matrix`
-  // is the single transform channel an SMIL animation can drive. The rotation / scale / skew /
-  // anchor components are not part of it and fall through to the unsupported-channel warning.
-  return name == "matrix";
+  // `matrix` wins over the component channels at runtime, so a layer carrying both is sampled
+  // through its matrix. Otherwise each component is folded into the layer matrix per frame.
+  return name == "matrix" || name == "x" || name == "y" || name == "rotation.z" ||
+         name == "scale.x" || name == "scale.y" || name == "skew.x" || name == "skew.y" ||
+         name == "anchor.x" || name == "anchor.y";
 }
 
 bool IsGroupTransformChannel(const std::string& name) {
@@ -74,7 +75,10 @@ namespace {
 bool IsSupportedChannel(NodeType nodeType, const std::string& name) {
   switch (nodeType) {
     case NodeType::Layer:
-      return name == "alpha" || name == "visible" || IsLayerTransformChannel(name);
+      return name == "alpha" || name == "visible" || IsLayerTransformChannel(name) ||
+             name == "x" || name == "y" || name == "rotation.z" || name == "scale.x" ||
+             name == "scale.y" || name == "skew.x" || name == "skew.y" || name == "anchor.x" ||
+             name == "anchor.y";
     case NodeType::Group:
     case NodeType::TextBox:
       return name == "alpha" || IsGroupTransformChannel(name);

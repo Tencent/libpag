@@ -5786,8 +5786,8 @@ PAGX_TEST(PAGXSVGTest, SVGExport_AnimUnsupportedLayerChannelWarns) {
   auto doc = MakeRectDocument();
   auto* animation = MakeAnimation(doc.get(), 60, pagx::LoopMode::Once);
   auto* object = MakeAnimationObject(doc.get(), animation, "layer");
-  // This exporter's transform model has no rotation component, so the channel cannot be expressed.
-  auto* channel = MakeChannel<float>(doc.get(), object, "rotation.z");
+  // The 3D transform model is not projected by this exporter, so the channel cannot be expressed.
+  auto* channel = MakeChannel<float>(doc.get(), object, "rotation.x");
   channel->keyframes.push_back({0, 0.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
   channel->keyframes.push_back({60, 90.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
   AttachTimeline(doc->layers[0], "anim");
@@ -5796,7 +5796,7 @@ PAGX_TEST(PAGXSVGTest, SVGExport_AnimUnsupportedLayerChannelWarns) {
   auto svg = pagx::SVGExporter::ToSVG(*doc, {}, &warnings);
   EXPECT_EQ(svg.find("<animate"), std::string::npos);
   ASSERT_FALSE(warnings.empty());
-  EXPECT_NE(warnings[0].find("rotation.z"), std::string::npos);
+  EXPECT_NE(warnings[0].find("rotation.x"), std::string::npos);
 }
 
 PAGX_TEST(PAGXSVGTest, SVGExport_AnimGroupTransform) {
@@ -6280,6 +6280,35 @@ PAGX_TEST(PAGXSVGTest, SVGExport_AnimVisibilityPingPongMirrors) {
   EXPECT_NE(svg.find("attributeName=\"visibility\""), std::string::npos) << svg;
   EXPECT_NE(svg.find("values=\"visible;hidden;visible\""), std::string::npos) << svg;
   EXPECT_NE(svg.find("dur=\"2s\""), std::string::npos) << svg;
+}
+
+// M2: Layer transform components are sampled into the layer matrix per frame.
+PAGX_TEST(PAGXSVGTest, SVGExport_AnimLayerPositionComponent) {
+  auto doc = MakeRectDocument();
+  auto* animation = MakeAnimation(doc.get(), 60, pagx::LoopMode::Once);
+  auto* object = MakeAnimationObject(doc.get(), animation, "layer");
+  auto* channel = MakeChannel<float>(doc.get(), object, "x");
+  channel->keyframes.push_back({0, 0.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  channel->keyframes.push_back({60, 100.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  AttachTimeline(doc->layers[0], "anim");
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("type=\"translate\""), std::string::npos) << svg;
+  EXPECT_NE(svg.find("values=\"0 0;100 0\""), std::string::npos) << svg;
+}
+
+PAGX_TEST(PAGXSVGTest, SVGExport_AnimLayerRotationComponent) {
+  auto doc = MakeRectDocument();
+  auto* animation = MakeAnimation(doc.get(), 60, pagx::LoopMode::Once);
+  auto* object = MakeAnimationObject(doc.get(), animation, "layer");
+  auto* channel = MakeChannel<float>(doc.get(), object, "rotation.z");
+  channel->keyframes.push_back({0, 0.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  channel->keyframes.push_back({60, 90.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  AttachTimeline(doc->layers[0], "anim");
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("type=\"rotate\""), std::string::npos) << svg;
+  EXPECT_NE(svg.find("90"), std::string::npos) << svg;
 }
 
 // Two animations driving the same attribute cannot share one SMIL track: Strict rejects, and// Two animations driving the same attribute cannot share one SMIL track: Strict rejects, and

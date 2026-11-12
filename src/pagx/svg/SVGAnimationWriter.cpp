@@ -692,16 +692,43 @@ bool SampleLayerTransform(const SVGAnimationPlan* plan, const Layer* layer,
   if (plan == nullptr || layer == nullptr) {
     return false;
   }
-  auto* binding = plan->Find(layer, "matrix");
-  if (binding == nullptr || binding->channel->valueType() != ChannelValueType::Matrix) {
+  auto* matrixBinding = plan->Find(layer, "matrix");
+  static const char* componentNames[] = {"x",           "y",          "rotation.z",
+                                         "scale.x",     "scale.y",    "skew.x",
+                                         "skew.y",      "anchor.x",   "anchor.y"};
+  std::vector<std::pair<std::string, const SVGAnimationBinding*>> components;
+  if (matrixBinding == nullptr) {
+    for (const auto* name : componentNames) {
+      auto* binding = plan->Find(layer, name);
+      if (binding != nullptr) {
+        components.emplace_back(name, binding);
+      }
+    }
+  }
+  if (matrixBinding == nullptr && components.empty()) {
     return false;
   }
-  if (!ResolveTiming(binding->animation, binding->timeline, timing)) {
+  const Animation* animation =
+      matrixBinding != nullptr ? matrixBinding->animation : components.front().second->animation;
+  const AnimationTimeline* timeline =
+      matrixBinding != nullptr ? matrixBinding->timeline : components.front().second->timeline;
+  for (const auto& entry : components) {
+    if (entry.second->animation != animation) {
+      return false;
+    }
+  }
+  if (!ResolveTiming(animation, timeline, timing)) {
     return false;
   }
-  *durationFrames = binding->animation->duration;
+  *durationFrames = animation->duration;
 
-  AppendTrackFrames(binding->channel, *durationFrames, frames);
+  if (matrixBinding != nullptr) {
+    AppendTrackFrames(matrixBinding->channel, *durationFrames, frames);
+  } else {
+    for (const auto& entry : components) {
+      AppendTrackFrames(entry.second->channel, *durationFrames, frames);
+    }
+  }
   if (frames->size() < 2) {
     return false;
   }
@@ -713,16 +740,69 @@ bool SampleLayerTransform(const SVGAnimationPlan* plan, const Layer* layer,
 
   splines->clear();
   *useSpline = false;
-  CollectSegmentSplines(binding->channel, *frames, splines, useSpline);
+  if (matrixBinding != nullptr) {
+    CollectSegmentSplines(matrixBinding->channel, *frames, splines, useSpline);
+  } else if (components.size() == 1) {
+    CollectSegmentSplines(components.front().second->channel, *frames, splines, useSpline);
+  }
 
   matrices->clear();
   matrices->reserve(frames->size());
-  for (Frame frame : *frames) {
-    LayerChannelOverride override = {};
-    Matrix matrixValue = EvaluateChannelMatrix(binding->channel, frame);
-    override.matrix = &matrixValue;
-    matrices->push_back(BuildLayerMatrix(layer, &override));
+  if (matrixBinding != nullptr) {
+    for (Frame frame : *frames) {
+      LayerChannelOverride override = {};
+      Matrix matrixValue = EvaluateChannelMatrix(matrixBinding->channel, frame);
+      override.matrix = &matrixValue;
+      matrices->push_back(BuildLayerMatrix(layer, &override));
+    }
+    return matrices->size() >= 2;
   }
+
+  // Component channels mutate the authored fields for the duration of the sampling; the render
+  // tree is not rebuilt, so BuildLayerMatrix reads the sampled values synchronously.
+  auto* mutableLayer = const_cast<Layer*>(layer);
+  float savedX = mutableLayer->x;
+  float savedY = mutableLayer->y;
+  float savedRotationZ = mutableLayer->rotationZ;
+  float savedScaleX = mutableLayer->scaleX;
+  float savedScaleY = mutableLayer->scaleY;
+  float savedSkewX = mutableLayer->skewX;
+  float savedSkewY = mutableLayer->skewY;
+  Point savedAnchor = mutableLayer->anchor;
+  for (Frame frame : *frames) {
+    for (const auto& entry : components) {
+      float value = EvaluateChannelFloat(entry.second->channel, frame);
+      const auto& name = entry.first;
+      if (name == "x") {
+        mutableLayer->x = value;
+      } else if (name == "y") {
+        mutableLayer->y = value;
+      } else if (name == "rotation.z") {
+        mutableLayer->rotationZ = value;
+      } else if (name == "scale.x") {
+        mutableLayer->scaleX = value;
+      } else if (name == "scale.y") {
+        mutableLayer->scaleY = value;
+      } else if (name == "skew.x") {
+        mutableLayer->skewX = value;
+      } else if (name == "skew.y") {
+        mutableLayer->skewY = value;
+      } else if (name == "anchor.x") {
+        mutableLayer->anchor.x = value;
+      } else if (name == "anchor.y") {
+        mutableLayer->anchor.y = value;
+      }
+    }
+    matrices->push_back(BuildLayerMatrix(layer));
+  }
+  mutableLayer->x = savedX;
+  mutableLayer->y = savedY;
+  mutableLayer->rotationZ = savedRotationZ;
+  mutableLayer->scaleX = savedScaleX;
+  mutableLayer->scaleY = savedScaleY;
+  mutableLayer->skewX = savedSkewX;
+  mutableLayer->skewY = savedSkewY;
+  mutableLayer->anchor = savedAnchor;
   return matrices->size() >= 2;
 }
 
