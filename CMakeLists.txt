@@ -1170,6 +1170,17 @@ if (PAG_BUILD_CLI)
             USES_TERMINAL
             COMMENT "Running SVG browser-fidelity gate in fixed Chromium")
 
+    # Regenerates docs/svg-policy-baseline.md from resources/**/*.pagx across the three static
+    # policies. Not part of the normal test run; run when policy defaults or resources change.
+    add_custom_target(SVGPolicyBaseline
+            COMMAND ${CMAKE_COMMAND} -E env
+            node ${CMAKE_CURRENT_SOURCE_DIR}/test/svg_policy_baseline.js
+            --pagx-bin $<TARGET_FILE:pagx-cli>
+            DEPENDS pagx-cli
+            WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+            USES_TERMINAL
+            COMMENT "Regenerating docs/svg-policy-baseline.md")
+
     # PPT visual-fidelity eval target. This is an end-to-end test rather than a
     # gtest binary: PAGX files are rendered natively, exported to PPTX, opened
     # by headless LibreOffice, rasterized, and compared against the native

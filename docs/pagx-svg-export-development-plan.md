@@ -699,7 +699,8 @@ ToSVG严格失败返回空结果、ToFile返回false、CLI非零；warnings=null
 | 本轮 S6 部分（2026-11-11） | `SVGAnimationOptions.policy` 实现 Strict / BestEffort：Strict 对 StateMachine、未知 target、不支持通道、无有效通道直接拒绝（ToSVG 返回空），BestEffort 保留可表达子集并告警；CLI 增加 `--svg-animation-policy`；新增 Strict 拒绝回归 | Diagnostics reasonCode / 预算 / D6 浏览器门禁 / 策略基线 / ST32/41/44/46 / C20—C24 仍未做 |
 | 本轮 S6 诊断与文件（2026-11-11） | 新增 `SVGDiagnostic` sink（reasonCode / action / message），Strict 与 VectorOnly 拒绝写 `Rejected`；ToFile 增加 `PAGX_SVG_FAIL_STAGE` 失败注入，覆盖 write/flush/close/replace 并验证旧文件保持不变；新增回归 | reasonCode 尚未覆盖全部站点；budgets、D6 浏览器门禁、策略基线、ST32/41/44 仍未做 |
 | 本轮 S6 预算（2026-11-11） | `SVGBudget.maxGeneratedElements` 接入 Resolver 的乘性展开上限；`maxOutputBytes` 超限时 ToSVG 返回空并写 `budget-exceeded` 诊断；新增预算回归 | rasterPixels / samples / instances 等其余预算字段未实现；D6、策略基线、ST32/41/44、C20—C24 未完成 |
-| 本轮 D6（2026-11-11） | 新增 `test/svg_browser_gate.js` 与 `SVGBrowserTest`：`pagx export` → 固定 Chromium 截图 → `pagx render` 参考 → pixel/SSIM 指标，固定 1400×900 / 白底 / scale 1 / pixelmatch 0.1；支持 `SVG_BROWSER_CASES` 与单例阈值覆盖；`constraint_textbox` 实测 pixelDiff 0.031、RGB 5.29、SSIM 0.416 | 默认阈值按首个文本样本标定为 0.05 / 8 / 0.4，仍需更多语料标定；策略可用性基线 `docs/svg-policy-baseline.md` 未生成 |
+| 本轮 D6（2026-11-11） | 新增 `test/svg_browser_gate.js` 与 `SVGBrowserTest`：`pagx export` → 固定 Chromium 截图 → `pagx render` 参考 → pixel/SSIM 指标，固定 1400×900 / 白底 / scale 1 / pixelmatch 0.1；支持 `SVG_BROWSER_CASES` 与单例阈值覆盖；`constraint_textbox` 实测 pixelDiff 0.031、RGB 5.29、SSIM 0.416 | 默认阈值按首个文本样本标定为 0.05 / 10 / 0.4，仍需更多语料标定；Playwright 固定 Chromium 未在本机安装 |
+| 本轮 4.7 策略基线（2026-11-11） | 新增 `test/svg_policy_baseline.js` 与 `SVGPolicyBaseline` target，扫描 271 个 resources PAGX：vector-only 241 native / 4 bake / 26 reject（17 unsupported-feature、9 import/resource）、preserve 241 / 21 / 9、best-effort 256 / 6 / 9；生成 `docs/svg-policy-baseline.md` | bake 桶把作者图片的 PNG 也计入，是效果烘焙上界；真实 reject 比例仍需分离资源失败 |
 
 ### 4.8 S3 文字待办清单（下一批入口）
 
