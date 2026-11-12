@@ -93,10 +93,6 @@ std::shared_ptr<PAGXDocument> SVGImporter::ParseString(const std::string& svgCon
 // ============== SVGParserContext ==============
 
 SVGParserContext::SVGParserContext(const SVGImporter::Options& options) : _options(options) {
-  _animationFrameRate = options.animationFrameRate;
-  if (_animationFrameRate <= 0.0f || std::isnan(_animationFrameRate)) {
-    _animationFrameRate = 60.0f;
-  }
 }
 
 std::shared_ptr<PAGXDocument> SVGParserContext::parse(const uint8_t* data, size_t length) {
@@ -1264,9 +1260,11 @@ Group* SVGParserContext::convertText(const std::shared_ptr<DOMNode>& element,
     std::string firstFill = {};
     float firstFillOpacity = 1.0f;
     allRunsNone = !emittedRuns.empty();
+    bool hasNoneRun = false;
     for (const auto& run : emittedRuns) {
       auto fill = run.fill.empty() ? elementFill : run.fill;
       if (fill == "none") {
+        hasNoneRun = true;
         continue;
       }
       allRunsNone = false;
@@ -1277,6 +1275,13 @@ Group* SVGParserContext::convertText(const std::shared_ptr<DOMNode>& element,
         uniformFill = false;
         break;
       }
+    }
+
+    // A group-level Fill paints every preceding shape, so a run asking for "none" cannot share it:
+    // with any painted run present the runs have to be emitted one by one, each carrying its own
+    // paint. "All none" is handled by allRunsNone below.
+    if (hasNoneRun && !allRunsNone) {
+      uniformFill = false;
     }
 
     // Reference geometry for gradient / pattern paints: objectBoundingBox units resolve against
@@ -2618,6 +2623,25 @@ void SVGParserContext::addFillStroke(const std::shared_ptr<DOMNode>& element,
     contents.push_back(strokeNode);
   }
 }
+// Approximate advance width of a proportional glyph, in em. Only used to size a <text> box for
+// objectBoundingBox paints; the exact advance needs the font layout pass.
+constexpr float kTextAverageAdvance = 0.6f;
+
+static void CollectTextNodeLength(const std::shared_ptr<DOMNode>& node, size_t* length) {
+  if (node == nullptr || length == nullptr) {
+    return;
+  }
+  auto child = node->getFirstChild();
+  while (child) {
+    if (child->type == DOMNodeType::Text) {
+      *length += child->name.size();
+    } else {
+      CollectTextNodeLength(child, length);
+    }
+    child = child->getNextSibling();
+  }
+}
+
 Rect SVGParserContext::getShapeBounds(const std::shared_ptr<DOMNode>& element) {
   const auto& tag = element->name;
 
@@ -2688,6 +2712,21 @@ Rect SVGParserContext::getShapeBounds(const std::shared_ptr<DOMNode>& element) {
       float y = parseLength(getAttribute(element, "y"), _viewBoxHeight);
       return Rect::MakeXYWH(refBounds.x + x, refBounds.y + y, refBounds.width, refBounds.height);
     }
+  }
+
+  // Text has no geometry branch of its own: without an estimate the box stays empty and an
+  // objectBoundingBox gradient or pattern collapses onto a single point.
+  if (tag == "text") {
+    const float x = parseLength(getAttribute(element, "x"), _viewBoxWidth);
+    const float y = parseLength(getAttribute(element, "y"), _viewBoxHeight);
+    std::string fontSizeStr = getAttribute(element, "font-size");
+    const float fontSize =
+        fontSizeStr.empty() ? DEFAULT_FONT_SIZE : parseLength(fontSizeStr, _viewBoxHeight);
+    size_t length = 0;
+    CollectTextNodeLength(element, &length);
+    const float width = static_cast<float>(length) * fontSize * kTextAverageAdvance;
+    // The baseline sits at `y`: the box reaches one line above it and a descender below.
+    return Rect::MakeXYWH(x, y - fontSize, width, fontSize * 1.2f);
   }
 
   return Rect::MakeXYWH(0, 0, 0, 0);

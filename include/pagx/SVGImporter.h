@@ -61,12 +61,6 @@ class SVGImporter {
      */
     float targetHeight = NAN;
 
-    /**
-     * Frame rate used when converting SMIL animation time values (begin/dur/keyTimes) to PAGX
-     * frame indices. Defaults to 60 fps, matching PAGX's native animation frame rate.
-     */
-    float animationFrameRate = 60.0f;
-
     Options() {
     }
   };
@@ -75,19 +69,19 @@ class SVGImporter {
    * Parses an SVG file and creates a PAGX Document.
    */
   static std::shared_ptr<PAGXDocument> Parse(const std::string& filePath,
-                                         const Options& options = Options());
+                                             const Options& options = Options());
 
   /**
    * Parses SVG data and creates a PAGX Document.
    */
   static std::shared_ptr<PAGXDocument> Parse(const uint8_t* data, size_t length,
-                                         const Options& options = Options());
+                                             const Options& options = Options());
 
   /**
    * Parses an SVG string and creates a PAGX Document.
    */
   static std::shared_ptr<PAGXDocument> ParseString(const std::string& svgContent,
-                                               const Options& options = Options());
+                                                   const Options& options = Options());
 };
 
 }  // namespace pagx

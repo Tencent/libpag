@@ -239,6 +239,16 @@ class SMILAnimationParser {
   static KeyValue ReadAttributeBase(SVGParserContext& ctx, const AnimatedNodeInfo& nodeInfo,
                                     const ChannelTarget& target, const std::string& attributeName);
 
+  /// True when additive="sum" should merge the track as deltas: only a `values` or `from`+`to` list
+  /// carries deltas, while to-only / by-only spell absolute values.
+  static bool IsAdditiveDeltaTrack(SVGParserContext& ctx, const std::shared_ptr<DOMNode>& element);
+
+  /// Mirrors a width/height channel's keyframes onto the rect's position channel so the animated
+  /// edge stays pinned to the SVG top-left corner (PAGX rectangles are anchored at their centre).
+  static void AppendSizeAnchorChannel(PAGXDocument* doc, const AnimatedNodeInfo& nodeInfo,
+                                      const std::string& attributeName,
+                                      std::vector<Channel*>& channels);
+
   // Parses a single <animateTransform> element into a single Matrix channel driving the Layer's
   // runtime "matrix" channel. Each keyframe's transform params (translate/scale/rotate/skewX/
   // skewY, including rotate's "angle cx cy" form) are baked into a full Matrix. additive="sum"

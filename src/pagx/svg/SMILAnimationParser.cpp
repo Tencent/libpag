@@ -330,6 +330,16 @@ static double ResolveRepeatCount(const std::string& repeatCountStr, const std::s
                                  double durSeconds) {
   double count = ParseRepeatCount(repeatCountStr);
   if (count < 0.0) {
+    // repeatCount="indefinite": SMIL takes the smaller of repeatCount and repeatDur, so a finite
+    // repeatDur turns the endless count into a real one instead of looping forever.
+    if (repeatDurStr.empty() || repeatDurStr == "indefinite") {
+      return -1.0;
+    }
+    const double repeatDurSeconds = SMILAnimationParser::parseSMILClockValue(repeatDurStr);
+    if (durSeconds > 0.0 && repeatDurSeconds > 0.0) {
+      count = repeatDurSeconds / durSeconds;
+      return count;
+    }
     return -1.0;
   }
   // repeatDur="indefinite" is the duration-side spelling of an endless repeat.
@@ -1786,15 +1796,27 @@ static void AppendKeyframe(Channel* channel, ChannelValueType valueType, Frame t
 // emitted: it would sit one frame past the animation and remain active for the rest of the
 // timeline (which is longer when other objects run longer), teleporting the target back to its
 // static pose mid-loop.
+// True when the animation repeats without end. A finite `end` truncates the active duration and a
+// finite `repeatDur` bounds it, so `repeatCount="indefinite"` combined with either one is a finite
+// animation that only looks endless in the repeatCount spelling.
 static bool IsIndefiniteRepeat(const std::shared_ptr<DOMNode>& element) {
   if (element == nullptr) {
+    return false;
+  }
+  const auto* end = element->findAttribute("end");
+  if (end != nullptr && !end->empty() && *end != "indefinite") {
+    return false;
+  }
+  const auto* repeatDur = element->findAttribute("repeatDur");
+  const bool repeatDurEndless =
+      repeatDur == nullptr || repeatDur->empty() || *repeatDur == "indefinite";
+  if (!repeatDurEndless) {
     return false;
   }
   const auto* repeatCount = element->findAttribute("repeatCount");
   if (repeatCount != nullptr && *repeatCount == "indefinite") {
     return true;
   }
-  const auto* repeatDur = element->findAttribute("repeatDur");
   return repeatDur != nullptr && *repeatDur == "indefinite";
 }
 
@@ -2305,6 +2327,18 @@ void SMILAnimationParser::ApplyAttributeUnitConversions(SVGParserContext& ctx, P
   }
 }
 
+bool SMILAnimationParser::IsAdditiveDeltaTrack(SVGParserContext& ctx,
+                                               const std::shared_ptr<DOMNode>& element) {
+  // additive="sum" merges a track's values as deltas onto the target's own value. Only a `values`
+  // list or a from+ pair carries raw values that need that composition: a to-only track is absolute
+  // (SMIL ignores additive on to-animations) and a by-only track already resolves to base →
+  // base + by, so folding the static value into those would add it a second time.
+  if (element == nullptr || ctx.getAttribute(element, "additive") != "sum") {
+    return false;
+  }
+  return !ctx.getAttribute(element, "values").empty() || !ctx.getAttribute(element, "from").empty();
+}
+
 KeyValue SMILAnimationParser::ReadAttributeBase(SVGParserContext& ctx,
                                                 const AnimatedNodeInfo& nodeInfo,
                                                 const ChannelTarget& target,
@@ -2329,6 +2363,33 @@ KeyValue SMILAnimationParser::ReadAttributeBase(SVGParserContext& ctx,
     return ReadBaseValue(target);
   }
   return parseValue(ctx, "0", target.valueType);
+}
+
+void SMILAnimationParser::AppendSizeAnchorChannel(PAGXDocument* doc,
+                                                  const AnimatedNodeInfo& nodeInfo,
+                                                  const std::string& attributeName,
+                                                  std::vector<Channel*>& channels) {
+  if ((attributeName != "width" && attributeName != "height") || channels.empty()) {
+    return;
+  }
+  auto* rect = static_cast<Rectangle*>(findContentNode(nodeInfo, NodeType::Rectangle));
+  if (rect == nullptr) {
+    return;
+  }
+  // SVG rects grow from their top-left corner while a PAGX Rectangle is anchored at its center, so
+  // animating size alone would expand both edges. Mirror the size keys onto a position channel to
+  // pin the animated edge to the static corner.
+  const bool horizontal = (attributeName == "width");
+  const float anchor = horizontal ? rect->position.x - rect->size.width * 0.5f
+                                  : rect->position.y - rect->size.height * 0.5f;
+  auto* sizeChannel = static_cast<TypedChannel<float>*>(channels.front());
+  auto* anchorChannel =
+      CreateChannelForType(doc, ChannelValueType::Float, horizontal ? "position.x" : "position.y");
+  for (const auto& key : sizeChannel->keyframes) {
+    AppendKeyframe(anchorChannel, ChannelValueType::Float, key.time, anchor + key.value * 0.5f,
+                   key.interpolation, key.bezierOut, key.bezierIn);
+  }
+  channels.push_back(anchorChannel);
 }
 
 std::vector<Channel*> SMILAnimationParser::parseAnimate(
@@ -2562,6 +2623,12 @@ std::vector<Channel*> SMILAnimationParser::parseAnimate(
   // not expanded here.
   double repeatCount = ResolveRepeatCount(ctx.getAttribute(animElement, "repeatCount"),
                                           ctx.getAttribute(animElement, "repeatDur"), durSeconds);
+  if (repeatCount < 0.0 && durSeconds > 0.0 && timing.endSeconds >= 0.0 &&
+      timing.endSeconds > timing.beginSeconds) {
+    // A finite end bounds an otherwise endless repeat: play the iterations that fit before the end
+    // and let the end limit truncate the last one, instead of expanding without bound.
+    repeatCount = (timing.endSeconds - timing.beginSeconds) / durSeconds;
+  }
   // SMIL ignores accumulate on a to-animation: there is no per-iteration delta to add, the end
   // value is the animation's target.
   const bool toOnly = valuesStr.empty() && fromStr.empty() && !toStr.empty() && byStr.empty();
@@ -2603,32 +2670,13 @@ std::vector<Channel*> SMILAnimationParser::parseAnimate(
   auto fillStr = ctx.getAttribute(animElement, "fill");
   bool fillFreeze = (fillStr == "freeze") || IsIndefiniteRepeat(animElement);
   KeyValue baseValue = ReadBaseValue(target);
+  const bool additiveTrack = IsAdditiveDeltaTrack(ctx, animElement);
   for (auto* ch : channels) {
     AddBaseValueKeyframes(ch, target.valueType, baseValue, beginFrames, outEndFrame, fillFreeze,
-                          ctx.getAttribute(animElement, "additive") == "sum");
+                          additiveTrack);
   }
 
-  // SVG rects are anchored at the top-left corner while a PAGX Rectangle is anchored at its
-  // center, so animating size alone would grow the shape from the center. Mirror the size
-  // keyframes onto a position channel at the same timestamps to pin the animated edge to the
-  // static top-left corner.
-  if ((attributeName == "width" || attributeName == "height") &&
-      target.valueType == ChannelValueType::Float && !channels.empty()) {
-    auto* rect = static_cast<Rectangle*>(findContentNode(nodeInfo, NodeType::Rectangle));
-    if (rect != nullptr) {
-      const bool horizontal = (attributeName == "width");
-      const float anchor = horizontal ? rect->position.x - rect->size.width * 0.5f
-                                      : rect->position.y - rect->size.height * 0.5f;
-      auto* size_channel = static_cast<TypedChannel<float>*>(channels.front());
-      auto* anchor_channel = CreateChannelForType(doc, ChannelValueType::Float,
-                                                  horizontal ? "position.x" : "position.y");
-      for (const auto& key : size_channel->keyframes) {
-        AppendKeyframe(anchor_channel, ChannelValueType::Float, key.time, anchor + key.value * 0.5f,
-                       key.interpolation, key.bezierOut, key.bezierIn);
-      }
-      channels.push_back(anchor_channel);
-    }
-  }
+  AppendSizeAnchorChannel(doc, nodeInfo, attributeName, channels);
   return channels;
 }
 std::vector<Channel*> SMILAnimationParser::parseSet(SVGParserContext& ctx, PAGXDocument* doc,
@@ -2713,8 +2761,10 @@ std::vector<Channel*> SMILAnimationParser::parseSet(SVGParserContext& ctx, PAGXD
   KeyValue baseValue = ReadBaseValue(target);
   for (auto* setChannel : setChannels) {
     AddBaseValueKeyframes(setChannel, target.valueType, baseValue, beginFrames, endFrame,
-                          fillFreeze, ctx.getAttribute(setElement, "additive") == "sum");
+                          fillFreeze, IsAdditiveDeltaTrack(ctx, setElement));
   }
+
+  AppendSizeAnchorChannel(doc, nodeInfo, attributeName, setChannels);
 
   channels = std::move(setChannels);
   return channels;
@@ -3421,7 +3471,7 @@ Animation* SMILAnimationParser::buildAnimation(
 
       for (const auto& animEl : group.animates) {
         Frame endFrame = 0;
-        bool additive = (ctx.getAttribute(animEl, "additive") == "sum");
+        bool additive = IsAdditiveDeltaTrack(ctx, animEl);
         std::string targetId;
         auto parsedChannels =
             parseAnimate(ctx, doc, animEl, nodeInfo, frameRate,
@@ -3443,7 +3493,7 @@ Animation* SMILAnimationParser::buildAnimation(
       }
       for (const auto& setEl : group.sets) {
         Frame endFrame = 0;
-        bool additive = (ctx.getAttribute(setEl, "additive") == "sum");
+        bool additive = IsAdditiveDeltaTrack(ctx, setEl);
         std::string targetId;
         auto parsedChannels = parseSet(
             ctx, doc, setEl, nodeInfo, frameRate,

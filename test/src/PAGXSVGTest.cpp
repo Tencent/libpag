@@ -7233,14 +7233,20 @@ PAGX_TEST(PAGXSVGTest, SVGImport_TspanOnlyGradientKeepsReference) {
     CollectElementsByType(layer, pagx::NodeType::Fill, fills);
   }
   ASSERT_FALSE(fills.empty());
-  bool hasGradientFill = false;
+  pagx::LinearGradient* gradient = nullptr;
   for (auto* element : fills) {
     auto* fill = static_cast<pagx::Fill*>(element);
     if (fill->color != nullptr && fill->color->nodeType() == pagx::NodeType::LinearGradient) {
-      hasGradientFill = true;
+      gradient = static_cast<pagx::LinearGradient*>(fill->color);
     }
   }
-  EXPECT_TRUE(hasGradientFill) << "tspan-only gradient must survive as a LinearGradient fill";
+  ASSERT_NE(gradient, nullptr) << "tspan-only gradient must survive as a LinearGradient fill";
+  // The gradient resolves against the <text> box estimate; a zero-size box would put both points on
+  // top of each other and render as a single colour.
+  const float span = std::abs(gradient->endPoint.x - gradient->startPoint.x) +
+                     std::abs(gradient->endPoint.y - gradient->startPoint.y);
+  EXPECT_GT(span, 1.0f);
+  EXPECT_NEAR(gradient->startPoint.x, 10.0f, 1.0f);
 }
 
 /**
@@ -7344,6 +7350,127 @@ PAGX_TEST(PAGXSVGTest, SVGImport_ReplaceAndSumShareOneMatrixChannel) {
   const auto end = std::get<pagx::Matrix>(matrix->evaluateAt(120));
   EXPECT_NEAR(end.tx, 20.0f, 0.05f);
   EXPECT_NEAR(end.ty, 30.0f, 0.05f);
+}
+
+/**
+ * to-only with additive="sum": the authored values are absolute, so the static base is not added a
+ * second time (SMIL ignores additive for to-animations).
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_ToOnlyAdditiveSumKeepsAbsoluteValues) {
+  std::string svg =
+      "<svg width=\"100\" height=\"100\" viewBox=\"0 0 100 100\">"
+      "<rect width=\"50\" height=\"50\" fill=\"red\" opacity=\"0.5\">"
+      "<animate attributeName=\"opacity\" to=\"1\" additive=\"sum\" dur=\"1s\" fill=\"freeze\"/>"
+      "</rect></svg>";
+  auto doc = pagx::SVGImporter::ParseString(svg);
+  ASSERT_NE(doc, nullptr);
+  ASSERT_FALSE(doc->animations.empty());
+  auto* anim = static_cast<pagx::Animation*>(doc->animations[0]);
+  auto* ch = FindFloatChannel(anim, "alpha");
+  ASSERT_NE(ch, nullptr);
+  ASSERT_GE(ch->keyframes.size(), 2u);
+  EXPECT_NEAR(ch->keyframes.front().value, 0.5f, 1e-4f);
+  EXPECT_NEAR(ch->keyframes.back().value, 1.0f, 1e-4f);
+}
+
+/**
+ * by-only with additive="sum": `by` is already additive, so the base is added once.
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_ByOnlyAdditiveSumKeepsAbsoluteValues) {
+  std::string svg =
+      "<svg width=\"100\" height=\"100\" viewBox=\"0 0 100 100\">"
+      "<rect x=\"10\" y=\"0\" width=\"50\" height=\"50\" fill=\"red\">"
+      "<animate attributeName=\"x\" by=\"40\" additive=\"sum\" dur=\"1s\" fill=\"freeze\"/>"
+      "</rect></svg>";
+  auto doc = pagx::SVGImporter::ParseString(svg);
+  ASSERT_NE(doc, nullptr);
+  ASSERT_FALSE(doc->animations.empty());
+  auto* anim = static_cast<pagx::Animation*>(doc->animations[0]);
+  auto* ch = FindFloatChannel(anim, "position.x");
+  ASSERT_NE(ch, nullptr);
+  ASSERT_GE(ch->keyframes.size(), 2u);
+  // x=10 with width 50 puts the PAGX centre at 35; `by=40` moves it to 75.
+  EXPECT_NEAR(ch->keyframes.front().value, 35.0f, 1e-4f);
+  EXPECT_NEAR(ch->keyframes.back().value, 75.0f, 1e-4f);
+}
+
+/**
+ * <set attributeName="width"> grows the rect from its left edge, so it needs the same position
+ * anchor channel <animate> uses.
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_SetWidthPinsLeftEdge) {
+  std::string svg =
+      "<svg width=\"200\" height=\"100\" viewBox=\"0 0 200 100\">"
+      "<rect x=\"10\" y=\"0\" width=\"20\" height=\"50\" fill=\"red\">"
+      "<set attributeName=\"width\" to=\"80\" dur=\"1s\" fill=\"freeze\"/>"
+      "</rect></svg>";
+  auto doc = pagx::SVGImporter::ParseString(svg);
+  ASSERT_NE(doc, nullptr);
+  ASSERT_FALSE(doc->animations.empty());
+  auto* anim = static_cast<pagx::Animation*>(doc->animations[0]);
+  auto* size = FindFloatChannel(anim, "size.width");
+  ASSERT_NE(size, nullptr);
+  EXPECT_NEAR(size->keyframes.front().value, 80.0f, 1e-4f);
+  auto* anchor = FindFloatChannel(anim, "position.x");
+  ASSERT_NE(anchor, nullptr);
+  // The left edge stays at 10: the centre moves to 10 + 80/2.
+  EXPECT_NEAR(anchor->keyframes.front().value, 50.0f, 1e-4f);
+}
+
+/**
+ * repeatCount="indefinite" with a finite repeatDur repeats only as long as repeatDur allows.
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_IndefiniteRepeatHonoursRepeatDur) {
+  std::string svg =
+      "<svg width=\"100\" height=\"100\" viewBox=\"0 0 100 100\">"
+      "<rect width=\"50\" height=\"50\" fill=\"red\">"
+      "<animate attributeName=\"opacity\" values=\"1;0\" dur=\"1s\" repeatCount=\"indefinite\" "
+      "repeatDur=\"2s\"/>"
+      "</rect></svg>";
+  auto doc = pagx::SVGImporter::ParseString(svg);
+  ASSERT_NE(doc, nullptr);
+  ASSERT_FALSE(doc->animations.empty());
+  auto* anim = static_cast<pagx::Animation*>(doc->animations[0]);
+  EXPECT_NE(anim->loop, pagx::LoopMode::Loop);
+  EXPECT_EQ(anim->duration, 120);
+}
+
+/**
+ * repeatCount="indefinite" with a finite end plays up to the end instead of looping forever.
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_IndefiniteRepeatHonoursEnd) {
+  std::string svg =
+      "<svg width=\"100\" height=\"100\" viewBox=\"0 0 100 100\">"
+      "<rect width=\"50\" height=\"50\" fill=\"red\">"
+      "<animate attributeName=\"opacity\" values=\"1;0\" dur=\"1s\" repeatCount=\"indefinite\" "
+      "end=\"3s\"/>"
+      "</rect></svg>";
+  auto doc = pagx::SVGImporter::ParseString(svg);
+  ASSERT_NE(doc, nullptr);
+  ASSERT_FALSE(doc->animations.empty());
+  auto* anim = static_cast<pagx::Animation*>(doc->animations[0]);
+  EXPECT_NE(anim->loop, pagx::LoopMode::Loop);
+  EXPECT_EQ(anim->duration, 180);
+}
+
+/**
+ * A fill="none" run next to a painted one: the unpainted run must not inherit the group's Fill.
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_MixedNoneTspanStaysUnpainted) {
+  std::string svg =
+      "<svg width=\"200\" height=\"60\" viewBox=\"0 0 200 60\">"
+      "<text x=\"10\" y=\"30\" font-size=\"20\">"
+      "<tspan fill=\"#FF0000\">A</tspan><tspan fill=\"none\">B</tspan>"
+      "</text></svg>";
+  auto doc = pagx::SVGImporter::ParseString(svg);
+  ASSERT_NE(doc, nullptr);
+  ASSERT_FALSE(doc->layers.empty());
+  std::vector<pagx::Element*> fills = {};
+  for (auto* layer : doc->layers) {
+    CollectElementsByType(layer, pagx::NodeType::Fill, fills);
+  }
+  // Only the painted run carries a fill; the "none" run would otherwise be painted by the group.
+  EXPECT_EQ(fills.size(), 1u);
 }
 
 }  // namespace pag
