@@ -678,7 +678,8 @@ static std::shared_ptr<tgfx::Image> ImageFromDataURI(const std::string& dataURI)
 // their contents in place.
 class LayerBuilderContext {
  public:
-  LayerBuilderContext() = default;
+  explicit LayerBuilderContext(bool exportSession = false) : _exportSession(exportSession) {
+  }
   virtual ~LayerBuilderContext() = default;
 
   void setDocument(const PAGXDocument* document) {
@@ -1302,13 +1303,40 @@ class LayerBuilderContext {
   // Generate TextBlob for a Text node using GlyphRunRenderer with the given inverse matrix.
   // For standalone Text (not inside TextBox), inverseMatrix is Identity.
   // For TextBox children, inverseMatrix cancels the cumulative Group transforms.
-  static void PrepareTextBlob(Text* text, const tgfx::Matrix& inverseMatrix) {
+  // The result stays in this build context: the shared Text node keeps only the authored
+  // layoutRuns, so an export build never writes render-time products back into the template.
+  struct PreparedTextState {
+    std::shared_ptr<tgfx::TextBlob> textBlob = nullptr;
+    std::vector<tgfx::Point> anchors = {};
+  };
+
+  PreparedTextState& PrepareTextBlob(Text* text, const tgfx::Matrix& inverseMatrix) {
+    auto& prepared = _preparedText[text];
+    if (usesSharedTextCache()) {
+      if (!text->glyphData->layoutRuns.empty()) {
+        text->glyphData->textBlob = GlyphRunRenderer::BuildTextBlobFromLayoutRuns(
+            text->glyphData->layoutRuns, inverseMatrix);
+      } else if (!text->glyphRuns.empty()) {
+        GlyphRunRenderer::BuildTextBlob(text, inverseMatrix);
+      }
+      prepared.textBlob = text->glyphData->textBlob;
+      prepared.anchors = text->glyphData->anchors;
+      return prepared;
+    }
     if (!text->glyphData->layoutRuns.empty()) {
-      text->glyphData->textBlob =
+      prepared.textBlob =
           GlyphRunRenderer::BuildTextBlobFromLayoutRuns(text->glyphData->layoutRuns, inverseMatrix);
     } else if (!text->glyphRuns.empty()) {
-      GlyphRunRenderer::BuildTextBlob(text, inverseMatrix);
+      prepared.textBlob =
+          GlyphRunRenderer::BuildTextBlob(text, inverseMatrix, &prepared.anchors, &_typefaceCache);
     }
+    return prepared;
+  }
+
+  // Export builds keep every render-time product in this context so the template document stays
+  // unchanged. Render builds keep the node-cache contract used by notifyChange and the CLI.
+  bool usesSharedTextCache() const {
+    return !_exportSession;
   }
 
   // FNV-1a 64-bit mixing step over a raw byte range. Kept as an explicit helper (no lambda)
@@ -1389,8 +1417,15 @@ class LayerBuilderContext {
   // stashes the result.
   void prepareTextBlobCached(Text* text, const tgfx::Matrix& inverseMatrix) {
     if (!text || !text->glyphData) return;
-    // Already prepared in this build session (or a previous instance hit the same cache slot).
-    if (text->glyphData->textBlob) return;
+    // Already prepared in this build session.
+    auto preparedIt = _preparedText.find(text);
+    if (preparedIt != _preparedText.end() && preparedIt->second.textBlob) return;
+    if (usesSharedTextCache() && text->glyphData->textBlob) {
+      auto& prepared = _preparedText[text];
+      prepared.textBlob = text->glyphData->textBlob;
+      prepared.anchors = text->glyphData->anchors;
+      return;
+    }
     // The runtime-shaping path uses layoutRuns rather than glyphRuns; the fingerprint scheme
     // here covers only the embedded glyphRuns path, which is what cocraft exports. Fall back
     // to the uncached path for layoutRuns to stay correct.
@@ -1402,14 +1437,19 @@ class LayerBuilderContext {
     size_t glyphSum = SumGlyphCount(text);
     auto it = _textBlobCache.find(fingerprint);
     if (it != _textBlobCache.end() && it->second.glyphSum == glyphSum) {
-      text->glyphData->textBlob = it->second.textBlob;
-      text->glyphData->anchors = it->second.anchors;
+      auto& prepared = _preparedText[text];
+      prepared.textBlob = it->second.textBlob;
+      prepared.anchors = it->second.anchors;
+      if (usesSharedTextCache()) {
+        text->glyphData->textBlob = it->second.textBlob;
+        text->glyphData->anchors = it->second.anchors;
+      }
       return;
     }
-    PrepareTextBlob(text, inverseMatrix);
-    if (text->glyphData->textBlob) {
+    auto& prepared = PrepareTextBlob(text, inverseMatrix);
+    if (prepared.textBlob) {
       _textBlobCache[fingerprint] =
-          TextBlobCacheEntry{glyphSum, text->glyphData->textBlob, text->glyphData->anchors};
+          TextBlobCacheEntry{glyphSum, prepared.textBlob, prepared.anchors};
     }
   }
 
@@ -1785,11 +1825,11 @@ class LayerBuilderContext {
 
   std::shared_ptr<tgfx::Text> convertText(Text* node) {
     prepareTextBlobCached(node, tgfx::Matrix::I());
-    auto textBlob = node->glyphData->textBlob;
-    if (textBlob == nullptr) {
+    auto preparedIt = _preparedText.find(node);
+    if (preparedIt == _preparedText.end() || preparedIt->second.textBlob == nullptr) {
       return nullptr;
     }
-    auto tgfxText = tgfx::Text::Make(textBlob, node->glyphData->anchors);
+    auto tgfxText = tgfx::Text::Make(preparedIt->second.textBlob, preparedIt->second.anchors);
     if (tgfxText) {
       auto pos = node->renderPosition();
       tgfxText->setPosition(tgfx::Point::Make(pos.x, pos.y));
@@ -3587,6 +3627,7 @@ class LayerBuilderContext {
   // structural changes (node additions/removals via notifyChange), callers must call
   // invalidateAllImages() to prevent dangling-pointer lookups.
   const PAGXDocument* _document = nullptr;
+  bool _exportSession = false;
   std::unordered_map<const Image*, std::shared_ptr<tgfx::Image>> _imageCache = {};
   // TextBlob fingerprint cache. Keyed by FNV-1a 64-bit hash over every BuildTextBlob input.
   // glyphSum acts as a secondary check guarding against the (vanishingly rare) hash collision.
@@ -3598,6 +3639,8 @@ class LayerBuilderContext {
     std::vector<tgfx::Point> anchors;
   };
   std::unordered_map<uint64_t, TextBlobCacheEntry> _textBlobCache = {};
+  std::unordered_map<const Text*, PreparedTextState> _preparedText = {};
+  GlyphRunRenderer::TypefaceCache _typefaceCache = {};
 };
 
 // Runtime build variant. Adds the "live" runtime structure the static base omits:
@@ -3680,7 +3723,7 @@ class RuntimeLayerBuilderContext : public LayerBuilderContext {
 
 // Public API implementation
 
-std::shared_ptr<tgfx::Layer> LayerBuilder::Build(PAGXDocument* document) {
+std::shared_ptr<tgfx::Layer> LayerBuilder::Build(PAGXDocument* document, bool exportSession) {
   if (document == nullptr) {
     return nullptr;
   }
@@ -3690,11 +3733,11 @@ std::shared_ptr<tgfx::Layer> LayerBuilder::Build(PAGXDocument* document) {
     return nullptr;
   }
 
-  LayerBuilderContext context;
+  LayerBuilderContext context(exportSession);
   return context.build(*document);
 }
 
-LayerBuildResult LayerBuilder::BuildWithMap(PAGXDocument* document) {
+LayerBuildResult LayerBuilder::BuildWithMap(PAGXDocument* document, bool exportSession) {
   if (document == nullptr) {
     return {};
   }
@@ -3706,7 +3749,7 @@ LayerBuildResult LayerBuilder::BuildWithMap(PAGXDocument* document) {
     return {};
   }
 
-  LayerBuilderContext context;
+  LayerBuilderContext context(exportSession);
   return context.buildWithMap(*document);
 }
 

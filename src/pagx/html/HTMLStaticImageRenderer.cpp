@@ -133,7 +133,7 @@ std::shared_ptr<tgfx::Data> RenderTileToPng(PAGXDocument* doc, int cssWidth, int
   int pxWidth = static_cast<int>(std::ceil(static_cast<float>(cssWidth) * rasterScale));
   int pxHeight = static_cast<int>(std::ceil(static_cast<float>(cssHeight) * rasterScale));
 
-  auto layer = LayerBuilder::Build(doc);
+  auto layer = LayerBuilder::Build(doc, true);
   if (!layer) {
     return nullptr;
   }

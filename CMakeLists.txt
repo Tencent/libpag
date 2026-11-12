@@ -329,6 +329,9 @@ if (PAG_BUILD_PAGX)
     if (PAG_BUILD_SVG)
         list(APPEND PAG_FILES src/pagx/svg/SVGImporter.cpp src/pagx/svg/SVGParserContext.h)
         list(APPEND PAG_FILES src/pagx/svg/SVGExporter.cpp src/pagx/svg/SVGFeatureProbe.cpp)
+        list(APPEND PAG_FILES src/pagx/svg/SVGAnimationPlan.cpp src/pagx/svg/SVGAnimationPlan.h)
+        list(APPEND PAG_FILES src/pagx/svg/SVGAnimationWriter.cpp src/pagx/svg/SVGAnimationWriter.h)
+        list(APPEND PAG_FILES src/pagx/svg/SVGCoverageLedger.cpp src/pagx/svg/SVGCoverageLedger.h)
     endif ()
 
     if (PAG_BUILD_HTML)
@@ -1155,6 +1158,52 @@ if (PAG_BUILD_CLI)
             WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
             USES_TERMINAL
             COMMENT "Running HTML browser-fidelity eval over resources/html corpora")
+
+    # D6 SVG browser-fidelity gate: pagx export -> fixed Chromium screenshot -> pagx render
+    # reference -> pixel/SSIM metrics. Playwright's bundled Chromium and Node.js are required.
+    # Cases default to resources/layout/constraint_textbox.pagx; override with SVG_BROWSER_CASES.
+    add_custom_target(SVGBrowserTest
+            COMMAND ${CMAKE_COMMAND} -E env PAGX_BIN=$<TARGET_FILE:pagx-cli>
+            bash ${CMAKE_CURRENT_SOURCE_DIR}/test/run_svg_browser_gate.sh
+            DEPENDS pagx-cli
+            WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+            USES_TERMINAL
+            COMMENT "Running SVG browser-fidelity gate in fixed Chromium")
+
+    # D6 animated gate: pauses SMIL at 0.5s in the browser and compares against the runtime
+    # renderer evaluated at the same time.
+    add_custom_target(SVGBrowserAnimTest
+            COMMAND ${CMAKE_COMMAND} -E env PAGX_BIN=$<TARGET_FILE:pagx-cli>
+            SVG_BROWSER_OUT=${CMAKE_CURRENT_SOURCE_DIR}/test/out/svg-browser-anim-gate
+            bash ${CMAKE_CURRENT_SOURCE_DIR}/test/run_svg_browser_gate.sh
+            ${CMAKE_CURRENT_SOURCE_DIR}/resources/cli/svg_browser_anim.pagx@0.5
+            ${CMAKE_CURRENT_SOURCE_DIR}/resources/cli/svg_browser_stop_anim.pagx@0.5
+            ${CMAKE_CURRENT_SOURCE_DIR}/resources/cli/svg_browser_grad_anim.pagx@0.5
+            ${CMAKE_CURRENT_SOURCE_DIR}/resources/cli/svg_browser_text_anim.pagx@0.5
+            ${CMAKE_CURRENT_SOURCE_DIR}/resources/cli/svg_browser_star_anim.pagx@0.5
+            ${CMAKE_CURRENT_SOURCE_DIR}/resources/cli/svg_browser_rect_trim_anim.pagx@0.5
+            ${CMAKE_CURRENT_SOURCE_DIR}/resources/cli/svg_browser_round_corner_anim.pagx@0.5
+            ${CMAKE_CURRENT_SOURCE_DIR}/resources/cli/svg_browser_ellipse_trim_anim.pagx@0.5
+            ${CMAKE_CURRENT_SOURCE_DIR}/resources/cli/svg_browser_trim_anim.pagx@0.5
+            ${CMAKE_CURRENT_SOURCE_DIR}/resources/cli/svg_browser_corner_anim.pagx@0.5
+            ${CMAKE_CURRENT_SOURCE_DIR}/resources/cli/svg_browser_layer_x_anim.pagx@0.5
+            ${CMAKE_CURRENT_SOURCE_DIR}/resources/cli/svg_browser_layer_rotate_anim.pagx@0.25
+            ${CMAKE_CURRENT_SOURCE_DIR}/resources/cli/svg_browser_shadow_anim.pagx@0.5
+            DEPENDS pagx-cli
+            WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+            USES_TERMINAL
+            COMMENT "Running animated SVG browser-fidelity gate in fixed Chromium")
+
+    # Regenerates docs/svg-policy-baseline.md from resources/**/*.pagx across the three static
+    # policies. Not part of the normal test run; run when policy defaults or resources change.
+    add_custom_target(SVGPolicyBaseline
+            COMMAND ${CMAKE_COMMAND} -E env
+            node ${CMAKE_CURRENT_SOURCE_DIR}/test/svg_policy_baseline.js
+            --pagx-bin $<TARGET_FILE:pagx-cli>
+            DEPENDS pagx-cli
+            WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+            USES_TERMINAL
+            COMMENT "Regenerating docs/svg-policy-baseline.md")
 
     # PPT visual-fidelity eval target. This is an end-to-end test rather than a
     # gtest binary: PAGX files are rendered natively, exported to PPTX, opened

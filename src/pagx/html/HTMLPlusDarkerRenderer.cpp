@@ -136,7 +136,7 @@ bool RenderCroppedBackdrop(const PAGXDocument& doc, tgfx::Context* ctx, float bx
   if (pxW <= 0 || pxH <= 0) {
     return false;
   }
-  auto layer = LayerBuilder::Build(const_cast<PAGXDocument*>(&doc));
+  auto layer = LayerBuilder::Build(const_cast<PAGXDocument*>(&doc), true);
   if (!layer) {
     return false;
   }

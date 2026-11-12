@@ -19,6 +19,7 @@
 #pragma once
 
 #include <memory>
+#include <unordered_map>
 #include <vector>
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/TextBlob.h"
@@ -44,6 +45,13 @@ struct TextLayoutGlyphRun;
 class GlyphRunRenderer {
  public:
   /**
+   * Per-build typeface cache. An entry with a null value records a failed build so pathological
+   * fonts are not retried, matching the node-level render cache semantics without writing into
+   * the shared Font node.
+   */
+  using TypefaceCache = std::unordered_map<const Font*, std::shared_ptr<tgfx::Typeface>>;
+
+  /**
    * Builds a TextBlob from a Text element's embedded GlyphRuns (pagx::GlyphRun), applying the
    * inverse matrix to convert from layout coordinates to Text local coordinates. Writes the
    * resulting TextBlob and per-glyph anchors directly into text->glyphData.
@@ -55,6 +63,22 @@ class GlyphRunRenderer {
   static void BuildTextBlob(Text* text, const tgfx::Matrix& inverseMatrix);
 
   /**
+   * Builds the TextBlob for a Text element's embedded GlyphRuns without writing into the shared
+   * Text node. Export builds use this overload to keep the template document free of render-time
+   * products while still sharing the exact glyph placement code.
+   * @param text the Text element providing the GlyphRuns and faux style.
+   * @param inverseMatrix the matrix converting layout coordinates into Text local coordinates.
+   * @param anchors optional output for the per-glyph anchors produced by the build.
+   * @param typefaceCache optional build-local typeface cache. When null, the shared Font node
+   *        render cache is used.
+   * @return the built TextBlob, or null when no run produced any glyph.
+   */
+  static std::shared_ptr<tgfx::TextBlob> BuildTextBlob(const Text* text,
+                                                       const tgfx::Matrix& inverseMatrix,
+                                                       std::vector<tgfx::Point>* anchors,
+                                                       TypefaceCache* typefaceCache = nullptr);
+
+  /**
    * Builds a TextBlob from runtime layout glyph runs (TextLayoutGlyphRun), applying the inverse
    * matrix to convert from layout coordinates to Text local coordinates.
    */
@@ -62,7 +86,10 @@ class GlyphRunRenderer {
       const std::vector<TextLayoutGlyphRun>& runs, const tgfx::Matrix& inverseMatrix);
 
  private:
-  static std::shared_ptr<tgfx::Typeface> BuildTypefaceFromFont(Font* fontNode);
+  static std::shared_ptr<tgfx::Typeface> BuildTypefaceFromFont(Font* fontNode,
+                                                               TypefaceCache* typefaceCache);
+
+  static std::shared_ptr<tgfx::Typeface> BuildTypefaceUncached(Font* fontNode);
 };
 
 }  // namespace pagx

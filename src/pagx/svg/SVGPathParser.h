@@ -20,11 +20,19 @@
 
 #include <string>
 #include "pagx/nodes/PathData.h"
+#include "tgfx/core/Path.h"
 
 namespace pagx {
 
 PathData PathDataFromSVGString(const std::string& d);
 
 std::string PathDataToSVGString(const PathData& path);
+
+/**
+ * Serializes a tgfx::Path to SVG path data with the same full-float precision as
+ * PathDataToSVGString. Used by exporters that bake path effects (e.g. adaptive dash) before
+ * emitting the geometry.
+ */
+std::string TGFXPathToSVGString(const tgfx::Path& path);
 
 }  // namespace pagx

@@ -349,6 +349,7 @@ class PAGXDocument : public Node {
   std::vector<std::weak_ptr<PAGScene>> liveScenes = {};
 
   friend class FontEmbedder;
+  friend class ModifierResolver;
 
   // Lazily built index of Image node filePath -> pagx Layer list, used by
   // findLayersByImageFilePath(). Built on first query; invalidated by notifyChange() since edits

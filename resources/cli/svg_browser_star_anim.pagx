@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- D6 animated gate case: a five-point star morphs its outer roundness from 0 to 1 over one
+     second. The browser gate pauses SMIL, seeks to 0.5s and compares against the runtime
+     renderer at the same time. -->
+<pagx width="200" height="120">
+  <Layer x="0" y="0" width="200" height="120">
+    <Polystar id="star" type="star" pointCount="5" outerRadius="45" innerRadius="22" outerRoundness="0" innerRoundness="0" position="100,60"/>
+    <Fill>
+      <SolidColor color="#3366FF"/>
+    </Fill>
+  </Layer>
+  <Animations>
+    <Animation id="round" duration="60" frameRate="60" loop="once">
+      <Object target="star">
+        <Channel name="outerRoundness" type="float">
+          <Key time="0" value="0" interpolation="linear"/>
+          <Key time="60" value="1" interpolation="linear"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>

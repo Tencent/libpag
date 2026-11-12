@@ -400,20 +400,24 @@ class LayerBuilder {
   /**
    * Builds a layer tree from a PAGXDocument.
    * @param document The document to build from. Must have had applyLayout() called.
+   * @param exportSession When true, shaped text blobs and built typefaces stay in the build
+   *        context instead of being written back into the shared Text / Font nodes. Exporters
+   *        pass true so the template document keeps only authored state.
    * @return The root layer of the built layer tree, or nullptr if document is null or layout was
    *         not applied.
    */
-  static std::shared_ptr<tgfx::Layer> Build(PAGXDocument* document);
+  static std::shared_ptr<tgfx::Layer> Build(PAGXDocument* document, bool exportSession = false);
 
   /**
    * Builds a layer tree and returns a mapping from PAGX Layer nodes to tgfx::Layer objects. This
    * mapping allows callers to look up the rendered layer for any PAGX Layer node.
    * @param document The document to build from. Must have had applyLayout() called.
+   * @param exportSession Same meaning as in Build().
    * @return A LayerBuildResult containing the root layer and runtime binding maps. Returns empty
    *         result if document is null or
    *         layout was not applied.
    */
-  static LayerBuildResult BuildWithMap(PAGXDocument* document);
+  static LayerBuildResult BuildWithMap(PAGXDocument* document, bool exportSession = false);
 
   /**
    * Builds a top-level layer tree for runtime use, stopping at Composition slot boundaries —

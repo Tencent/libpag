@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- D6 animated gate case: the first gradient stop lerps red to green over one second. The
+     browser gate pauses SMIL, seeks to 0.5s and compares against the runtime renderer at the
+     same time. -->
+<pagx width="200" height="100">
+  <Layer x="20" y="20" width="160" height="60">
+    <Rectangle position="80,30" size="160,60"/>
+    <Fill>
+      <LinearGradient startPoint="0,0" endPoint="160,0" fitsToGeometry="false">
+        <ColorStop id="stop0" color="#FF0000" offset="0"/>
+        <ColorStop id="stop1" color="#0000FF" offset="1"/>
+      </LinearGradient>
+    </Fill>
+  </Layer>
+  <Animations>
+    <Animation id="stopPulse" duration="60" frameRate="60" loop="once">
+      <Object target="stop0">
+        <Channel name="color" type="color">
+          <Key time="0" value="#FF0000" interpolation="linear"/>
+          <Key time="60" value="#00FF00" interpolation="linear"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>

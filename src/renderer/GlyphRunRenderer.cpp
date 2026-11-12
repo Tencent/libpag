@@ -99,9 +99,19 @@ static void WriteGlyphsWithMode(tgfx::TextBlobBuilder& builder, const tgfx::Font
   }
 }
 
-std::shared_ptr<tgfx::Typeface> GlyphRunRenderer::BuildTypefaceFromFont(Font* fontNode) {
+std::shared_ptr<tgfx::Typeface> GlyphRunRenderer::BuildTypefaceFromFont(
+    Font* fontNode, TypefaceCache* typefaceCache) {
   if (fontNode == nullptr) {
     return nullptr;
+  }
+  if (typefaceCache != nullptr) {
+    auto it = typefaceCache->find(fontNode);
+    if (it != typefaceCache->end()) {
+      return it->second;
+    }
+    auto typeface = BuildTypefaceUncached(fontNode);
+    (*typefaceCache)[fontNode] = typeface;
+    return typeface;
   }
   if (fontNode->renderCache == nullptr) {
     fontNode->renderCache = std::make_unique<FontRenderCache>();
@@ -114,7 +124,11 @@ std::shared_ptr<tgfx::Typeface> GlyphRunRenderer::BuildTypefaceFromFont(Font* fo
   // Mark the build as attempted up-front so that pathological Fonts (empty glyphs, mixed
   // path+image, or builders that fail to detach) are not retried on every render call.
   cache.built = true;
+  cache.typeface = BuildTypefaceUncached(fontNode);
+  return cache.typeface;
+}
 
+std::shared_ptr<tgfx::Typeface> GlyphRunRenderer::BuildTypefaceUncached(Font* fontNode) {
   if (fontNode->glyphs.empty()) {
     return nullptr;
   }
@@ -173,20 +187,31 @@ std::shared_ptr<tgfx::Typeface> GlyphRunRenderer::BuildTypefaceFromFont(Font* fo
     typeface = builder.detach();
   }
 
-  fontNode->renderCache->typeface = typeface;
   return typeface;
 }
-
 void GlyphRunRenderer::BuildTextBlob(Text* text, const tgfx::Matrix& inverseMatrix) {
+  if (text == nullptr || text->glyphData == nullptr) {
+    return;
+  }
+  text->glyphData->textBlob = BuildTextBlob(text, inverseMatrix, &text->glyphData->anchors);
+}
+
+std::shared_ptr<tgfx::TextBlob> GlyphRunRenderer::BuildTextBlob(const Text* text,
+                                                                const tgfx::Matrix& inverseMatrix,
+                                                                std::vector<tgfx::Point>* anchors,
+                                                                TypefaceCache* typefaceCache) {
+  if (text == nullptr) {
+    return nullptr;
+  }
   tgfx::TextBlobBuilder builder = {};
-  std::vector<tgfx::Point> anchors;
+  std::vector<tgfx::Point> builtAnchors;
 
   for (const auto& run : text->glyphRuns) {
     if (run->glyphs.empty()) {
       continue;
     }
 
-    auto typeface = BuildTypefaceFromFont(run->font);
+    auto typeface = BuildTypefaceFromFont(run->font, typefaceCache);
     if (typeface == nullptr) {
       continue;
     }
@@ -205,9 +230,9 @@ void GlyphRunRenderer::BuildTextBlob(Text* text, const tgfx::Matrix& inverseMatr
     if (!run->anchors.empty()) {
       for (size_t i = 0; i < count; i++) {
         if (i < run->anchors.size()) {
-          anchors.push_back(tgfx::Point::Make(run->anchors[i].x, run->anchors[i].y));
+          builtAnchors.push_back(tgfx::Point::Make(run->anchors[i].x, run->anchors[i].y));
         } else {
-          anchors.push_back(tgfx::Point::Zero());
+          builtAnchors.push_back(tgfx::Point::Zero());
         }
       }
     }
@@ -285,8 +310,10 @@ void GlyphRunRenderer::BuildTextBlob(Text* text, const tgfx::Matrix& inverseMatr
     WriteGlyphsWithMode(builder, font, run->glyphs.data(), count, glyphMatrices, mode);
   }
 
-  text->glyphData->textBlob = builder.build();
-  text->glyphData->anchors = std::move(anchors);
+  if (anchors != nullptr) {
+    *anchors = std::move(builtAnchors);
+  }
+  return builder.build();
 }
 
 std::shared_ptr<tgfx::TextBlob> GlyphRunRenderer::BuildTextBlobFromLayoutRuns(

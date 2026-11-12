@@ -18,6 +18,7 @@
 
 #include "renderer/TextHolder.h"
 #include <variant>
+#include "base/utils/Log.h"
 #include "pagx/LayoutContext.h"
 #include "pagx/runtime/MixUtils.h"
 #include "renderer/GlyphRunRenderer.h"
@@ -165,25 +166,49 @@ void TextHolder::flush(FontConfig* fontConfig) {
     elements.push_back({entry.node, entry.glyph});
   }
   LayoutContext context(fontConfig);
-  auto result = TextLayout::Layout(elements, params, &context);
+  // A shaping channel changed, so the readable Text content is authoritative even when the node
+  // still carries authored GlyphRuns from the document. Force the real shaping path instead of the
+  // embedded fast path that would only report the original bounds.
+  auto result = TextLayout::Layout(elements, params, &context, false);
   for (auto& entry : entries) {
+    auto text = entry.target->getObject<tgfx::Text>();
+    if (text == nullptr) {
+      continue;
+    }
     auto runs = result.extractLayoutRuns(entry.node);
     // Bake the container padding offset into the run positions the same way TextBox::updateLayout
     // does, so a reshaped TextBox child stays aligned with its box inset.
     ApplyPaddingToRuns(runs, entry.paddingLeft, entry.paddingTop);
+    if (runs.empty()) {
+      // The new content legitimately has no glyphs (empty text or every glyph dropped). Clear the
+      // blob instead of keeping the previous glyphs; the Text object and its position survive.
+      text->clearTextBlob();
+      continue;
+    }
     auto textBlob = GlyphRunRenderer::BuildTextBlobFromLayoutRuns(runs, entry.inverseMatrix);
     if (textBlob == nullptr) {
+      LOGE(
+          "TextHolder::flush: shaping produced runs but no blob for Text '%s'; clearing the "
+          "stale glyphs.",
+          entry.node->id.c_str());
+      text->clearTextBlob();
       continue;
     }
     // Reshape in place: replace the existing tgfx::Text's blob rather than building a new object.
     // The render tree (parent VectorGroup / VectorLayer) and the binding both hold the same Text
     // object, so an in-place blob swap takes effect on the next draw without any reference sync.
     // The runtime position set by x / y writers is preserved because the object is not replaced.
-    auto text = entry.target->getObject<tgfx::Text>();
-    if (text == nullptr) {
-      continue;
+    // Explicit anchors are kept per glyph order and resized to the new glyph count; without
+    // explicit anchors setTextBlob's empty vector keeps the default advance/2 anchors.
+    std::vector<tgfx::Point> anchors = text->anchors();
+    if (!anchors.empty()) {
+      size_t glyphCount = 0;
+      for (auto run : *textBlob) {
+        glyphCount += run.glyphCount;
+      }
+      anchors.resize(glyphCount, tgfx::Point::Zero());
     }
-    text->setTextBlob(textBlob);
+    text->setTextBlob(textBlob, std::move(anchors));
   }
 }
 

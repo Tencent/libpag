@@ -17,18 +17,26 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include <cmath>
+#include <cstdlib>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
+#include <iterator>
 #include <set>
 #include "cli/CommandVerify.h"
+#include "pagx/PAGImage.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/PAGXExporter.h"
 #include "pagx/PAGXImporter.h"
+#include "pagx/PAGXNodeChannel.h"
 #include "pagx/PAGXOptimizer.h"
 #include "pagx/SVGExporter.h"
 #include "pagx/SVGImporter.h"
 #include "pagx/TextLayout.h"
+#include "pagx/nodes/Animation.h"
+#include "pagx/nodes/AnimationObject.h"
+#include "pagx/nodes/AnimationTimeline.h"
+#include "pagx/nodes/BackgroundBlurStyle.h"
 #include "pagx/nodes/BlendFilter.h"
 #include "pagx/nodes/BlurFilter.h"
 #include "pagx/nodes/ColorMatrixFilter.h"
@@ -47,12 +55,16 @@
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/ImagePattern.h"
 #include "pagx/nodes/InnerShadowFilter.h"
+#include "pagx/nodes/InnerShadowStyle.h"
 #include "pagx/nodes/LinearGradient.h"
 #include "pagx/nodes/MergePath.h"
+#include "pagx/nodes/NoiseFilter.h"
+#include "pagx/nodes/NoiseStyle.h"
 #include "pagx/nodes/Path.h"
 #include "pagx/nodes/PathData.h"
 #include "pagx/nodes/Polystar.h"
 #include "pagx/nodes/RadialGradient.h"
+#include "pagx/nodes/RangeSelector.h"
 #include "pagx/nodes/Rectangle.h"
 #include "pagx/nodes/Repeater.h"
 #include "pagx/nodes/RoundCorner.h"
@@ -60,10 +72,14 @@
 #include "pagx/nodes/Stroke.h"
 #include "pagx/nodes/Text.h"
 #include "pagx/nodes/TextBox.h"
+#include "pagx/nodes/TextModifier.h"
 #include "pagx/nodes/TextPath.h"
 #include "pagx/nodes/TrimPath.h"
+#include "pagx/svg/SVGAnimationPlan.h"
+#include "pagx/svg/SVGCoverageLedger.h"
 #include "pagx/svg/SVGPathParser.h"
 #include "pagx/svg/SVGTransformParser.h"
+#include "pagx/utils/StringParser.h"
 #include "renderer/FontEmbedder.h"
 #include "renderer/LayerBuilder.h"
 #include "tgfx/core/Data.h"
@@ -1380,7 +1396,7 @@ PAGX_TEST(PAGXSVGTest, SVGExport_DropShadowStyle) {
  * Vector export reports the loss of non-zero spread for both shadow styles and preserves the
  * zero-spread output. Zero values do not emit warnings.
  */
-PAGX_TEST(PAGXSVGTest, SVGExport_ShadowSpreadWarnings) {
+PAGX_TEST(PAGXSVGTest, SVGExport_ShadowSpreadUsesMorphology) {
   for (const auto* spread : {"8", "-8", "0"}) {
     SCOPED_TRACE(spread);
     auto xml = std::string(R"(<pagx width="100" height="100"><Layer>)") +
@@ -1393,14 +1409,16 @@ PAGX_TEST(PAGXSVGTest, SVGExport_ShadowSpreadWarnings) {
     auto svg = pagx::SVGExporter::ToSVG(*doc, {}, &warnings);
     EXPECT_FALSE(svg.empty());
     EXPECT_NE(svg.find("<feMerge"), std::string::npos);
+    EXPECT_TRUE(warnings.empty()) << (warnings.empty() ? "" : warnings[0]);
     if (std::string(spread) == "0") {
-      EXPECT_TRUE(warnings.empty());
+      EXPECT_EQ(svg.find("<feMorphology"), std::string::npos);
     } else {
-      ASSERT_EQ(warnings.size(), 2u);
-      EXPECT_NE(warnings[0].find("DropShadowStyle spread"), std::string::npos);
-      EXPECT_NE(warnings[0].find("'drop'"), std::string::npos);
-      EXPECT_NE(warnings[1].find("InnerShadowStyle spread"), std::string::npos);
-      EXPECT_NE(warnings[1].find("'inner'"), std::string::npos);
+      // A non-zero spread grows (positive) or shrinks (negative) the silhouette before blurring.
+      EXPECT_NE(svg.find("<feMorphology"), std::string::npos);
+      EXPECT_NE(
+          svg.find(std::string(spread)[0] == '-' ? "operator=\"erode\"" : "operator=\"dilate\""),
+          std::string::npos);
+      EXPECT_NE(svg.find("radius=\"8\""), std::string::npos);
     }
   }
 }
@@ -1461,7 +1479,6 @@ PAGX_TEST(PAGXSVGTest, SVGExport_WritingModeVertical) {
   doc->layers.push_back(layer);
 
   pagx::SVGExportOptions options;
-  options.convertTextToPath = false;
   auto svg = pagx::SVGExporter::ToSVG(*doc, options);
   EXPECT_NE(svg.find("writing-mode=\"vertical-rl\""), std::string::npos);
   SaveFile(svg, "PAGXSVGTest/svg_export_writing_mode_vertical.svg");
@@ -1505,7 +1522,6 @@ PAGX_TEST(PAGXSVGTest, SVGExport_WritingModeVerticalJustifyEmitsTextLength) {
   doc->layers.push_back(layer);
 
   pagx::SVGExportOptions options;
-  options.convertTextToPath = false;
   auto svg = pagx::SVGExporter::ToSVG(*doc, options);
   EXPECT_NE(svg.find("writing-mode=\"vertical-rl\""), std::string::npos);
   EXPECT_NE(svg.find("textLength="), std::string::npos);
@@ -2177,7 +2193,7 @@ PAGX_TEST(PAGXSVGTest, SVGExport_RepeaterFractionalCopies) {
 }
 
 PAGX_TEST(PAGXSVGTest, SVGExport_RepeaterNegativeScaleFractionalOffset) {
-  // Triggers SignedPow's sign-preservation on a negative base with non-integer exponent.
+  // A negative scale with a fractional progress is NaN in tgfx, so every copy is invisible.
   auto doc = pagx::PAGXDocument::Make(400, 200);
   auto* layer = doc->makeNode<pagx::Layer>();
   auto* rect = doc->makeNode<pagx::Rectangle>();
@@ -2194,7 +2210,7 @@ PAGX_TEST(PAGXSVGTest, SVGExport_RepeaterNegativeScaleFractionalOffset) {
   doc->layers.push_back(layer);
 
   auto svg = pagx::SVGExporter::ToSVG(*doc);
-  EXPECT_NE(svg.find("<rect"), std::string::npos);
+  EXPECT_EQ(svg.find("<rect"), std::string::npos);
 }
 
 PAGX_TEST(PAGXSVGTest, SVGExport_PathWithRenderScale) {
@@ -2375,7 +2391,7 @@ PAGX_TEST(PAGXSVGTest, SVGExport_ConicGradientDegradesToRadial) {
   doc->layers.push_back(layer);
 
   pagx::SVGExporter::Options opts;
-  opts.bakeUnsupported = false;
+  opts.staticPolicy = pagx::SVGStaticExportPolicy::BestEffort;
   auto svg = pagx::SVGExporter::ToSVG(*doc, opts);
   EXPECT_NE(svg.find("<radialGradient"), std::string::npos);
   EXPECT_NE(svg.find("conic gradient degraded"), std::string::npos);
@@ -2405,13 +2421,13 @@ PAGX_TEST(PAGXSVGTest, SVGExport_DiamondGradientDegradesToRadial) {
   doc->layers.push_back(layer);
 
   pagx::SVGExporter::Options opts;
-  opts.bakeUnsupported = false;
+  opts.staticPolicy = pagx::SVGStaticExportPolicy::BestEffort;
   auto svg = pagx::SVGExporter::ToSVG(*doc, opts);
   EXPECT_NE(svg.find("<radialGradient"), std::string::npos);
   EXPECT_NE(svg.find("diamond gradient degraded"), std::string::npos);
 }
 
-// Coverage for bakeUnsupported=true (the default): conic / diamond gradient trips the SVG
+// Coverage for the default PreserveAppearance policy: conic / diamond gradient trips the SVG
 // feature probe and is baked to an embedded PNG patch via <image> instead of degrading to a
 // radial gradient.
 PAGX_TEST(PAGXSVGTest, SVGExport_BakeUnsupportedRastersConicGradient) {
@@ -2436,12 +2452,56 @@ PAGX_TEST(PAGXSVGTest, SVGExport_BakeUnsupportedRastersConicGradient) {
   layer->contents.push_back(fill);
   doc->layers.push_back(layer);
 
-  // Default options: bakeUnsupported=true. Expect an <image> with a PNG data URI to replace the
+  // Default options: PreserveAppearance. Expect an <image> with a PNG data URI to replace the
   // vector emission, and no <radialGradient> degrade fallback to slip through.
   auto svg = pagx::SVGExporter::ToSVG(*doc);
   EXPECT_NE(svg.find("<image"), std::string::npos);
   EXPECT_NE(svg.find("data:image/png;base64,"), std::string::npos);
   EXPECT_EQ(svg.find("<radialGradient"), std::string::npos);
+}
+
+// S6: VectorOnly rejects conic gradients that would need a baked patch, while
+// PreserveAppearance bakes them.
+PAGX_TEST(PAGXSVGTest, SVGExport_StaticPoliciesForConicGradient) {
+  auto makeDoc = []() {
+    auto doc = pagx::PAGXDocument::Make(200, 200);
+    auto* layer = doc->makeNode<pagx::Layer>();
+    auto* rect = doc->makeNode<pagx::Rectangle>();
+    rect->position = {100, 100};
+    rect->size = {180, 180};
+    auto* grad = doc->makeNode<pagx::ConicGradient>();
+    grad->center = {100, 100};
+    auto* first = doc->makeNode<pagx::ColorStop>();
+    first->offset = 0.0f;
+    first->color = {1, 0, 0, 1};
+    auto* second = doc->makeNode<pagx::ColorStop>();
+    second->offset = 1.0f;
+    second->color = {0, 0, 1, 1};
+    grad->colorStops = {first, second};
+    auto* fill = doc->makeNode<pagx::Fill>();
+    fill->color = grad;
+    layer->contents = {rect, fill};
+    doc->layers.push_back(layer);
+    return doc;
+  };
+
+  auto vectorDoc = makeDoc();
+  pagx::SVGExportOptions vectorOnly = {};
+  vectorOnly.staticPolicy = pagx::SVGStaticExportPolicy::VectorOnly;
+  std::vector<std::string> warnings;
+  std::vector<pagx::SVGDiagnostic> diagnostics;
+  vectorOnly.diagnostics = &diagnostics;
+  auto vectorSvg = pagx::SVGExporter::ToSVG(*vectorDoc, vectorOnly, &warnings);
+  EXPECT_TRUE(vectorSvg.empty());
+  EXPECT_FALSE(warnings.empty());
+  ASSERT_FALSE(diagnostics.empty());
+  EXPECT_EQ(diagnostics.front().action, pagx::SVGDiagnosticAction::Rejected);
+
+  auto preserveDoc = makeDoc();
+  pagx::SVGExportOptions preserve = {};
+  preserve.staticPolicy = pagx::SVGStaticExportPolicy::PreserveAppearance;
+  auto preserveSvg = pagx::SVGExporter::ToSVG(*preserveDoc, preserve);
+  EXPECT_NE(preserveSvg.find("data:image/png;base64,"), std::string::npos);
 }
 
 PAGX_TEST(PAGXSVGTest, SVGExport_BakeUnsupportedRastersDiamondGradient) {
@@ -2520,7 +2580,7 @@ PAGX_TEST(PAGXSVGTest, SVGExport_BakeUnsupportedHonoursScrollRect) {
 }
 
 // Coverage for the rasterScale clamp: 0 / negative / huge values must be clamped to a usable
-// range so bakeUnsupported=true still produces a non-empty <image>. The placed <image> always
+// range so the default PreserveAppearance policy still produces a non-empty <image>. The placed <image> always
 // keeps logical coordinates regardless of the chosen scale, but the PNG payload size scales.
 PAGX_TEST(PAGXSVGTest, SVGExport_RasterScaleDefaultProducesImage) {
   auto doc = pagx::PAGXDocument::Make(120, 120);
@@ -2565,8 +2625,8 @@ PAGX_TEST(PAGXSVGTest, SVGExport_RasterScaleClampsZeroAndNegative) {
   doc->layers.push_back(layer);
 
   // rasterScale=0 / negative would silently produce a zero-pixel surface and the bake would
-  // fall through to the vector path, contradicting bakeUnsupported=true. The clamp at the
-  // entry point keeps the bake alive.
+  // fall through to the vector path, contradicting the PreserveAppearance policy. The clamp at
+  // the entry point keeps the bake alive.
   pagx::SVGExporter::Options opts;
   opts.rasterScale = 0.0f;
   auto svg = pagx::SVGExporter::ToSVG(*doc, opts);
@@ -2973,7 +3033,7 @@ PAGX_TEST(PAGXSVGTest, SVGExport_FilterCombinationDropShadowPlusBlur) {
 }
 
 PAGX_TEST(PAGXSVGTest, SVGExport_ConvertTextToPathDisabled) {
-  // Exercises native <text> emission path (writeText) when convertTextToPath is off.
+  // Exercises native <text> emission path (writeText) for a Text without authored glyphs.
   auto doc = pagx::PAGXDocument::Make(300, 100);
   auto* layer = doc->makeNode<pagx::Layer>();
   auto* text = doc->makeNode<pagx::Text>();
@@ -2994,7 +3054,6 @@ PAGX_TEST(PAGXSVGTest, SVGExport_ConvertTextToPathDisabled) {
   doc->layers.push_back(layer);
 
   pagx::SVGExporter::Options opts;
-  opts.convertTextToPath = false;
   auto svg = pagx::SVGExporter::ToSVG(*doc, opts);
   EXPECT_NE(svg.find("<text"), std::string::npos);
   EXPECT_NE(svg.find("Native"), std::string::npos);
@@ -3320,7 +3379,6 @@ PAGX_TEST(PAGXSVGTest, SVGExport_TextMultiLine) {
   doc->layers.push_back(layer);
 
   pagx::SVGExporter::Options opts;
-  opts.convertTextToPath = false;
   auto svg = pagx::SVGExporter::ToSVG(*doc, opts);
   EXPECT_NE(svg.find("<text"), std::string::npos);
 }
@@ -3347,7 +3405,6 @@ PAGX_TEST(PAGXSVGTest, SVGExport_TextInContainer) {
   doc->layers.push_back(layer);
 
   pagx::SVGExporter::Options opts;
-  opts.convertTextToPath = false;
   auto svg = pagx::SVGExporter::ToSVG(*doc, opts);
   EXPECT_NE(svg.find("<text"), std::string::npos);
 }
@@ -3390,7 +3447,7 @@ PAGX_TEST(PAGXSVGTest, SVGExport_LayerMatrix3D) {
 // <style>@font-face{...}</style> declaration in <defs>. Text nodes whose GlyphRun references a
 // participating Font are emitted as a real <text> element with PUA Unicode characters mapped
 // 1:1 to glyph IDs (0xE000 + (gid-1)). The path output is reserved for cases the <text> element
-// cannot losslessly express: convertTextToPath=true, embedFontsAsWoff2=false, bitmap fonts, runs
+// cannot losslessly express: embedFontsAsWoff2=false, bitmap fonts, runs
 // with per-glyph scales/skews, and gradient fills.
 
 // Builds a minimal vector Font with two square-ish glyph paths plus a Text containing a single
@@ -3472,24 +3529,6 @@ PAGX_TEST(PAGXSVGTest, SVGExport_EmbedFontsAsWoff2_Disabled) {
   EXPECT_EQ(svg.find("pagx-font-"), std::string::npos);
   EXPECT_NE(svg.find("<path"), std::string::npos);
   SaveFile(svg, "PAGXSVGTest/svg_export_embed_fonts_woff2_disabled.svg");
-}
-
-/**
- * convertTextToPath=true is the user explicitly asking for outline geometry. The pre-pass must
- * skip WOFF2 generation regardless of embedFontsAsWoff2's value, and the GlyphRun must render
- * as a <path>.
- */
-PAGX_TEST(PAGXSVGTest, SVGExport_EmbedFontsAsWoff2_SuppressedByConvertTextToPath) {
-  auto doc = MakeVectorGlyphRunDocSVG();
-
-  pagx::SVGExporter::Options opts;
-  opts.embedFontsAsWoff2 = true;
-  opts.convertTextToPath = true;
-  auto svg = pagx::SVGExporter::ToSVG(*doc, opts);
-  EXPECT_EQ(svg.find("@font-face"), std::string::npos);
-  EXPECT_EQ(svg.find("data:font/woff2"), std::string::npos);
-  EXPECT_NE(svg.find("<path"), std::string::npos);
-  SaveFile(svg, "PAGXSVGTest/svg_export_embed_fonts_woff2_convert_to_path.svg");
 }
 
 /**
@@ -3948,7 +3987,7 @@ PAGX_TEST(PAGXSVGTest, SVGExport_RepeaterClampsExcessiveCopies) {
 }
 
 PAGX_TEST(PAGXSVGTest, SVGExport_RepeaterNegativeScale) {
-  // Negative scale exercises SignedPow's negative branch.
+  // A half-step offset makes every progress fractional; tgfx produces NaN scales and no output.
   auto doc = pagx::PAGXDocument::Make(400, 200);
   auto* layer = doc->makeNode<pagx::Layer>();
   auto* rect = doc->makeNode<pagx::Rectangle>();
@@ -4108,7 +4147,7 @@ PAGX_TEST(PAGXSVGTest, SVGExport_TrimPathOnEllipse) {
  * argument, and applies that. Regression: if entry.alpha sneaks back in, the outer fill would
  * be emitted with `fill-opacity="0.5"` or equivalent.
  */
-PAGX_TEST(PAGXSVGTest, SVGExport_PaintersOutsideGroupIgnoreGroupAlpha) {
+PAGX_TEST(PAGXSVGTest, SVGExport_PaintersOutsideGroupApplyGroupAlpha) {
   auto doc = pagx::PAGXDocument::Make(200, 200);
   auto* layer = doc->makeNode<pagx::Layer>();
   auto* group = doc->makeNode<pagx::Group>();
@@ -4118,19 +4157,12 @@ PAGX_TEST(PAGXSVGTest, SVGExport_PaintersOutsideGroupIgnoreGroupAlpha) {
   rect->size = {80, 80};
   group->elements.push_back(rect);
   layer->contents.push_back(group);
-  // Painter lives in the layer scope, OUTSIDE the group. With the fix, its alpha is the layer's
-  // alpha (1.0). Without the fix, the rect's `entry.alpha = 0.5` (captured inside the group)
-  // gets multiplied in.
+  // Painter lives in the layer scope, OUTSIDE the group; the geometry keeps the group's alpha.
   layer->contents.push_back(MakeSolidFillSVG(doc.get(), 1.0f, 0.0f, 0.0f));
   doc->layers.push_back(layer);
 
   auto svg = pagx::SVGExporter::ToSVG(*doc);
-  // The fill emits `fill="rgb(255,0,0)"`. Any fill-opacity attribute at all would indicate the
-  // painter took on the group's 0.5 alpha. Both writeRectangle's `fill-opacity` and the inline
-  // `;opacity:0.5` style spellings would trigger the regression, so check both shapes.
-  EXPECT_EQ(svg.find("fill-opacity"), std::string::npos);
-  EXPECT_EQ(svg.find("opacity:0.5"), std::string::npos);
-  EXPECT_EQ(svg.find("opacity=\"0.5\""), std::string::npos);
+  EXPECT_NE(svg.find("fill-opacity=\"0.5\""), std::string::npos) << svg;
 }
 
 /**
@@ -4427,13 +4459,14 @@ PAGX_TEST(PAGXSVGTest, SVGExport_SharedMaskLayerMaskAndContourEmitDistinctDefs) 
  * divergence is visible to CI / log readers, while still emitting the <mask> def so the
  * owner is not silently dropped from the SVG.
  */
-PAGX_TEST(PAGXSVGTest, SVGExport_CrossParentMaskEmitsWarningButKeepsDef) {
+PAGX_TEST(PAGXSVGTest, SVGExport_CrossParentMaskUsesRelativeMatrix) {
   auto doc = pagx::PAGXDocument::Make(400, 400);
 
   auto* topA = doc->makeNode<pagx::Layer>();
   topA->id = "topA";
   auto* maskLayer = doc->makeNode<pagx::Layer>();
   maskLayer->id = "crossParentMask";
+  maskLayer->x = 10.0f;
   auto* maskRect = doc->makeNode<pagx::Rectangle>();
   maskRect->position = {50, 50};
   maskRect->size = {80, 80};
@@ -4444,6 +4477,7 @@ PAGX_TEST(PAGXSVGTest, SVGExport_CrossParentMaskEmitsWarningButKeepsDef) {
 
   auto* topB = doc->makeNode<pagx::Layer>();
   topB->id = "topB";
+  topB->x = 100.0f;
   auto* owner = doc->makeNode<pagx::Layer>();
   owner->id = "crossParentOwner";
   owner->mask = maskLayer;
@@ -4459,23 +4493,3947 @@ PAGX_TEST(PAGXSVGTest, SVGExport_CrossParentMaskEmitsWarningButKeepsDef) {
   std::vector<std::string> warnings;
   auto svg = pagx::SVGExporter::ToSVG(*doc, {}, &warnings);
 
-  // The cross-parent reference must be flagged for CI / log visibility.
-  bool sawCrossParentWarning = false;
-  for (const auto& w : warnings) {
-    if (w.find("crossParentMask") != std::string::npos &&
-        w.find("crossParentOwner") != std::string::npos &&
-        w.find("across parent boundaries") != std::string::npos) {
-      sawCrossParentWarning = true;
-      break;
-    }
-  }
-  EXPECT_TRUE(sawCrossParentWarning);
-
-  // Emission is preserved (warning-only, not skip): the <mask> def appears in <defs> and the
-  // owner still carries the mask attribute. A regression that silently drops the def would
-  // leave the SVG without `<mask id=...>` and the owner without its `mask=` attribute.
+  // The mask body is placed in the owner's parent space: translate(10) relative to translate(100)
+  // is matrix(1,0,0,1,-90,0). The old implementation applied only the mask layer's own matrix and
+  // reported a warning instead.
   EXPECT_NE(svg.find("id=\"crossParentMask_a\""), std::string::npos);
   EXPECT_NE(svg.find("mask=\"url(#crossParentMask_a)\""), std::string::npos);
+  EXPECT_NE(svg.find("matrix(1,0,0,1,-90,0)"), std::string::npos);
+  for (const auto& warning : warnings) {
+    EXPECT_EQ(warning.find("across parent boundaries"), std::string::npos) << warning;
+  }
+}
+
+//==============================================================================
+// PAGX animation -> SVG SMIL export
+//==============================================================================
+
+static pagx::Animation* MakeAnimation(pagx::PAGXDocument* doc, pagx::Frame duration,
+                                      pagx::LoopMode loop, float frameRate = 60.0f) {
+  auto* animation = doc->makeNode<pagx::Animation>("anim");
+  animation->duration = duration;
+  animation->frameRate = frameRate;
+  animation->loop = loop;
+  doc->animations.push_back(animation);
+  return animation;
+}
+
+static pagx::AnimationObject* MakeAnimationObject(pagx::PAGXDocument* doc,
+                                                  pagx::Animation* animation,
+                                                  const std::string& targetId) {
+  auto* object = doc->makeNode<pagx::AnimationObject>();
+  object->target = targetId;
+  animation->objects.push_back(object);
+  return object;
+}
+
+template <typename T>
+static pagx::TypedChannel<T>* MakeChannel(pagx::PAGXDocument* doc, pagx::AnimationObject* object,
+                                          const std::string& name) {
+  auto* channel = doc->makeNode<pagx::TypedChannel<T>>();
+  channel->name = name;
+  object->channels.push_back(channel);
+  return channel;
+}
+
+static void AttachTimeline(pagx::Layer* layer, const std::string& animationId,
+                           int64_t evaluationOffset = 0, bool playing = true) {
+  auto timeline = std::make_unique<pagx::AnimationTimeline>();
+  timeline->animationId = animationId;
+  timeline->evaluationOffset = evaluationOffset;
+  timeline->playing = playing;
+  layer->timelines.push_back(std::move(timeline));
+}
+
+static std::shared_ptr<pagx::PAGXDocument> MakeRectDocument(pagx::Rectangle** outRect = nullptr,
+                                                            pagx::Fill** outFill = nullptr,
+                                                            pagx::Stroke** outStroke = nullptr) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto* layer = doc->makeNode<pagx::Layer>("layer");
+  auto* rect = doc->makeNode<pagx::Rectangle>("rect");
+  rect->position = {100, 100};
+  rect->size = {160, 120};
+  auto* fill = doc->makeNode<pagx::Fill>("fill");
+  auto* solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {1.0f, 0.0f, 0.0f, 1.0f};
+  fill->color = solid;
+  auto* stroke = doc->makeNode<pagx::Stroke>("stroke");
+  auto* strokeSolid = doc->makeNode<pagx::SolidColor>();
+  strokeSolid->color = {0.0f, 0.0f, 1.0f, 1.0f};
+  stroke->color = strokeSolid;
+  stroke->width = 4.0f;
+  layer->contents = {rect, fill, stroke};
+  doc->layers.push_back(layer);
+  if (outRect != nullptr) {
+    *outRect = rect;
+  }
+  if (outFill != nullptr) {
+    *outFill = fill;
+  }
+  if (outStroke != nullptr) {
+    *outStroke = stroke;
+  }
+  return doc;
+}
+
+// F10: animations inside a mask layer reach the actual <mask>/<clipPath> host, and a Strict
+// rejection inside the mask propagates to the whole export.
+PAGX_TEST(PAGXSVGTest, SVGExport_AnimMaskContent) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto* maskLayer = doc->makeNode<pagx::Layer>("maskLayer");
+  auto* maskRect = doc->makeNode<pagx::Rectangle>("maskRect");
+  maskRect->position = {100, 100};
+  maskRect->size = {120, 120};
+  maskLayer->contents = {maskRect, MakeSolidFillSVG(doc.get(), 1, 1, 1)};
+
+  auto* user = doc->makeNode<pagx::Layer>("user");
+  user->mask = maskLayer;
+  user->maskType = pagx::MaskType::Alpha;
+  auto* rect = doc->makeNode<pagx::Rectangle>("rect");
+  rect->position = {100, 100};
+  rect->size = {180, 180};
+  user->contents = {rect, MakeSolidFillSVG(doc.get(), 0.2f, 0.6f, 0.9f)};
+  doc->layers.push_back(user);
+
+  auto* animation = MakeAnimation(doc.get(), 60, pagx::LoopMode::Once);
+  auto* object = MakeAnimationObject(doc.get(), animation, "maskRect");
+  auto* channel = MakeChannel<float>(doc.get(), object, "size.width");
+  channel->keyframes.push_back({0, 120.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  channel->keyframes.push_back({60, 160.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  AttachTimeline(user, "anim");
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("<mask"), std::string::npos) << svg;
+  EXPECT_NE(svg.find("attributeName=\"width\""), std::string::npos) << svg;
+  EXPECT_NE(svg.find("values=\"120;160\""), std::string::npos) << svg;
+}
+
+PAGX_TEST(PAGXSVGTest, SVGExport_NoAnimationOutputUnchanged) {
+  auto doc = MakeRectDocument();
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_EQ(svg.find("<animate"), std::string::npos);
+  EXPECT_EQ(svg.find("<set"), std::string::npos);
+  auto rectPos = svg.find("<rect");
+  ASSERT_NE(rectPos, std::string::npos);
+  EXPECT_NE(svg.find("/>", rectPos), std::string::npos);
+}
+
+PAGX_TEST(PAGXSVGTest, SVGExport_AnimLayerOpacity) {
+  auto doc = MakeRectDocument();
+  auto* animation = MakeAnimation(doc.get(), 60, pagx::LoopMode::Once);
+  auto* object = MakeAnimationObject(doc.get(), animation, "layer");
+  auto* channel = MakeChannel<float>(doc.get(), object, "alpha");
+  channel->keyframes.push_back({0, 0.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  channel->keyframes.push_back({60, 1.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  AttachTimeline(doc->layers[0], "anim");
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("attributeName=\"opacity\""), std::string::npos);
+  EXPECT_NE(svg.find("values=\"0;1\""), std::string::npos);
+  EXPECT_NE(svg.find("keyTimes=\"0;1\""), std::string::npos);
+  EXPECT_NE(svg.find("dur=\"1s\""), std::string::npos);
+  EXPECT_NE(svg.find("fill=\"freeze\""), std::string::npos);
+  EXPECT_EQ(svg.find("repeatCount"), std::string::npos);
+}
+
+// M6: Strict rejects an animation with a channel SVG cannot express; BestEffort keeps the
+// expressible subset and reports the drop.
+PAGX_TEST(PAGXSVGTest, SVGExport_AnimationPolicyStrictRejectsUnsupportedChannel) {
+  auto doc = MakeRectDocument();
+  auto* animation = MakeAnimation(doc.get(), 60, pagx::LoopMode::Once);
+  auto* object = MakeAnimationObject(doc.get(), animation, "rect");
+  auto* channel = MakeChannel<float>(doc.get(), object, "rotation");
+  channel->keyframes.push_back({0, 0.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  channel->keyframes.push_back({60, 90.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  AttachTimeline(doc->layers[0], "anim");
+
+  std::vector<std::string> strictWarnings;
+  std::vector<pagx::SVGDiagnostic> strictDiagnostics;
+  pagx::SVGExportOptions strict = {};
+  strict.animation.policy = pagx::SVGAnimationPolicy::Strict;
+  strict.diagnostics = &strictDiagnostics;
+  auto strictSvg = pagx::SVGExporter::ToSVG(*doc, strict, &strictWarnings);
+  EXPECT_TRUE(strictSvg.empty());
+  EXPECT_FALSE(strictWarnings.empty());
+  ASSERT_FALSE(strictDiagnostics.empty());
+  EXPECT_EQ(strictDiagnostics.front().reasonCode, "animation-rejected");
+  EXPECT_EQ(strictDiagnostics.front().action, pagx::SVGDiagnosticAction::Rejected);
+
+  pagx::SVGExportOptions bestEffort = {};
+  bestEffort.animation.policy = pagx::SVGAnimationPolicy::BestEffort;
+  auto bestEffortSvg = pagx::SVGExporter::ToSVG(*doc, bestEffort);
+  EXPECT_FALSE(bestEffortSvg.empty());
+}
+
+// M4.1: a SolidColor resource binding drives every Fill / Stroke consumer.
+PAGX_TEST(PAGXSVGTest, SVGExport_AnimSolidColorSourceDrivesFill) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto* layer = doc->makeNode<pagx::Layer>("layer");
+  auto* rect = doc->makeNode<pagx::Rectangle>("rect");
+  rect->position = {50, 50};
+  rect->size = {80, 80};
+  auto* fill = doc->makeNode<pagx::Fill>("fill");
+  auto* solid = doc->makeNode<pagx::SolidColor>("color");
+  solid->color = {1, 0, 0, 1};
+  fill->color = solid;
+  layer->contents = {rect, fill};
+  doc->layers.push_back(layer);
+
+  auto* animation = MakeAnimation(doc.get(), 60, pagx::LoopMode::Once);
+  auto* object = MakeAnimationObject(doc.get(), animation, "color");
+  auto* channel = MakeChannel<pagx::Color>(doc.get(), object, "color");
+  channel->keyframes.push_back(
+      {0, pagx::Color{1, 0, 0, 1}, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  channel->keyframes.push_back(
+      {60, pagx::Color{0, 0, 1, 1}, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  AttachTimeline(layer, "anim");
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("attributeName=\"fill\""), std::string::npos);
+  EXPECT_NE(svg.find("dur=\"1s\""), std::string::npos);
+}
+
+// M4.2: ColorStop offset and color are written on the <stop> host of the linear/radial def.
+PAGX_TEST(PAGXSVGTest, SVGExport_AnimGradientStopOffsetAndColor) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto* layer = doc->makeNode<pagx::Layer>("layer");
+  auto* rect = doc->makeNode<pagx::Rectangle>("rect");
+  rect->position = {50, 50};
+  rect->size = {80, 80};
+  auto* gradient = doc->makeNode<pagx::LinearGradient>("grad");
+  gradient->startPoint = {0, 0};
+  gradient->endPoint = {1, 0};
+  auto* first = doc->makeNode<pagx::ColorStop>("stop0");
+  first->offset = 0.0f;
+  first->color = {1, 0, 0, 1};
+  auto* second = doc->makeNode<pagx::ColorStop>("stop1");
+  second->offset = 1.0f;
+  second->color = {0, 0, 1, 1};
+  gradient->colorStops = {first, second};
+  auto* fill = doc->makeNode<pagx::Fill>("fill");
+  fill->color = gradient;
+  layer->contents = {rect, fill};
+  doc->layers.push_back(layer);
+
+  auto* animation = MakeAnimation(doc.get(), 60, pagx::LoopMode::Once);
+  auto* object = MakeAnimationObject(doc.get(), animation, "stop0");
+  auto* offset = MakeChannel<float>(doc.get(), object, "offset");
+  offset->keyframes.push_back({0, 0.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  offset->keyframes.push_back({60, 0.5f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  auto* color = MakeChannel<pagx::Color>(doc.get(), object, "color");
+  color->keyframes.push_back(
+      {0, pagx::Color{1, 0, 0, 1}, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  color->keyframes.push_back(
+      {60, pagx::Color{0, 1, 0, 1}, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  AttachTimeline(layer, "anim");
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("<linearGradient"), std::string::npos);
+  EXPECT_NE(svg.find("attributeName=\"offset\""), std::string::npos);
+  EXPECT_NE(svg.find("values=\"0;0.5\""), std::string::npos);
+  EXPECT_NE(svg.find("attributeName=\"stop-color\""), std::string::npos);
+  EXPECT_NE(svg.find("values=\"#FF0000;#00FF00\""), std::string::npos);
+  EXPECT_NE(svg.find("attributeName=\"stop-opacity\""), std::string::npos);
+  EXPECT_NE(svg.find("</stop>"), std::string::npos);
+  EXPECT_EQ(svg.find("attributeName=\"fill\""), std::string::npos);
+}
+
+// M4.2: one stop shared by two gradients receives a track in every def it is written into.
+PAGX_TEST(PAGXSVGTest, SVGExport_AnimGradientStopSharedAcrossDefs) {
+  auto doc = pagx::PAGXDocument::Make(200, 100);
+  auto* layer = doc->makeNode<pagx::Layer>("layer");
+  auto* left = doc->makeNode<pagx::Rectangle>("left");
+  left->position = {50, 50};
+  left->size = {80, 80};
+  auto* right = doc->makeNode<pagx::Rectangle>("right");
+  right->position = {150, 50};
+  right->size = {80, 80};
+  auto* shared = doc->makeNode<pagx::ColorStop>("shared");
+  shared->offset = 0.0f;
+  shared->color = {1, 0, 0, 1};
+  auto* end = doc->makeNode<pagx::ColorStop>("end");
+  end->offset = 1.0f;
+  end->color = {0, 0, 1, 1};
+  auto* firstGradient = doc->makeNode<pagx::LinearGradient>("g1");
+  firstGradient->startPoint = {0, 0};
+  firstGradient->endPoint = {1, 0};
+  firstGradient->colorStops = {shared, end};
+  auto* secondGradient = doc->makeNode<pagx::RadialGradient>("g2");
+  secondGradient->center = {0.5f, 0.5f};
+  secondGradient->radius = 0.5f;
+  secondGradient->colorStops = {shared, end};
+  auto* firstFill = doc->makeNode<pagx::Fill>("f1");
+  firstFill->color = firstGradient;
+  auto* secondFill = doc->makeNode<pagx::Fill>("f2");
+  secondFill->color = secondGradient;
+  auto* firstGroup = doc->makeNode<pagx::Group>("group1");
+  firstGroup->elements = {left, firstFill};
+  auto* secondGroup = doc->makeNode<pagx::Group>("group2");
+  secondGroup->elements = {right, secondFill};
+  layer->contents = {firstGroup, secondGroup};
+  doc->layers.push_back(layer);
+
+  auto* animation = MakeAnimation(doc.get(), 60, pagx::LoopMode::Once);
+  auto* object = MakeAnimationObject(doc.get(), animation, "shared");
+  auto* offset = MakeChannel<float>(doc.get(), object, "offset");
+  offset->keyframes.push_back({0, 0.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  offset->keyframes.push_back({60, 0.25f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  AttachTimeline(layer, "anim");
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  size_t occurrences = 0;
+  for (size_t pos = svg.find("attributeName=\"offset\""); pos != std::string::npos;
+       pos = svg.find("attributeName=\"offset\"", pos + 1)) {
+    ++occurrences;
+  }
+  EXPECT_EQ(occurrences, 2u) << svg;
+}
+
+// M4.2: conic / diamond gradients degrade to radial, which is not a native stop host, so their
+// stop channels are rejected instead of silently written into the approximation.
+PAGX_TEST(PAGXSVGTest, SVGExport_AnimConicStopRejected) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto* layer = doc->makeNode<pagx::Layer>("layer");
+  auto* rect = doc->makeNode<pagx::Rectangle>("rect");
+  rect->position = {100, 100};
+  rect->size = {180, 180};
+  auto* gradient = doc->makeNode<pagx::ConicGradient>("grad");
+  gradient->center = {100, 100};
+  auto* stop = doc->makeNode<pagx::ColorStop>("stop");
+  stop->offset = 0.0f;
+  stop->color = {1, 0, 0, 1};
+  auto* end = doc->makeNode<pagx::ColorStop>("end");
+  end->offset = 1.0f;
+  end->color = {0, 0, 1, 1};
+  gradient->colorStops = {stop, end};
+  auto* fill = doc->makeNode<pagx::Fill>("fill");
+  fill->color = gradient;
+  layer->contents = {rect, fill};
+  doc->layers.push_back(layer);
+
+  auto* animation = MakeAnimation(doc.get(), 60, pagx::LoopMode::Once);
+  auto* object = MakeAnimationObject(doc.get(), animation, "stop");
+  auto* offset = MakeChannel<float>(doc.get(), object, "offset");
+  offset->keyframes.push_back({0, 0.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  offset->keyframes.push_back({60, 0.5f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  AttachTimeline(layer, "anim");
+
+  std::vector<std::string> strictWarnings;
+  pagx::SVGExportOptions strict = {};
+  strict.animation.policy = pagx::SVGAnimationPolicy::Strict;
+  auto strictSvg = pagx::SVGExporter::ToSVG(*doc, strict, &strictWarnings);
+  EXPECT_TRUE(strictSvg.empty());
+  bool reported = false;
+  for (const auto& warning : strictWarnings) {
+    reported = reported || warning.find("not a native stop host") != std::string::npos;
+  }
+  EXPECT_TRUE(reported) << (strictWarnings.empty() ? "no warnings" : strictWarnings[0]);
+
+  pagx::SVGExportOptions bestEffort = {};
+  bestEffort.animation.policy = pagx::SVGAnimationPolicy::BestEffort;
+  bestEffort.staticPolicy = pagx::SVGStaticExportPolicy::BestEffort;
+  auto bestEffortSvg = pagx::SVGExporter::ToSVG(*doc, bestEffort);
+  EXPECT_NE(bestEffortSvg.find("<stop"), std::string::npos);
+  EXPECT_EQ(bestEffortSvg.find("<animate"), std::string::npos);
+}
+
+// M4.2: SMIL colour values are sRGB, so a P3 stop animation reports the gamut loss and drops the
+// CSS declaration that would otherwise bypass the track.
+PAGX_TEST(PAGXSVGTest, SVGExport_AnimGradientStopWideGamutIsReported) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto* layer = doc->makeNode<pagx::Layer>("layer");
+  auto* rect = doc->makeNode<pagx::Rectangle>("rect");
+  rect->position = {50, 50};
+  rect->size = {80, 80};
+  auto* gradient = doc->makeNode<pagx::LinearGradient>("grad");
+  gradient->startPoint = {0, 0};
+  gradient->endPoint = {1, 0};
+  auto* first = doc->makeNode<pagx::ColorStop>("stop0");
+  first->offset = 0.0f;
+  first->color = {1, 0, 0, 1};
+  first->color.colorSpace = pagx::ColorSpace::DisplayP3;
+  gradient->colorStops = {first};
+  auto* fill = doc->makeNode<pagx::Fill>("fill");
+  fill->color = gradient;
+  layer->contents = {rect, fill};
+  doc->layers.push_back(layer);
+
+  auto* animation = MakeAnimation(doc.get(), 60, pagx::LoopMode::Once);
+  auto* object = MakeAnimationObject(doc.get(), animation, "stop0");
+  auto* color = MakeChannel<pagx::Color>(doc.get(), object, "color");
+  color->keyframes.push_back(
+      {0, pagx::Color{1, 0, 0, 1}, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  color->keyframes.push_back(
+      {60, pagx::Color{0, 0, 1, 1}, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  AttachTimeline(layer, "anim");
+
+  std::vector<pagx::SVGDiagnostic> diagnostics;
+  pagx::SVGExportOptions options = {};
+  options.diagnostics = &diagnostics;
+  auto svg = pagx::SVGExporter::ToSVG(*doc, options);
+  EXPECT_NE(svg.find("attributeName=\"stop-color\""), std::string::npos);
+  EXPECT_EQ(svg.find("display-p3"), std::string::npos);
+  bool reported = false;
+  for (const auto& diagnostic : diagnostics) {
+    if (diagnostic.reasonCode == "color-space") {
+      reported = true;
+      EXPECT_EQ(diagnostic.action, pagx::SVGDiagnosticAction::Approximated);
+    }
+  }
+  EXPECT_TRUE(reported);
+}
+
+// M4.3: linear endpoint channels animate x1 / y1 / x2 / y2, and a gradient shared by the fill and
+// the stroke of one shape gets a track in each def it is written into.
+PAGX_TEST(PAGXSVGTest, SVGExport_AnimLinearGradientEndpointsSharedByPainters) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto* layer = doc->makeNode<pagx::Layer>("layer");
+  auto* rect = doc->makeNode<pagx::Rectangle>("rect");
+  rect->position = {50, 50};
+  rect->size = {80, 80};
+  auto* gradient = doc->makeNode<pagx::LinearGradient>("grad");
+  gradient->startPoint = {0, 0};
+  gradient->endPoint = {1, 0};
+  auto* first = doc->makeNode<pagx::ColorStop>("stop0");
+  first->offset = 0.0f;
+  first->color = {1, 0, 0, 1};
+  auto* second = doc->makeNode<pagx::ColorStop>("stop1");
+  second->offset = 1.0f;
+  second->color = {0, 0, 1, 1};
+  gradient->colorStops = {first, second};
+  auto* fill = doc->makeNode<pagx::Fill>("fill");
+  fill->color = gradient;
+  auto* stroke = doc->makeNode<pagx::Stroke>("stroke");
+  stroke->color = gradient;
+  stroke->width = 4.0f;
+  layer->contents = {rect, fill, stroke};
+  doc->layers.push_back(layer);
+
+  auto* animation = MakeAnimation(doc.get(), 60, pagx::LoopMode::Once);
+  auto* object = MakeAnimationObject(doc.get(), animation, "grad");
+  auto* endX = MakeChannel<float>(doc.get(), object, "endPoint.x");
+  endX->keyframes.push_back({0, 0.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  endX->keyframes.push_back({60, 1.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  auto* startY = MakeChannel<float>(doc.get(), object, "startPoint.y");
+  startY->keyframes.push_back({0, 0.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  startY->keyframes.push_back({60, 0.5f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  AttachTimeline(layer, "anim");
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  size_t x2Count = 0;
+  for (size_t pos = svg.find("attributeName=\"x2\""); pos != std::string::npos;
+       pos = svg.find("attributeName=\"x2\"", pos + 1)) {
+    ++x2Count;
+  }
+  EXPECT_EQ(x2Count, 2u) << svg;
+  EXPECT_NE(svg.find("values=\"0;1\""), std::string::npos);
+  EXPECT_NE(svg.find("attributeName=\"y1\""), std::string::npos);
+  EXPECT_NE(svg.find("values=\"0;0.5\""), std::string::npos);
+  EXPECT_EQ(svg.find("attributeName=\"x1\""), std::string::npos);
+}
+
+// M4.3: radial centre and radius tracks animate cx / cy / r, and negative radius samples are
+// clamped because SVG rejects a negative r.
+PAGX_TEST(PAGXSVGTest, SVGExport_AnimRadialGradientCenterAndClampedRadius) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto* layer = doc->makeNode<pagx::Layer>("layer");
+  auto* rect = doc->makeNode<pagx::Rectangle>("rect");
+  rect->position = {50, 50};
+  rect->size = {80, 80};
+  auto* gradient = doc->makeNode<pagx::RadialGradient>("grad");
+  gradient->center = {0.5f, 0.5f};
+  gradient->radius = 0.5f;
+  auto* first = doc->makeNode<pagx::ColorStop>("stop0");
+  first->offset = 0.0f;
+  first->color = {1, 0, 0, 1};
+  auto* second = doc->makeNode<pagx::ColorStop>("stop1");
+  second->offset = 1.0f;
+  second->color = {0, 0, 1, 1};
+  gradient->colorStops = {first, second};
+  auto* fill = doc->makeNode<pagx::Fill>("fill");
+  fill->color = gradient;
+  layer->contents = {rect, fill};
+  doc->layers.push_back(layer);
+
+  auto* animation = MakeAnimation(doc.get(), 60, pagx::LoopMode::Once);
+  auto* object = MakeAnimationObject(doc.get(), animation, "grad");
+  auto* centerX = MakeChannel<float>(doc.get(), object, "center.x");
+  centerX->keyframes.push_back({0, 0.25f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  centerX->keyframes.push_back({60, 0.75f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  auto* radius = MakeChannel<float>(doc.get(), object, "radius");
+  radius->keyframes.push_back({0, 0.5f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  radius->keyframes.push_back({60, -0.5f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  AttachTimeline(layer, "anim");
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("attributeName=\"cx\""), std::string::npos);
+  EXPECT_NE(svg.find("values=\"0.25;0.75\""), std::string::npos);
+  EXPECT_NE(svg.find("attributeName=\"r\""), std::string::npos);
+  EXPECT_NE(svg.find("values=\"0.5;0\""), std::string::npos) << svg;
+  EXPECT_EQ(svg.find("values=\"0.5;-0.5\""), std::string::npos);
+}
+
+// M4.3: a gradient that is already degenerate before the animation starts keeps the static
+// collapse and the moving geometry is rejected instead of emitting a track with different
+// semantics.
+PAGX_TEST(PAGXSVGTest, SVGExport_AnimDegenerateGradientGeometryRejected) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto* layer = doc->makeNode<pagx::Layer>("layer");
+  auto* rect = doc->makeNode<pagx::Rectangle>("rect");
+  rect->position = {50, 50};
+  rect->size = {80, 80};
+  auto* gradient = doc->makeNode<pagx::LinearGradient>("grad");
+  gradient->startPoint = {0.5f, 0.5f};
+  gradient->endPoint = {0.5f, 0.5f};
+  auto* first = doc->makeNode<pagx::ColorStop>("stop0");
+  first->offset = 0.0f;
+  first->color = {1, 0, 0, 1};
+  auto* second = doc->makeNode<pagx::ColorStop>("stop1");
+  second->offset = 1.0f;
+  second->color = {0, 0, 1, 1};
+  gradient->colorStops = {first, second};
+  auto* fill = doc->makeNode<pagx::Fill>("fill");
+  fill->color = gradient;
+  layer->contents = {rect, fill};
+  doc->layers.push_back(layer);
+
+  auto* animation = MakeAnimation(doc.get(), 60, pagx::LoopMode::Once);
+  auto* object = MakeAnimationObject(doc.get(), animation, "grad");
+  auto* endX = MakeChannel<float>(doc.get(), object, "endPoint.x");
+  endX->keyframes.push_back({0, 0.5f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  endX->keyframes.push_back({60, 1.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  AttachTimeline(layer, "anim");
+
+  std::vector<std::string> strictWarnings;
+  pagx::SVGExportOptions strict = {};
+  strict.animation.policy = pagx::SVGAnimationPolicy::Strict;
+  auto strictSvg = pagx::SVGExporter::ToSVG(*doc, strict, &strictWarnings);
+  EXPECT_TRUE(strictSvg.empty());
+  bool reported = false;
+  for (const auto& warning : strictWarnings) {
+    reported = reported || warning.find("degenerate before the animation") != std::string::npos;
+  }
+  EXPECT_TRUE(reported) << (strictWarnings.empty() ? "no warnings" : strictWarnings[0]);
+
+  pagx::SVGExportOptions bestEffort = {};
+  bestEffort.animation.policy = pagx::SVGAnimationPolicy::BestEffort;
+  auto bestEffortSvg = pagx::SVGExporter::ToSVG(*doc, bestEffort);
+  EXPECT_EQ(bestEffortSvg.find("<animate"), std::string::npos);
+  EXPECT_NE(bestEffortSvg.find("<stop"), std::string::npos);
+  EXPECT_NE(bestEffortSvg.find("stop-color=\"#FF0000\""), std::string::npos);
+  EXPECT_EQ(bestEffortSvg.find("stop-color=\"#0000FF\""), std::string::npos);
+}
+
+// M5.1: point channels drive a `d` track that keeps the authored verb structure.
+PAGX_TEST(PAGXSVGTest, SVGExport_AnimPathPointEmitsDataTrack) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto* layer = doc->makeNode<pagx::Layer>("layer");
+  auto* path = doc->makeNode<pagx::Path>("path");
+  auto* data = doc->makeNode<pagx::PathData>();
+  *data = pagx::PathDataFromSVGString("M10 10 L60 10 L10 60 Z");
+  path->data = data;
+  auto* fill = doc->makeNode<pagx::Fill>("fill");
+  auto* solid = doc->makeNode<pagx::SolidColor>("color");
+  solid->color = {1, 0, 0, 1};
+  fill->color = solid;
+  layer->contents = {path, fill};
+  doc->layers.push_back(layer);
+
+  auto* animation = MakeAnimation(doc.get(), 60, pagx::LoopMode::Once);
+  auto* object = MakeAnimationObject(doc.get(), animation, "path");
+  auto* channel = MakeChannel<float>(doc.get(), object, "point1.x");
+  channel->keyframes.push_back({0, 60.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  channel->keyframes.push_back({60, 110.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  AttachTimeline(layer, "anim");
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  auto marker = svg.find("attributeName=\"d\"");
+  ASSERT_NE(marker, std::string::npos) << svg;
+  auto valuesStart = svg.find("values=\"", marker);
+  ASSERT_NE(valuesStart, std::string::npos);
+  valuesStart += 8;
+  auto valuesEnd = svg.find('"', valuesStart);
+  ASSERT_NE(valuesEnd, std::string::npos);
+  auto values = svg.substr(valuesStart, valuesEnd - valuesStart);
+  EXPECT_EQ(values.find(';'), values.rfind(';'));
+  EXPECT_NE(values.find("L60"), std::string::npos) << values;
+  EXPECT_NE(values.find("L110"), std::string::npos) << values;
+}
+
+// M5.1: a Hold point track emits a discrete d track instead of interpolating between frames.
+PAGX_TEST(PAGXSVGTest, SVGExport_AnimPathPointHoldIsDiscrete) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto* layer = doc->makeNode<pagx::Layer>("layer");
+  auto* path = doc->makeNode<pagx::Path>("path");
+  auto* data = doc->makeNode<pagx::PathData>();
+  *data = pagx::PathDataFromSVGString("M10 10 L60 10 L10 60 Z");
+  path->data = data;
+  auto* fill = doc->makeNode<pagx::Fill>("fill");
+  auto* solid = doc->makeNode<pagx::SolidColor>("color");
+  solid->color = {0, 0, 0, 1};
+  fill->color = solid;
+  layer->contents = {path, fill};
+  doc->layers.push_back(layer);
+
+  auto* animation = MakeAnimation(doc.get(), 60, pagx::LoopMode::Once);
+  auto* object = MakeAnimationObject(doc.get(), animation, "path");
+  auto* channel = MakeChannel<float>(doc.get(), object, "point0.y");
+  channel->keyframes.push_back({0, 10.0f, pagx::KeyframeInterpolationType::Hold, {}, {}});
+  channel->keyframes.push_back({60, 50.0f, pagx::KeyframeInterpolationType::Hold, {}, {}});
+  AttachTimeline(layer, "anim");
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("attributeName=\"d\""), std::string::npos) << svg;
+  EXPECT_NE(svg.find("calcMode=\"discrete\""), std::string::npos) << svg;
+}
+
+// M5.2: Text.x / Text.y translate the shaped run through a wrapping <g> without reshaping it.
+// F10: native TextBox rendering bakes the box transform into its <text> children, so an animated
+// box wraps them in a <g> whose delta track carries the motion.
+PAGX_TEST(PAGXSVGTest, SVGExport_AnimNativeTextBoxPosition) {
+  auto doc = pagx::PAGXDocument::Make(300, 100);
+  auto* layer = doc->makeNode<pagx::Layer>("layer");
+  auto* box = doc->makeNode<pagx::TextBox>("box");
+  box->left = 40;
+  box->top = 20;
+  box->width = 200;
+  box->height = 60;
+  auto* text = doc->makeNode<pagx::Text>("label");
+  text->text = "Hi";
+  text->fontFamily = "Arial";
+  text->fontSize = 20;
+  auto* fill = doc->makeNode<pagx::Fill>("fill");
+  auto* solid = doc->makeNode<pagx::SolidColor>("color");
+  solid->color = {0, 0, 0, 1};
+  fill->color = solid;
+  box->elements = {text, fill};
+  layer->contents = {box};
+  doc->layers.push_back(layer);
+
+  auto* animation = MakeAnimation(doc.get(), 60, pagx::LoopMode::Once);
+  auto* object = MakeAnimationObject(doc.get(), animation, "box");
+  auto* channel = MakeChannel<float>(doc.get(), object, "position.x");
+  channel->keyframes.push_back({0, 40.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  channel->keyframes.push_back({60, 120.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  AttachTimeline(layer, "anim");
+
+  pagx::SVGExportOptions options = {};
+  auto svg = pagx::SVGExporter::ToSVG(*doc, options);
+  EXPECT_NE(svg.find("<text"), std::string::npos) << svg;
+  EXPECT_NE(svg.find("animateTransform"), std::string::npos) << svg;
+  EXPECT_NE(svg.find("type=\"translate\""), std::string::npos) << svg;
+  EXPECT_NE(svg.find("values=\"0 0;80 0\""), std::string::npos) << svg;
+}
+
+PAGX_TEST(PAGXSVGTest, SVGExport_AnimTextPositionEmitsTranslate) {
+  auto doc = pagx::PAGXDocument::Make(300, 100);
+  auto* layer = doc->makeNode<pagx::Layer>("layer");
+  auto* text = doc->makeNode<pagx::Text>("text");
+  text->text = "Hi";
+  text->position = {50, 50};
+  text->fontFamily = "Arial";
+  text->fontSize = 24;
+  auto* fill = doc->makeNode<pagx::Fill>("fill");
+  auto* solid = doc->makeNode<pagx::SolidColor>("color");
+  solid->color = {0, 0, 0, 1};
+  fill->color = solid;
+  layer->contents = {text, fill};
+  doc->layers.push_back(layer);
+
+  auto* animation = MakeAnimation(doc.get(), 60, pagx::LoopMode::Once);
+  auto* object = MakeAnimationObject(doc.get(), animation, "text");
+  auto* xChannel = MakeChannel<float>(doc.get(), object, "x");
+  xChannel->keyframes.push_back({0, 50.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  xChannel->keyframes.push_back({60, 120.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  auto* yChannel = MakeChannel<float>(doc.get(), object, "y");
+  yChannel->keyframes.push_back({0, 50.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  yChannel->keyframes.push_back({60, 70.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  AttachTimeline(layer, "anim");
+
+  pagx::SVGExportOptions options = {};
+  auto svg = pagx::SVGExporter::ToSVG(*doc, options);
+  EXPECT_NE(svg.find("<text"), std::string::npos) << svg;
+  EXPECT_NE(svg.find("animateTransform"), std::string::npos) << svg;
+  EXPECT_NE(svg.find("type=\"translate\""), std::string::npos) << svg;
+  EXPECT_NE(svg.find("values=\"0 0;70 20\""), std::string::npos) << svg;
+  // The translate track is a child of the wrapper, so the start tag must close before it.
+  EXPECT_EQ(svg.find("<g  <"), std::string::npos) << svg;
+  EXPECT_NE(svg.find("</g>"), std::string::npos) << svg;
+}
+
+// A14: an animated Rectangle re-resolves through the static TrimPath with an explicit geometry
+// override, so the d track follows the size change without touching the document's layout.
+PAGX_TEST(PAGXSVGTest, SVGExport_AnimShapeGeometryWithModifierRebakesData) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto* layer = doc->makeNode<pagx::Layer>("layer");
+  auto* rect = doc->makeNode<pagx::Rectangle>("rect");
+  rect->position = {100, 100};
+  rect->size = {80, 80};
+  auto* trim = doc->makeNode<pagx::TrimPath>("trim");
+  trim->start = 0.0f;
+  trim->end = 0.5f;
+  auto* stroke = doc->makeNode<pagx::Stroke>("stroke");
+  auto* solid = doc->makeNode<pagx::SolidColor>("color");
+  solid->color = {0, 0, 0, 1};
+  stroke->color = solid;
+  stroke->width = 3;
+  layer->contents = {rect, trim, stroke};
+  doc->layers.push_back(layer);
+
+  auto* animation = MakeAnimation(doc.get(), 60, pagx::LoopMode::Once);
+  auto* object = MakeAnimationObject(doc.get(), animation, "rect");
+  auto* channel = MakeChannel<float>(doc.get(), object, "size.width");
+  channel->keyframes.push_back({0, 80.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  channel->keyframes.push_back({60, 120.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  AttachTimeline(layer, "anim");
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  auto marker = svg.find("attributeName=\"d\"");
+  ASSERT_NE(marker, std::string::npos) << svg;
+  auto valuesStart = svg.find("values=\"", marker);
+  ASSERT_NE(valuesStart, std::string::npos);
+  valuesStart += 8;
+  auto valuesEnd = svg.find('"', valuesStart);
+  ASSERT_NE(valuesEnd, std::string::npos);
+  auto values = svg.substr(valuesStart, valuesEnd - valuesStart);
+  auto separator = values.find(';');
+  ASSERT_NE(separator, std::string::npos) << values;
+  EXPECT_EQ(separator, values.rfind(';'));
+  EXPECT_NE(values.substr(0, separator), values.substr(separator + 1));
+}
+
+// A14: continuous trim splits the sampled geometry per shape; the animated source still gets its
+// own d track while the untouched sibling keeps the static bake.
+PAGX_TEST(PAGXSVGTest, SVGExport_AnimPathPointWithContinuousTrimRebakesData) {
+  auto doc = pagx::PAGXDocument::Make(300, 200);
+  auto* layer = doc->makeNode<pagx::Layer>("layer");
+  auto* first = doc->makeNode<pagx::Path>("first");
+  first->data = doc->makeNode<pagx::PathData>();
+  *first->data = pagx::PathDataFromSVGString("M40 40 L140 40 L140 140 L40 140 Z");
+  auto* second = doc->makeNode<pagx::Path>("second");
+  second->data = doc->makeNode<pagx::PathData>();
+  *second->data = pagx::PathDataFromSVGString("M170 40 L260 40 L260 140 L170 140 Z");
+  auto* trim = doc->makeNode<pagx::TrimPath>("trim");
+  trim->type = pagx::TrimType::Continuous;
+  trim->start = 0.0f;
+  trim->end = 0.5f;
+  auto* stroke = doc->makeNode<pagx::Stroke>("stroke");
+  auto* solid = doc->makeNode<pagx::SolidColor>("color");
+  solid->color = {0, 0, 0, 1};
+  stroke->color = solid;
+  stroke->width = 3;
+  layer->contents = {first, second, trim, stroke};
+  doc->layers.push_back(layer);
+
+  auto* animation = MakeAnimation(doc.get(), 60, pagx::LoopMode::Once);
+  auto* object = MakeAnimationObject(doc.get(), animation, "first");
+  auto* channel = MakeChannel<float>(doc.get(), object, "point1.x");
+  channel->keyframes.push_back({0, 140.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  channel->keyframes.push_back({60, 120.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  AttachTimeline(layer, "anim");
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  auto marker = svg.find("attributeName=\"d\"");
+  ASSERT_NE(marker, std::string::npos) << svg;
+  auto valuesStart = svg.find("values=\"", marker);
+  ASSERT_NE(valuesStart, std::string::npos);
+  valuesStart += 8;
+  auto valuesEnd = svg.find('"', valuesStart);
+  ASSERT_NE(valuesEnd, std::string::npos);
+  auto values = svg.substr(valuesStart, valuesEnd - valuesStart);
+  auto separator = values.find(';');
+  ASSERT_NE(separator, std::string::npos) << values;
+  EXPECT_NE(values.substr(0, separator), values.substr(separator + 1));
+}
+
+// M5.4: an animated RoundCorner radius re-bakes the rounded outline into a d track.
+PAGX_TEST(PAGXSVGTest, SVGExport_AnimRoundCornerRebakesData) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto* layer = doc->makeNode<pagx::Layer>("layer");
+  auto* rect = doc->makeNode<pagx::Rectangle>("rect");
+  rect->position = {100, 100};
+  rect->size = {100, 100};
+  auto* corner = doc->makeNode<pagx::RoundCorner>("corner");
+  corner->radius = 4;
+  auto* stroke = doc->makeNode<pagx::Stroke>("stroke");
+  auto* solid = doc->makeNode<pagx::SolidColor>("color");
+  solid->color = {0, 0, 0, 1};
+  stroke->color = solid;
+  stroke->width = 3;
+  layer->contents = {rect, corner, stroke};
+  doc->layers.push_back(layer);
+
+  auto* animation = MakeAnimation(doc.get(), 60, pagx::LoopMode::Once);
+  auto* object = MakeAnimationObject(doc.get(), animation, "corner");
+  auto* channel = MakeChannel<float>(doc.get(), object, "radius");
+  channel->keyframes.push_back({0, 4.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  channel->keyframes.push_back({60, 24.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  AttachTimeline(layer, "anim");
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  auto marker = svg.find("attributeName=\"d\"");
+  ASSERT_NE(marker, std::string::npos) << svg;
+  auto valuesStart = svg.find("values=\"", marker);
+  ASSERT_NE(valuesStart, std::string::npos);
+  valuesStart += 8;
+  auto valuesEnd = svg.find('"', valuesStart);
+  ASSERT_NE(valuesEnd, std::string::npos);
+  auto values = svg.substr(valuesStart, valuesEnd - valuesStart);
+  auto separator = values.find(';');
+  ASSERT_NE(separator, std::string::npos) << values;
+  EXPECT_EQ(separator, values.rfind(';'));
+  EXPECT_NE(values.substr(0, separator), values.substr(separator + 1));
+}
+
+// M5.4: an animated TrimPath on a static shape re-bakes the trimmed outline into a d track.
+PAGX_TEST(PAGXSVGTest, SVGExport_AnimTrimPathRebakesData) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto* layer = doc->makeNode<pagx::Layer>("layer");
+  auto* rect = doc->makeNode<pagx::Rectangle>("rect");
+  rect->position = {100, 100};
+  rect->size = {80, 80};
+  auto* trim = doc->makeNode<pagx::TrimPath>("trim");
+  trim->start = 0.0f;
+  trim->end = 0.3f;
+  auto* stroke = doc->makeNode<pagx::Stroke>("stroke");
+  auto* solid = doc->makeNode<pagx::SolidColor>("color");
+  solid->color = {0, 0, 0, 1};
+  stroke->color = solid;
+  stroke->width = 3;
+  layer->contents = {rect, trim, stroke};
+  doc->layers.push_back(layer);
+
+  auto* animation = MakeAnimation(doc.get(), 60, pagx::LoopMode::Once);
+  auto* object = MakeAnimationObject(doc.get(), animation, "trim");
+  auto* channel = MakeChannel<float>(doc.get(), object, "end");
+  channel->keyframes.push_back({0, 0.3f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  channel->keyframes.push_back({60, 0.9f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  AttachTimeline(layer, "anim");
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  auto marker = svg.find("attributeName=\"d\"");
+  ASSERT_NE(marker, std::string::npos) << svg;
+  auto valuesStart = svg.find("values=\"", marker);
+  ASSERT_NE(valuesStart, std::string::npos);
+  valuesStart += 8;
+  auto valuesEnd = svg.find('"', valuesStart);
+  ASSERT_NE(valuesEnd, std::string::npos);
+  auto values = svg.substr(valuesStart, valuesEnd - valuesStart);
+  auto separator = values.find(';');
+  ASSERT_NE(separator, std::string::npos) << values;
+  EXPECT_EQ(separator, values.rfind(';'));
+  EXPECT_NE(values.substr(0, separator), values.substr(separator + 1));
+}
+
+// A14: a RoundCorner chain re-bakes sampled Rectangle geometry through the same override.
+PAGX_TEST(PAGXSVGTest, SVGExport_AnimShapeGeometryWithRoundCornerRebakesData) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto* layer = doc->makeNode<pagx::Layer>("layer");
+  auto* rect = doc->makeNode<pagx::Rectangle>("rect");
+  rect->position = {100, 100};
+  rect->size = {80, 80};
+  auto* corner = doc->makeNode<pagx::RoundCorner>("corner");
+  corner->radius = 10;
+  auto* stroke = doc->makeNode<pagx::Stroke>("stroke");
+  auto* solid = doc->makeNode<pagx::SolidColor>("color");
+  solid->color = {0, 0, 0, 1};
+  stroke->color = solid;
+  stroke->width = 3;
+  layer->contents = {rect, corner, stroke};
+  doc->layers.push_back(layer);
+
+  auto* animation = MakeAnimation(doc.get(), 60, pagx::LoopMode::Once);
+  auto* object = MakeAnimationObject(doc.get(), animation, "rect");
+  auto* channel = MakeChannel<float>(doc.get(), object, "size.width");
+  channel->keyframes.push_back({0, 80.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  channel->keyframes.push_back({60, 140.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  AttachTimeline(layer, "anim");
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  auto marker = svg.find("attributeName=\"d\"");
+  ASSERT_NE(marker, std::string::npos) << svg;
+  auto valuesStart = svg.find("values=\"", marker);
+  ASSERT_NE(valuesStart, std::string::npos);
+  valuesStart += 8;
+  auto valuesEnd = svg.find('"', valuesStart);
+  ASSERT_NE(valuesEnd, std::string::npos);
+  auto values = svg.substr(valuesStart, valuesEnd - valuesStart);
+  auto separator = values.find(';');
+  ASSERT_NE(separator, std::string::npos) << values;
+  EXPECT_NE(values.substr(0, separator), values.substr(separator + 1));
+}
+
+// A14: Path point channels also survive a TrimPath through the same per-frame re-bake.
+PAGX_TEST(PAGXSVGTest, SVGExport_AnimPathPointWithTrimRebakesData) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto* layer = doc->makeNode<pagx::Layer>("layer");
+  auto* path = doc->makeNode<pagx::Path>("path");
+  auto* data = doc->makeNode<pagx::PathData>();
+  *data = pagx::PathDataFromSVGString("M40 40 L160 40 L160 160 L40 160 Z");
+  path->data = data;
+  auto* trim = doc->makeNode<pagx::TrimPath>("trim");
+  trim->start = 0.0f;
+  trim->end = 0.6f;
+  auto* stroke = doc->makeNode<pagx::Stroke>("stroke");
+  auto* solid = doc->makeNode<pagx::SolidColor>("color");
+  solid->color = {0, 0, 0, 1};
+  stroke->color = solid;
+  stroke->width = 3;
+  layer->contents = {path, trim, stroke};
+  doc->layers.push_back(layer);
+
+  auto* animation = MakeAnimation(doc.get(), 60, pagx::LoopMode::Once);
+  auto* object = MakeAnimationObject(doc.get(), animation, "path");
+  auto* channel = MakeChannel<float>(doc.get(), object, "point2.x");
+  channel->keyframes.push_back({0, 160.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  channel->keyframes.push_back({60, 120.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  AttachTimeline(layer, "anim");
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  auto marker = svg.find("attributeName=\"d\"");
+  ASSERT_NE(marker, std::string::npos) << svg;
+  auto valuesStart = svg.find("values=\"", marker);
+  ASSERT_NE(valuesStart, std::string::npos);
+  valuesStart += 8;
+  auto valuesEnd = svg.find('"', valuesStart);
+  ASSERT_NE(valuesEnd, std::string::npos);
+  auto values = svg.substr(valuesStart, valuesEnd - valuesStart);
+  auto separator = values.find(';');
+  ASSERT_NE(separator, std::string::npos) << values;
+  EXPECT_NE(values.substr(0, separator), values.substr(separator + 1));
+}
+
+// M5.4 / A14: Polystar roundness keeps the vertex count and content bounds, so the baked path can
+// carry a d track with one stable cubic verb list.
+PAGX_TEST(PAGXSVGTest, SVGExport_AnimPolystarRoundnessEmitsDataTrack) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto* layer = doc->makeNode<pagx::Layer>("layer");
+  auto* star = doc->makeNode<pagx::Polystar>("star");
+  star->type = pagx::PolystarType::Star;
+  star->pointCount = 5;
+  star->outerRadius = 40;
+  star->innerRadius = 20;
+  star->position = {100, 100};
+  auto* fill = doc->makeNode<pagx::Fill>("fill");
+  auto* solid = doc->makeNode<pagx::SolidColor>("color");
+  solid->color = {1, 0, 0, 1};
+  fill->color = solid;
+  layer->contents = {star, fill};
+  doc->layers.push_back(layer);
+
+  auto* animation = MakeAnimation(doc.get(), 60, pagx::LoopMode::Once);
+  auto* object = MakeAnimationObject(doc.get(), animation, "star");
+  auto* channel = MakeChannel<float>(doc.get(), object, "outerRoundness");
+  channel->keyframes.push_back({0, 0.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  channel->keyframes.push_back({60, 1.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  AttachTimeline(layer, "anim");
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  auto marker = svg.find("attributeName=\"d\"");
+  ASSERT_NE(marker, std::string::npos) << svg;
+  auto valuesStart = svg.find("values=\"", marker);
+  ASSERT_NE(valuesStart, std::string::npos);
+  valuesStart += 8;
+  auto valuesEnd = svg.find('"', valuesStart);
+  ASSERT_NE(valuesEnd, std::string::npos);
+  auto values = svg.substr(valuesStart, valuesEnd - valuesStart);
+  EXPECT_EQ(values.find(';'), values.rfind(';'));
+  EXPECT_NE(values.find('C'), std::string::npos) << values;
+}
+
+// A Polystar rotation changes the content bounds, so each frame re-runs the layout placement and
+// the d track still carries the moving outline.
+PAGX_TEST(PAGXSVGTest, SVGExport_AnimPolystarRotationEmitsDataTrack) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto* layer = doc->makeNode<pagx::Layer>("layer");
+  auto* star = doc->makeNode<pagx::Polystar>("star");
+  star->type = pagx::PolystarType::Star;
+  star->pointCount = 5;
+  star->outerRadius = 40;
+  star->innerRadius = 20;
+  star->position = {100, 100};
+  auto* fill = doc->makeNode<pagx::Fill>("fill");
+  auto* solid = doc->makeNode<pagx::SolidColor>("color");
+  solid->color = {1, 0, 0, 1};
+  fill->color = solid;
+  layer->contents = {star, fill};
+  doc->layers.push_back(layer);
+
+  auto* animation = MakeAnimation(doc.get(), 60, pagx::LoopMode::Once);
+  auto* object = MakeAnimationObject(doc.get(), animation, "star");
+  auto* channel = MakeChannel<float>(doc.get(), object, "rotation");
+  channel->keyframes.push_back({0, 0.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  channel->keyframes.push_back({60, 45.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  AttachTimeline(layer, "anim");
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  auto marker = svg.find("attributeName=\"d\"");
+  ASSERT_NE(marker, std::string::npos) << svg;
+  auto valuesStart = svg.find("values=\"", marker);
+  ASSERT_NE(valuesStart, std::string::npos);
+  valuesStart += 8;
+  auto valuesEnd = svg.find('"', valuesStart);
+  ASSERT_NE(valuesEnd, std::string::npos);
+  auto values = svg.substr(valuesStart, valuesEnd - valuesStart);
+  EXPECT_EQ(values.find(';'), values.rfind(';'));
+  ASSERT_NE(values.find(';'), std::string::npos);
+  auto firstValue = values.substr(0, values.find(';'));
+  auto secondValue = values.substr(values.find(';') + 1);
+  EXPECT_NE(firstValue, secondValue);
+}
+
+// pointCount changes the vertex list, which one interpolated d track cannot carry.
+PAGX_TEST(PAGXSVGTest, SVGExport_AnimPolystarPointCountRejected) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto* layer = doc->makeNode<pagx::Layer>("layer");
+  auto* star = doc->makeNode<pagx::Polystar>("star");
+  star->type = pagx::PolystarType::Star;
+  star->pointCount = 5;
+  star->outerRadius = 40;
+  star->innerRadius = 20;
+  star->position = {100, 100};
+  auto* fill = doc->makeNode<pagx::Fill>("fill");
+  auto* solid = doc->makeNode<pagx::SolidColor>("color");
+  solid->color = {1, 0, 0, 1};
+  fill->color = solid;
+  layer->contents = {star, fill};
+  doc->layers.push_back(layer);
+
+  auto* animation = MakeAnimation(doc.get(), 60, pagx::LoopMode::Once);
+  auto* object = MakeAnimationObject(doc.get(), animation, "star");
+  auto* channel = MakeChannel<float>(doc.get(), object, "pointCount");
+  channel->keyframes.push_back({0, 5.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  channel->keyframes.push_back({60, 7.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  AttachTimeline(layer, "anim");
+
+  std::vector<std::string> warnings;
+  pagx::SVGExportOptions strict = {};
+  strict.animation.policy = pagx::SVGAnimationPolicy::Strict;
+  auto strictSvg = pagx::SVGExporter::ToSVG(*doc, strict, &warnings);
+  EXPECT_TRUE(strictSvg.empty());
+  bool reported = false;
+  for (const auto& warning : warnings) {
+    reported = reported || warning.find("no SMIL equivalent") != std::string::npos ||
+               warning.find("bakes this element into new geometry") != std::string::npos;
+  }
+  EXPECT_TRUE(reported) << (warnings.empty() ? "no warnings" : warnings[0]);
+
+  pagx::SVGExportOptions bestEffort = {};
+  bestEffort.animation.policy = pagx::SVGAnimationPolicy::BestEffort;
+  auto bestEffortSvg = pagx::SVGExporter::ToSVG(*doc, bestEffort);
+  EXPECT_NE(bestEffortSvg.find("<path"), std::string::npos);
+  EXPECT_EQ(bestEffortSvg.find("<animate"), std::string::npos);
+}
+
+// F8: when the colour's alpha and the painter alpha both animate, fill-opacity carries their
+// product on a densified grid instead of losing the colour alpha.
+PAGX_TEST(PAGXSVGTest, SVGExport_AnimColorAlphaTimesPainterAlpha) {
+  auto doc = MakeRectDocument();
+  auto* color = doc->makeNode<pagx::SolidColor>("sharedColor");
+  color->color = {1, 0, 0, 1};
+  auto* painter = doc->makeNode<pagx::Fill>("painted");
+  painter->color = color;
+  doc->layers[0]->contents.push_back(painter);
+
+  auto* animation = doc->makeNode<pagx::Animation>("fadeBoth");
+  animation->duration = 8;
+  animation->frameRate = 60.0f;
+  animation->loop = pagx::LoopMode::Once;
+  doc->animations.push_back(animation);
+
+  auto* colorObject = MakeAnimationObject(doc.get(), animation, "sharedColor");
+  auto* colorChannel = MakeChannel<pagx::Color>(doc.get(), colorObject, "color");
+  colorChannel->keyframes.push_back(
+      {0, pagx::Color{1, 0, 0, 1}, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  colorChannel->keyframes.push_back(
+      {8, pagx::Color{1, 0, 0, 0.5f}, pagx::KeyframeInterpolationType::Linear, {}, {}});
+
+  auto* fillObject = MakeAnimationObject(doc.get(), animation, "painted");
+  auto* alphaChannel = MakeChannel<float>(doc.get(), fillObject, "alpha");
+  alphaChannel->keyframes.push_back({0, 1.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  alphaChannel->keyframes.push_back({8, 0.5f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  AttachTimeline(doc->layers[0], "fadeBoth");
+
+  pagx::SVGExportOptions options = {};
+  options.animation.selection = pagx::SVGAnimationSelection::All;
+  auto svg = pagx::SVGExporter::ToSVG(*doc, options);
+  EXPECT_NE(svg.find("attributeName=\"fill\""), std::string::npos) << svg;
+  EXPECT_NE(svg.find("attributeName=\"fill-opacity\""), std::string::npos) << svg;
+  EXPECT_NE(svg.find("0.5625"), std::string::npos) << svg;
+}
+
+// M1: Default selects the first declared Animation, Named selects one id, All exports every
+// top-level Animation. Timing comes from a mounted timeline when present and from animation
+// defaults otherwise.
+PAGX_TEST(PAGXSVGTest, SVGExport_AnimSelectionDefaultNamedAll) {
+  auto doc = MakeRectDocument();
+  auto* first = doc->makeNode<pagx::Animation>("a1");
+  first->duration = 60;
+  first->frameRate = 60.0f;
+  first->loop = pagx::LoopMode::Once;
+  doc->animations.push_back(first);
+  auto* firstObject = MakeAnimationObject(doc.get(), first, "layer");
+  auto* firstChannel = MakeChannel<float>(doc.get(), firstObject, "alpha");
+  firstChannel->keyframes.push_back({0, 0.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  firstChannel->keyframes.push_back({60, 1.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+
+  auto* second = doc->makeNode<pagx::Animation>("a2");
+  second->duration = 120;
+  second->frameRate = 60.0f;
+  second->loop = pagx::LoopMode::Once;
+  doc->animations.push_back(second);
+  auto* secondObject = MakeAnimationObject(doc.get(), second, "fill");
+  auto* secondChannel = MakeChannel<float>(doc.get(), secondObject, "alpha");
+  secondChannel->keyframes.push_back({0, 1.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  secondChannel->keyframes.push_back({120, 0.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  AttachTimeline(doc->layers[0], "a1");
+
+  auto defaultSvg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(defaultSvg.find("dur=\"1s\""), std::string::npos);
+  EXPECT_EQ(defaultSvg.find("dur=\"2s\""), std::string::npos);
+
+  pagx::SVGExportOptions named = {};
+  named.animation.selection = pagx::SVGAnimationSelection::Named;
+  named.animation.animationId = "a2";
+  auto namedSvg = pagx::SVGExporter::ToSVG(*doc, named);
+  EXPECT_NE(namedSvg.find("dur=\"2s\""), std::string::npos);
+  EXPECT_EQ(namedSvg.find("dur=\"1s\""), std::string::npos);
+
+  pagx::SVGExportOptions all = {};
+  all.animation.selection = pagx::SVGAnimationSelection::All;
+  auto allSvg = pagx::SVGExporter::ToSVG(*doc, all);
+  EXPECT_NE(allSvg.find("dur=\"1s\""), std::string::npos);
+  EXPECT_NE(allSvg.find("dur=\"2s\""), std::string::npos);
+}
+
+PAGX_TEST(PAGXSVGTest, SVGExport_AnimLayerOpacityLoop) {
+  auto doc = MakeRectDocument();
+  auto* animation = MakeAnimation(doc.get(), 120, pagx::LoopMode::Loop);
+  auto* object = MakeAnimationObject(doc.get(), animation, "layer");
+  auto* channel = MakeChannel<float>(doc.get(), object, "alpha");
+  channel->keyframes.push_back({0, 1.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  channel->keyframes.push_back({120, 0.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  AttachTimeline(doc->layers[0], "anim");
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("repeatCount=\"indefinite\""), std::string::npos);
+  EXPECT_NE(svg.find("dur=\"2s\""), std::string::npos);
+}
+
+PAGX_TEST(PAGXSVGTest, SVGExport_AnimLayerOpacityPingPong) {
+  auto doc = MakeRectDocument();
+  auto* animation = MakeAnimation(doc.get(), 60, pagx::LoopMode::PingPong);
+  auto* object = MakeAnimationObject(doc.get(), animation, "layer");
+  auto* channel = MakeChannel<float>(doc.get(), object, "alpha");
+  channel->keyframes.push_back({0, 0.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  channel->keyframes.push_back({60, 1.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  AttachTimeline(doc->layers[0], "anim");
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("values=\"0;1;0\""), std::string::npos);
+  EXPECT_NE(svg.find("keyTimes=\"0;0.5;1\""), std::string::npos);
+  EXPECT_NE(svg.find("dur=\"2s\""), std::string::npos);
+  EXPECT_NE(svg.find("repeatCount=\"indefinite\""), std::string::npos);
+}
+
+PAGX_TEST(PAGXSVGTest, SVGExport_AnimEvaluationOffsetAndPaused) {
+  auto doc = MakeRectDocument();
+  auto* animation = MakeAnimation(doc.get(), 60, pagx::LoopMode::Once);
+  auto* object = MakeAnimationObject(doc.get(), animation, "layer");
+  auto* channel = MakeChannel<float>(doc.get(), object, "alpha");
+  channel->keyframes.push_back({0, 0.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  channel->keyframes.push_back({60, 1.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  AttachTimeline(doc->layers[0], "anim", 30);
+  auto delayed = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(delayed.find("begin=\"0.5s\""), std::string::npos);
+
+  doc->layers[0]->timelines.clear();
+  AttachTimeline(doc->layers[0], "anim", -30);
+  auto ahead = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(ahead.find("begin=\"-0.5s\""), std::string::npos);
+
+  doc->layers[0]->timelines.clear();
+  AttachTimeline(doc->layers[0], "anim", 0, false);
+  auto paused = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(paused.find("begin=\"indefinite\""), std::string::npos);
+}
+
+PAGX_TEST(PAGXSVGTest, SVGExport_AnimLayerVisibility) {
+  auto doc = MakeRectDocument();
+  auto* animation = MakeAnimation(doc.get(), 60, pagx::LoopMode::Loop);
+  auto* object = MakeAnimationObject(doc.get(), animation, "layer");
+  auto* channel = MakeChannel<bool>(doc.get(), object, "visible");
+  channel->keyframes.push_back({0, true, pagx::KeyframeInterpolationType::Hold, {}, {}});
+  channel->keyframes.push_back({30, false, pagx::KeyframeInterpolationType::Hold, {}, {}});
+  AttachTimeline(doc->layers[0], "anim");
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("attributeName=\"visibility\""), std::string::npos);
+  EXPECT_NE(svg.find("calcMode=\"discrete\""), std::string::npos);
+  EXPECT_NE(svg.find("values=\"visible;hidden;hidden\""), std::string::npos);
+}
+
+PAGX_TEST(PAGXSVGTest, SVGExport_AnimFillColor) {
+  auto doc = MakeRectDocument();
+  auto* animation = MakeAnimation(doc.get(), 60, pagx::LoopMode::Once);
+  auto* object = MakeAnimationObject(doc.get(), animation, "fill");
+  auto* channel = MakeChannel<pagx::Color>(doc.get(), object, "color");
+  channel->keyframes.push_back(
+      {0, pagx::Color{1.0f, 0.0f, 0.0f, 1.0f}, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  channel->keyframes.push_back(
+      {60, pagx::Color{0.0f, 0.0f, 1.0f, 1.0f}, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  AttachTimeline(doc->layers[0], "anim");
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("attributeName=\"fill\""), std::string::npos);
+  EXPECT_NE(svg.find("values=\"#FF0000;#0000FF\""), std::string::npos);
+}
+
+PAGX_TEST(PAGXSVGTest, SVGExport_AnimStrokeWidthAndDashOffset) {
+  auto doc = MakeRectDocument();
+  auto* animation = MakeAnimation(doc.get(), 60, pagx::LoopMode::Once);
+  auto* object = MakeAnimationObject(doc.get(), animation, "stroke");
+  auto* width = MakeChannel<float>(doc.get(), object, "width");
+  width->keyframes.push_back({0, 1.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  width->keyframes.push_back({60, 9.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  auto* dashOffset = MakeChannel<float>(doc.get(), object, "dashOffset");
+  dashOffset->keyframes.push_back({0, 0.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  dashOffset->keyframes.push_back({60, 20.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  AttachTimeline(doc->layers[0], "anim");
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("attributeName=\"stroke-width\""), std::string::npos);
+  EXPECT_NE(svg.find("attributeName=\"stroke-dashoffset\""), std::string::npos);
+}
+
+PAGX_TEST(PAGXSVGTest, SVGExport_AnimBezierKeySplines) {
+  auto doc = MakeRectDocument();
+  auto* animation = MakeAnimation(doc.get(), 60, pagx::LoopMode::Once);
+  auto* object = MakeAnimationObject(doc.get(), animation, "layer");
+  auto* channel = MakeChannel<float>(doc.get(), object, "alpha");
+  channel->keyframes.push_back(
+      {0, 0.0f, pagx::KeyframeInterpolationType::Bezier, {0.25f, 0.1f}, {}});
+  channel->keyframes.push_back(
+      {60, 1.0f, pagx::KeyframeInterpolationType::Linear, {}, {0.75f, 0.9f}});
+  AttachTimeline(doc->layers[0], "anim");
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("calcMode=\"spline\""), std::string::npos);
+  EXPECT_NE(svg.find("keySplines=\"0.25 0.1 0.75 0.9\""), std::string::npos);
+}
+
+PAGX_TEST(PAGXSVGTest, SVGExport_AnimHoldSegmentProducesStep) {
+  auto doc = MakeRectDocument();
+  auto* animation = MakeAnimation(doc.get(), 100, pagx::LoopMode::Once);
+  auto* object = MakeAnimationObject(doc.get(), animation, "layer");
+  auto* channel = MakeChannel<float>(doc.get(), object, "alpha");
+  channel->keyframes.push_back({0, 0.0f, pagx::KeyframeInterpolationType::Hold, {}, {}});
+  channel->keyframes.push_back({50, 1.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  channel->keyframes.push_back({100, 0.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  AttachTimeline(doc->layers[0], "anim");
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("values=\"0;0;1;0\""), std::string::npos);
+}
+
+PAGX_TEST(PAGXSVGTest, SVGExport_AnimLayerMatrixChannel) {
+  auto doc = MakeRectDocument();
+  auto* animation = MakeAnimation(doc.get(), 60, pagx::LoopMode::Once);
+  auto* object = MakeAnimationObject(doc.get(), animation, "layer");
+  auto* channel = MakeChannel<pagx::Matrix>(doc.get(), object, "matrix");
+  channel->keyframes.push_back(
+      {0, pagx::Matrix::Identity(), pagx::KeyframeInterpolationType::Linear, {}, {}});
+  channel->keyframes.push_back(
+      {60, pagx::Matrix::Scale(2.0f, 2.0f), pagx::KeyframeInterpolationType::Linear, {}, {}});
+  AttachTimeline(doc->layers[0], "anim");
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("<animateTransform"), std::string::npos);
+  EXPECT_NE(svg.find("additive=\"replace\""), std::string::npos);
+  EXPECT_NE(svg.find("type=\"scale\""), std::string::npos);
+  EXPECT_NE(svg.find("values=\"1 1;2 2\""), std::string::npos);
+}
+
+PAGX_TEST(PAGXSVGTest, SVGExport_AnimUnsupportedLayerChannelWarns) {
+  auto doc = MakeRectDocument();
+  auto* animation = MakeAnimation(doc.get(), 60, pagx::LoopMode::Once);
+  auto* object = MakeAnimationObject(doc.get(), animation, "layer");
+  // The 3D transform model is not projected by this exporter, so the channel cannot be expressed.
+  auto* channel = MakeChannel<float>(doc.get(), object, "rotation.x");
+  channel->keyframes.push_back({0, 0.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  channel->keyframes.push_back({60, 90.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  AttachTimeline(doc->layers[0], "anim");
+
+  std::vector<std::string> warnings;
+  auto svg = pagx::SVGExporter::ToSVG(*doc, {}, &warnings);
+  EXPECT_EQ(svg.find("<animate"), std::string::npos);
+  ASSERT_FALSE(warnings.empty());
+  EXPECT_NE(warnings[0].find("rotation.x"), std::string::npos);
+}
+
+PAGX_TEST(PAGXSVGTest, SVGExport_AnimGroupTransform) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto* layer = doc->makeNode<pagx::Layer>("layer");
+  auto* group = doc->makeNode<pagx::Group>("group");
+  auto* rect = doc->makeNode<pagx::Rectangle>("rect");
+  rect->position = {100, 100};
+  rect->size = {80, 80};
+  auto* fill = doc->makeNode<pagx::Fill>("fill");
+  auto* solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {1.0f, 0.0f, 0.0f, 1.0f};
+  fill->color = solid;
+  group->elements = {rect, fill};
+  layer->contents = {group};
+  doc->layers.push_back(layer);
+
+  auto* animation = MakeAnimation(doc.get(), 60, pagx::LoopMode::Once);
+  auto* object = MakeAnimationObject(doc.get(), animation, "group");
+  auto* channel = MakeChannel<float>(doc.get(), object, "rotation");
+  channel->keyframes.push_back({0, 0.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  channel->keyframes.push_back({60, 90.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  AttachTimeline(layer, "anim");
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  auto rectPos = svg.find("<rect");
+  ASSERT_NE(rectPos, std::string::npos);
+  auto rectEnd = svg.find("</rect>", rectPos);
+  ASSERT_NE(rectEnd, std::string::npos);
+  auto rectContent = svg.substr(rectPos, rectEnd - rectPos);
+  EXPECT_NE(rectContent.find("<animateTransform"), std::string::npos);
+  EXPECT_NE(rectContent.find("type=\"rotate\""), std::string::npos);
+  EXPECT_NE(rectContent.find("values=\"0;90\""), std::string::npos);
+}
+
+PAGX_TEST(PAGXSVGTest, SVGExport_AnimGroupAlpha) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto* layer = doc->makeNode<pagx::Layer>("layer");
+  auto* group = doc->makeNode<pagx::Group>("group");
+  auto* rect = doc->makeNode<pagx::Rectangle>("rect");
+  rect->position = {100, 100};
+  rect->size = {80, 80};
+  auto* fill = doc->makeNode<pagx::Fill>("fill");
+  auto* solid = doc->makeNode<pagx::SolidColor>();
+  fill->color = solid;
+  group->elements = {rect, fill};
+  layer->contents = {group};
+  doc->layers.push_back(layer);
+
+  auto* animation = MakeAnimation(doc.get(), 60, pagx::LoopMode::Once);
+  auto* object = MakeAnimationObject(doc.get(), animation, "group");
+  auto* channel = MakeChannel<float>(doc.get(), object, "alpha");
+  channel->keyframes.push_back({0, 1.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  channel->keyframes.push_back({60, 0.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  AttachTimeline(layer, "anim");
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("attributeName=\"fill-opacity\""), std::string::npos);
+  EXPECT_NE(svg.find("values=\"1;0\""), std::string::npos);
+}
+
+PAGX_TEST(PAGXSVGTest, SVGExport_AnimRectWidth) {
+  auto doc = MakeRectDocument();
+  auto* animation = MakeAnimation(doc.get(), 60, pagx::LoopMode::Once);
+  auto* object = MakeAnimationObject(doc.get(), animation, "rect");
+  auto* channel = MakeChannel<float>(doc.get(), object, "size.width");
+  channel->keyframes.push_back({0, 160.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  channel->keyframes.push_back({60, 200.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  AttachTimeline(doc->layers[0], "anim");
+
+  std::vector<std::string> warnings;
+  auto svg = pagx::SVGExporter::ToSVG(*doc, {}, &warnings);
+  EXPECT_NE(svg.find("attributeName=\"width\""), std::string::npos);
+  EXPECT_NE(svg.find("values=\"160;200\""), std::string::npos);
+  EXPECT_TRUE(warnings.empty()) << (warnings.empty() ? "" : warnings[0]);
+}
+
+PAGX_TEST(PAGXSVGTest, SVGExport_AnimRectRoundness) {
+  auto doc = MakeRectDocument();
+  auto* animation = MakeAnimation(doc.get(), 60, pagx::LoopMode::Once);
+  auto* object = MakeAnimationObject(doc.get(), animation, "rect");
+  auto* channel = MakeChannel<float>(doc.get(), object, "roundness");
+  channel->keyframes.push_back({0, 0.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  channel->keyframes.push_back({60, 20.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  AttachTimeline(doc->layers[0], "anim");
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("attributeName=\"rx\""), std::string::npos);
+  EXPECT_NE(svg.find("attributeName=\"ry\""), std::string::npos);
+  EXPECT_NE(svg.find("values=\"0;20\""), std::string::npos);
+}
+
+PAGX_TEST(PAGXSVGTest, SVGExport_AnimCircleRadius) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto* layer = doc->makeNode<pagx::Layer>("layer");
+  auto* ellipse = doc->makeNode<pagx::Ellipse>("circle");
+  ellipse->position = {100, 100};
+  ellipse->size = {80, 80};
+  auto* fill = doc->makeNode<pagx::Fill>("fill");
+  auto* solid = doc->makeNode<pagx::SolidColor>();
+  fill->color = solid;
+  layer->contents = {ellipse, fill};
+  doc->layers.push_back(layer);
+
+  auto* animation = MakeAnimation(doc.get(), 60, pagx::LoopMode::Once);
+  auto* object = MakeAnimationObject(doc.get(), animation, "circle");
+  auto* channel = MakeChannel<float>(doc.get(), object, "size.width");
+  channel->keyframes.push_back({0, 80.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  channel->keyframes.push_back({60, 120.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  auto* heightChannel = MakeChannel<float>(doc.get(), object, "size.height");
+  heightChannel->keyframes.push_back({0, 80.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  heightChannel->keyframes.push_back({60, 120.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  AttachTimeline(layer, "anim");
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("<circle"), std::string::npos);
+  EXPECT_NE(svg.find("attributeName=\"r\""), std::string::npos);
+  EXPECT_NE(svg.find("values=\"40;60\""), std::string::npos);
+}
+
+//==============================================================================
+// Regression cases for the defects listed in docs/pagx-svg-export-development-plan.md (F3/F5/F9/A08)
+//==============================================================================
+
+// F3: every track of one element must share a single doubled duration under PingPong. Mirroring and
+// doubling used to happen together, so a four-track transform produced 2^4 times the duration.
+PAGX_TEST(PAGXSVGTest, SVGExport_AnimPingPongTransformSharesOneDuration) {
+  auto doc = MakeRectDocument();
+  auto* animation = MakeAnimation(doc.get(), 60, pagx::LoopMode::PingPong);
+  auto* object = MakeAnimationObject(doc.get(), animation, "layer");
+  auto* channel = MakeChannel<pagx::Matrix>(doc.get(), object, "matrix");
+  channel->keyframes.push_back(
+      {0, pagx::Matrix::Identity(), pagx::KeyframeInterpolationType::Linear, {}, {}});
+  channel->keyframes.push_back(
+      {60, pagx::Matrix::Scale(2.0f, 2.0f), pagx::KeyframeInterpolationType::Linear, {}, {}});
+  AttachTimeline(doc->layers[0], "anim");
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("dur=\"2s\""), std::string::npos);
+  EXPECT_EQ(svg.find("dur=\"4s\""), std::string::npos);
+  EXPECT_EQ(svg.find("dur=\"8s\""), std::string::npos);
+  EXPECT_EQ(svg.find("dur=\"16s\""), std::string::npos);
+}
+
+// F5: a Group whose authored position is zero must still expose the animated position, otherwise
+// BuildGroupMatrix takes the early-out and every frame reports an identity transform.
+PAGX_TEST(PAGXSVGTest, SVGExport_AnimGroupPositionFromZero) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto* layer = doc->makeNode<pagx::Layer>("layer");
+  auto* group = doc->makeNode<pagx::Group>("group");
+  auto* rect = doc->makeNode<pagx::Rectangle>("rect");
+  rect->position = {100, 100};
+  rect->size = {80, 80};
+  auto* fill = doc->makeNode<pagx::Fill>("fill");
+  auto* solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {1.0f, 0.0f, 0.0f, 1.0f};
+  fill->color = solid;
+  group->elements = {rect, fill};
+  layer->contents = {group};
+  doc->layers.push_back(layer);
+
+  auto* animation = MakeAnimation(doc.get(), 60, pagx::LoopMode::Once);
+  auto* object = MakeAnimationObject(doc.get(), animation, "group");
+  auto* channel = MakeChannel<float>(doc.get(), object, "position.x");
+  channel->keyframes.push_back({0, 0.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  channel->keyframes.push_back({60, 100.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  AttachTimeline(layer, "anim");
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("type=\"translate\""), std::string::npos);
+  EXPECT_NE(svg.find("values=\"0 0;100 0\""), std::string::npos);
+}
+
+// F9: only an alpha animation forces the group-opacity form. A transform-only animation must keep
+// the static per-child alpha distribution.
+PAGX_TEST(PAGXSVGTest, SVGExport_AnimTransformKeepsPerChildAlpha) {
+  auto doc = MakeRectDocument();
+  doc->layers[0]->groupOpacity = false;
+  doc->layers[0]->alpha = 0.5f;
+  auto* animation = MakeAnimation(doc.get(), 60, pagx::LoopMode::Once);
+  auto* object = MakeAnimationObject(doc.get(), animation, "layer");
+  auto* channel = MakeChannel<pagx::Matrix>(doc.get(), object, "matrix");
+  channel->keyframes.push_back(
+      {0, pagx::Matrix::Identity(), pagx::KeyframeInterpolationType::Linear, {}, {}});
+  channel->keyframes.push_back(
+      {60, pagx::Matrix::Scale(2.0f, 2.0f), pagx::KeyframeInterpolationType::Linear, {}, {}});
+  AttachTimeline(doc->layers[0], "anim");
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  // The alpha stays distributed to the painters instead of moving onto the <g>.
+  EXPECT_NE(svg.find("fill-opacity=\"0.5\""), std::string::npos);
+  EXPECT_EQ(svg.find(" opacity=\"0.5\""), std::string::npos);
+}
+
+// A08: a keyframe before the timeline origin must not be clamped into a different track shape. With
+// keys at (-10, 0) and (10, 1) across a 100-frame animation the runtime reports 0.5 at t=0.
+PAGX_TEST(PAGXSVGTest, SVGExport_AnimKeyframeBeforeOriginKeepsInterpolatedStart) {
+  auto doc = MakeRectDocument();
+  auto* animation = MakeAnimation(doc.get(), 100, pagx::LoopMode::Once);
+  auto* object = MakeAnimationObject(doc.get(), animation, "layer");
+  auto* channel = MakeChannel<float>(doc.get(), object, "alpha");
+  channel->keyframes.push_back({-10, 0.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  channel->keyframes.push_back({10, 1.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  AttachTimeline(doc->layers[0], "anim");
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("values=\"0.5;1;1\""), std::string::npos);
+  EXPECT_NE(svg.find("keyTimes=\"0;0.1;1\""), std::string::npos);
+}
+
+//==============================================================================
+// P1: filter parameter animation
+//==============================================================================
+
+PAGX_TEST(PAGXSVGTest, SVGExport_AnimBlurFilterStdDeviation) {
+  auto doc = MakeRectDocument();
+  auto* blur = doc->makeNode<pagx::BlurFilter>("blur");
+  blur->blurX = 0.0f;
+  blur->blurY = 0.0f;
+  doc->layers[0]->filters.push_back(blur);
+
+  auto* animation = MakeAnimation(doc.get(), 60, pagx::LoopMode::Once);
+  auto* object = MakeAnimationObject(doc.get(), animation, "blur");
+  auto* channel = MakeChannel<float>(doc.get(), object, "blurX");
+  channel->keyframes.push_back({0, 0.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  channel->keyframes.push_back({60, 8.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  AttachTimeline(doc->layers[0], "anim");
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("attributeName=\"stdDeviation\""), std::string::npos);
+  // The non-animated axis keeps its authored value, so the pair form is used throughout.
+  EXPECT_NE(svg.find("values=\"0 0;8 0\""), std::string::npos);
+}
+
+PAGX_TEST(PAGXSVGTest, SVGExport_AnimDropShadowOffset) {
+  auto doc = MakeRectDocument();
+  auto* shadow = doc->makeNode<pagx::DropShadowFilter>("shadow");
+  shadow->offsetX = 0.0f;
+  shadow->offsetY = 0.0f;
+  shadow->blurX = 0.0f;
+  shadow->blurY = 0.0f;
+  shadow->color = {0.0f, 0.0f, 0.0f, 1.0f};
+  doc->layers[0]->filters.push_back(shadow);
+
+  auto* animation = MakeAnimation(doc.get(), 60, pagx::LoopMode::Once);
+  auto* object = MakeAnimationObject(doc.get(), animation, "shadow");
+  auto* channel = MakeChannel<float>(doc.get(), object, "offsetX");
+  channel->keyframes.push_back({0, 0.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  channel->keyframes.push_back({60, 10.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  AttachTimeline(doc->layers[0], "anim");
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("attributeName=\"dx\""), std::string::npos);
+  EXPECT_NE(svg.find("values=\"0;10\""), std::string::npos);
+  // No blur channel, so the blur primitive stays static.
+  EXPECT_EQ(svg.find("attributeName=\"stdDeviation\""), std::string::npos);
+}
+
+PAGX_TEST(PAGXSVGTest, SVGExport_AnimBlendFilterColor) {
+  auto doc = MakeRectDocument();
+  auto* blend = doc->makeNode<pagx::BlendFilter>("blend");
+  blend->color = {1.0f, 0.0f, 0.0f, 1.0f};
+  doc->layers[0]->filters.push_back(blend);
+
+  auto* animation = MakeAnimation(doc.get(), 60, pagx::LoopMode::Once);
+  auto* object = MakeAnimationObject(doc.get(), animation, "blend");
+  auto* channel = MakeChannel<pagx::Color>(doc.get(), object, "color");
+  channel->keyframes.push_back(
+      {0, pagx::Color{1.0f, 0.0f, 0.0f, 1.0f}, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  channel->keyframes.push_back(
+      {60, pagx::Color{0.0f, 0.0f, 1.0f, 1.0f}, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  AttachTimeline(doc->layers[0], "anim");
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("attributeName=\"flood-color\""), std::string::npos);
+  EXPECT_NE(svg.find("values=\"#FF0000;#0000FF\""), std::string::npos);
+}
+
+//==============================================================================
+// S0: coverage ledger gate
+//==============================================================================
+
+// Every animatable channel the PAGX reflection table knows about must have a ledger row, and every
+// ledger row must still be a real animatable channel. Adding one without the other fails here.
+PAGX_TEST(PAGXSVGTest, SVGCoverageLedgerIsComplete) {
+  static const pagx::NodeType AllNodeTypes[] = {
+      pagx::NodeType::Document,
+      pagx::NodeType::PathData,
+      pagx::NodeType::Image,
+      pagx::NodeType::Composition,
+      pagx::NodeType::SolidColor,
+      pagx::NodeType::LinearGradient,
+      pagx::NodeType::RadialGradient,
+      pagx::NodeType::ConicGradient,
+      pagx::NodeType::DiamondGradient,
+      pagx::NodeType::ImagePattern,
+      pagx::NodeType::ColorStop,
+      pagx::NodeType::Font,
+      pagx::NodeType::Glyph,
+      pagx::NodeType::Animation,
+      pagx::NodeType::AnimationObject,
+      pagx::NodeType::Channel,
+      pagx::NodeType::StateMachine,
+      pagx::NodeType::StateRegion,
+      pagx::NodeType::State,
+      pagx::NodeType::StateTransition,
+      pagx::NodeType::TransitionCondition,
+      pagx::NodeType::StateMachineInput,
+      pagx::NodeType::Layer,
+      pagx::NodeType::DropShadowStyle,
+      pagx::NodeType::InnerShadowStyle,
+      pagx::NodeType::BackgroundBlurStyle,
+      pagx::NodeType::NoiseStyle,
+      pagx::NodeType::GlassStyle,
+      pagx::NodeType::BlurFilter,
+      pagx::NodeType::DropShadowFilter,
+      pagx::NodeType::InnerShadowFilter,
+      pagx::NodeType::BlendFilter,
+      pagx::NodeType::ColorMatrixFilter,
+      pagx::NodeType::NoiseFilter,
+      pagx::NodeType::Rectangle,
+      pagx::NodeType::Ellipse,
+      pagx::NodeType::Polystar,
+      pagx::NodeType::Path,
+      pagx::NodeType::Text,
+      pagx::NodeType::Fill,
+      pagx::NodeType::Stroke,
+      pagx::NodeType::TrimPath,
+      pagx::NodeType::RoundCorner,
+      pagx::NodeType::MergePath,
+      pagx::NodeType::TextModifier,
+      pagx::NodeType::TextPath,
+      pagx::NodeType::TextBox,
+      pagx::NodeType::Group,
+      pagx::NodeType::Repeater,
+      pagx::NodeType::RangeSelector,
+      pagx::NodeType::GlyphRun,
+      pagx::NodeType::ViewModel,
+      pagx::NodeType::ViewModelProperty,
+      pagx::NodeType::DataBind,
+  };
+
+  size_t animatableChannels = 0;
+  std::string firstMissing;
+  for (auto type : AllNodeTypes) {
+    for (const auto& name : pagx::ListChannels(type)) {
+      if (!pagx::IsAnimatableChannel(type, name)) {
+        continue;
+      }
+      ++animatableChannels;
+      if (firstMissing.empty() && pagx::FindSVGChannelEntry(type, name) == nullptr) {
+        firstMissing = std::string(pagx::NodeTypeName(type)) + "." + name;
+      }
+    }
+  }
+  EXPECT_TRUE(firstMissing.empty()) << "unclassified animatable channel: " << firstMissing;
+  EXPECT_EQ(animatableChannels, 175u);
+  EXPECT_EQ(pagx::SVGChannelLedger().size(), 175u);
+  EXPECT_EQ(pagx::SVGClassifiedNodeTypeCount(), 30u);
+
+  // The reverse direction: a stale ledger row would claim a channel the model no longer has.
+  for (const auto& entry : pagx::SVGChannelLedger()) {
+    EXPECT_TRUE(pagx::IsAnimatableChannel(entry.type, entry.channel))
+        << "stale ledger row: " << pagx::NodeTypeName(entry.type) << "." << entry.channel;
+    EXPECT_NE(entry.note, nullptr);
+  }
+}
+
+// The capability document is generated from the ledger. Regenerate it by running this test and
+// copying test/out/PAGXSVGTest/svg-animation-capabilities.md when the ledger changes.
+PAGX_TEST(PAGXSVGTest, SVGAnimationCapabilitiesDocIsCurrent) {
+  std::string doc;
+  doc += "# PAGX to SVG animation capability matrix\n\n";
+  doc +=
+      "Generated from `SVGChannelLedger()` in `src/pagx/svg/SVGCoverageLedger.cpp`. Do not edit "
+      "this file by hand: `PAGXSVGTest.SVGAnimationCapabilitiesDocIsCurrent` regenerates it "
+      "into `test/out/PAGXSVGTest/svg-animation-capabilities.md` whenever the ledger changes.\n\n";
+  size_t supported = 0;
+  size_t planned = 0;
+  size_t notExpressible = 0;
+  for (const auto& entry : pagx::SVGChannelLedger()) {
+    switch (entry.status) {
+      case pagx::SVGChannelStatus::Supported:
+        ++supported;
+        break;
+      case pagx::SVGChannelStatus::Planned:
+        ++planned;
+        break;
+      case pagx::SVGChannelStatus::NotExpressible:
+        ++notExpressible;
+        break;
+    }
+  }
+  doc +=
+      "- Reflective animatable channels: " + std::to_string(pagx::SVGChannelLedger().size()) + "\n";
+  doc += "- Supported: " + std::to_string(supported) + "\n";
+  doc += "- Planned: " + std::to_string(planned) + "\n";
+  doc += "- Not expressible: " + std::to_string(notExpressible) + "\n";
+  doc +=
+      "- Table-external family: Path `point{N}.x` / `point{N}.y` (not counted in the rows "
+      "above)\n";
+  doc +=
+      "- Browser gate cases: `SVGBrowserAnimTest` covers SolidColor, ColorStop, linear "
+      "endpoint, Text.x and Polystar roundness at a paused SMIL seek time.\n\n";
+
+  pagx::NodeType currentType = pagx::NodeType::Document;
+  bool firstType = true;
+  for (const auto& entry : pagx::SVGChannelLedger()) {
+    if (firstType || entry.type != currentType) {
+      if (!firstType) {
+        doc += "\n";
+      }
+      currentType = entry.type;
+      firstType = false;
+      doc += "## ";
+      doc += pagx::NodeTypeName(currentType);
+      doc += "\n\n| Channel | Status | Notes |\n|---|---|---|\n";
+    }
+    const char* status = "Supported";
+    if (entry.status == pagx::SVGChannelStatus::Planned) {
+      status = "Planned";
+    } else if (entry.status == pagx::SVGChannelStatus::NotExpressible) {
+      status = "Not expressible";
+    }
+    doc += "| `";
+    doc += entry.channel;
+    doc += "` | ";
+    doc += status;
+    doc += " | ";
+    doc += entry.note != nullptr ? entry.note : "";
+    doc += " |\n";
+  }
+
+  auto expectedPath = ProjectPath::Absolute("docs/pagx-svg-animation-capabilities.md");
+  auto outDir = ProjectPath::Absolute("test/out/PAGXSVGTest");
+  std::filesystem::create_directories(outDir);
+  auto generatedPath = outDir + "/svg-animation-capabilities.md";
+  {
+    std::ofstream out(generatedPath, std::ios::binary);
+    ASSERT_TRUE(out.good());
+    out << doc;
+  }
+  std::ifstream in(expectedPath, std::ios::binary);
+  std::string expected((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+  EXPECT_EQ(expected, doc) << "capability document is stale; copy " << generatedPath << " to "
+                           << expectedPath;
+}
+
+// feTurbulence seed animation: the primitive keeps its static seed as the base value and carries
+// a seed track inside the open element.
+PAGX_TEST(PAGXSVGTest, SVGExport_AnimNoiseFilterSeed) {
+  auto doc = MakeRectDocument();
+  auto* noise = doc->makeNode<pagx::NoiseFilter>("noise");
+  noise->mode = pagx::NoiseMode::Mono;
+  noise->size = 8;
+  noise->density = 0.5f;
+  noise->seed = 1;
+  doc->layers[0]->filters.push_back(noise);
+
+  auto* animation = MakeAnimation(doc.get(), 60, pagx::LoopMode::Once);
+  auto* object = MakeAnimationObject(doc.get(), animation, "noise");
+  auto* channel = MakeChannel<float>(doc.get(), object, "seed");
+  channel->keyframes.push_back({0, 1.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  channel->keyframes.push_back({60, 4.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  AttachTimeline(doc->layers[0], "anim");
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("attributeName=\"seed\""), std::string::npos) << svg;
+  EXPECT_NE(svg.find("values=\"1;4\""), std::string::npos) << svg;
+  EXPECT_NE(svg.find("</feTurbulence>"), std::string::npos) << svg;
+}
+
+// F3: a ping-pong visibility track mirrors its discrete values and doubles the duration.
+PAGX_TEST(PAGXSVGTest, SVGExport_AnimVisibilityPingPongMirrors) {
+  auto doc = MakeRectDocument();
+  auto* animation = MakeAnimation(doc.get(), 60, pagx::LoopMode::PingPong);
+  auto* object = MakeAnimationObject(doc.get(), animation, "layer");
+  auto* channel = MakeChannel<bool>(doc.get(), object, "visible");
+  channel->keyframes.push_back({0, true, pagx::KeyframeInterpolationType::Hold, {}, {}});
+  channel->keyframes.push_back({60, false, pagx::KeyframeInterpolationType::Hold, {}, {}});
+  AttachTimeline(doc->layers[0], "anim");
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("attributeName=\"visibility\""), std::string::npos) << svg;
+  EXPECT_NE(svg.find("values=\"visible;hidden;visible\""), std::string::npos) << svg;
+  EXPECT_NE(svg.find("dur=\"2s\""), std::string::npos) << svg;
+}
+
+// M2: Layer transform components are sampled into the layer matrix per frame.
+PAGX_TEST(PAGXSVGTest, SVGExport_AnimLayerPositionComponent) {
+  auto doc = MakeRectDocument();
+  auto* animation = MakeAnimation(doc.get(), 60, pagx::LoopMode::Once);
+  auto* object = MakeAnimationObject(doc.get(), animation, "layer");
+  auto* channel = MakeChannel<float>(doc.get(), object, "x");
+  channel->keyframes.push_back({0, 0.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  channel->keyframes.push_back({60, 100.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  AttachTimeline(doc->layers[0], "anim");
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("type=\"translate\""), std::string::npos) << svg;
+  EXPECT_NE(svg.find("values=\"0 0;100 0\""), std::string::npos) << svg;
+}
+
+PAGX_TEST(PAGXSVGTest, SVGExport_AnimLayerRotationComponent) {
+  auto doc = MakeRectDocument();
+  auto* animation = MakeAnimation(doc.get(), 60, pagx::LoopMode::Once);
+  auto* object = MakeAnimationObject(doc.get(), animation, "layer");
+  auto* channel = MakeChannel<float>(doc.get(), object, "rotation.z");
+  channel->keyframes.push_back({0, 0.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  channel->keyframes.push_back({60, 90.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  AttachTimeline(doc->layers[0], "anim");
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("type=\"rotate\""), std::string::npos) << svg;
+  EXPECT_NE(svg.find("90"), std::string::npos) << svg;
+}
+
+// F7: a multi-channel track with bezier easing is densified so the shared linear track follows
+// the per-channel curve instead of only its endpoints.
+PAGX_TEST(PAGXSVGTest, SVGExport_AnimMultiChannelBezierIsDensified) {
+  auto doc = MakeRectDocument();
+  auto* animation = MakeAnimation(doc.get(), 60, pagx::LoopMode::Once);
+  auto* object = MakeAnimationObject(doc.get(), animation, "layer");
+  auto* xChannel = MakeChannel<float>(doc.get(), object, "x");
+  xChannel->keyframes.push_back(
+      {0, 0.0f, pagx::KeyframeInterpolationType::Bezier, {0.9f, 0.0f}, {}});
+  xChannel->keyframes.push_back(
+      {60, 100.0f, pagx::KeyframeInterpolationType::Bezier, {}, {0.9f, 1.0f}});
+  auto* rotationChannel = MakeChannel<float>(doc.get(), object, "rotation.z");
+  rotationChannel->keyframes.push_back({0, 0.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  rotationChannel->keyframes.push_back(
+      {60, 90.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  AttachTimeline(doc->layers[0], "anim");
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  auto marker = svg.find("type=\"translate\"");
+  ASSERT_NE(marker, std::string::npos) << svg;
+  auto valuesStart = svg.find("values=\"", marker);
+  ASSERT_NE(valuesStart, std::string::npos);
+  valuesStart += 8;
+  auto valuesEnd = svg.find('"', valuesStart);
+  ASSERT_NE(valuesEnd, std::string::npos);
+  auto values = svg.substr(valuesStart, valuesEnd - valuesStart);
+  size_t separators = 0;
+  for (char c : values) {
+    if (c == ';') {
+      ++separators;
+    }
+  }
+  EXPECT_GE(separators, 7u) << values;
+  // Bezier ease-in at the midpoint is well below the linear 50.
+  EXPECT_EQ(values.find("50 0"), std::string::npos) << values;
+}
+
+// F6: a scalar rotation past 180 degrees keeps winding instead of taking the short way back.
+PAGX_TEST(PAGXSVGTest, SVGExport_AnimLayerRotationKeepsTurns) {
+  auto doc = MakeRectDocument();
+  auto* animation = MakeAnimation(doc.get(), 60, pagx::LoopMode::Once);
+  auto* object = MakeAnimationObject(doc.get(), animation, "layer");
+  auto* channel = MakeChannel<float>(doc.get(), object, "rotation.z");
+  channel->keyframes.push_back({0, 0.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  channel->keyframes.push_back({60, 370.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  AttachTimeline(doc->layers[0], "anim");
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("values=\"0;370\""), std::string::npos) << svg;
+}
+
+PAGX_TEST(PAGXSVGTest, SVGExport_AnimGroupRotationKeepsTurns) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto* layer = doc->makeNode<pagx::Layer>("layer");
+  auto* group = doc->makeNode<pagx::Group>("group");
+  auto* rect = doc->makeNode<pagx::Rectangle>("rect");
+  rect->position = {100, 100};
+  rect->size = {100, 100};
+  auto* fill = doc->makeNode<pagx::Fill>("fill");
+  auto* solid = doc->makeNode<pagx::SolidColor>("color");
+  solid->color = {1, 0, 0, 1};
+  fill->color = solid;
+  group->elements = {rect, fill};
+  layer->contents = {group};
+  doc->layers.push_back(layer);
+
+  auto* animation = MakeAnimation(doc.get(), 60, pagx::LoopMode::Once);
+  auto* object = MakeAnimationObject(doc.get(), animation, "group");
+  auto* channel = MakeChannel<float>(doc.get(), object, "rotation");
+  channel->keyframes.push_back({0, 0.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  channel->keyframes.push_back({60, 370.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  AttachTimeline(layer, "anim");
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("values=\"0;370\""), std::string::npos) << svg;
+}
+
+// M4.E: a shadow filter colour animates the feColorMatrix constant column.
+PAGX_TEST(PAGXSVGTest, SVGExport_AnimDropShadowFilterColor) {
+  auto doc = MakeRectDocument();
+  auto* filter = doc->makeNode<pagx::DropShadowFilter>("shadowFilter");
+  filter->color = {1, 0, 0, 1};
+  filter->offsetX = 4;
+  filter->offsetY = 4;
+  filter->blurX = 4;
+  filter->blurY = 4;
+  doc->layers[0]->filters.push_back(filter);
+
+  auto* animation = MakeAnimation(doc.get(), 60, pagx::LoopMode::Once);
+  auto* object = MakeAnimationObject(doc.get(), animation, "shadowFilter");
+  auto* channel = MakeChannel<pagx::Color>(doc.get(), object, "color");
+  channel->keyframes.push_back(
+      {0, pagx::Color{1, 0, 0, 1}, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  channel->keyframes.push_back(
+      {60, pagx::Color{0, 0, 1, 1}, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  AttachTimeline(doc->layers[0], "anim");
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("attributeName=\"values\""), std::string::npos) << svg;
+  EXPECT_NE(svg.find("0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0"), std::string::npos) << svg;
+}
+
+// M4.E: a shadow style colour animates the same feColorMatrix track.
+PAGX_TEST(PAGXSVGTest, SVGExport_AnimDropShadowStyleColor) {
+  auto doc = MakeRectDocument();
+  auto* style = doc->makeNode<pagx::DropShadowStyle>("shadowStyle");
+  style->color = {0, 1, 0, 1};
+  style->offsetX = 6;
+  style->offsetY = 6;
+  style->blurX = 6;
+  style->blurY = 6;
+  doc->layers[0]->styles.push_back(style);
+
+  auto* animation = MakeAnimation(doc.get(), 60, pagx::LoopMode::Once);
+  auto* object = MakeAnimationObject(doc.get(), animation, "shadowStyle");
+  auto* channel = MakeChannel<pagx::Color>(doc.get(), object, "color");
+  channel->keyframes.push_back(
+      {0, pagx::Color{0, 1, 0, 1}, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  channel->keyframes.push_back(
+      {60, pagx::Color{1, 0, 0, 1}, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  AttachTimeline(doc->layers[0], "anim");
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("attributeName=\"values\""), std::string::npos) << svg;
+  EXPECT_NE(svg.find("0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 1 0"), std::string::npos) << svg;
+}
+
+// M4.E: a noise style animates the same feTurbulence seed track as the filter.
+PAGX_TEST(PAGXSVGTest, SVGExport_AnimNoiseStyleSeed) {
+  auto doc = MakeRectDocument();
+  auto* noise = doc->makeNode<pagx::NoiseStyle>("noise");
+  noise->mode = pagx::NoiseMode::Mono;
+  noise->size = 6;
+  noise->density = 0.4f;
+  noise->seed = 2;
+  doc->layers[0]->styles.push_back(noise);
+
+  auto* animation = MakeAnimation(doc.get(), 60, pagx::LoopMode::Once);
+  auto* object = MakeAnimationObject(doc.get(), animation, "noise");
+  auto* channel = MakeChannel<float>(doc.get(), object, "seed");
+  channel->keyframes.push_back({0, 2.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  channel->keyframes.push_back({60, 5.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  AttachTimeline(doc->layers[0], "anim");
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("attributeName=\"seed\""), std::string::npos) << svg;
+  EXPECT_NE(svg.find("values=\"2;5\""), std::string::npos) << svg;
+}
+
+// M4.E: noise colour channels animate the feFlood that tints the turbulence.
+PAGX_TEST(PAGXSVGTest, SVGExport_AnimNoiseColor) {
+  auto doc = MakeRectDocument();
+  auto* noise = doc->makeNode<pagx::NoiseFilter>("noise");
+  noise->mode = pagx::NoiseMode::Mono;
+  noise->size = 8;
+  noise->density = 0.5f;
+  noise->seed = 1;
+  noise->color = {1, 0, 0, 1};
+  doc->layers[0]->filters.push_back(noise);
+
+  auto* animation = MakeAnimation(doc.get(), 60, pagx::LoopMode::Once);
+  auto* object = MakeAnimationObject(doc.get(), animation, "noise");
+  auto* channel = MakeChannel<pagx::Color>(doc.get(), object, "color");
+  channel->keyframes.push_back(
+      {0, pagx::Color{1, 0, 0, 1}, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  channel->keyframes.push_back(
+      {60, pagx::Color{0, 1, 0, 1}, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  AttachTimeline(doc->layers[0], "anim");
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("attributeName=\"flood-color\""), std::string::npos) << svg;
+  EXPECT_NE(svg.find("values=\"#FF0000;#00FF00\""), std::string::npos) << svg;
+}
+
+PAGX_TEST(PAGXSVGTest, SVGExport_AnimNoiseDuoFirstColor) {
+  auto doc = MakeRectDocument();
+  auto* noise = doc->makeNode<pagx::NoiseStyle>("noise");
+  noise->mode = pagx::NoiseMode::Duo;
+  noise->size = 6;
+  noise->density = 0.4f;
+  noise->firstColor = {1, 0, 0, 1};
+  noise->secondColor = {0, 0, 1, 1};
+  doc->layers[0]->styles.push_back(noise);
+
+  auto* animation = MakeAnimation(doc.get(), 60, pagx::LoopMode::Once);
+  auto* object = MakeAnimationObject(doc.get(), animation, "noise");
+  auto* channel = MakeChannel<pagx::Color>(doc.get(), object, "firstColor");
+  channel->keyframes.push_back(
+      {0, pagx::Color{1, 0, 0, 1}, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  channel->keyframes.push_back(
+      {60, pagx::Color{0, 1, 0, 1}, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  AttachTimeline(doc->layers[0], "anim");
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("attributeName=\"flood-color\""), std::string::npos) << svg;
+}
+
+// M4.E: a shadow style spread animates the feMorphology radius.
+PAGX_TEST(PAGXSVGTest, SVGExport_AnimShadowSpread) {
+  auto doc = MakeRectDocument();
+  auto* style = doc->makeNode<pagx::DropShadowStyle>("shadowStyle");
+  style->offsetX = 6;
+  style->offsetY = 6;
+  style->blurX = 6;
+  style->blurY = 6;
+  style->spread = 4;
+  doc->layers[0]->styles.push_back(style);
+
+  auto* animation = MakeAnimation(doc.get(), 60, pagx::LoopMode::Once);
+  auto* object = MakeAnimationObject(doc.get(), animation, "shadowStyle");
+  auto* channel = MakeChannel<float>(doc.get(), object, "spread");
+  channel->keyframes.push_back({0, 4.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  channel->keyframes.push_back({60, 10.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  AttachTimeline(doc->layers[0], "anim");
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("<feMorphology"), std::string::npos) << svg;
+  EXPECT_NE(svg.find("attributeName=\"radius\""), std::string::npos) << svg;
+  EXPECT_NE(svg.find("values=\"4;10\""), std::string::npos) << svg;
+}
+
+// A spread track that crosses zero cannot animate feMorphology's discrete operator; Strict
+// rejects instead of freezing it.
+PAGX_TEST(PAGXSVGTest, SVGExport_AnimShadowSpreadCrossingZeroRejected) {
+  auto doc = MakeRectDocument();
+  auto* style = doc->makeNode<pagx::InnerShadowStyle>("shadowStyle");
+  style->offsetX = 4;
+  style->offsetY = 4;
+  style->blurX = 4;
+  style->blurY = 4;
+  doc->layers[0]->styles.push_back(style);
+
+  auto* animation = MakeAnimation(doc.get(), 60, pagx::LoopMode::Once);
+  auto* object = MakeAnimationObject(doc.get(), animation, "shadowStyle");
+  auto* channel = MakeChannel<float>(doc.get(), object, "spread");
+  channel->keyframes.push_back({0, -4.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  channel->keyframes.push_back({60, 4.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  AttachTimeline(doc->layers[0], "anim");
+
+  std::vector<std::string> warnings;
+  pagx::SVGExportOptions strict = {};
+  strict.animation.policy = pagx::SVGAnimationPolicy::Strict;
+  auto strictSvg = pagx::SVGExporter::ToSVG(*doc, strict, &warnings);
+  EXPECT_TRUE(strictSvg.empty());
+  bool reported = false;
+  for (const auto& warning : warnings) {
+    reported = reported || warning.find("changes sign") != std::string::npos;
+  }
+  EXPECT_TRUE(reported) << (warnings.empty() ? "no warnings" : warnings[0]);
+}
+
+// M4.E: a noise size animation drives feTurbulence baseFrequency as 1/size.
+PAGX_TEST(PAGXSVGTest, SVGExport_AnimNoiseSize) {
+  auto doc = MakeRectDocument();
+  auto* noise = doc->makeNode<pagx::NoiseStyle>("noise");
+  noise->mode = pagx::NoiseMode::Mono;
+  noise->size = 4;
+  noise->density = 0.5f;
+  noise->seed = 1;
+  doc->layers[0]->styles.push_back(noise);
+
+  auto* animation = MakeAnimation(doc.get(), 60, pagx::LoopMode::Once);
+  auto* object = MakeAnimationObject(doc.get(), animation, "noise");
+  auto* channel = MakeChannel<float>(doc.get(), object, "size");
+  channel->keyframes.push_back({0, 4.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  channel->keyframes.push_back({60, 8.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  AttachTimeline(doc->layers[0], "anim");
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("attributeName=\"baseFrequency\""), std::string::npos) << svg;
+  EXPECT_NE(svg.find("values=\"0.25;0.125\""), std::string::npos) << svg;
+}
+
+// Two animations driving the same attribute cannot share one SMIL track: Strict rejects, and// Two animations driving the same attribute cannot share one SMIL track: Strict rejects, and
+// BestEffort keeps the later animation's track (the runtime's last-writer-wins order).
+PAGX_TEST(PAGXSVGTest, SVGExport_AnimMultiClockChannelRejected) {
+  auto doc = MakeRectDocument();
+  auto* first = doc->makeNode<pagx::Animation>("a1");
+  first->duration = 60;
+  first->frameRate = 60.0f;
+  first->loop = pagx::LoopMode::Once;
+  doc->animations.push_back(first);
+  auto* firstObject = MakeAnimationObject(doc.get(), first, "fill");
+  auto* firstChannel = MakeChannel<float>(doc.get(), firstObject, "alpha");
+  firstChannel->keyframes.push_back({0, 0.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  firstChannel->keyframes.push_back({60, 0.5f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+
+  auto* second = doc->makeNode<pagx::Animation>("a2");
+  second->duration = 60;
+  second->frameRate = 60.0f;
+  second->loop = pagx::LoopMode::Once;
+  doc->animations.push_back(second);
+  auto* secondObject = MakeAnimationObject(doc.get(), second, "fill");
+  auto* secondChannel = MakeChannel<float>(doc.get(), secondObject, "alpha");
+  secondChannel->keyframes.push_back({0, 1.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  secondChannel->keyframes.push_back({60, 0.6f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+
+  std::vector<std::string> warnings;
+  pagx::SVGExportOptions strict = {};
+  strict.animation.selection = pagx::SVGAnimationSelection::All;
+  strict.animation.policy = pagx::SVGAnimationPolicy::Strict;
+  auto strictSvg = pagx::SVGExporter::ToSVG(*doc, strict, &warnings);
+  EXPECT_TRUE(strictSvg.empty());
+  bool reported = false;
+  for (const auto& warning : warnings) {
+    reported = reported || warning.find("multiple animations") != std::string::npos;
+  }
+  EXPECT_TRUE(reported) << (warnings.empty() ? "no warnings" : warnings[0]);
+
+  pagx::SVGExportOptions bestEffort = {};
+  bestEffort.animation.selection = pagx::SVGAnimationSelection::All;
+  bestEffort.animation.policy = pagx::SVGAnimationPolicy::BestEffort;
+  auto bestEffortSvg = pagx::SVGExporter::ToSVG(*doc, bestEffort);
+  EXPECT_NE(bestEffortSvg.find("attributeName=\"fill-opacity\""), std::string::npos);
+  EXPECT_NE(bestEffortSvg.find("values=\"1;0.6"), std::string::npos) << bestEffortSvg;
+  size_t occurrences = 0;
+  for (size_t pos = bestEffortSvg.find("attributeName=\"fill-opacity\""); pos != std::string::npos;
+       pos = bestEffortSvg.find("attributeName=\"fill-opacity\"", pos + 1)) {
+    ++occurrences;
+  }
+  EXPECT_EQ(occurrences, 1u);
+}
+
+// The Plan whitelist and the coverage ledger must agree in both directions. The Path point family
+// is table-external: the plan accepts it while the 175-row ledger stays untouched.
+PAGX_TEST(PAGXSVGTest, SVGAnimationPlanWhitelistMatchesLedger) {
+  for (const auto& entry : pagx::SVGChannelLedger()) {
+    bool supported = pagx::SVGAnimationPlan::SupportsChannel(entry.type, entry.channel);
+    if (entry.status == pagx::SVGChannelStatus::Supported) {
+      EXPECT_TRUE(supported) << "ledger Supported but Plan rejects: "
+                             << pagx::NodeTypeName(entry.type) << "." << entry.channel;
+    } else {
+      EXPECT_FALSE(supported) << "ledger not Supported but Plan accepts: "
+                              << pagx::NodeTypeName(entry.type) << "." << entry.channel;
+    }
+  }
+  EXPECT_TRUE(pagx::SVGAnimationPlan::SupportsChannel(pagx::NodeType::Path, "point0.x"));
+  EXPECT_TRUE(pagx::SVGAnimationPlan::SupportsChannel(pagx::NodeType::Path, "point12.y"));
+  EXPECT_FALSE(pagx::SVGAnimationPlan::SupportsChannel(pagx::NodeType::Path, "point.x"));
+  EXPECT_FALSE(pagx::SVGAnimationPlan::SupportsChannel(pagx::NodeType::Path, "point0.z"));
+  for (const auto& entry : pagx::SVGChannelLedger()) {
+    if (entry.type != pagx::NodeType::Path) {
+      continue;
+    }
+    EXPECT_TRUE(std::string(entry.channel).rfind("point", 0) != 0)
+        << "the point family must stay out of the reflective ledger";
+  }
+}
+
+// An animation that cannot produce a track must be reported, not silently treated as animated.
+PAGX_TEST(PAGXSVGTest, SVGExport_DegenerateAnimationIsReported) {
+  auto doc = MakeRectDocument();
+  auto* animation = MakeAnimation(doc.get(), 0, pagx::LoopMode::Once);
+  auto* object = MakeAnimationObject(doc.get(), animation, "layer");
+  auto* channel = MakeChannel<float>(doc.get(), object, "alpha");
+  channel->keyframes.push_back({0, 0.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  AttachTimeline(doc->layers[0], "anim");
+
+  std::vector<std::string> warnings;
+  auto svg = pagx::SVGExporter::ToSVG(*doc, {}, &warnings);
+  EXPECT_EQ(svg.find("<animate"), std::string::npos);
+  bool reported = false;
+  for (const auto& warning : warnings) {
+    reported = reported || warning.find("non-positive duration") != std::string::npos;
+  }
+  EXPECT_TRUE(reported) << (warnings.empty() ? "no warnings" : warnings[0]);
+}
+
+// ToFile writes through a sibling temporary file: a successful write leaves no temp behind and a
+// failed write must not create or truncate the target.
+PAGX_TEST(PAGXSVGTest, SVGExport_ToFileIsAtomic) {
+  auto dir = ProjectPath::Absolute("test/out/PAGXSVGTest");
+  std::filesystem::create_directories(dir);
+  auto path = dir + "/atomic_write.svg";
+  auto tempPath = path + ".tmp";
+  std::filesystem::remove(path);
+  std::filesystem::remove(tempPath);
+
+  auto doc = MakeRectDocument();
+  ASSERT_TRUE(pagx::SVGExporter::ToFile(*doc, path));
+  ASSERT_TRUE(std::filesystem::exists(path));
+  auto firstSize = std::filesystem::file_size(path);
+  EXPECT_FALSE(std::filesystem::exists(tempPath));
+
+  auto other = pagx::PAGXDocument::Make(100, 50);
+  ASSERT_TRUE(pagx::SVGExporter::ToFile(*other, path));
+  EXPECT_NE(std::filesystem::file_size(path), firstSize);
+  EXPECT_FALSE(std::filesystem::exists(tempPath));
+
+  auto missing = dir + "/missing_dir_xyz/out.svg";
+  EXPECT_FALSE(pagx::SVGExporter::ToFile(*doc, missing));
+  EXPECT_FALSE(std::filesystem::exists(missing));
+}
+
+// ST33: a hidden layer is skipped even when it owns a mask — the mask describes what the owner
+// clips, it does not make hidden content visible.
+PAGX_TEST(PAGXSVGTest, SVGExport_HiddenLayerWithMaskIsSkipped) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto* owner = doc->makeNode<pagx::Layer>("owner");
+  owner->visible = false;
+  auto* rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {100, 100};
+  rect->size = {80, 80};
+  auto* fill = doc->makeNode<pagx::Fill>();
+  auto* green = doc->makeNode<pagx::SolidColor>();
+  green->color = {0.0f, 1.0f, 0.0f, 1.0f};
+  fill->color = green;
+  owner->contents = {rect, fill};
+
+  auto* mask = doc->makeNode<pagx::Layer>("mask");
+  auto* maskRect = doc->makeNode<pagx::Rectangle>();
+  maskRect->position = {100, 100};
+  maskRect->size = {60, 60};
+  auto* maskFill = doc->makeNode<pagx::Fill>();
+  auto* white = doc->makeNode<pagx::SolidColor>();
+  white->color = {1.0f, 1.0f, 1.0f, 1.0f};
+  maskFill->color = white;
+  mask->contents = {maskRect, maskFill};
+  owner->mask = mask;
+  owner->children.push_back(mask);
+  doc->layers.push_back(owner);
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  // The owner's unique fill must not reach the output; the mask layer itself may still appear as a
+  // <mask> definition.
+  EXPECT_EQ(svg.find("#00FF00"), std::string::npos);
+}
+
+// ST34: the renderer draws the composition instead of the layer's vector contents, so the exporter
+// must not paint both.
+PAGX_TEST(PAGXSVGTest, SVGExport_CompositionWinsOverContents) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto* composition = doc->makeNode<pagx::Composition>("comp");
+  auto* compLayer = doc->makeNode<pagx::Layer>("compLayer");
+  auto* compRect = doc->makeNode<pagx::Rectangle>();
+  compRect->position = {100, 100};
+  compRect->size = {80, 80};
+  auto* compFill = doc->makeNode<pagx::Fill>();
+  auto* blue = doc->makeNode<pagx::SolidColor>();
+  blue->color = {0.0f, 0.0f, 1.0f, 1.0f};
+  compFill->color = blue;
+  compLayer->contents = {compRect, compFill};
+  composition->layers.push_back(compLayer);
+
+  auto* owner = doc->makeNode<pagx::Layer>("owner");
+  owner->composition = composition;
+  auto* ownRect = doc->makeNode<pagx::Rectangle>();
+  ownRect->position = {100, 100};
+  ownRect->size = {40, 40};
+  auto* ownFill = doc->makeNode<pagx::Fill>();
+  auto* red = doc->makeNode<pagx::SolidColor>();
+  red->color = {1.0f, 0.0f, 0.0f, 1.0f};
+  ownFill->color = red;
+  owner->contents = {ownRect, ownFill};
+  doc->layers.push_back(owner);
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("#0000FF"), std::string::npos);
+  EXPECT_EQ(svg.find("#FF0000"), std::string::npos);
+}
+
+static size_t CountOccurrences(const std::string& text, const std::string& needle) {
+  size_t count = 0;
+  for (size_t pos = 0; (pos = text.find(needle, pos)) != std::string::npos; pos += needle.size()) {
+    ++count;
+  }
+  return count;
+}
+
+// ST1: a generated def id must never shadow a name the document already uses.
+PAGX_TEST(PAGXSVGTest, SVGExport_GeneratedIdsAvoidAuthorIds) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto* layer = doc->makeNode<pagx::Layer>("grad0");
+  auto* rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {100, 100};
+  rect->size = {80, 80};
+  auto* fill = doc->makeNode<pagx::Fill>();
+  auto* gradient = doc->makeNode<pagx::LinearGradient>("authorGradient");
+  gradient->startPoint = {60, 100};
+  gradient->endPoint = {140, 100};
+  auto* stop = doc->makeNode<pagx::ColorStop>();
+  stop->offset = 0.0f;
+  stop->color = {1.0f, 0.0f, 0.0f, 1.0f};
+  gradient->colorStops.push_back(stop);
+  fill->color = gradient;
+  layer->contents = {rect, fill};
+  doc->layers.push_back(layer);
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  // The author's layer keeps grad0; the generated gradient has to pick another name.
+  EXPECT_EQ(CountOccurrences(svg, "id=\"grad0\""), 1u);
+  EXPECT_EQ(CountOccurrences(svg, "id=\"grad1\""), 1u);
+}
+
+// ST1: the same composition inlined twice repeats the layer ids; the second instance must be
+// uniquified instead of producing a duplicate DOM id.
+PAGX_TEST(PAGXSVGTest, SVGExport_CompositionInstancesGetUniqueIds) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto* composition = doc->makeNode<pagx::Composition>("comp");
+  auto* inner = doc->makeNode<pagx::Layer>("inner");
+  auto* rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {100, 100};
+  rect->size = {80, 80};
+  auto* fill = doc->makeNode<pagx::Fill>();
+  auto* solid = doc->makeNode<pagx::SolidColor>();
+  fill->color = solid;
+  inner->contents = {rect, fill};
+  composition->layers.push_back(inner);
+
+  auto* first = doc->makeNode<pagx::Layer>("slotA");
+  first->composition = composition;
+  auto* second = doc->makeNode<pagx::Layer>("slotB");
+  second->composition = composition;
+  doc->layers = {first, second};
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_EQ(CountOccurrences(svg, "id=\"inner\""), 1u);
+  EXPECT_EQ(CountOccurrences(svg, "id=\"inner_1\""), 1u);
+}
+
+// ST4: a contour mask becomes <clipPath>, where the inside/outside test is driven by clip-rule.
+// An even-odd mask fill must therefore emit clip-rule instead of fill-rule.
+PAGX_TEST(PAGXSVGTest, SVGExport_ContourMaskUsesClipRule) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto* mask = doc->makeNode<pagx::Layer>("contourMask");
+  auto* maskRect = doc->makeNode<pagx::Rectangle>();
+  maskRect->position = {100, 100};
+  maskRect->size = {80, 80};
+  auto* maskFill = doc->makeNode<pagx::Fill>();
+  auto* white = doc->makeNode<pagx::SolidColor>();
+  white->color = {1.0f, 1.0f, 1.0f, 1.0f};
+  maskFill->color = white;
+  maskFill->fillRule = pagx::FillRule::EvenOdd;
+  mask->contents = {maskRect, maskFill};
+
+  auto* owner = doc->makeNode<pagx::Layer>("owner");
+  owner->mask = mask;
+  owner->maskType = pagx::MaskType::Contour;
+  auto* rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {100, 100};
+  rect->size = {100, 100};
+  auto* fill = doc->makeNode<pagx::Fill>();
+  auto* solid = doc->makeNode<pagx::SolidColor>();
+  fill->color = solid;
+  owner->contents = {rect, fill};
+  owner->children.push_back(mask);
+  doc->layers.push_back(owner);
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("<clipPath"), std::string::npos);
+  EXPECT_NE(svg.find("clip-rule=\"evenodd\""), std::string::npos);
+  EXPECT_EQ(svg.find("fill-rule=\"evenodd\""), std::string::npos);
+}
+
+// ST5: a layer that needs an offscreen composite (here a blur filter) must fold its alpha onto the
+// group instead of distributing it to each child, otherwise the filter runs before the group alpha.
+PAGX_TEST(PAGXSVGTest, SVGExport_IsolatedLayerUsesGroupAlpha) {
+  auto doc = MakeRectDocument();
+  doc->layers[0]->groupOpacity = false;
+  doc->layers[0]->alpha = 0.5f;
+  auto* blur = doc->makeNode<pagx::BlurFilter>("blur");
+  blur->blurX = 4.0f;
+  blur->blurY = 4.0f;
+  doc->layers[0]->filters.push_back(blur);
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find(" opacity=\"0.5\""), std::string::npos);
+  EXPECT_EQ(svg.find("fill-opacity=\"0.5\""), std::string::npos);
+}
+
+// ST6: the filter region margins are pixels but the region itself is a percentage of the bounds.
+// A small element with a large blur must therefore get a proportionally larger region.
+PAGX_TEST(PAGXSVGTest, SVGExport_FilterRegionScalesWithBounds) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto* layer = doc->makeNode<pagx::Layer>("small");
+  layer->width = 40.0f;
+  layer->height = 40.0f;
+  auto* blur = doc->makeNode<pagx::BlurFilter>("blur");
+  blur->blurX = 20.0f;
+  blur->blurY = 20.0f;
+  layer->filters.push_back(blur);
+  auto* rect = doc->makeNode<pagx::Rectangle>("rect");
+  rect->position = {20, 20};
+  rect->size = {40, 40};
+  auto* fill = doc->makeNode<pagx::Fill>("fill");
+  auto* solid = doc->makeNode<pagx::SolidColor>();
+  fill->color = solid;
+  layer->contents = {rect, fill};
+  doc->layers.push_back(layer);
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  // 3 * 20px blur = 60px, which is 150% of the 40px box.
+  EXPECT_NE(svg.find("x=\"-150%\""), std::string::npos);
+  EXPECT_NE(svg.find("width=\"400%\""), std::string::npos);
+}
+
+// ST40: a blend mode without an feBlend equivalent must be reported instead of silently rendering
+// as the default mode.
+PAGX_TEST(PAGXSVGTest, SVGExport_BlendFilterNonFeBlendModeWarns) {
+  auto doc = MakeRectDocument();
+  auto* blend = doc->makeNode<pagx::BlendFilter>("blend");
+  blend->color = {0.0f, 0.0f, 1.0f, 1.0f};
+  blend->blendMode = pagx::BlendMode::PlusLighter;
+  doc->layers[0]->filters.push_back(blend);
+
+  std::vector<std::string> warnings;
+  auto svg = pagx::SVGExporter::ToSVG(*doc, {}, &warnings);
+  EXPECT_NE(svg.find("<feBlend"), std::string::npos);
+  bool warned = false;
+  for (const auto& warning : warnings) {
+    warned = warned || warning.find("no feBlend equivalent") != std::string::npos;
+  }
+  EXPECT_TRUE(warned) << (warnings.empty() ? "no warnings" : warnings[0]);
+}
+
+// ST17: antiAlias=false has no per-shape SVG switch, but crispEdges removes the coverage smoothing
+// the renderer turns off in that mode.
+PAGX_TEST(PAGXSVGTest, SVGExport_AntiAliasFalseUsesCrispEdges) {
+  auto doc = MakeRectDocument();
+  doc->layers[0]->antiAlias = false;
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("shape-rendering=\"crispEdges\""), std::string::npos);
+
+  auto smooth = MakeRectDocument();
+  auto smoothSvg = pagx::SVGExporter::ToSVG(*smooth);
+  EXPECT_EQ(smoothSvg.find("shape-rendering"), std::string::npos);
+}
+
+// ST43 remainder: modifiers such as Polystar are always resolved; there is no option that drops
+// them.
+PAGX_TEST(PAGXSVGTest, SVGExport_AlwaysResolvesPolystar) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto* layer = doc->makeNode<pagx::Layer>("layer");
+  auto* star = doc->makeNode<pagx::Polystar>();
+  star->position = {100, 100};
+  star->pointCount = 5;
+  star->outerRadius = 40;
+  star->innerRadius = 20;
+  auto* fill = doc->makeNode<pagx::Fill>();
+  auto* solid = doc->makeNode<pagx::SolidColor>();
+  fill->color = solid;
+  layer->contents = {star, fill};
+  doc->layers.push_back(layer);
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("<path"), std::string::npos);
+}
+
+// ST6: filters form a chain. A blur placed after a drop shadow must consume the merged shadow
+// output; before this fix it read SourceGraphic and the shadow was left un-blurred.
+PAGX_TEST(PAGXSVGTest, SVGExport_FilterChainAdvancesAfterDropShadow) {
+  auto doc = MakeRectDocument();
+  auto* shadow = doc->makeNode<pagx::DropShadowFilter>("shadow");
+  shadow->blurX = 4.0f;
+  shadow->blurY = 4.0f;
+  shadow->offsetX = 2.0f;
+  shadow->offsetY = 2.0f;
+  shadow->color = {0.0f, 0.0f, 0.0f, 1.0f};
+  auto* blur = doc->makeNode<pagx::BlurFilter>("blur");
+  blur->blurX = 3.0f;
+  blur->blurY = 3.0f;
+  doc->layers[0]->filters = {shadow, blur};
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("in=\"shadow0Over\""), std::string::npos);
+}
+
+// ST4 remainder: a stroke-only contour mask cannot become a clip region, because <clipPath> uses
+// the filled area. The degradation has to be visible instead of silently clipping to the interior.
+PAGX_TEST(PAGXSVGTest, SVGExport_StrokeOnlyContourMaskWarns) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto* mask = doc->makeNode<pagx::Layer>("strokeMask");
+  auto* maskRect = doc->makeNode<pagx::Rectangle>();
+  maskRect->position = {100, 100};
+  maskRect->size = {80, 80};
+  auto* stroke = doc->makeNode<pagx::Stroke>();
+  auto* color = doc->makeNode<pagx::SolidColor>();
+  stroke->color = color;
+  stroke->width = 6.0f;
+  mask->contents = {maskRect, stroke};
+
+  auto* owner = doc->makeNode<pagx::Layer>("owner");
+  owner->mask = mask;
+  owner->maskType = pagx::MaskType::Contour;
+  auto* rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {100, 100};
+  rect->size = {100, 100};
+  auto* fill = doc->makeNode<pagx::Fill>();
+  auto* solid = doc->makeNode<pagx::SolidColor>();
+  fill->color = solid;
+  owner->contents = {rect, fill};
+  owner->children.push_back(mask);
+  doc->layers.push_back(owner);
+
+  std::vector<std::string> warnings;
+  auto svg = pagx::SVGExporter::ToSVG(*doc, {}, &warnings);
+  EXPECT_NE(svg.find("<clipPath"), std::string::npos);
+  bool warned = false;
+  for (const auto& warning : warnings) {
+    warned = warned || warning.find("stroke-only") != std::string::npos;
+  }
+  EXPECT_TRUE(warned) << (warnings.empty() ? "no warnings" : warnings[0]);
+}
+
+// ST7 remainder: backdrop effects have no SVG equivalent under D8=off. They must be reported as
+// dropped rather than silently skipped while the base content still renders.
+PAGX_TEST(PAGXSVGTest, SVGExport_BackdropStylesAreReported) {
+  auto doc = MakeRectDocument();
+  auto* glass = doc->makeNode<pagx::GlassStyle>("glass");
+  doc->layers[0]->styles.push_back(glass);
+  auto* backdrop = doc->makeNode<pagx::BackgroundBlurStyle>("backdrop");
+  doc->layers[0]->styles.push_back(backdrop);
+
+  std::vector<std::string> warnings;
+  auto svg = pagx::SVGExporter::ToSVG(*doc, {}, &warnings);
+  EXPECT_FALSE(svg.empty());
+  size_t reported = 0;
+  for (const auto& warning : warnings) {
+    if (warning.find("GlassStyle") != std::string::npos ||
+        warning.find("BackgroundBlurStyle") != std::string::npos) {
+      ++reported;
+    }
+  }
+  EXPECT_EQ(reported, 2u);
+}
+
+// ST8: a TextBox run whose GlyphRun data yields no outline (here: no Font) is dropped, and the
+// loss has to be reported. The warning has to survive the no-line-info fallback, which returns
+// before the <tspan> path.
+PAGX_TEST(PAGXSVGTest, SVGExport_TextBoxGlyphRunWithoutOutlinesWarns) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto* layer = doc->makeNode<pagx::Layer>("layer");
+  auto* box = doc->makeNode<pagx::TextBox>("box");
+  box->width = 200;
+  box->height = 100;
+  auto* text = doc->makeNode<pagx::Text>("run");
+  text->text = "Hi";
+  text->fontSize = 20;
+  auto* glyphRun = doc->makeNode<pagx::GlyphRun>();
+  glyphRun->glyphs = {1};
+  text->glyphRuns.push_back(glyphRun);
+  box->elements = {text, MakeSolidFillSVG(doc.get(), 0, 0, 0)};
+  layer->contents = {box};
+  doc->layers.push_back(layer);
+
+  std::vector<std::string> warnings;
+  auto svg = pagx::SVGExporter::ToSVG(*doc, {}, &warnings);
+  EXPECT_FALSE(svg.empty());
+  bool warned = false;
+  for (const auto& warning : warnings) {
+    warned = warned || warning.find("no usable glyph outline") != std::string::npos;
+  }
+  EXPECT_TRUE(warned) << (warnings.empty() ? "no warnings" : warnings[0]);
+}
+
+// ST8: a TextBox run with usable glyph outlines is emitted as a <g> of <path>s instead of being
+// re-shaped. TextLayout never reports lines for embedded GlyphRuns, so this always goes through
+// the per-run fallback path.
+PAGX_TEST(PAGXSVGTest, SVGExport_TextBoxGlyphRunEmitsOutlines) {
+  auto doc = pagx::PAGXDocument::Make(200, 100);
+  auto* font = doc->makeNode<pagx::Font>("vectorFont");
+  font->unitsPerEm = 1000;
+  auto* glyph = doc->makeNode<pagx::Glyph>();
+  glyph->path = doc->makeNode<pagx::PathData>();
+  *glyph->path = pagx::PathDataFromSVGString("M 0,0 L 700,0 L 700,-800 L 0,-800 Z");
+  glyph->advance = 700;
+  font->glyphs.push_back(glyph);
+
+  auto* layer = doc->makeNode<pagx::Layer>("layer");
+  auto* box = doc->makeNode<pagx::TextBox>("box");
+  box->width = 200;
+  box->height = 100;
+  auto* text = doc->makeNode<pagx::Text>("run");
+  text->text = "A";
+  text->fontSize = 40;
+  auto* run = doc->makeNode<pagx::GlyphRun>();
+  run->font = font;
+  run->fontSize = 40;
+  run->glyphs = {1};
+  text->glyphRuns.push_back(run);
+  box->elements = {text, MakeSolidFillSVG(doc.get(), 0, 0, 0)};
+  layer->contents = {box};
+  doc->layers.push_back(layer);
+
+  std::vector<std::string> warnings;
+  auto svg = pagx::SVGExporter::ToSVG(*doc, {}, &warnings);
+  EXPECT_NE(svg.find("<path"), std::string::npos);
+  for (const auto& warning : warnings) {
+    EXPECT_EQ(warning.find("no line layout"), std::string::npos) << warning;
+    EXPECT_EQ(warning.find("no usable glyph outline"), std::string::npos) << warning;
+  }
+}
+
+// ST9: a glyph with no positions / xOffsets entry advances by its own width, so the <text> x
+// list must walk the pen instead of collapsing every glyph onto the run origin.
+PAGX_TEST(PAGXSVGTest, SVGExport_FontPathAdvancesGlyphsWithoutPositions) {
+  auto doc = pagx::PAGXDocument::Make(400, 100);
+  auto* font = doc->makeNode<pagx::Font>("advanceFont");
+  font->unitsPerEm = 1000;
+  for (float advance : {700.0f, 500.0f}) {
+    auto* glyph = doc->makeNode<pagx::Glyph>();
+    glyph->path = doc->makeNode<pagx::PathData>();
+    *glyph->path = pagx::PathDataFromSVGString("M 0,0 L 100,0 L 100,-100 L 0,-100 Z");
+    glyph->advance = advance;
+    font->glyphs.push_back(glyph);
+  }
+
+  auto* layer = doc->makeNode<pagx::Layer>("layer");
+  auto* text = doc->makeNode<pagx::Text>("run");
+  text->fontSize = 1000;
+  auto* run = doc->makeNode<pagx::GlyphRun>();
+  run->font = font;
+  run->fontSize = 1000;
+  run->glyphs = {1, 2};
+  text->glyphRuns.push_back(run);
+  layer->contents = {text, MakeSolidFillSVG(doc.get(), 0, 0, 0)};
+  doc->layers.push_back(layer);
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("<text"), std::string::npos);
+  EXPECT_NE(svg.find("x=\"0 700\""), std::string::npos);
+}
+
+// ST9: one <text> can only name one family, so runs built from different Fonts must fall back to
+// per-glyph outlines instead of rendering the second font with the first font's family.
+PAGX_TEST(PAGXSVGTest, SVGExport_FontPathRequiresSingleFont) {
+  auto doc = pagx::PAGXDocument::Make(400, 100);
+  auto buildFont = [&]() {
+    auto* font = doc->makeNode<pagx::Font>();
+    font->unitsPerEm = 1000;
+    auto* glyph = doc->makeNode<pagx::Glyph>();
+    glyph->path = doc->makeNode<pagx::PathData>();
+    *glyph->path = pagx::PathDataFromSVGString("M 0,0 L 700,0 L 700,-800 L 0,-800 Z");
+    glyph->advance = 700;
+    font->glyphs.push_back(glyph);
+    return font;
+  };
+  auto* fontA = buildFont();
+  auto* fontB = buildFont();
+
+  auto* layer = doc->makeNode<pagx::Layer>("layer");
+  auto* text = doc->makeNode<pagx::Text>("run");
+  text->fontSize = 50;
+  for (auto* font : {fontA, fontB}) {
+    auto* run = doc->makeNode<pagx::GlyphRun>();
+    run->font = font;
+    run->fontSize = 50;
+    run->glyphs = {1};
+    text->glyphRuns.push_back(run);
+  }
+  layer->contents = {text, MakeSolidFillSVG(doc.get(), 0, 0, 0)};
+  doc->layers.push_back(layer);
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_EQ(svg.find("<text"), std::string::npos);
+  EXPECT_NE(svg.find("<path"), std::string::npos);
+}
+
+// ST9: SVG rotates each character around its own (x, y) while PAGX pivots around mid-advance plus
+// the glyph anchor, so a rotated run cannot use <text>.
+PAGX_TEST(PAGXSVGTest, SVGExport_FontPathRejectsGlyphRotation) {
+  auto doc = pagx::PAGXDocument::Make(400, 100);
+  auto* font = doc->makeNode<pagx::Font>("rotatedFont");
+  font->unitsPerEm = 1000;
+  auto* glyph = doc->makeNode<pagx::Glyph>();
+  glyph->path = doc->makeNode<pagx::PathData>();
+  *glyph->path = pagx::PathDataFromSVGString("M 0,0 L 700,0 L 700,-800 L 0,-800 Z");
+  glyph->advance = 700;
+  font->glyphs.push_back(glyph);
+
+  auto* layer = doc->makeNode<pagx::Layer>("layer");
+  auto* text = doc->makeNode<pagx::Text>("run");
+  text->fontSize = 50;
+  auto* run = doc->makeNode<pagx::GlyphRun>();
+  run->font = font;
+  run->fontSize = 50;
+  run->glyphs = {1};
+  run->rotations = {30};
+  text->glyphRuns.push_back(run);
+  layer->contents = {text, MakeSolidFillSVG(doc.get(), 0, 0, 0)};
+  doc->layers.push_back(layer);
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_EQ(svg.find("<text"), std::string::npos);
+  EXPECT_NE(svg.find("<path"), std::string::npos);
+}
+
+// ST10: the accumulated group alpha has to reach the glyph <g>, which carries the fill / stroke
+// the child <path>s inherit.
+PAGX_TEST(PAGXSVGTest, SVGExport_GlyphOutlinesCarryGroupAlpha) {
+  auto doc = pagx::PAGXDocument::Make(200, 100);
+  auto* font = doc->makeNode<pagx::Font>("alphaFont");
+  font->unitsPerEm = 1000;
+  auto* glyph = doc->makeNode<pagx::Glyph>();
+  glyph->path = doc->makeNode<pagx::PathData>();
+  *glyph->path = pagx::PathDataFromSVGString("M 0,0 L 700,0 L 700,-800 L 0,-800 Z");
+  glyph->advance = 700;
+  font->glyphs.push_back(glyph);
+
+  auto* layer = doc->makeNode<pagx::Layer>("layer");
+  auto* group = doc->makeNode<pagx::Group>("group");
+  group->alpha = 0.5f;
+  auto* text = doc->makeNode<pagx::Text>("run");
+  text->fontSize = 50;
+  auto* run = doc->makeNode<pagx::GlyphRun>();
+  run->font = font;
+  run->fontSize = 50;
+  run->glyphs = {1};
+  text->glyphRuns.push_back(run);
+  group->elements = {text, MakeSolidFillSVG(doc.get(), 0, 0, 0)};
+  layer->contents = {group};
+  doc->layers.push_back(layer);
+
+  pagx::SVGExportOptions options = {};
+  options.embedFontsAsWoff2 = false;
+  auto svg = pagx::SVGExporter::ToSVG(*doc, options);
+  EXPECT_NE(svg.find("<path"), std::string::npos);
+  EXPECT_NE(svg.find("fill-opacity=\"0.5\""), std::string::npos);
+}
+
+// ST29: overflow="hidden" discards every line that does not fit. With no fitting line left the
+// exporter must not fall back to re-emitting the whole run, which would paint the dropped lines.
+PAGX_TEST(PAGXSVGTest, SVGExport_HiddenOverflowDropsAllLines) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto* layer = doc->makeNode<pagx::Layer>("layer");
+  auto* box = doc->makeNode<pagx::TextBox>("box");
+  box->width = 200;
+  box->height = 20;
+  box->overflow = pagx::Overflow::Hidden;
+  auto* text = doc->makeNode<pagx::Text>("run");
+  text->text = "One Two Three";
+  text->fontSize = 40;
+  box->elements = {text, MakeSolidFillSVG(doc.get(), 0, 0, 0)};
+  layer->contents = {box};
+  doc->layers.push_back(layer);
+
+  std::vector<std::string> warnings;
+  auto svg = pagx::SVGExporter::ToSVG(*doc, {}, &warnings);
+  EXPECT_EQ(svg.find("<text"), std::string::npos);
+  bool warned = false;
+  for (const auto& warning : warnings) {
+    warned = warned || warning.find("nothing is drawn") != std::string::npos;
+  }
+  EXPECT_TRUE(warned) << (warnings.empty() ? "no warnings" : warnings[0]);
+}
+
+// ST28: the native text box re-typesets and anchors with the layout-resolved frame. A dual-edge
+// TextBox must not fall back to its lower-priority authored width when placing the text.
+PAGX_TEST(PAGXSVGTest, SVGExport_TextBoxAnchorUsesResolvedWidth) {
+  auto doc = pagx::PAGXDocument::Make(300, 200);
+  auto* layer = doc->makeNode<pagx::Layer>("layer");
+  layer->width = 300;
+  layer->height = 200;
+  auto* box = doc->makeNode<pagx::TextBox>("box");
+  box->width = 100;
+  box->height = 60;
+  box->left = 20;
+  box->right = 30;
+  box->top = 10;
+  box->bottom = 20;
+  box->padding.top = 10;
+  box->padding.right = 10;
+  box->padding.bottom = 10;
+  box->padding.left = 10;
+  box->textAlign = pagx::TextAlign::End;
+  auto* text = doc->makeNode<pagx::Text>("run");
+  text->text = "Hi";
+  text->fontFamily = "Arial";
+  text->fontSize = 20;
+  box->elements = {text, MakeSolidFillSVG(doc.get(), 0, 0, 0)};
+  layer->contents = {box};
+  doc->layers.push_back(layer);
+
+  doc->applyLayout();
+  doc->applyLayout();
+
+  pagx::SVGExportOptions options = {};
+  auto svg = pagx::SVGExporter::ToSVG(*doc, options);
+  SaveFile(svg, "PAGXSVGTest/svg_export_textbox_resolved_width.svg");
+  EXPECT_NE(svg.find(" x=\"240\""), std::string::npos);
+  EXPECT_EQ(svg.find(" x=\"90\""), std::string::npos);
+}
+
+// ST28: a height allocated as 0 by a dual-edge constraint is a real box height, so overflow
+// "hidden" must still drop every line instead of treating 0 as "height unset".
+PAGX_TEST(PAGXSVGTest, SVGExport_HiddenOverflowWithZeroResolvedHeightDropsAllLines) {
+  auto doc = pagx::PAGXDocument::Make(300, 200);
+  auto* layer = doc->makeNode<pagx::Layer>("layer");
+  layer->width = 300;
+  layer->height = 200;
+  auto* box = doc->makeNode<pagx::TextBox>("box");
+  box->width = 200;
+  box->top = 100;
+  box->bottom = 100;
+  box->overflow = pagx::Overflow::Hidden;
+  auto* text = doc->makeNode<pagx::Text>("run");
+  text->text = "One Two";
+  text->fontFamily = "Arial";
+  text->fontSize = 40;
+  box->elements = {text, MakeSolidFillSVG(doc.get(), 0, 0, 0)};
+  layer->contents = {box};
+  doc->layers.push_back(layer);
+
+  std::vector<std::string> warnings;
+  auto svg = pagx::SVGExporter::ToSVG(*doc, {}, &warnings);
+  EXPECT_EQ(svg.find("<text"), std::string::npos);
+  bool warned = false;
+  for (const auto& warning : warnings) {
+    warned = warned || warning.find("nothing is drawn") != std::string::npos;
+  }
+  EXPECT_TRUE(warned) << (warnings.empty() ? "no warnings" : warnings[0]);
+}
+
+// ST18: the embedded WOFF2 face carries the regular style only, so faux bold / italic have to
+// travel as CSS weight / style or the exported glyphs lose them.
+PAGX_TEST(PAGXSVGTest, SVGExport_EmbeddedFontCarriesFauxStyle) {
+  auto doc = pagx::PAGXDocument::Make(200, 100);
+  auto* font = doc->makeNode<pagx::Font>("fauxFont");
+  font->unitsPerEm = 1000;
+  auto* glyph = doc->makeNode<pagx::Glyph>();
+  glyph->path = doc->makeNode<pagx::PathData>();
+  *glyph->path = pagx::PathDataFromSVGString("M 0,0 L 700,0 L 700,-800 L 0,-800 Z");
+  glyph->advance = 700;
+  font->glyphs.push_back(glyph);
+
+  auto* layer = doc->makeNode<pagx::Layer>("layer");
+  auto* text = doc->makeNode<pagx::Text>("run");
+  text->fontSize = 50;
+  text->fauxBold = true;
+  text->fauxItalic = true;
+  auto* run = doc->makeNode<pagx::GlyphRun>();
+  run->font = font;
+  run->fontSize = 50;
+  run->glyphs = {1};
+  text->glyphRuns.push_back(run);
+  layer->contents = {text, MakeSolidFillSVG(doc.get(), 0, 0, 0)};
+  doc->layers.push_back(layer);
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("<text"), std::string::npos);
+  EXPECT_NE(svg.find("font-weight=\"bold\""), std::string::npos);
+  EXPECT_NE(svg.find("font-style=\"italic\""), std::string::npos);
+}
+
+// ST18: native <text> has no glyph runs to inspect, so the same faux flags must be emitted from
+// the Text node itself.
+PAGX_TEST(PAGXSVGTest, SVGExport_NativeTextCarriesFauxStyle) {
+  auto doc = pagx::PAGXDocument::Make(200, 100);
+  auto* layer = doc->makeNode<pagx::Layer>("layer");
+  auto* text = doc->makeNode<pagx::Text>("run");
+  text->text = "Hi";
+  text->fontSize = 20;
+  text->fauxBold = true;
+  text->fauxItalic = true;
+  layer->contents = {text, MakeSolidFillSVG(doc.get(), 0, 0, 0)};
+  doc->layers.push_back(layer);
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("<text"), std::string::npos);
+  EXPECT_NE(svg.find("font-weight=\"bold\""), std::string::npos);
+  EXPECT_NE(svg.find("font-style=\"italic\""), std::string::npos);
+}
+
+// ST20: a TextModifier whose channels fit GlyphRun can be baked by the resolver, so the layer keeps
+// vector output instead of being rasterized into a PNG patch.
+PAGX_TEST(PAGXSVGTest, SVGExport_TextModifierBakesIntoGlyphRuns) {
+  auto doc = pagx::PAGXDocument::Make(400, 200);
+  auto* font = doc->makeNode<pagx::Font>("modifierFont");
+  font->unitsPerEm = 1000;
+  for (float advance : {700.0f, 700.0f}) {
+    auto* glyph = doc->makeNode<pagx::Glyph>();
+    glyph->path = doc->makeNode<pagx::PathData>();
+    *glyph->path = pagx::PathDataFromSVGString("M 0,0 L 700,0 L 700,-800 L 0,-800 Z");
+    glyph->advance = advance;
+    font->glyphs.push_back(glyph);
+  }
+
+  auto* layer = doc->makeNode<pagx::Layer>("layer");
+  auto* text = doc->makeNode<pagx::Text>("run");
+  text->fontSize = 1000;
+  auto* run = doc->makeNode<pagx::GlyphRun>();
+  run->font = font;
+  run->fontSize = 1000;
+  run->glyphs = {1, 2};
+  run->positions = {{0.0f, 0.0f}, {700.0f, 0.0f}};
+  text->glyphRuns.push_back(run);
+
+  auto* selector = doc->makeNode<pagx::RangeSelector>();
+  selector->unit = pagx::SelectorUnit::Index;
+  selector->start = 0.0f;
+  selector->end = 1.0f;
+  auto* modifier = doc->makeNode<pagx::TextModifier>("modifier");
+  modifier->position = {0.0f, -100.0f};
+  modifier->selectors = {selector};
+
+  layer->contents = {text, MakeSolidFillSVG(doc.get(), 0, 0, 0), modifier};
+  doc->layers.push_back(layer);
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("<text"), std::string::npos);
+  EXPECT_NE(svg.find("y=\"-100 0\""), std::string::npos);
+  EXPECT_EQ(svg.find("data:image/png"), std::string::npos);
+}
+
+// ST21: a TextModifier fillColor is an override weight, so a 1/2 weight must emit the original
+// painter plus a SrcOver overlay instead of replacing the fill outright.
+static pagx::Font* MakeSquareGlyphFont(pagx::PAGXDocument* doc) {
+  auto* font = doc->makeNode<pagx::Font>();
+  font->unitsPerEm = 100;
+  auto* glyph = doc->makeNode<pagx::Glyph>();
+  glyph->path = doc->makeNode<pagx::PathData>();
+  *glyph->path = pagx::PathDataFromSVGString("M 0,0 L 20,0 L 20,-20 L 0,-20 Z");
+  glyph->advance = 20;
+  font->glyphs.push_back(glyph);
+  return font;
+}
+
+static pagx::Text* MakeSquareGlyphText(pagx::PAGXDocument* doc, pagx::Font* font,
+                                       const pagx::Point& position) {
+  auto* text = doc->makeNode<pagx::Text>();
+  text->position = position;
+  text->fontSize = 100;
+  auto* run = doc->makeNode<pagx::GlyphRun>();
+  run->font = font;
+  run->fontSize = 100;
+  run->glyphs = {1};
+  run->positions = {{0, 0}};
+  text->glyphRuns.push_back(run);
+  return text;
+}
+
+PAGX_TEST(PAGXSVGTest, SVGExport_TextModifierOverrideBranches) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto* font = MakeSquareGlyphFont(doc.get());
+  auto* text = MakeSquareGlyphText(doc.get(), font, {20, 40});
+  auto* selector = doc->makeNode<pagx::RangeSelector>();
+  selector->weight = 0.5f;
+  auto* modifier = doc->makeNode<pagx::TextModifier>();
+  modifier->fillColor = pagx::Color{1, 0, 0, 1};
+  modifier->selectors = {selector};
+  auto* layer = doc->makeNode<pagx::Layer>();
+  layer->contents = {text, modifier, MakeSolidFillSVG(doc.get(), 0, 0, 1)};
+  doc->layers.push_back(layer);
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_EQ(svg.find("data:image/png"), std::string::npos);
+  EXPECT_NE(svg.find("fill=\"#0000FF\""), std::string::npos);
+  EXPECT_NE(svg.find("fill=\"#FF0000\""), std::string::npos);
+  EXPECT_NE(svg.find("fill-opacity=\"0.5\""), std::string::npos);
+}
+
+PAGX_TEST(PAGXSVGTest, SVGExport_TextModifierFullOverrideDropsBase) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto* font = MakeSquareGlyphFont(doc.get());
+  auto* text = MakeSquareGlyphText(doc.get(), font, {20, 40});
+  auto* modifier = doc->makeNode<pagx::TextModifier>();
+  modifier->fillColor = pagx::Color{1, 0, 0, 1};
+  auto* layer = doc->makeNode<pagx::Layer>();
+  layer->contents = {text, modifier, MakeSolidFillSVG(doc.get(), 0, 0, 1)};
+  doc->layers.push_back(layer);
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_EQ(svg.find("data:image/png"), std::string::npos);
+  EXPECT_EQ(svg.find("fill=\"#0000FF\""), std::string::npos);
+  EXPECT_NE(svg.find("fill=\"#FF0000\""), std::string::npos);
+}
+
+static std::vector<uint8_t> RenderSVGPixel(tgfx::Context* context, const std::string& svg, int px,
+                                           int py) {
+  auto roundTrip = pagx::SVGImporter::ParseString(svg);
+  if (roundTrip == nullptr) {
+    return {};
+  }
+  roundTrip->applyLayout();
+  auto tgfxLayer = pagx::LayerBuilder::Build(roundTrip.get());
+  if (tgfxLayer == nullptr) {
+    return {};
+  }
+  auto surface = Surface::Make(context, 100, 100);
+  if (surface == nullptr) {
+    return {};
+  }
+  DisplayList displayList;
+  displayList.root()->addChild(tgfxLayer);
+  displayList.render(surface.get(), false);
+  std::vector<uint8_t> pixels(100 * 4 * 100);
+  auto info = tgfx::ImageInfo::Make(100, 100, tgfx::ColorType::RGBA_8888,
+                                    tgfx::AlphaType::Premultiplied, static_cast<size_t>(100) * 4);
+  if (!surface->readPixels(info, pixels.data())) {
+    return {};
+  }
+  size_t offset = (static_cast<size_t>(py) * 100 + static_cast<size_t>(px)) * 4;
+  return {pixels[offset], pixels[offset + 1], pixels[offset + 2], pixels[offset + 3]};
+}
+
+// ST21 pixel gate: the exported SVG is imported back and rendered, so the assertion covers the
+// actual base/overlay composition rather than the attribute spelling.
+PAGX_TEST(PAGXSVGTest, SVGExport_TextModifierOverridePixels) {
+  pag::DeviceLockScope deviceLock;
+  ASSERT_TRUE(static_cast<bool>(deviceLock));
+  auto* context = deviceLock.context();
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto* font = MakeSquareGlyphFont(doc.get());
+  auto* text = MakeSquareGlyphText(doc.get(), font, {20, 40});
+  auto* selector = doc->makeNode<pagx::RangeSelector>();
+  selector->weight = 0.5f;
+  auto* modifier = doc->makeNode<pagx::TextModifier>();
+  modifier->fillColor = pagx::Color{1, 0, 0, 1};
+  modifier->selectors = {selector};
+  auto* fill = MakeSolidFillSVG(doc.get(), 0, 0, 1);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  layer->contents = {text, modifier, fill};
+  doc->layers.push_back(layer);
+  doc->applyLayout();
+
+  auto pixel = RenderSVGPixel(context, pagx::SVGExporter::ToSVG(*doc), 30, 30);
+  ASSERT_EQ(pixel.size(), 4u);
+  EXPECT_NEAR(pixel[0], 128, 4);
+  EXPECT_NEAR(pixel[1], 0, 4);
+  EXPECT_NEAR(pixel[2], 128, 4);
+  EXPECT_NEAR(pixel[3], 255, 4);
+}
+
+PAGX_TEST(PAGXSVGTest, SVGExport_TextModifierAlphaAndAccumulationPixels) {
+  pag::DeviceLockScope deviceLock;
+  ASSERT_TRUE(static_cast<bool>(deviceLock));
+  auto* context = deviceLock.context();
+
+  auto makeDoc = [](float fillAlpha, float firstWeight, bool addGreen) {
+    auto doc = pagx::PAGXDocument::Make(100, 100);
+    auto* font = MakeSquareGlyphFont(doc.get());
+    auto* text = MakeSquareGlyphText(doc.get(), font, {20, 40});
+    auto* firstSelector = doc->makeNode<pagx::RangeSelector>();
+    firstSelector->weight = firstWeight;
+    auto* red = doc->makeNode<pagx::TextModifier>();
+    red->fillColor = pagx::Color{1, 0, 0, 1};
+    red->selectors = {firstSelector};
+    auto* fill = MakeSolidFillSVG(doc.get(), 0, 0, 1);
+    fill->alpha = fillAlpha;
+    auto* layer = doc->makeNode<pagx::Layer>();
+    layer->contents = {text, red};
+    if (addGreen) {
+      auto* secondSelector = doc->makeNode<pagx::RangeSelector>();
+      secondSelector->weight = 0.5f;
+      auto* green = doc->makeNode<pagx::TextModifier>();
+      green->fillColor = pagx::Color{0, 1, 0, 1};
+      green->selectors = {secondSelector};
+      layer->contents.push_back(green);
+    }
+    layer->contents.push_back(fill);
+    doc->layers.push_back(layer);
+    doc->applyLayout();
+    return doc;
+  };
+
+  auto halfAlpha = makeDoc(0.5f, 0.5f, false);
+  auto pixel = RenderSVGPixel(context, pagx::SVGExporter::ToSVG(*halfAlpha), 30, 30);
+  ASSERT_EQ(pixel.size(), 4u);
+  EXPECT_NEAR(pixel[0], 64, 4);
+  EXPECT_NEAR(pixel[1], 0, 4);
+  EXPECT_NEAR(pixel[2], 96, 4);
+  EXPECT_NEAR(pixel[3], 159, 4);
+
+  auto fullOverride = makeDoc(0.5f, 1.0f, false);
+  pixel = RenderSVGPixel(context, pagx::SVGExporter::ToSVG(*fullOverride), 30, 30);
+  ASSERT_EQ(pixel.size(), 4u);
+  EXPECT_NEAR(pixel[0], 128, 4);
+  EXPECT_NEAR(pixel[1], 0, 4);
+  EXPECT_NEAR(pixel[2], 0, 4);
+  EXPECT_NEAR(pixel[3], 128, 4);
+
+  auto accumulated = makeDoc(1.0f, 0.5f, true);
+  pixel = RenderSVGPixel(context, pagx::SVGExporter::ToSVG(*accumulated), 30, 30);
+  ASSERT_EQ(pixel.size(), 4u);
+  EXPECT_NEAR(pixel[0], 64, 4);
+  EXPECT_NEAR(pixel[1], 128, 4);
+  EXPECT_NEAR(pixel[2], 64, 4);
+  EXPECT_NEAR(pixel[3], 255, 4);
+}
+
+PAGX_TEST(PAGXSVGTest, SVGExport_TextModifierStrokeOverride) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto* font = MakeSquareGlyphFont(doc.get());
+  auto* text = MakeSquareGlyphText(doc.get(), font, {20, 40});
+  auto* selector = doc->makeNode<pagx::RangeSelector>();
+  selector->weight = 0.5f;
+  auto* modifier = doc->makeNode<pagx::TextModifier>();
+  modifier->strokeColor = pagx::Color{1, 0, 0, 1};
+  modifier->strokeWidth = 10.0f;
+  modifier->selectors = {selector};
+  auto* stroke = doc->makeNode<pagx::Stroke>();
+  stroke->color = doc->makeNode<pagx::SolidColor>();
+  static_cast<pagx::SolidColor*>(stroke->color)->color = {0, 0, 1, 1};
+  stroke->width = 2.0f;
+  auto* layer = doc->makeNode<pagx::Layer>();
+  layer->contents = {text, modifier, stroke};
+  doc->layers.push_back(layer);
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_EQ(svg.find("data:image/png"), std::string::npos);
+  EXPECT_NE(svg.find("stroke=\"#0000FF\""), std::string::npos);
+  EXPECT_NE(svg.find("stroke=\"#FF0000\""), std::string::npos);
+  EXPECT_NE(svg.find("stroke-width=\"6\""), std::string::npos);
+  EXPECT_NE(svg.find("stroke-opacity=\"0.5\""), std::string::npos);
+}
+
+PAGX_TEST(PAGXSVGTest, SVGExport_TextModifierAppliesPerGlyphRange) {
+  pag::DeviceLockScope deviceLock;
+  ASSERT_TRUE(static_cast<bool>(deviceLock));
+  auto* context = deviceLock.context();
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto* font = MakeSquareGlyphFont(doc.get());
+  auto* secondGlyph = doc->makeNode<pagx::Glyph>();
+  secondGlyph->path = doc->makeNode<pagx::PathData>();
+  *secondGlyph->path = pagx::PathDataFromSVGString("M 0,0 L 20,0 L 20,-20 L 0,-20 Z");
+  secondGlyph->advance = 20;
+  font->glyphs.push_back(secondGlyph);
+
+  auto* text = doc->makeNode<pagx::Text>();
+  text->position = {20, 40};
+  text->fontSize = 100;
+  auto* run = doc->makeNode<pagx::GlyphRun>();
+  run->font = font;
+  run->fontSize = 100;
+  run->glyphs = {1, 2};
+  run->positions = {{0, 0}, {20, 0}};
+  text->glyphRuns.push_back(run);
+
+  auto* selector = doc->makeNode<pagx::RangeSelector>();
+  selector->unit = pagx::SelectorUnit::Index;
+  selector->start = 0;
+  selector->end = 1;
+  auto* modifier = doc->makeNode<pagx::TextModifier>();
+  modifier->fillColor = pagx::Color{1, 0, 0, 1};
+  modifier->selectors = {selector};
+  auto* layer = doc->makeNode<pagx::Layer>();
+  layer->contents = {text, modifier, MakeSolidFillSVG(doc.get(), 0, 0, 1)};
+  doc->layers.push_back(layer);
+  doc->applyLayout();
+
+  auto pixel = RenderSVGPixel(context, pagx::SVGExporter::ToSVG(*doc), 30, 30);
+  ASSERT_EQ(pixel.size(), 4u);
+  EXPECT_NEAR(pixel[0], 255, 4);
+  EXPECT_NEAR(pixel[1], 0, 4);
+  EXPECT_NEAR(pixel[2], 0, 4);
+  EXPECT_NEAR(pixel[3], 255, 4);
+
+  pixel = RenderSVGPixel(context, pagx::SVGExporter::ToSVG(*doc), 50, 30);
+  ASSERT_EQ(pixel.size(), 4u);
+  EXPECT_NEAR(pixel[0], 0, 4);
+  EXPECT_NEAR(pixel[1], 0, 4);
+  EXPECT_NEAR(pixel[2], 255, 4);
+  EXPECT_NEAR(pixel[3], 255, 4);
+}
+
+// ST22: a TextPath over pre-shaped glyph runs is emitted as vector outlines with the final glyph
+// matrices instead of rasterizing the whole layer.
+PAGX_TEST(PAGXSVGTest, SVGExport_TextPathEmitsPlacedGlyphs) {
+  auto doc = pagx::PAGXDocument::Make(200, 100);
+  auto* font = MakeSquareGlyphFont(doc.get());
+  auto* text = doc->makeNode<pagx::Text>();
+  text->position = {0, 40};
+  text->fontSize = 100;
+  auto* run = doc->makeNode<pagx::GlyphRun>();
+  run->font = font;
+  run->fontSize = 100;
+  run->glyphs = {1, 1, 1};
+  run->positions = {{0, 0}, {20, 0}, {40, 0}};
+  text->glyphRuns.push_back(run);
+
+  auto* textPath = doc->makeNode<pagx::TextPath>();
+  textPath->path = doc->makeNode<pagx::PathData>();
+  *textPath->path = pagx::PathDataFromSVGString("M0 0 L100 0");
+  textPath->firstMargin = 10;
+  auto* layer = doc->makeNode<pagx::Layer>();
+  layer->contents = {text, textPath, MakeSolidFillSVG(doc.get(), 0, 0, 1)};
+  doc->layers.push_back(layer);
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_EQ(svg.find("data:image/png"), std::string::npos);
+  EXPECT_EQ(svg.find("<text"), std::string::npos);
+  size_t pathCount = 0;
+  for (size_t pos = svg.find("<path"); pos != std::string::npos; pos = svg.find("<path", pos + 1)) {
+    ++pathCount;
+  }
+  EXPECT_EQ(pathCount, 3u);
+}
+
+// ST27: tgfx clamps zero / negative axes to a 5e-3 micro contour for stroke, while a fill on that
+// contour has no visible area.
+PAGX_TEST(PAGXSVGTest, SVGExport_ZeroAxisRectangleKeepsStrokeMicroContour) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {50, 50};
+  rect->size = {0, 0};
+  auto* stroke = doc->makeNode<pagx::Stroke>();
+  stroke->color = doc->makeNode<pagx::SolidColor>();
+  static_cast<pagx::SolidColor*>(stroke->color)->color = {1, 0, 0, 1};
+  stroke->width = 2.0f;
+  layer->contents = {rect, stroke};
+  doc->layers.push_back(layer);
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("<rect"), std::string::npos);
+  EXPECT_NE(svg.find("stroke=\"#FF0000\""), std::string::npos);
+  EXPECT_NE(svg.find("width=\"0.004"), std::string::npos);
+}
+
+PAGX_TEST(PAGXSVGTest, SVGExport_ZeroAxisRectangleSkipsFill) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {50, 50};
+  rect->size = {0, 0};
+  layer->contents = {rect, MakeSolidFillSVG(doc.get(), 1, 0, 0)};
+  doc->layers.push_back(layer);
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_EQ(svg.find("<rect"), std::string::npos);
+}
+
+PAGX_TEST(PAGXSVGTest, SVGExport_NegativeAxisEllipseKeepsStrokeMicroContour) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* ellipse = doc->makeNode<pagx::Ellipse>();
+  ellipse->position = {50, 50};
+  ellipse->size = {-10, -10};
+  auto* stroke = doc->makeNode<pagx::Stroke>();
+  stroke->color = doc->makeNode<pagx::SolidColor>();
+  static_cast<pagx::SolidColor*>(stroke->color)->color = {0, 0, 1, 1};
+  stroke->width = 2.0f;
+  layer->contents = {ellipse, stroke};
+  doc->layers.push_back(layer);
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("<circle"), std::string::npos);
+  EXPECT_NE(svg.find("stroke=\"#0000FF\""), std::string::npos);
+  EXPECT_NE(svg.find("r=\"0.0024"), std::string::npos);
+}
+
+static std::string ExportReversedPathData(bool reversed) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* path = doc->makeNode<pagx::Path>();
+  path->data = doc->makeNode<pagx::PathData>();
+  *path->data = pagx::PathDataFromSVGString("M0 0 L40 0 L40 40 L0 40 Z");
+  path->reversed = reversed;
+  layer->contents = {path, MakeSolidFillSVG(doc.get(), 1, 0, 0)};
+  doc->layers.push_back(layer);
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  auto pos = svg.find(" d=\"");
+  if (pos == std::string::npos) {
+    return {};
+  }
+  pos += 4;
+  auto end = svg.find('"', pos);
+  return end == std::string::npos ? std::string() : svg.substr(pos, end - pos);
+}
+
+// ST11: a reversed contour changes the dash start and direction; SVG/PPT primitives cannot express
+// it, so the resolver bakes it into the path data.
+PAGX_TEST(PAGXSVGTest, SVGExport_ReversedPathChangesContourDirection) {
+  auto forward = ExportReversedPathData(false);
+  auto reversed = ExportReversedPathData(true);
+  EXPECT_FALSE(forward.empty());
+  EXPECT_FALSE(reversed.empty());
+  EXPECT_NE(forward, reversed);
+}
+
+// ST11: tgfx StrokeStyle skips non-positive widths, so SVG must not turn 0 into a hairline.
+PAGX_TEST(PAGXSVGTest, SVGExport_ZeroWidthStrokeIsSkipped) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {50, 50};
+  rect->size = {40, 40};
+  auto* stroke = doc->makeNode<pagx::Stroke>();
+  stroke->color = doc->makeNode<pagx::SolidColor>();
+  static_cast<pagx::SolidColor*>(stroke->color)->color = {1, 0, 0, 1};
+  stroke->width = 0.0f;
+  layer->contents = {rect, stroke};
+  doc->layers.push_back(layer);
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("stroke=\"none\""), std::string::npos);
+  EXPECT_EQ(svg.find("stroke=\"#FF0000\""), std::string::npos);
+}
+
+// ST16: modifier resolution creates temporary nodes; repeated exports must not accumulate them in
+// the document and must stay byte-identical.
+PAGX_TEST(PAGXSVGTest, SVGExport_RepeatedExportKeepsNodeCountStable) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* path = doc->makeNode<pagx::Path>();
+  path->data = doc->makeNode<pagx::PathData>();
+  *path->data = pagx::PathDataFromSVGString("M10 10 L90 10 L90 90 L10 90 Z");
+  auto* trim = doc->makeNode<pagx::TrimPath>();
+  trim->start = 0.0f;
+  trim->end = 0.5f;
+  layer->contents = {path, trim, MakeSolidFillSVG(doc.get(), 1, 0, 0)};
+  doc->layers.push_back(layer);
+
+  auto before = doc->nodes.size();
+  auto firstSvg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_EQ(doc->nodes.size(), before);
+  auto secondSvg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_EQ(doc->nodes.size(), before);
+  EXPECT_EQ(firstSvg, secondSvg);
+}
+
+// ST45: a singular group stays empty instead of being inverse-recovered; the export keeps the
+// degenerate transform and produces valid SVG.
+PAGX_TEST(PAGXSVGTest, SVGExport_SingularGroupKeepsEmptyGeometry) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* group = doc->makeNode<pagx::Group>();
+  group->scale = {0, 0};
+  auto* rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {50, 50};
+  rect->size = {40, 40};
+  group->elements = {rect, MakeSolidFillSVG(doc.get(), 1, 0, 0)};
+  layer->contents = {group};
+  doc->layers.push_back(layer);
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("<svg"), std::string::npos);
+  bool keepsSingularTransform =
+      svg.find("matrix(0,0,0,0") != std::string::npos || svg.find("scale(0") != std::string::npos;
+  EXPECT_TRUE(keepsSingularTransform) << svg;
+}
+
+// Fidelity keeps the layout-resolved glyphs as the authoritative source, which embeds the shaped
+// vector font; Native keeps the authored string and must not embed the shaped font.
+PAGX_TEST(PAGXSVGTest, SVGExport_TextModeSelectsGlyphSource) {
+  auto makeDoc = []() {
+    auto doc = pagx::PAGXDocument::Make(100, 100);
+    auto* font = MakeSquareGlyphFont(doc.get());
+    auto* text = MakeSquareGlyphText(doc.get(), font, {20, 40});
+    text->text = "A";
+    auto* layer = doc->makeNode<pagx::Layer>();
+    layer->contents = {text, MakeSolidFillSVG(doc.get(), 1, 0, 0)};
+    doc->layers.push_back(layer);
+    return doc;
+  };
+
+  auto fidelityDoc = makeDoc();
+  pagx::SVGExportOptions fidelity = {};
+  fidelity.textMode = pagx::SVGTextExportMode::Fidelity;
+  auto fidelitySvg = pagx::SVGExporter::ToSVG(*fidelityDoc, fidelity);
+  EXPECT_NE(fidelitySvg.find("@font-face"), std::string::npos);
+  EXPECT_NE(fidelitySvg.find("<text"), std::string::npos);
+
+  auto nativeDoc = makeDoc();
+  pagx::SVGExportOptions native = {};
+  native.textMode = pagx::SVGTextExportMode::Native;
+  auto nativeSvg = pagx::SVGExporter::ToSVG(*nativeDoc, native);
+  EXPECT_EQ(nativeSvg.find("@font-face"), std::string::npos);
+  EXPECT_NE(nativeSvg.find("<text"), std::string::npos);
+  EXPECT_NE(nativeSvg.find(">A<"), std::string::npos);
+}
+
+// S3/S5: exporting after a constraint edit must re-run layout instead of serializing stale
+// resolved geometry.
+PAGX_TEST(PAGXSVGTest, SVGExport_ReLayoutsAfterConstraintEdit) {
+  auto doc = pagx::PAGXDocument::Make(300, 200);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  layer->width = 300;
+  layer->height = 200;
+  auto* box = doc->makeNode<pagx::TextBox>();
+  box->width = 100;
+  box->height = 60;
+  box->padding.top = 10;
+  box->padding.right = 10;
+  box->padding.bottom = 10;
+  box->padding.left = 10;
+  box->textAlign = pagx::TextAlign::End;
+  auto* text = doc->makeNode<pagx::Text>();
+  text->text = "Hi";
+  text->fontFamily = "Arial";
+  text->fontSize = 20;
+  box->elements = {text, MakeSolidFillSVG(doc.get(), 0, 0, 0)};
+  layer->contents = {box};
+  doc->layers.push_back(layer);
+  doc->applyLayout();
+
+  pagx::SVGExportOptions options = {};
+  auto before = pagx::SVGExporter::ToSVG(*doc, options);
+  EXPECT_NE(before.find(" x=\"90\""), std::string::npos);
+
+  box->width = 250;
+  auto after = pagx::SVGExporter::ToSVG(*doc, options);
+  EXPECT_NE(after.find(" x=\"240\""), std::string::npos);
+}
+
+// ST37: fonts owned by an external composition must participate in the WOFF2 pre-scan even though
+// they are not in the root document's node list.
+PAGX_TEST(PAGXSVGTest, SVGExport_EmbedsFontsFromExternalDocument) {
+  auto external = pagx::PAGXDocument::Make(100, 100);
+  auto* externalFont = MakeSquareGlyphFont(external.get());
+  auto* externalText = MakeSquareGlyphText(external.get(), externalFont, {20, 40});
+  auto* externalLayer = external->makeNode<pagx::Layer>();
+  externalLayer->contents = {externalText, MakeSolidFillSVG(external.get(), 1, 0, 0)};
+  external->layers.push_back(externalLayer);
+
+  auto root = pagx::PAGXDocument::Make(100, 100);
+  auto* wrapper = root->makeNode<pagx::Composition>();
+  wrapper->width = 100;
+  wrapper->height = 100;
+  wrapper->layers = external->layers;
+  auto* host = root->makeNode<pagx::Layer>();
+  host->composition = wrapper;
+  host->externalDoc = external;
+  root->layers.push_back(host);
+
+  pagx::SVGExportOptions options = {};
+  options.embedFontsAsWoff2 = true;
+  auto svg = pagx::SVGExporter::ToSVG(*root, options);
+  EXPECT_NE(svg.find("@font-face"), std::string::npos);
+  EXPECT_NE(svg.find("<text"), std::string::npos);
+}
+
+// ST30: native text must preserve authored whitespace instead of letting SVG collapse it.
+PAGX_TEST(PAGXSVGTest, SVGExport_TextBoxPreservesWhitespace) {
+  auto doc = pagx::PAGXDocument::Make(200, 100);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* box = doc->makeNode<pagx::TextBox>();
+  box->width = 180;
+  box->height = 80;
+  auto* text = doc->makeNode<pagx::Text>();
+  text->text = "A  B";
+  text->fontFamily = "Arial";
+  text->fontSize = 20;
+  box->elements = {text, MakeSolidFillSVG(doc.get(), 0, 0, 0)};
+  layer->contents = {box};
+  doc->layers.push_back(layer);
+
+  pagx::SVGExportOptions options = {};
+  auto svg = pagx::SVGExporter::ToSVG(*doc, options);
+  EXPECT_NE(svg.find("xml:space=\"preserve\""), std::string::npos);
+  EXPECT_NE(svg.find("A  B"), std::string::npos);
+}
+
+// ST30: a tab stop cannot be represented by SVG whitespace, so the native box splits the run and
+// positions the post-tab segment from the layout glyph x.
+PAGX_TEST(PAGXSVGTest, SVGExport_TextBoxTabUsesLayoutPosition) {
+  auto doc = pagx::PAGXDocument::Make(200, 100);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* box = doc->makeNode<pagx::TextBox>();
+  box->width = 180;
+  box->height = 80;
+  auto* text = doc->makeNode<pagx::Text>();
+  text->text = "A\tB";
+  text->fontFamily = "Arial";
+  text->fontSize = 20;
+  box->elements = {text, MakeSolidFillSVG(doc.get(), 0, 0, 0)};
+  layer->contents = {box};
+  doc->layers.push_back(layer);
+
+  pagx::SVGExportOptions options = {};
+  auto svg = pagx::SVGExporter::ToSVG(*doc, options);
+  EXPECT_EQ(svg.find('\t'), std::string::npos);
+  size_t tspanCount = 0;
+  for (size_t pos = svg.find("<tspan"); pos != std::string::npos;
+       pos = svg.find("<tspan", pos + 1)) {
+    ++tspanCount;
+  }
+  EXPECT_GE(tspanCount, 2u);
+}
+
+// ST30: an RTL paragraph uses the right edge as its inline start; the base direction must be
+// exported or the browser lays mixed digits/punctuation with an LTR base.
+PAGX_TEST(PAGXSVGTest, SVGExport_TextBoxRTLBaseDirection) {
+  auto doc = pagx::PAGXDocument::Make(120, 100);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* box = doc->makeNode<pagx::TextBox>();
+  box->width = 100;
+  box->height = 60;
+  auto* text = doc->makeNode<pagx::Text>();
+  text->text = "שלום";
+  text->fontFamily = "Arial";
+  text->fontSize = 20;
+  box->elements = {text, MakeSolidFillSVG(doc.get(), 0, 0, 0)};
+  layer->contents = {box};
+  doc->layers.push_back(layer);
+
+  pagx::SVGExportOptions options = {};
+  auto svg = pagx::SVGExporter::ToSVG(*doc, options);
+  EXPECT_NE(svg.find("direction=\"rtl\""), std::string::npos);
+  EXPECT_NE(svg.find("x=\"100\""), std::string::npos);
+  EXPECT_EQ(svg.find("text-anchor=\"end\""), std::string::npos);
+}
+
+// ST30: CJK lines break without spaces, so justify has to use textLength rather than word-spacing.
+PAGX_TEST(PAGXSVGTest, SVGExport_TextBoxCJKJustifyUsesTextLength) {
+  auto doc = pagx::PAGXDocument::Make(100, 300);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* box = doc->makeNode<pagx::TextBox>();
+  box->width = 60;
+  box->height = 240;
+  box->textAlign = pagx::TextAlign::Justify;
+  auto* text = doc->makeNode<pagx::Text>();
+  text->text = "中文中文中文中文中文中文";
+  text->fontFamily = "Arial";
+  text->fontSize = 20;
+  box->elements = {text, MakeSolidFillSVG(doc.get(), 0, 0, 0)};
+  layer->contents = {box};
+  doc->layers.push_back(layer);
+
+  pagx::SVGExportOptions options = {};
+  auto svg = pagx::SVGExporter::ToSVG(*doc, options);
+  EXPECT_NE(svg.find("textLength="), std::string::npos);
+  EXPECT_NE(svg.find("lengthAdjust=\"spacing\""), std::string::npos);
+}
+
+PAGX_TEST(PAGXSVGTest, SVGExport_SingularGroupKeepsFillAndStroke) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* group = doc->makeNode<pagx::Group>();
+  group->scale = {0, 0};
+  auto* rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {50, 50};
+  rect->size = {40, 40};
+  auto* stroke = doc->makeNode<pagx::Stroke>();
+  stroke->color = doc->makeNode<pagx::SolidColor>();
+  static_cast<pagx::SolidColor*>(stroke->color)->color = {0, 0, 1, 1};
+  stroke->width = 2.0f;
+  group->elements = {rect, MakeSolidFillSVG(doc.get(), 1, 0, 0), stroke};
+  layer->contents = {group};
+  doc->layers.push_back(layer);
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("matrix(0,0,0,0"), std::string::npos);
+  EXPECT_NE(svg.find("fill=\"#FF0000\""), std::string::npos);
+  EXPECT_NE(svg.find("stroke=\"#0000FF\""), std::string::npos);
+}
+
+// ST11: SVG has no stroke-alignment property. Inside strokes are doubled and clipped to the fill
+// region so only the inner half is painted.
+PAGX_TEST(PAGXSVGTest, SVGExport_PathInsideStrokeUsesClip) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* path = doc->makeNode<pagx::Path>();
+  path->data = doc->makeNode<pagx::PathData>();
+  *path->data = pagx::PathDataFromSVGString("M10 10 L90 10 L90 90 L10 90 Z");
+  auto* stroke = doc->makeNode<pagx::Stroke>();
+  stroke->color = doc->makeNode<pagx::SolidColor>();
+  static_cast<pagx::SolidColor*>(stroke->color)->color = {1, 0, 0, 1};
+  stroke->width = 2.0f;
+  stroke->align = pagx::StrokeAlign::Inside;
+  layer->contents = {path, stroke};
+  doc->layers.push_back(layer);
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("clip-path=\"url(#"), std::string::npos);
+  EXPECT_NE(svg.find("stroke-width=\"4\""), std::string::npos);
+  EXPECT_NE(svg.find("<clipPath"), std::string::npos);
+}
+
+// ST8: a TextBox run nested in a Group keeps that Group's alpha on its painter.
+PAGX_TEST(PAGXSVGTest, SVGExport_TextBoxRunKeepsGroupAlpha) {
+  auto doc = pagx::PAGXDocument::Make(200, 100);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* box = doc->makeNode<pagx::TextBox>();
+  box->width = 180;
+  box->height = 80;
+  auto* group = doc->makeNode<pagx::Group>();
+  group->alpha = 0.5f;
+  auto* text = doc->makeNode<pagx::Text>();
+  text->text = "Hi";
+  text->fontFamily = "Arial";
+  text->fontSize = 20;
+  group->elements = {text, MakeSolidFillSVG(doc.get(), 0, 0, 0)};
+  box->elements = {group};
+  layer->contents = {box};
+  doc->layers.push_back(layer);
+
+  pagx::SVGExportOptions options = {};
+  auto svg = pagx::SVGExporter::ToSVG(*doc, options);
+  EXPECT_NE(svg.find("fill-opacity=\"0.5\""), std::string::npos);
+}
+
+// ST21: a paint modifier inside a container TextBox applies to pre-shaped glyph runs instead of
+// forcing the whole box into a PNG.
+PAGX_TEST(PAGXSVGTest, SVGExport_TextBoxPaintModifierStaysVector) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto* font = MakeSquareGlyphFont(doc.get());
+  auto* text = MakeSquareGlyphText(doc.get(), font, {20, 40});
+  text->text = "A";
+  auto* modifier = doc->makeNode<pagx::TextModifier>();
+  modifier->fillColor = pagx::Color{1, 0, 0, 1};
+  auto* box = doc->makeNode<pagx::TextBox>();
+  box->width = 80;
+  box->height = 80;
+  box->elements = {text, modifier, MakeSolidFillSVG(doc.get(), 0, 0, 1)};
+  auto* layer = doc->makeNode<pagx::Layer>();
+  layer->contents = {box};
+  doc->layers.push_back(layer);
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_EQ(svg.find("data:image/png"), std::string::npos);
+  EXPECT_NE(svg.find("fill=\"#FF0000\""), std::string::npos);
+  EXPECT_EQ(svg.find("fill=\"#0000FF\""), std::string::npos);
+}
+
+// ST11: SVG has no adaptive dash; the exporter bakes the effect into the centerline and emits a
+// plain stroke, so no dasharray survives.
+PAGX_TEST(PAGXSVGTest, SVGExport_AdaptiveDashBakesIntoGeometry) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* path = doc->makeNode<pagx::Path>();
+  path->data = doc->makeNode<pagx::PathData>();
+  *path->data = pagx::PathDataFromSVGString("M10 10 L90 10 L90 90 L10 90 Z");
+  auto* stroke = doc->makeNode<pagx::Stroke>();
+  stroke->color = doc->makeNode<pagx::SolidColor>();
+  static_cast<pagx::SolidColor*>(stroke->color)->color = {1, 0, 0, 1};
+  stroke->width = 2.0f;
+  stroke->dashes = {4.0f, 4.0f};
+  stroke->dashAdaptive = true;
+  layer->contents = {path, stroke};
+  doc->layers.push_back(layer);
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_EQ(svg.find("stroke-dasharray"), std::string::npos);
+  auto dPos = svg.find(" d=\"");
+  ASSERT_NE(dPos, std::string::npos);
+  dPos += 4;
+  auto dEnd = svg.find('"', dPos);
+  ASSERT_NE(dEnd, std::string::npos);
+  size_t moveCount = 0;
+  for (size_t pos = dPos; pos < dEnd; pos++) {
+    if (svg[pos] == 'M') {
+      ++moveCount;
+    }
+  }
+  EXPECT_GE(moveCount, 2u);
+}
+
+PAGX_TEST(PAGXSVGTest, SVGExport_PathOutsideStrokeUsesMask) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* path = doc->makeNode<pagx::Path>();
+  path->data = doc->makeNode<pagx::PathData>();
+  *path->data = pagx::PathDataFromSVGString("M10 10 L90 10 L90 90 L10 90 Z");
+  auto* stroke = doc->makeNode<pagx::Stroke>();
+  stroke->color = doc->makeNode<pagx::SolidColor>();
+  static_cast<pagx::SolidColor*>(stroke->color)->color = {1, 0, 0, 1};
+  stroke->width = 2.0f;
+  stroke->align = pagx::StrokeAlign::Outside;
+  layer->contents = {path, stroke};
+  doc->layers.push_back(layer);
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("mask=\"url(#"), std::string::npos);
+  EXPECT_NE(svg.find("<mask"), std::string::npos);
+  EXPECT_NE(svg.find("stroke-width=\"4\""), std::string::npos);
+}
+
+// ST8: an embedded TextBox run nested in a translated Group keeps that Group transform on the
+// emitted glyph geometry.
+PAGX_TEST(PAGXSVGTest, SVGExport_TextBoxRunKeepsGroupTransform) {
+  auto doc = pagx::PAGXDocument::Make(200, 100);
+  auto* font = MakeSquareGlyphFont(doc.get());
+  auto* text = MakeSquareGlyphText(doc.get(), font, {0, 40});
+  text->text = "A";
+  auto* group = doc->makeNode<pagx::Group>();
+  group->position = {50, 0};
+  group->elements = {text, MakeSolidFillSVG(doc.get(), 0, 0, 0)};
+  auto* box = doc->makeNode<pagx::TextBox>();
+  box->width = 180;
+  box->height = 80;
+  box->elements = {group};
+  auto* layer = doc->makeNode<pagx::Layer>();
+  layer->contents = {box};
+  doc->layers.push_back(layer);
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("matrix(1,0,0,1,50,0)"), std::string::npos);
+}
+
+// ST15: a host-supplied runtime image with a data URI is preferred over the template resource.
+PAGX_TEST(PAGXSVGTest, SVGExport_ImagePatternUsesRuntimeImageDataURI) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {50, 50};
+  rect->size = {80, 80};
+  auto* image = doc->makeNode<pagx::Image>();
+  image->runtimeImage = pagx::PAGImage::MakeFromDataURI(
+      "data:image/png;base64,"
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJg"
+      "gg==");
+  ASSERT_TRUE(image->runtimeImage != nullptr);
+  auto* pattern = doc->makeNode<pagx::ImagePattern>();
+  pattern->image = image;
+  pattern->scaleMode = pagx::ScaleMode::Stretch;
+  auto* fill = doc->makeNode<pagx::Fill>();
+  fill->color = pattern;
+  layer->contents = {rect, fill};
+  doc->layers.push_back(layer);
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("data:image/png;base64,"), std::string::npos);
+}
+
+// ST26: degenerate gradients collapse to tgfx's endpoint color instead of SVG's last stop rule.
+PAGX_TEST(PAGXSVGTest, SVGExport_DegenerateGradientsUseTGFXEndpointColor) {
+  auto makeStop = [](pagx::PAGXDocument* doc, float offset, const pagx::Color& color) {
+    auto* stop = doc->makeNode<pagx::ColorStop>();
+    stop->offset = offset;
+    stop->color = color;
+    return stop;
+  };
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {50, 50};
+  rect->size = {80, 80};
+  auto* linear = doc->makeNode<pagx::LinearGradient>();
+  linear->startPoint = {10, 10};
+  linear->endPoint = {10, 10};
+  linear->colorStops = {makeStop(doc.get(), 0, {1, 0, 0, 1}), makeStop(doc.get(), 1, {0, 0, 1, 1})};
+  auto* fill = doc->makeNode<pagx::Fill>();
+  fill->color = linear;
+  layer->contents = {rect, fill};
+  doc->layers.push_back(layer);
+  auto linearSvg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(linearSvg.find("stop-color=\"#FF0000\""), std::string::npos);
+  EXPECT_EQ(linearSvg.find("stop-color=\"#0000FF\""), std::string::npos);
+
+  auto radialDoc = pagx::PAGXDocument::Make(100, 100);
+  auto* radialLayer = radialDoc->makeNode<pagx::Layer>();
+  auto* radialRect = radialDoc->makeNode<pagx::Rectangle>();
+  radialRect->position = {50, 50};
+  radialRect->size = {80, 80};
+  auto* radial = radialDoc->makeNode<pagx::RadialGradient>();
+  radial->center = {50, 50};
+  radial->radius = 0;
+  radial->colorStops = {makeStop(radialDoc.get(), 0, {1, 0, 0, 1}),
+                        makeStop(radialDoc.get(), 1, {0, 1, 0, 1})};
+  auto* radialFill = radialDoc->makeNode<pagx::Fill>();
+  radialFill->color = radial;
+  radialLayer->contents = {radialRect, radialFill};
+  radialDoc->layers.push_back(radialLayer);
+  auto radialSvg = pagx::SVGExporter::ToSVG(*radialDoc);
+  EXPECT_NE(radialSvg.find("stop-color=\"#00FF00\""), std::string::npos);
+  EXPECT_EQ(radialSvg.find("stop-color=\"#FF0000\""), std::string::npos);
+}
+
+// ST19: nearest filtering maps to image-rendering=pixelated.
+PAGX_TEST(PAGXSVGTest, SVGExport_ImagePatternNearestFilter) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {50, 50};
+  rect->size = {80, 80};
+  auto* image = doc->makeNode<pagx::Image>();
+  image->runtimeImage = pagx::PAGImage::MakeFromDataURI(
+      "data:image/png;base64,"
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJg"
+      "gg==");
+  ASSERT_TRUE(image->runtimeImage != nullptr);
+  auto* pattern = doc->makeNode<pagx::ImagePattern>();
+  pattern->image = image;
+  pattern->filterMode = pagx::FilterMode::Nearest;
+  auto* fill = doc->makeNode<pagx::Fill>();
+  fill->color = pattern;
+  layer->contents = {rect, fill};
+  doc->layers.push_back(layer);
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("image-rendering=\"pixelated\""), std::string::npos);
+}
+
+// ST46: ToFile must keep the previous file intact for every injected write/flush/close/replace
+// failure.
+PAGX_TEST(PAGXSVGTest, SVGExport_ToFileFailureKeepsExistingFile) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {50, 50};
+  rect->size = {80, 80};
+  layer->contents = {rect, MakeSolidFillSVG(doc.get(), 1, 0, 0)};
+  doc->layers.push_back(layer);
+
+  auto path = std::filesystem::temp_directory_path() / "pagx_svg_fail_test.svg";
+  {
+    std::ofstream old(path, std::ios::binary | std::ios::trunc);
+    old << "OLD";
+  }
+  const char* stages[] = {"write", "flush", "close", "replace"};
+  for (const char* stage : stages) {
+    setenv("PAGX_SVG_FAIL_STAGE", stage, 1);
+    EXPECT_FALSE(pagx::SVGExporter::ToFile(*doc, path.string()));
+    std::ifstream current(path, std::ios::binary);
+    std::string content((std::istreambuf_iterator<char>(current)),
+                        std::istreambuf_iterator<char>());
+    EXPECT_EQ(content, "OLD") << stage;
+  }
+  unsetenv("PAGX_SVG_FAIL_STAGE");
+  EXPECT_TRUE(pagx::SVGExporter::ToFile(*doc, path.string()));
+  std::ifstream written(path, std::ios::binary);
+  std::string content((std::istreambuf_iterator<char>(written)), std::istreambuf_iterator<char>());
+  EXPECT_NE(content.find("<svg"), std::string::npos);
+  std::filesystem::remove(path);
+}
+
+// S6: hard budgets reject oversized output and cap multiplicative repeater expansion.
+PAGX_TEST(PAGXSVGTest, SVGExport_BudgetsCapOutputAndRepeaterCopies) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {20, 20};
+  rect->size = {10, 10};
+  layer->contents = {rect, MakeSolidFillSVG(doc.get(), 1, 0, 0)};
+  doc->layers.push_back(layer);
+
+  pagx::SVGExportOptions tooSmall = {};
+  tooSmall.budget.maxOutputBytes = 10;
+  std::vector<pagx::SVGDiagnostic> diagnostics;
+  tooSmall.diagnostics = &diagnostics;
+  EXPECT_TRUE(pagx::SVGExporter::ToSVG(*doc, tooSmall).empty());
+  ASSERT_FALSE(diagnostics.empty());
+  EXPECT_EQ(diagnostics.front().reasonCode, "budget-exceeded");
+
+  auto* repeater = doc->makeNode<pagx::Repeater>();
+  repeater->copies = 10;
+  repeater->position = {10, 0};
+  layer->contents.push_back(repeater);
+  pagx::SVGExportOptions capped = {};
+  capped.budget.maxGeneratedElements = 5;
+  auto svg = pagx::SVGExporter::ToSVG(*doc, capped);
+  size_t rectCount = 0;
+  for (size_t pos = svg.find("<rect"); pos != std::string::npos; pos = svg.find("<rect", pos + 1)) {
+    ++rectCount;
+  }
+  EXPECT_LE(rectCount, 5u);
+}
+
+// ST30: standalone native Text also needs preserved whitespace and an RTL base direction.
+PAGX_TEST(PAGXSVGTest, SVGExport_StandaloneTextWhitespaceAndRTL) {
+  auto doc = pagx::PAGXDocument::Make(200, 100);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* text = doc->makeNode<pagx::Text>();
+  text->text = "A  B";
+  text->fontFamily = "Arial";
+  text->fontSize = 20;
+  layer->contents = {text, MakeSolidFillSVG(doc.get(), 0, 0, 0)};
+  doc->layers.push_back(layer);
+
+  pagx::SVGExportOptions options = {};
+  auto svg = pagx::SVGExporter::ToSVG(*doc, options);
+  EXPECT_NE(svg.find("xml:space=\"preserve\""), std::string::npos);
+
+  auto* rtlText = doc->makeNode<pagx::Text>();
+  rtlText->text = "שלום";
+  rtlText->fontFamily = "Arial";
+  rtlText->fontSize = 20;
+  layer->contents = {rtlText, MakeSolidFillSVG(doc.get(), 0, 0, 0)};
+  auto rtlSvg = pagx::SVGExporter::ToSVG(*doc, options);
+  EXPECT_NE(rtlSvg.find("direction=\"rtl\""), std::string::npos);
+  EXPECT_EQ(rtlSvg.find("text-anchor=\"end\""), std::string::npos);
+}
+
+// S6: a raster pixel budget rejects the bake and falls back to vector emission.
+PAGX_TEST(PAGXSVGTest, SVGExport_RasterPixelBudgetSkipsBake) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {100, 100};
+  rect->size = {180, 180};
+  auto* grad = doc->makeNode<pagx::ConicGradient>();
+  grad->center = {100, 100};
+  auto* first = doc->makeNode<pagx::ColorStop>();
+  first->offset = 0.0f;
+  first->color = {1, 0, 0, 1};
+  auto* second = doc->makeNode<pagx::ColorStop>();
+  second->offset = 1.0f;
+  second->color = {0, 0, 1, 1};
+  grad->colorStops = {first, second};
+  auto* fill = doc->makeNode<pagx::Fill>();
+  fill->color = grad;
+  layer->contents = {rect, fill};
+  doc->layers.push_back(layer);
+
+  pagx::SVGExportOptions options = {};
+  options.staticPolicy = pagx::SVGStaticExportPolicy::PreserveAppearance;
+  options.budget.maxRasterPixels = 1;
+  std::vector<pagx::SVGDiagnostic> diagnostics;
+  options.diagnostics = &diagnostics;
+  auto svg = pagx::SVGExporter::ToSVG(*doc, options);
+  EXPECT_EQ(svg.find("data:image/png;base64,"), std::string::npos);
+  bool found = false;
+  for (const auto& diagnostic : diagnostics) {
+    found = found || diagnostic.reasonCode == "budget-exceeded";
+  }
+  EXPECT_TRUE(found);
+}
+
+// A Group's alpha has to survive until the painter that draws its geometry, even when that painter
+// sits outside the Group.
+PAGX_TEST(PAGXSVGTest, SVGExport_GroupAlphaReachesOuterPainter) {
+  auto doc = pagx::PAGXDocument::Make(200, 100);
+  auto* layer = doc->makeNode<pagx::Layer>("layer");
+  auto* group = doc->makeNode<pagx::Group>("group");
+  group->alpha = 0.5f;
+  auto* text = doc->makeNode<pagx::Text>("run");
+  text->text = "Hi";
+  text->fontSize = 20;
+  group->elements = {text};
+  layer->contents = {group, MakeSolidFillSVG(doc.get(), 0, 0, 0)};
+  doc->layers.push_back(layer);
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("fill-opacity=\"0.5\""), std::string::npos) << svg;
+}
+
+// Pixel check for the accumulated group alpha: the exported SVG is imported back and rendered, so
+// the assertion covers what a viewer actually paints rather than the attribute spelling.
+PAGX_PIXEL_TEST(PAGXSVGTest, SVGExport_GroupAlphaRoundTripPixels) {
+  pag::DeviceLockScope deviceLock;
+  ASSERT_TRUE(static_cast<bool>(deviceLock));
+  auto* context = deviceLock.context();
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto* layer = doc->makeNode<pagx::Layer>("layer");
+  auto* group = doc->makeNode<pagx::Group>("group");
+  group->alpha = 0.5f;
+  auto* rect = doc->makeNode<pagx::Rectangle>("rect");
+  rect->position = {100, 100};
+  rect->size = {80, 80};
+  group->elements = {rect};
+  layer->contents = {group, MakeSolidFillSVG(doc.get(), 1.0f, 0.0f, 0.0f)};
+  doc->layers.push_back(layer);
+  doc->applyLayout();
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  auto roundTrip = pagx::SVGImporter::ParseString(svg);
+  ASSERT_TRUE(roundTrip != nullptr);
+  roundTrip->applyLayout();
+  auto tgfxLayer = pagx::LayerBuilder::Build(roundTrip.get());
+  ASSERT_TRUE(tgfxLayer != nullptr);
+
+  auto surface = Surface::Make(context, 200, 200);
+  ASSERT_TRUE(surface != nullptr);
+  DisplayList displayList;
+  displayList.root()->addChild(tgfxLayer);
+  displayList.render(surface.get(), false);
+  EXPECT_TRUE(Baseline::Compare(surface, "PAGXSVGTest/GroupAlphaRoundTrip"));
 }
 
 }  // namespace pag

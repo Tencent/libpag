@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- D6 animated gate case: a layer slides 100px right through its x transform component over
+     one second. The browser gate pauses SMIL, seeks to 0.5s and compares against the runtime
+     renderer at the same time. -->
+<pagx width="300" height="200">
+  <Layer id="layer" x="0" y="0" width="300" height="200">
+    <Rectangle position="100,100" size="100,100"/>
+    <Fill>
+      <SolidColor color="#CC2200"/>
+    </Fill>
+  </Layer>
+  <Animations>
+    <Animation id="slide" duration="60" frameRate="60" loop="once">
+      <Object target="layer">
+        <Channel name="x" type="float">
+          <Key time="0" value="0" interpolation="linear"/>
+          <Key time="60" value="100" interpolation="linear"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>

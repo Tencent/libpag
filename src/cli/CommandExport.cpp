@@ -21,6 +21,7 @@
 #include <fstream>
 #include <iostream>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 #include "cli/CliUtils.h"
@@ -37,6 +38,13 @@ struct ExportOptions {
   std::string format = {};
   int svgIndent = 2;
   bool svgNoXmlDeclaration = false;
+  std::optional<pagx::SVGStaticExportPolicy> svgStaticPolicy = std::nullopt;
+  std::optional<pagx::SVGTextExportMode> svgTextMode = std::nullopt;
+  bool svgNoAnimation = false;
+  pagx::SVGAnimationSelection svgAnimationSelection = pagx::SVGAnimationSelection::Default;
+  pagx::SVGAnimationPolicy svgAnimationPolicy = pagx::SVGAnimationPolicy::Strict;
+  std::string svgAnimationId = {};
+  bool svgAnimationSelected = false;
   bool textToPath = false;
   bool pptBakeUnsupported = true;
   bool pptIgnoreGlyphRuns = false;
@@ -59,6 +67,12 @@ static void PrintUsage() {
       << "SVG options:\n"
       << "  --svg-indent <n>            Indentation spaces (default: 2, valid range: 0-16)\n"
       << "  --svg-no-xml-declaration    Omit the <?xml ...?> declaration\n"
+      << "  --svg-static-policy <p>     vector-only | preserve-appearance | best-effort\n"
+      << "  --svg-text-mode <m>         native | fidelity\n"
+      << "  --svg-no-animation          Do not export SMIL animations\n"
+      << "  --svg-animation <id>        Export only the named Animation\n"
+      << "  --svg-all-animations        Export every top-level Animation\n"
+      << "  --svg-animation-policy <p>  strict | best-effort (default: strict)\n"
       << "\n"
       << "PPT options:\n"
       << "  --ppt-no-bake-unsupported\n"
@@ -125,6 +139,57 @@ static int ParseOptions(int argc, char* argv[], ExportOptions* options) {
       options->svgIndent = static_cast<int>(value);
     } else if (arg == "--svg-no-xml-declaration") {
       options->svgNoXmlDeclaration = true;
+    } else if (arg == "--svg-static-policy" && i + 1 < argc) {
+      std::string value = argv[++i];
+      if (value == "vector-only") {
+        options->svgStaticPolicy = pagx::SVGStaticExportPolicy::VectorOnly;
+      } else if (value == "preserve-appearance") {
+        options->svgStaticPolicy = pagx::SVGStaticExportPolicy::PreserveAppearance;
+      } else if (value == "best-effort") {
+        options->svgStaticPolicy = pagx::SVGStaticExportPolicy::BestEffort;
+      } else {
+        std::cerr << "pagx export: error: invalid --svg-static-policy '" << value << "'\n";
+        return 1;
+      }
+    } else if (arg == "--svg-text-mode" && i + 1 < argc) {
+      std::string value = argv[++i];
+      if (value == "native") {
+        options->svgTextMode = pagx::SVGTextExportMode::Native;
+      } else if (value == "fidelity") {
+        options->svgTextMode = pagx::SVGTextExportMode::Fidelity;
+      } else {
+        std::cerr << "pagx export: error: invalid --svg-text-mode '" << value << "'\n";
+        return 1;
+      }
+    } else if (arg == "--svg-no-animation") {
+      options->svgNoAnimation = true;
+    } else if (arg == "--svg-animation" && i + 1 < argc) {
+      if (options->svgAnimationSelected) {
+        std::cerr << "pagx export: error: --svg-animation and --svg-all-animations are "
+                     "mutually exclusive\n";
+        return 1;
+      }
+      options->svgAnimationSelection = pagx::SVGAnimationSelection::Named;
+      options->svgAnimationId = argv[++i];
+      options->svgAnimationSelected = true;
+    } else if (arg == "--svg-animation-policy" && i + 1 < argc) {
+      std::string value = argv[++i];
+      if (value == "strict") {
+        options->svgAnimationPolicy = pagx::SVGAnimationPolicy::Strict;
+      } else if (value == "best-effort") {
+        options->svgAnimationPolicy = pagx::SVGAnimationPolicy::BestEffort;
+      } else {
+        std::cerr << "pagx export: error: invalid --svg-animation-policy '" << value << "'\n";
+        return 1;
+      }
+    } else if (arg == "--svg-all-animations") {
+      if (options->svgAnimationSelected) {
+        std::cerr << "pagx export: error: --svg-animation and --svg-all-animations are "
+                     "mutually exclusive\n";
+        return 1;
+      }
+      options->svgAnimationSelection = pagx::SVGAnimationSelection::All;
+      options->svgAnimationSelected = true;
     } else if (arg == "--text-to-path") {
       options->textToPath = true;
     } else if (arg == "--ppt-no-bake-unsupported") {
@@ -143,6 +208,11 @@ static int ParseOptions(int argc, char* argv[], ExportOptions* options) {
       return 1;
     }
     i++;
+  }
+
+  if (options->svgNoAnimation && options->svgAnimationSelected) {
+    std::cerr << "pagx export: error: --svg-no-animation conflicts with the animation selection\n";
+    return 1;
   }
 
   if (options->inputFiles.empty()) {
@@ -184,11 +254,25 @@ static int ExportToSVG(const ExportOptions& options) {
   SVGExporter::Options svgOptions = {};
   svgOptions.indent = options.svgIndent;
   svgOptions.xmlDeclaration = !options.svgNoXmlDeclaration;
-  svgOptions.convertTextToPath = options.textToPath;
+  svgOptions.staticPolicy =
+      options.svgStaticPolicy.value_or(pagx::SVGStaticExportPolicy::PreserveAppearance);
+  svgOptions.textMode = options.svgTextMode.value_or(pagx::SVGTextExportMode::Fidelity);
+  svgOptions.exportAnimation = !options.svgNoAnimation;
+  svgOptions.animation.selection = options.svgAnimationSelection;
+  svgOptions.animation.animationId = options.svgAnimationId;
+  svgOptions.animation.policy = options.svgAnimationPolicy;
 
-  if (!SVGExporter::ToFile(*document, options.outputFile, svgOptions)) {
-    std::cerr << "pagx export: error: failed to write '" << options.outputFile << "'\n";
+  std::vector<std::string> warnings;
+  if (!SVGExporter::ToFile(*document, options.outputFile, svgOptions, &warnings)) {
+    for (const auto& warning : warnings) {
+      std::cerr << "pagx export: warning: " << warning << "\n";
+    }
+    std::cerr << "pagx export: error: failed to write '" << options.outputFile
+              << "' (see warnings above)\n";
     return 1;
+  }
+  for (const auto& warning : warnings) {
+    std::cerr << "pagx export: warning: " << warning << "\n";
   }
 
   std::cout << "pagx export: wrote " << options.outputFile << "\n";

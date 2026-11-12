@@ -6378,8 +6378,7 @@ PAGX_TEST(PAGXPPTTest, RepeaterInsideGroupExpansion) {
 }
 
 PAGX_TEST(PAGXPPTTest, RepeaterReversedScale) {
-  // Repeater scale.x negative + fractional: SignedPow's negative branch (line
-  // 47) and the fractional alpha multiplier branch (line 562-563) fire.
+  // Repeater scale.x negative with integer progress exercises the fractional alpha multiplier.
   auto doc = pagx::PAGXDocument::Make(500, 300);
   auto* layer = doc->makeNode<pagx::Layer>();
   auto* rect = doc->makeNode<pagx::Rectangle>();

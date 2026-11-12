@@ -45,6 +45,7 @@ namespace {
 struct PositionedGlyph {
   const Glyph* glyph = nullptr;
   Matrix transform;
+  size_t glyphIndex = 0;
 };
 
 // Resolves the layer-space pen position for glyph `i` of `run`. The GlyphRun
@@ -130,44 +131,11 @@ static Matrix ComposeGlyphMatrix(const Glyph* glyph, const GlyphRun* run, size_t
 // matrix already composed. Callers filter for the kind they need (path vs.
 // image) instead of the walker knowing about either.
 static std::vector<PositionedGlyph> WalkGlyphs(const Text& text, float textPosX, float textPosY) {
+  auto placements = ComputeGlyphPlacements(text, textPosX, textPosY);
   std::vector<PositionedGlyph> result;
-  size_t totalGlyphs = 0;
-  for (const auto* run : text.glyphRuns) {
-    totalGlyphs += run->glyphs.size();
-  }
-  result.reserve(totalGlyphs);
-  for (const auto* run : text.glyphRuns) {
-    if (!run->font || run->font->unitsPerEm <= 0 || run->glyphs.empty()) {
-      continue;
-    }
-    float scale = run->fontSize / static_cast<float>(run->font->unitsPerEm);
-    float baseX = textPosX + run->x;
-    float baseY = textPosY + run->y;
-    float currentX = baseX;
-    for (size_t i = 0; i < run->glyphs.size(); i++) {
-      uint16_t glyphID = run->glyphs[i];
-      if (glyphID == 0) {
-        continue;
-      }
-      auto glyphIndex = static_cast<size_t>(glyphID) - 1;
-      if (glyphIndex >= run->font->glyphs.size()) {
-        continue;
-      }
-      auto* glyph = run->font->glyphs[glyphIndex];
-      if (!glyph) {
-        continue;
-      }
-
-      float posX = 0;
-      float posY = 0;
-      ResolveGlyphPosition(run, i, baseX, baseY, currentX, &posX, &posY);
-      // Advance the cursor for the no-positions / no-xOffsets fallback path
-      // even when this particular glyph is later filtered out, so subsequent
-      // glyphs land where the renderer expects them.
-      currentX += glyph->advance * scale;
-
-      result.push_back({glyph, ComposeGlyphMatrix(glyph, run, i, scale, posX, posY)});
-    }
+  result.reserve(placements.size());
+  for (const auto& placement : placements) {
+    result.push_back({placement.glyph, placement.transform, placement.glyphIndex});
   }
   return result;
 }
@@ -176,12 +144,11 @@ static std::vector<PositionedGlyph> WalkGlyphs(const Text& text, float textPosX,
 // bitmap, applying the design-space offset so pixel (0,0) maps to the image's
 // top-left in layer space. Kept separate from the walker so ComputeGlyphImages
 // and the combined API share identical image-placement math.
-static bool TryMakeGlyphImage(const PositionedGlyph& entry, GlyphImage* out) {
-  const auto* glyph = entry.glyph;
+static bool TryMakeGlyphImage(const Glyph* glyph, const Matrix& transform, GlyphImage* out) {
   if (!glyph->image) {
     return false;
   }
-  Matrix imageMatrix = entry.transform;
+  Matrix imageMatrix = transform;
   if (glyph->offset.x != 0 || glyph->offset.y != 0) {
     imageMatrix = imageMatrix * Matrix::Translate(glyph->offset.x, glyph->offset.y);
   }
@@ -189,15 +156,68 @@ static bool TryMakeGlyphImage(const PositionedGlyph& entry, GlyphImage* out) {
   return true;
 }
 
-static bool TryMakeGlyphPath(const PositionedGlyph& entry, GlyphPath* out) {
-  if (!entry.glyph->path || entry.glyph->path->isEmpty()) {
+static bool TryMakeGlyphPath(const Glyph* glyph, const Matrix& transform, GlyphPath* out) {
+  if (!glyph->path || glyph->path->isEmpty()) {
     return false;
   }
-  *out = {entry.transform, entry.glyph->path};
+  *out = {transform, glyph->path};
   return true;
 }
 
 }  // namespace
+
+std::vector<GlyphPlacement> ComputeGlyphPlacements(
+    const Text& text, float textPosX, float textPosY,
+    const std::vector<GlyphTransformOverride>& transforms) {
+  std::vector<GlyphPlacement> result;
+  size_t totalGlyphs = 0;
+  for (const auto* run : text.glyphRuns) {
+    totalGlyphs += run->glyphs.size();
+  }
+  result.reserve(totalGlyphs);
+  size_t glyphIndex = 0;
+  for (const auto* run : text.glyphRuns) {
+    if (!run->font || run->font->unitsPerEm <= 0 || run->glyphs.empty()) {
+      glyphIndex += run->glyphs.size();
+      continue;
+    }
+    float scale = run->fontSize / static_cast<float>(run->font->unitsPerEm);
+    float baseX = textPosX + run->x;
+    float baseY = textPosY + run->y;
+    float currentX = baseX;
+    for (size_t i = 0; i < run->glyphs.size(); i++) {
+      size_t currentGlyphIndex = glyphIndex++;
+      uint16_t glyphID = run->glyphs[i];
+      if (glyphID == 0) {
+        continue;
+      }
+      auto glyphIndexInFont = static_cast<size_t>(glyphID) - 1;
+      if (glyphIndexInFont >= run->font->glyphs.size()) {
+        continue;
+      }
+      auto* glyph = run->font->glyphs[glyphIndexInFont];
+      if (!glyph) {
+        continue;
+      }
+      float posX = 0;
+      float posY = 0;
+      ResolveGlyphPosition(run, i, baseX, baseY, currentX, &posX, &posY);
+      currentX += glyph->advance * scale;
+      Matrix transform = ComposeGlyphMatrix(glyph, run, i, scale, posX, posY);
+      if (currentGlyphIndex < transforms.size() && transforms[currentGlyphIndex].valid) {
+        transform = transforms[currentGlyphIndex].transform;
+      }
+      float advance = glyph->advance * scale;
+      Point anchor = {advance * 0.5f, 0};
+      if (i < run->anchors.size()) {
+        anchor.x += run->anchors[i].x;
+        anchor.y += run->anchors[i].y;
+      }
+      result.push_back({glyph, transform, anchor, advance, currentGlyphIndex});
+    }
+  }
+  return result;
+}
 
 void ComputeGlyphPathsAndImages(const Text& text, float textPosX, float textPosY,
                                 std::vector<GlyphPath>* paths, std::vector<GlyphImage>* images) {
@@ -214,13 +234,13 @@ void ComputeGlyphPathsAndImages(const Text& text, float textPosX, float textPosY
   for (const auto& entry : positioned) {
     if (paths) {
       GlyphPath path = {};
-      if (TryMakeGlyphPath(entry, &path)) {
+      if (TryMakeGlyphPath(entry.glyph, entry.transform, &path)) {
         paths->push_back(path);
       }
     }
     if (images) {
       GlyphImage image = {};
-      if (TryMakeGlyphImage(entry, &image)) {
+      if (TryMakeGlyphImage(entry.glyph, entry.transform, &image)) {
         images->push_back(image);
       }
     }
@@ -237,6 +257,45 @@ std::vector<GlyphImage> ComputeGlyphImages(const Text& text, float textPosX, flo
   std::vector<GlyphImage> result;
   ComputeGlyphPathsAndImages(text, textPosX, textPosY, nullptr, &result);
   return result;
+}
+
+std::vector<GlyphDrawItem> ComputeGlyphDrawItems(const Text& text, float textPosX, float textPosY) {
+  return ComputeGlyphDrawItems(text, textPosX, textPosY, {});
+}
+
+std::vector<GlyphDrawItem> ComputeGlyphDrawItems(
+    const Text& text, float textPosX, float textPosY,
+    const std::vector<GlyphTransformOverride>& transforms) {
+  auto placements = ComputeGlyphPlacements(text, textPosX, textPosY, transforms);
+  std::vector<GlyphDrawItem> result = {};
+  result.reserve(placements.size());
+  for (const auto& placement : placements) {
+    GlyphPath path = {};
+    if (TryMakeGlyphPath(placement.glyph, placement.transform, &path)) {
+      GlyphDrawItem item = {};
+      item.transform = path.transform;
+      item.pathData = path.pathData;
+      item.glyphIndex = placement.glyphIndex;
+      result.push_back(item);
+    }
+    GlyphImage image = {};
+    if (TryMakeGlyphImage(placement.glyph, placement.transform, &image)) {
+      GlyphDrawItem item = {};
+      item.transform = image.transform;
+      item.image = image.image;
+      item.glyphIndex = placement.glyphIndex;
+      result.push_back(item);
+    }
+  }
+  return result;
+}
+
+size_t TextGlyphCount(const Text& text) {
+  size_t count = 0;
+  for (const auto* run : text.glyphRuns) {
+    count += run->glyphs.size();
+  }
+  return count;
 }
 
 Rect ComputeGlyphRunTextBounds(const Text& text) {
@@ -489,22 +548,39 @@ std::string UTF8ToUTF16BEHex(const std::string& utf8) {
   return hex;
 }
 
+// The layout pass already resolved the authored priority order, so final output must read that
+// result instead of re-deriving it. A modifier-only TextBox keeps its authored size as a
+// measurement input, but its percentage or dual-edge axis only counts once layout assigned it.
 float EffectiveTextBoxWidth(const TextBox* box) {
-  if (!std::isnan(box->width)) {
-    return box->width;
+  float resolved = box->resolvedLayoutSize().width;
+  if (!box->elements.empty()) {
+    return resolved;
   }
-  // Use the layout-resolved width (set by the constraint layout pass) so TextBoxes
-  // sized via left/right/centerX still wrap and lay out as the author intended.
-  float resolved = box->layoutBounds().width;
-  return resolved > 0 ? resolved : NAN;
+  bool constrained =
+      !std::isnan(box->percentWidth) || (!std::isnan(box->left) && !std::isnan(box->right));
+  if (constrained) {
+    return resolved;
+  }
+  if (std::isnan(box->width)) {
+    return NAN;
+  }
+  return std::isnan(resolved) ? box->width : resolved;
 }
 
 float EffectiveTextBoxHeight(const TextBox* box) {
-  if (!std::isnan(box->height)) {
-    return box->height;
+  float resolved = box->resolvedLayoutSize().height;
+  if (!box->elements.empty()) {
+    return resolved;
   }
-  float resolved = box->layoutBounds().height;
-  return resolved > 0 ? resolved : NAN;
+  bool constrained =
+      !std::isnan(box->percentHeight) || (!std::isnan(box->top) && !std::isnan(box->bottom));
+  if (constrained) {
+    return resolved;
+  }
+  if (std::isnan(box->height)) {
+    return NAN;
+  }
+  return std::isnan(resolved) ? box->height : resolved;
 }
 
 TextLayoutParams MakeTextBoxParams(const TextBox* box) {

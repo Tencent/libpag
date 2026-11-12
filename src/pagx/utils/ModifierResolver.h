@@ -18,14 +18,19 @@
 
 #pragma once
 
+#include <unordered_map>
 #include <vector>
 #include "pagx/PAGXDocument.h"
 #include "pagx/nodes/Element.h"
+#include "pagx/types/Point.h"
+#include "pagx/types/Size.h"
 
 namespace pagx {
 
 class PathData;
 class RoundCorner;
+class Text;
+class TextModifier;
 class TrimPath;
 
 /**
@@ -47,10 +52,29 @@ class TrimPath;
  * remain owned by the document for the lifetime of the export. It never mutates the original
  * elements.
  */
+/**
+ * Per-frame geometry values for one authored shape. The resolver substitutes these values when it
+ * converts the target to a tgfx::Path, so sampling never mutates the document or its resolved
+ * layout. Unset fields fall back to the node's current values.
+ */
+struct ShapeGeometryOverride {
+  const Element* target = nullptr;
+  bool hasPosition = false;
+  Point position = {};
+  bool hasSize = false;
+  Size size = {};
+  bool hasRoundness = false;
+  float roundness = 0.0f;
+};
+
 class ModifierResolver {
  public:
-  explicit ModifierResolver(PAGXDocument* doc) : _doc(doc) {
+  explicit ModifierResolver(PAGXDocument* doc, size_t maxGeneratedElements = 200000)
+      : _doc(doc), _nodeCountBefore(doc->nodes.size()),
+        _maxGeneratedElements(maxGeneratedElements) {
   }
+
+  ~ModifierResolver();
 
   /**
    * Returns a normalized copy of `elements` with all path modifiers baked. Fill, Stroke, Group,
@@ -59,8 +83,33 @@ class ModifierResolver {
    */
   std::vector<Element*> resolve(const std::vector<Element*>& elements);
 
+  /**
+   * Resolves with ShapeGeometryOverride applied to its target. The override has no effect on any
+   * other element and is cleared before returning.
+   */
+  std::vector<Element*> resolveWithOverride(const std::vector<Element*>& elements,
+                                            const ShapeGeometryOverride& override);
+
+  /**
+   * Returns true when every TextModifier inside `elements` can be baked into its target Texts
+   * through GlyphRun channels alone, i.e. resolve() drops them instead of leaving them for a
+   * rasterized fallback. Identity modifiers and modifiers with no target Text count as bakeable.
+   * The walk mirrors resolve(), including nested Group / TextBox element lists.
+   */
+  bool CanBakeTextModifiers(const std::vector<Element*>& elements) const;
+
+  /**
+   * Returns the authored element a baked Path came from when the Path is the direct conversion of
+   * that element (currently Polystar). Returns null when the Path was produced by a path modifier
+   * or has no recorded source. Writers use this to re-emit an animated `d` track for the source.
+   */
+  const Element* sourceOf(const Element* baked) const;
+
  private:
   PAGXDocument* _doc;
+  size_t _nodeCountBefore = 0;
+  size_t _generatedElements = 0;
+  size_t _maxGeneratedElements = 200000;
 
   Element* makePathFromData(PathData* data) const;
 
@@ -77,6 +126,37 @@ class ModifierResolver {
                            const TrimPath* trim) const;
 
   Element* applyRoundCornerToElement(Element* shape, const RoundCorner* corner) const;
+
+  /**
+   * Returns a new Text owned by the document with `modifier`'s geometry channels baked into its
+   * GlyphRun channels, or nullptr when the modifier cannot be expressed through those channels.
+   * `baseIndex`/`totalCount` place this Text in the scope's selector index domain.
+   */
+  Text* bakeTextModifier(const Text* text, const TextModifier* modifier, size_t baseIndex,
+                         size_t totalCount);
+
+  /**
+   * Returns a document-owned copy of `modifier` with its geometry channels reset to identity and
+   * its paint channels/selectors preserved. The exporter uses it to apply paint overrides after
+   * the geometry has already been baked into the Text clone.
+   */
+  TextModifier* makePaintOnlyModifier(const TextModifier* modifier);
+
+  /**
+   * Records that `after` is the baked form of `before`, keeping the authored root source so a
+   * later re-resolve can correlate its output with the animated element.
+   */
+  void RecordBake(const Element* before, const Element* after) const;
+
+  /**
+   * Returns the authored root of `element`, or `element` itself when it was never baked.
+   */
+  const Element* SourceRoot(const Element* element) const;
+
+  // Baked Path -> authored source element. Entries are only consulted for Paths that survive in
+  // the resolved output, so a modifier replacing the bake naturally drops the mapping.
+  mutable std::unordered_map<const Element*, const Element*> bakedSources = {};
+  ShapeGeometryOverride shapeOverride = {};
 };
 
 }  // namespace pagx

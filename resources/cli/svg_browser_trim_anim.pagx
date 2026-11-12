@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- D6 animated gate case: a trimmed square grows its trim end from 0.3 to 0.9 over one second.
+     The browser gate pauses SMIL, seeks to 0.5s and compares the re-baked d track against the
+     runtime renderer at the same time. -->
+<pagx width="200" height="200">
+  <Layer x="0" y="0" width="200" height="200">
+    <Rectangle position="100,100" size="100,100"/>
+    <TrimPath id="trim" start="0" end="0.3"/>
+    <Stroke width="8">
+      <SolidColor color="#CC2200"/>
+    </Stroke>
+  </Layer>
+  <Animations>
+    <Animation id="grow" duration="60" frameRate="60" loop="once">
+      <Object target="trim">
+        <Channel name="end" type="float">
+          <Key time="0" value="0.3" interpolation="linear"/>
+          <Key time="60" value="0.9" interpolation="linear"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>

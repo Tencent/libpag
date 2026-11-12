@@ -229,7 +229,7 @@ void PPTWriter::writeShapeTail(XMLBuilder& out, const FillStrokeInfo& fs, float 
 
 const LayerBuildResult& PPTWriter::ensureBuildResult() {
   if (!_buildResultReady) {
-    _buildResult = LayerBuilder::BuildWithMap(_doc);
+    _buildResult = LayerBuilder::BuildWithMap(_doc, true);
     _buildResultReady = true;
   }
   return _buildResult;

@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- D6 animated gate case: a drop shadow tint lerps red to blue over one second through the
+     feColorMatrix values track. The browser gate pauses SMIL, seeks to 0.5s and compares
+     against the runtime renderer at the same time. -->
+<pagx width="300" height="200">
+  <Layer id="layer" x="60" y="30" width="180" height="120">
+    <Rectangle position="90,60" size="120,80"/>
+    <Fill><SolidColor color="#FFFFFF"/></Fill>
+    <DropShadowFilter id="shadow" offsetX="10" offsetY="10" blurX="6" blurY="6" color="#FF0000"/>
+  </Layer>
+  <Animations>
+    <Animation id="tint" duration="60" frameRate="60" loop="once">
+      <Object target="shadow">
+        <Channel name="color" type="color">
+          <Key time="0" value="#FF0000" interpolation="linear"/>
+          <Key time="60" value="#0000FF" interpolation="linear"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>

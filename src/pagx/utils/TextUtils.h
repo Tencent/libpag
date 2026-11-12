@@ -35,6 +35,7 @@ namespace pagx {
 
 class Image;
 class PathData;
+class Glyph;
 
 struct GlyphPath {
   Matrix transform;
@@ -65,27 +66,29 @@ const TextBox* FindModifierTextBox(const std::vector<Element*>& elements);
  * `parentStroke`; Texts nested inside a Group use that Group's locally-collected
  * Fill / Stroke (falling back to the parent's when the Group supplies none).
  *
- * The Run type must be aggregate-initialisable from `{const Text*, const Fill*,
- * const Stroke*}` (e.g. `pagx::PPTWriter::RichTextRun` and the SVG-side
- * `SVGRichTextRun`). Using a template lets both exporters share the same walk
- * without forcing them to share a struct definition with unrelated members.
+ * The Run type must be aggregate-initialisable from `{const Text*, const Fill*, const Stroke*,
+ * float, const Matrix&}` where the float is the accumulated Group alpha and the matrix the
+ * accumulated Group transform (e.g. `pagx::PPTWriter::RichTextRun` and `SVGRichTextRun`).
  */
 template <typename Run>
 void CollectRichTextRuns(const std::vector<Element*>& elements, const Fill* parentFill,
-                         const Stroke* parentStroke, std::vector<Run>& outRuns) {
+                         const Stroke* parentStroke, const Matrix& parentTransform,
+                         float parentAlpha, std::vector<Run>& outRuns) {
   for (auto* element : elements) {
     auto type = element->nodeType();
     if (type == NodeType::Text) {
       auto* t = static_cast<const Text*>(element);
       if (!t->text.empty()) {
-        outRuns.push_back({t, parentFill, parentStroke});
+        outRuns.push_back({t, parentFill, parentStroke, parentAlpha, parentTransform});
       }
     } else if (type == NodeType::Group) {
       auto* g = static_cast<const Group*>(element);
       auto groupFs = CollectFillStroke(g->elements);
       const Fill* effectiveFill = groupFs.fill ? groupFs.fill : parentFill;
       const Stroke* effectiveStroke = groupFs.stroke ? groupFs.stroke : parentStroke;
-      CollectRichTextRuns(g->elements, effectiveFill, effectiveStroke, outRuns);
+      auto groupMatrix = parentTransform * BuildGroupMatrix(g);
+      CollectRichTextRuns(g->elements, effectiveFill, effectiveStroke, groupMatrix,
+                          parentAlpha * g->alpha, outRuns);
     }
   }
 }
@@ -125,6 +128,65 @@ void ComputeGlyphPathsAndImages(const Text& text, float textPosX, float textPosY
                                 std::vector<GlyphPath>* paths, std::vector<GlyphImage>* images);
 
 /**
+ * A single drawable produced by a pre-shaped glyph, in glyph order. A glyph may carry a vector
+ * outline, a bitmap, or both; callers must paint the entries in this order because a later bitmap
+ * can cover an earlier outline and vice versa.
+ */
+struct GlyphDrawItem {
+  // Layer-space transform: glyph placement for outlines, pixel-rect placement for bitmaps.
+  Matrix transform;
+  const PathData* pathData = nullptr;
+  const Image* image = nullptr;
+  // Index of the source glyph across the whole Text, including glyphs that produced no
+  // drawable (blank / missing). Selector weights and paint overrides are indexed by this value.
+  size_t glyphIndex = 0;
+};
+
+/**
+ * Optional per-glyph matrix override produced by a TextPath modifier. `valid` distinguishes an
+ * unmodified glyph from one whose final matrix happens to be the identity.
+ */
+struct GlyphTransformOverride {
+  Matrix transform = {};
+  bool valid = false;
+};
+
+/**
+ * A glyph's placement in the Text's local space, including the advance and local anchor needed by
+ * TextPath layout. Blank glyphs are included so advances and selector indices stay aligned.
+ */
+struct GlyphPlacement {
+  const Glyph* glyph = nullptr;
+  Matrix transform = {};
+  Point anchor = {};
+  float advance = 0;
+  size_t glyphIndex = 0;
+};
+
+/**
+ * Walks every valid glyph of `text` in source order, applying the optional per-glyph matrix
+ * overrides. `textPosX`/`textPosY` are the Text's render origin.
+ */
+std::vector<GlyphPlacement> ComputeGlyphPlacements(
+    const Text& text, float textPosX, float textPosY,
+    const std::vector<GlyphTransformOverride>& transforms = {});
+
+/**
+ * Converts text glyph runs into an ordered list of glyph drawables. Unlike
+ * ComputeGlyphPathsAndImages (which returns two separate lists), this preserves the relative order
+ * of vector and bitmap glyphs within each run.
+ * textPosX/textPosY are the base position for glyph placement.
+ */
+std::vector<GlyphDrawItem> ComputeGlyphDrawItems(const Text& text, float textPosX, float textPosY);
+
+/**
+ * Same as above, but uses the per-glyph matrix overrides for glyphs whose `valid` flag is set.
+ */
+std::vector<GlyphDrawItem> ComputeGlyphDrawItems(
+    const Text& text, float textPosX, float textPosY,
+    const std::vector<GlyphTransformOverride>& transforms);
+
+/**
  * Computes the bounding box of a Text's pre-shaped GlyphRuns in the Text's local coordinate space
  * (i.e. as if textPos were (0, 0), so callers add renderPosition() themselves). The horizontal span
  * runs from each glyph's pen origin to its advance edge (pen origin + scaled advance), matching the
@@ -139,6 +201,12 @@ void ComputeGlyphPathsAndImages(const Text& text, float textPosX, float textPosY
  * separately shaped editable-text line box.
  */
 Rect ComputeGlyphRunTextBounds(const Text& text);
+
+/**
+ * Returns the number of glyphs in `text` across all GlyphRuns. This is the index domain used by
+ * TextModifier selectors, so it counts blank and missing glyphs too.
+ */
+size_t TextGlyphCount(const Text& text);
 
 bool HasNonASCII(const std::string& str);
 
@@ -211,10 +279,13 @@ bool HasRTLParagraphBase(const std::string& utf8);
 std::string UTF8ToUTF16BEHex(const std::string& utf8);
 
 /**
- * Returns the effective width/height of a TextBox for typesetting and shape sizing.
- * Falls back to the layout-resolved dimensions when no explicit width/height was supplied
- * (e.g. when the TextBox is positioned via left/right/top/bottom constraints), and returns
- * NaN when neither an explicit nor a resolved value is available (auto-sized in that axis).
+ * Returns the effective width/height of a TextBox for typesetting and shape sizing, or NaN when
+ * the axis has no valid size. A laid-out container TextBox returns the resolved frame size from
+ * the layout pass (a legitimate 0 included), so dual-edge and percentage allocations are not
+ * overridden by a lower priority authored width/height. A modifier-only TextBox keeps its authored
+ * size as a measurement input, but an authored percentage or dual-edge constraint must have been
+ * resolved by layout; otherwise that axis remains NaN. Callers must finish layout before using
+ * the result for final output.
  */
 float EffectiveTextBoxWidth(const TextBox* box);
 float EffectiveTextBoxHeight(const TextBox* box);

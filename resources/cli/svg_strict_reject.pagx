@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- CLI diagnostics case: rotating a Rectangle has no SMIL equivalent, so the default Strict
+     animation policy rejects the export and must surface the reason on stderr. -->
+<pagx width="200" height="200">
+  <Layer x="0" y="0" width="200" height="200">
+    <Rectangle id="rect" position="100,100" size="80,80"/>
+    <Fill>
+      <SolidColor color="#3366FF"/>
+    </Fill>
+  </Layer>
+  <Animations>
+    <Animation id="spin" duration="60" frameRate="60" loop="once">
+      <Object target="rect">
+        <Channel name="rotation" type="float">
+          <Key time="0" value="0" interpolation="linear"/>
+          <Key time="60" value="90" interpolation="linear"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>

@@ -31,8 +31,12 @@
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/Layer.h"
+#include "pagx/nodes/MergePath.h"
+#include "pagx/nodes/Path.h"
 #include "pagx/nodes/PathData.h"
+#include "pagx/nodes/RangeSelector.h"
 #include "pagx/nodes/Rectangle.h"
+#include "pagx/nodes/Repeater.h"
 #include "pagx/nodes/SolidColor.h"
 #include "pagx/nodes/Stroke.h"
 #include "pagx/nodes/Text.h"
@@ -45,8 +49,12 @@
 #include "pagx/utils/ExporterUtils.h"
 #include "pagx/utils/ImageFormatUtils.h"
 #include "pagx/utils/ImageMime.h"
+#include "pagx/utils/ModifierResolver.h"
 #include "pagx/utils/RasterUtils.h"
 #include "pagx/utils/StrokeGeometryUtils.h"
+#include "pagx/utils/TextPaintUtils.h"
+#include "pagx/utils/TextPathUtils.h"
+#include "pagx/utils/TextSelectorUtils.h"
 #include "pagx/utils/TextUtils.h"
 #include "renderer/LayerBuilder.h"
 #include "tgfx/core/Bitmap.h"
@@ -2125,6 +2133,607 @@ PAGX_TEST(PAGXUtilsTest, EffectiveTextBoxHeight_NaNUnresolved) {
   EXPECT_TRUE(std::isnan(pagx::EffectiveTextBoxHeight(box)));
 }
 
+PAGX_TEST(PAGXUtilsTest, EffectiveTextBoxSize_UsesResolvedDualEdgeFrame) {
+  auto doc = pagx::PAGXDocument::Make(300, 200);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  layer->width = 300;
+  layer->height = 200;
+  auto* box = doc->makeNode<pagx::TextBox>();
+  box->width = 100;
+  box->height = 60;
+  box->left = 20;
+  box->right = 30;
+  box->top = 10;
+  box->bottom = 20;
+  box->padding.top = 10;
+  box->padding.right = 10;
+  box->padding.bottom = 10;
+  box->padding.left = 10;
+  box->elements.push_back(doc->makeNode<pagx::Rectangle>());
+  layer->contents.push_back(box);
+  doc->layers.push_back(layer);
+
+  doc->applyLayout();
+
+  auto resolved = box->resolvedLayoutSize();
+  EXPECT_FLOAT_EQ(resolved.width, 250.0f);
+  EXPECT_FLOAT_EQ(resolved.height, 170.0f);
+  EXPECT_FLOAT_EQ(pagx::EffectiveTextBoxWidth(box), 250.0f);
+  EXPECT_FLOAT_EQ(pagx::EffectiveTextBoxHeight(box), 170.0f);
+  auto params = pagx::MakeTextBoxParams(box);
+  EXPECT_FLOAT_EQ(params.boxWidth, 230.0f);
+  EXPECT_FLOAT_EQ(params.boxHeight, 150.0f);
+
+  doc->applyLayout();
+
+  EXPECT_FLOAT_EQ(box->resolvedLayoutSize().width, 250.0f);
+  EXPECT_FLOAT_EQ(box->resolvedLayoutSize().height, 170.0f);
+  auto relaidOut = pagx::MakeTextBoxParams(box);
+  EXPECT_FLOAT_EQ(relaidOut.boxWidth, 230.0f);
+  EXPECT_FLOAT_EQ(relaidOut.boxHeight, 150.0f);
+}
+
+PAGX_TEST(PAGXUtilsTest, EffectiveTextBoxSize_UsesResolvedPercentFrame) {
+  auto doc = pagx::PAGXDocument::Make(300, 200);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  layer->width = 300;
+  layer->height = 200;
+  auto* box = doc->makeNode<pagx::TextBox>();
+  box->width = 100;
+  box->height = 60;
+  box->percentWidth = 80;
+  box->percentHeight = 50;
+  box->padding.top = 10;
+  box->padding.right = 10;
+  box->padding.bottom = 10;
+  box->padding.left = 10;
+  box->elements.push_back(doc->makeNode<pagx::Rectangle>());
+  layer->contents.push_back(box);
+  doc->layers.push_back(layer);
+
+  doc->applyLayout();
+
+  EXPECT_FLOAT_EQ(box->resolvedLayoutSize().width, 240.0f);
+  EXPECT_FLOAT_EQ(box->resolvedLayoutSize().height, 100.0f);
+  EXPECT_FLOAT_EQ(pagx::EffectiveTextBoxWidth(box), 240.0f);
+  EXPECT_FLOAT_EQ(pagx::EffectiveTextBoxHeight(box), 100.0f);
+  auto params = pagx::MakeTextBoxParams(box);
+  EXPECT_FLOAT_EQ(params.boxWidth, 220.0f);
+  EXPECT_FLOAT_EQ(params.boxHeight, 80.0f);
+}
+
+PAGX_TEST(PAGXUtilsTest, EffectiveTextBoxSize_UsesAuthoredFrameWhenUnconstrained) {
+  auto doc = pagx::PAGXDocument::Make(300, 200);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  layer->width = 300;
+  layer->height = 200;
+  auto* box = doc->makeNode<pagx::TextBox>();
+  box->width = 100;
+  box->height = 60;
+  box->padding.top = 10;
+  box->padding.right = 10;
+  box->padding.bottom = 10;
+  box->padding.left = 10;
+  box->elements.push_back(doc->makeNode<pagx::Rectangle>());
+  layer->contents.push_back(box);
+  doc->layers.push_back(layer);
+
+  doc->applyLayout();
+
+  EXPECT_FLOAT_EQ(box->resolvedLayoutSize().width, 100.0f);
+  EXPECT_FLOAT_EQ(box->resolvedLayoutSize().height, 60.0f);
+  auto params = pagx::MakeTextBoxParams(box);
+  EXPECT_FLOAT_EQ(params.boxWidth, 80.0f);
+  EXPECT_FLOAT_EQ(params.boxHeight, 40.0f);
+}
+
+PAGX_TEST(PAGXUtilsTest, EffectiveTextBoxSize_KeepsZeroAllocation) {
+  auto doc = pagx::PAGXDocument::Make(300, 200);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  layer->width = 300;
+  layer->height = 200;
+  auto* box = doc->makeNode<pagx::TextBox>();
+  box->left = 170;
+  box->right = 130;
+  layer->contents.push_back(box);
+  doc->layers.push_back(layer);
+
+  doc->applyLayout();
+
+  EXPECT_FLOAT_EQ(box->resolvedLayoutSize().width, 0.0f);
+  EXPECT_FLOAT_EQ(pagx::EffectiveTextBoxWidth(box), 0.0f);
+  EXPECT_FLOAT_EQ(pagx::MakeTextBoxParams(box).boxWidth, 0.0f);
+  EXPECT_TRUE(std::isnan(pagx::EffectiveTextBoxHeight(box)));
+}
+
+PAGX_TEST(PAGXUtilsTest, EffectiveTextBoxSize_ModifierOnlyPercentWinsOverAuthor) {
+  auto doc = pagx::PAGXDocument::Make(300, 200);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  layer->width = 300;
+  layer->height = 200;
+  auto* box = doc->makeNode<pagx::TextBox>();
+  box->width = 100;
+  box->height = 60;
+  box->percentWidth = 80;
+  box->percentHeight = 50;
+  layer->contents.push_back(box);
+  doc->layers.push_back(layer);
+
+  doc->applyLayout();
+
+  EXPECT_FLOAT_EQ(box->resolvedLayoutSize().width, 240.0f);
+  EXPECT_FLOAT_EQ(box->resolvedLayoutSize().height, 100.0f);
+  EXPECT_FLOAT_EQ(pagx::EffectiveTextBoxWidth(box), 240.0f);
+  EXPECT_FLOAT_EQ(pagx::EffectiveTextBoxHeight(box), 100.0f);
+}
+
+PAGX_TEST(PAGXUtilsTest, EffectiveTextBoxSize_ModifierOnlyWithoutSourceStaysNaN) {
+  auto doc = pagx::PAGXDocument::Make(300, 200);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  layer->width = 300;
+  layer->height = 200;
+  auto* box = doc->makeNode<pagx::TextBox>();
+  layer->contents.push_back(box);
+  doc->layers.push_back(layer);
+
+  doc->applyLayout();
+
+  EXPECT_TRUE(std::isnan(pagx::EffectiveTextBoxWidth(box)));
+  EXPECT_TRUE(std::isnan(pagx::EffectiveTextBoxHeight(box)));
+}
+
+PAGX_TEST(PAGXUtilsTest, EffectiveTextBoxSize_AssignsNestedModifierOnlyBox) {
+  auto doc = pagx::PAGXDocument::Make(300, 200);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  layer->width = 300;
+  layer->height = 200;
+  auto* outer = doc->makeNode<pagx::TextBox>();
+  outer->width = 300;
+  outer->height = 200;
+  auto* inner = doc->makeNode<pagx::TextBox>();
+  inner->percentWidth = 80;
+  inner->percentHeight = 50;
+  outer->elements.push_back(inner);
+  layer->contents.push_back(outer);
+  doc->layers.push_back(layer);
+
+  doc->applyLayout();
+
+  EXPECT_FLOAT_EQ(inner->resolvedLayoutSize().width, 240.0f);
+  EXPECT_FLOAT_EQ(inner->resolvedLayoutSize().height, 100.0f);
+  EXPECT_FLOAT_EQ(pagx::EffectiveTextBoxWidth(inner), 240.0f);
+  EXPECT_FLOAT_EQ(pagx::EffectiveTextBoxHeight(inner), 100.0f);
+}
+
+PAGX_TEST(PAGXUtilsTest, PathDataToSVGString_KeepsFloatPrecision) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto* data = doc->makeNode<pagx::PathData>();
+  *data = pagx::PathDataFromSVGString("M123456.5 0.125 L123457.25 -0.375");
+  auto text = pagx::PathDataToSVGString(*data);
+  EXPECT_NE(text.find("123456.5"), std::string::npos) << text;
+  EXPECT_NE(text.find("123457.25"), std::string::npos);
+  EXPECT_NE(text.find("0.125"), std::string::npos);
+  EXPECT_NE(text.find("-0.375"), std::string::npos);
+}
+
+PAGX_TEST(PAGXUtilsTest, ModifierResolver_MergeDoesNotMutateAuthoredFill) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto* first = doc->makeNode<pagx::Rectangle>();
+  first->position = {40, 50};
+  first->size = {40, 40};
+  auto* second = doc->makeNode<pagx::Rectangle>();
+  second->position = {60, 50};
+  second->size = {40, 40};
+  auto* fill = doc->makeNode<pagx::Fill>();
+  fill->fillRule = pagx::FillRule::Winding;
+  auto* merge = doc->makeNode<pagx::MergePath>();
+  merge->mode = pagx::MergePathMode::Difference;
+
+  std::vector<pagx::Element*> elements = {first, second, merge, fill};
+  pagx::ModifierResolver resolver(doc.get());
+  auto resolved = resolver.resolve(elements);
+  EXPECT_EQ(fill->fillRule, pagx::FillRule::Winding);
+  bool foundEvenOddFill = false;
+  for (auto* element : resolved) {
+    if (element->nodeType() == pagx::NodeType::Fill) {
+      foundEvenOddFill = static_cast<pagx::Fill*>(element)->fillRule == pagx::FillRule::EvenOdd;
+      EXPECT_NE(element, fill);
+    }
+  }
+  EXPECT_TRUE(foundEvenOddFill);
+}
+
+PAGX_TEST(PAGXUtilsTest, ModifierResolver_MergeIncludesGroupGeometry) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto* group = doc->makeNode<pagx::Group>();
+  auto* first = doc->makeNode<pagx::Rectangle>();
+  first->position = {20, 20};
+  first->size = {20, 20};
+  group->elements = {first};
+  auto* second = doc->makeNode<pagx::Rectangle>();
+  second->position = {120, 120};
+  second->size = {20, 20};
+  auto* merge = doc->makeNode<pagx::MergePath>();
+  merge->mode = pagx::MergePathMode::Union;
+  group->updateSize(nullptr);
+  second->updateSize(nullptr);
+
+  std::vector<pagx::Element*> elements = {group, second, merge};
+  pagx::ModifierResolver resolver(doc.get());
+  auto resolved = resolver.resolve(elements);
+  ASSERT_EQ(resolved.size(), 1u);
+  ASSERT_EQ(resolved[0]->nodeType(), pagx::NodeType::Path);
+  auto bounds = static_cast<pagx::Path*>(resolved[0])->data->getBounds();
+  EXPECT_GT(bounds.width, 100.0f);
+  EXPECT_GT(bounds.height, 100.0f);
+}
+
+// PathData bounds are conservative: quadratic/cubic control points participate even when the
+// curve itself stays close to the endpoints.
+PAGX_TEST(PAGXUtilsTest, PathDataBoundsIncludeControlPoints) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto* data = doc->makeNode<pagx::PathData>();
+  *data = pagx::PathDataFromSVGString("M0 0 Q1000 1000 10 10 C-500 -500 20 20 30 30");
+  auto bounds = data->getBounds();
+  EXPECT_GE(bounds.width, 1000.0f);
+  EXPECT_GE(bounds.height, 1000.0f);
+  EXPECT_LE(bounds.x, -500.0f);
+}
+
+// ---------------------------------------------------------------------------
+// TextModifier paint overrides
+// ---------------------------------------------------------------------------
+
+static pagx::RangeSelector* MakeWeightedSelector(pagx::PAGXDocument* doc, float weight) {
+  auto* selector = doc->makeNode<pagx::RangeSelector>();
+  selector->weight = weight;
+  return selector;
+}
+
+PAGX_TEST(PAGXUtilsTest, TextPaintUtils_AccumulatesOverrideWeightAndColor) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  std::vector<pagx::GlyphPaintStyle> styles(1);
+  auto* red = doc->makeNode<pagx::TextModifier>();
+  red->fillColor = pagx::Color{1.0f, 0.0f, 0.0f, 1.0f};
+  red->selectors = {MakeWeightedSelector(doc.get(), 0.5f)};
+  pagx::ApplyTextModifierPaint(*red, 0, 1, &styles);
+  EXPECT_FLOAT_EQ(styles[0].fillColor.alpha, 0.5f);
+  EXPECT_FLOAT_EQ(styles[0].fillColor.red, 1.0f);
+
+  auto* green = doc->makeNode<pagx::TextModifier>();
+  green->fillColor = pagx::Color{0.0f, 1.0f, 0.0f, 1.0f};
+  green->selectors = {MakeWeightedSelector(doc.get(), 0.5f)};
+  pagx::ApplyTextModifierPaint(*green, 0, 1, &styles);
+  EXPECT_NEAR(styles[0].fillColor.alpha, 0.75f, 1e-6f);
+  EXPECT_NEAR(styles[0].fillColor.red, 1.0f / 3.0f, 1e-6f);
+  EXPECT_NEAR(styles[0].fillColor.green, 2.0f / 3.0f, 1e-6f);
+  EXPECT_FLOAT_EQ(styles[0].fillColor.blue, 0.0f);
+}
+
+PAGX_TEST(PAGXUtilsTest, TextPaintUtils_ZeroAlphaOverrideKeepsPreviousStyle) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  std::vector<pagx::GlyphPaintStyle> styles(1);
+  auto* red = doc->makeNode<pagx::TextModifier>();
+  red->fillColor = pagx::Color{1.0f, 0.0f, 0.0f, 1.0f};
+  red->selectors = {MakeWeightedSelector(doc.get(), 0.5f)};
+  pagx::ApplyTextModifierPaint(*red, 0, 1, &styles);
+
+  auto* clear = doc->makeNode<pagx::TextModifier>();
+  clear->fillColor = pagx::Color{0.0f, 0.0f, 1.0f, 0.0f};
+  pagx::ApplyTextModifierPaint(*clear, 0, 1, &styles);
+  EXPECT_FLOAT_EQ(styles[0].fillColor.alpha, 0.5f);
+  EXPECT_FLOAT_EQ(styles[0].fillColor.red, 1.0f);
+  EXPECT_FLOAT_EQ(styles[0].fillColor.blue, 0.0f);
+}
+
+PAGX_TEST(PAGXUtilsTest, TextPaintUtils_BlendsStrokeWidth) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  std::vector<pagx::GlyphPaintStyle> styles(1);
+  auto* stroke = doc->makeNode<pagx::TextModifier>();
+  stroke->strokeWidth = 10.0f;
+  stroke->selectors = {MakeWeightedSelector(doc.get(), 0.5f)};
+  pagx::ApplyTextModifierPaint(*stroke, 0, 1, &styles);
+  EXPECT_FLOAT_EQ(styles[0].strokeWidthFactor, 0.5f);
+  EXPECT_FLOAT_EQ(pagx::BlendGlyphStrokeWidth(2.0f, styles[0]), 6.0f);
+}
+
+PAGX_TEST(PAGXUtilsTest, TextPaintUtils_UsesScopeGlyphIndex) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  std::vector<pagx::GlyphPaintStyle> styles(2);
+  auto* selector = doc->makeNode<pagx::RangeSelector>();
+  selector->unit = pagx::SelectorUnit::Index;
+  selector->start = 0.0f;
+  selector->end = 1.0f;
+  auto* red = doc->makeNode<pagx::TextModifier>();
+  red->fillColor = pagx::Color{1.0f, 0.0f, 0.0f, 1.0f};
+  red->selectors = {selector};
+  pagx::ApplyTextModifierPaint(*red, 1, 2, &styles);
+  EXPECT_FLOAT_EQ(styles[0].fillColor.alpha, 0.0f);
+  EXPECT_FLOAT_EQ(styles[1].fillColor.alpha, 0.0f);
+
+  pagx::ApplyTextModifierPaint(*red, 0, 2, &styles);
+  EXPECT_FLOAT_EQ(styles[0].fillColor.alpha, 1.0f);
+  EXPECT_FLOAT_EQ(styles[1].fillColor.alpha, 0.0f);
+}
+
+// ---------------------------------------------------------------------------
+// TextPath TP01—TP16
+// ---------------------------------------------------------------------------
+
+static pagx::TextPath* MakeTextPathNode(pagx::PAGXDocument* doc, const char* pathData) {
+  auto* textPath = doc->makeNode<pagx::TextPath>();
+  textPath->path = doc->makeNode<pagx::PathData>();
+  *textPath->path = pagx::PathDataFromSVGString(pathData);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  layer->contents.push_back(textPath);
+  doc->layers.push_back(layer);
+  return textPath;
+}
+
+static std::vector<pagx::TextPathGlyphInput> MakeThreeGlyphs() {
+  return {{pagx::Matrix::Translate(0, 10), {10, 0}, 20},
+          {pagx::Matrix::Translate(20, 10), {10, 0}, 20},
+          {pagx::Matrix::Translate(40, 10), {10, 0}, 20}};
+}
+
+static float MappedX(const pagx::Matrix& m, float x, float y) {
+  return m.a * x + m.c * y + m.tx;
+}
+
+static float MappedY(const pagx::Matrix& m, float x, float y) {
+  return m.b * x + m.d * y + m.ty;
+}
+
+PAGX_TEST(PAGXUtilsTest, TextPath_NormalStartMargin) {
+  auto doc = pagx::PAGXDocument::Make(300, 200);
+  auto* textPath = MakeTextPathNode(doc.get(), "M0 0 L100 0");
+  textPath->firstMargin = 10;
+  doc->applyLayout();
+  std::vector<pagx::Matrix> out;
+  ASSERT_TRUE(pagx::ApplyTextPathToGlyphs(*textPath, MakeThreeGlyphs(), &out));
+  ASSERT_EQ(out.size(), 3u);
+  EXPECT_NEAR(MappedX(out[0], 10, 0), 20, 1e-4);
+  EXPECT_NEAR(MappedX(out[1], 10, 0), 40, 1e-4);
+  EXPECT_NEAR(MappedX(out[2], 10, 0), 60, 1e-4);
+  EXPECT_NEAR(MappedY(out[0], 10, 0), 10, 1e-4);
+  textPath->firstMargin = -20;
+  ASSERT_TRUE(pagx::ApplyTextPathToGlyphs(*textPath, MakeThreeGlyphs(), &out));
+  EXPECT_NEAR(MappedX(out[0], 10, 0), -10, 1e-4);
+  EXPECT_NEAR(MappedX(out[2], 10, 0), 30, 1e-4);
+}
+
+PAGX_TEST(PAGXUtilsTest, TextPath_NormalIgnoresLastMargin) {
+  auto doc = pagx::PAGXDocument::Make(300, 200);
+  auto* textPath = MakeTextPathNode(doc.get(), "M0 0 L100 0");
+  textPath->firstMargin = 10;
+  textPath->lastMargin = -10;
+  doc->applyLayout();
+  std::vector<pagx::Matrix> out;
+  ASSERT_TRUE(pagx::ApplyTextPathToGlyphs(*textPath, MakeThreeGlyphs(), &out));
+  ASSERT_EQ(out.size(), 3u);
+  EXPECT_NEAR(MappedX(out[0], 10, 0), 20, 1e-4);
+  EXPECT_NEAR(MappedX(out[1], 10, 0), 40, 1e-4);
+  EXPECT_NEAR(MappedX(out[2], 10, 0), 60, 1e-4);
+}
+
+PAGX_TEST(PAGXUtilsTest, TextPath_NormalVerticalAndPerpendicular) {
+  auto doc = pagx::PAGXDocument::Make(300, 200);
+  auto* textPath = MakeTextPathNode(doc.get(), "M0 0 L0 100");
+  textPath->perpendicular = true;
+  doc->applyLayout();
+  std::vector<pagx::Matrix> out;
+  ASSERT_TRUE(pagx::ApplyTextPathToGlyphs(*textPath, MakeThreeGlyphs(), &out));
+  ASSERT_EQ(out.size(), 3u);
+  EXPECT_NEAR(MappedX(out[0], 10, 0), -10, 1e-4);
+  EXPECT_NEAR(MappedY(out[0], 10, 0), 10, 1e-4);
+  EXPECT_NEAR(MappedY(out[2], 10, 0), 50, 1e-4);
+  EXPECT_NEAR(out[0].a, 0, 1e-4);
+  EXPECT_NEAR(out[0].b, 1, 1e-4);
+  EXPECT_NEAR(out[0].c, -1, 1e-4);
+  EXPECT_NEAR(out[0].d, 0, 1e-4);
+  textPath->perpendicular = false;
+  ASSERT_TRUE(pagx::ApplyTextPathToGlyphs(*textPath, MakeThreeGlyphs(), &out));
+  EXPECT_NEAR(MappedX(out[0], 10, 0), -10, 1e-4);
+  EXPECT_NEAR(MappedY(out[0], 10, 0), 10, 1e-4);
+  EXPECT_NEAR(out[0].a, 1, 1e-4);
+  EXPECT_NEAR(out[0].d, 1, 1e-4);
+}
+
+PAGX_TEST(PAGXUtilsTest, TextPath_ReversedDistances) {
+  auto doc = pagx::PAGXDocument::Make(300, 200);
+  auto* textPath = MakeTextPathNode(doc.get(), "M0 0 L100 0");
+  textPath->reversed = true;
+  doc->applyLayout();
+  std::vector<pagx::Matrix> out;
+  ASSERT_TRUE(pagx::ApplyTextPathToGlyphs(*textPath, MakeThreeGlyphs(), &out));
+  ASSERT_EQ(out.size(), 3u);
+  EXPECT_NEAR(MappedX(out[0], 10, 0), 90, 1e-4);
+  EXPECT_NEAR(MappedX(out[1], 10, 0), 70, 1e-4);
+  EXPECT_NEAR(MappedX(out[2], 10, 0), 50, 1e-4);
+}
+
+PAGX_TEST(PAGXUtilsTest, TextPath_ReversedPathUsesPathDirection) {
+  auto doc = pagx::PAGXDocument::Make(300, 200);
+  auto* textPath = MakeTextPathNode(doc.get(), "M100 0 L0 0");
+  doc->applyLayout();
+  std::vector<pagx::Matrix> out;
+  ASSERT_TRUE(pagx::ApplyTextPathToGlyphs(*textPath, MakeThreeGlyphs(), &out));
+  ASSERT_EQ(out.size(), 3u);
+  EXPECT_NEAR(MappedX(out[0], 10, 0), 90, 1e-4);
+  EXPECT_NEAR(MappedY(out[0], 10, 0), -10, 1e-4);
+  EXPECT_NEAR(MappedX(out[2], 10, 0), 50, 1e-4);
+}
+
+PAGX_TEST(PAGXUtilsTest, TextPath_UsesAnchorAndBaselineOrigin) {
+  auto doc = pagx::PAGXDocument::Make(300, 200);
+  auto* textPath = MakeTextPathNode(doc.get(), "M0 0 L100 0");
+  textPath->baselineOrigin = {5, 0};
+  textPath->baselineAngle = 90;
+  textPath->perpendicular = true;
+  doc->applyLayout();
+  std::vector<pagx::TextPathGlyphInput> glyphs = {{pagx::Matrix::Translate(0, 0), {15, 30}, 20}};
+  std::vector<pagx::Matrix> out;
+  ASSERT_TRUE(pagx::ApplyTextPathToGlyphs(*textPath, glyphs, &out));
+  ASSERT_EQ(out.size(), 1u);
+  EXPECT_NEAR(MappedX(out[0], 15, 30), 30, 1e-4);
+  EXPECT_NEAR(MappedY(out[0], 15, 30), -10, 1e-4);
+  EXPECT_NEAR(out[0].a, 0, 1e-4);
+  EXPECT_NEAR(out[0].b, -1, 1e-4);
+}
+
+PAGX_TEST(PAGXUtilsTest, TextPath_ForceAlignmentSpacing) {
+  auto doc = pagx::PAGXDocument::Make(300, 200);
+  auto* textPath = MakeTextPathNode(doc.get(), "M0 0 L200 0");
+  textPath->forceAlignment = true;
+  doc->applyLayout();
+  std::vector<pagx::Matrix> out;
+  ASSERT_TRUE(pagx::ApplyTextPathToGlyphs(*textPath, MakeThreeGlyphs(), &out));
+  ASSERT_EQ(out.size(), 3u);
+  EXPECT_NEAR(MappedX(out[0], 10, 0), 10, 1e-4);
+  EXPECT_NEAR(MappedX(out[1], 10, 0), 100, 1e-4);
+  EXPECT_NEAR(MappedX(out[2], 10, 0), 190, 1e-4);
+  EXPECT_NEAR(MappedY(out[0], 10, 0), 0, 1e-4);
+}
+
+PAGX_TEST(PAGXUtilsTest, TextPath_ForceMarginSigns) {
+  auto doc = pagx::PAGXDocument::Make(300, 200);
+  auto* textPath = MakeTextPathNode(doc.get(), "M0 0 L100 0");
+  textPath->forceAlignment = true;
+  textPath->firstMargin = 10;
+  textPath->lastMargin = -10;
+  doc->applyLayout();
+  std::vector<pagx::Matrix> out;
+  ASSERT_TRUE(pagx::ApplyTextPathToGlyphs(*textPath, MakeThreeGlyphs(), &out));
+  ASSERT_EQ(out.size(), 3u);
+  EXPECT_NEAR(MappedX(out[0], 10, 0), 20, 1e-4);
+  EXPECT_NEAR(MappedX(out[1], 10, 0), 50, 1e-4);
+  EXPECT_NEAR(MappedX(out[2], 10, 0), 80, 1e-4);
+}
+
+PAGX_TEST(PAGXUtilsTest, TextPath_OpenPathExtendsAndKeepsNegativeSpacing) {
+  auto doc = pagx::PAGXDocument::Make(300, 200);
+  auto* textPath = MakeTextPathNode(doc.get(), "M0 0 L100 0");
+  textPath->forceAlignment = true;
+  textPath->firstMargin = 80;
+  textPath->lastMargin = -80;
+  doc->applyLayout();
+  std::vector<pagx::Matrix> out;
+  ASSERT_TRUE(pagx::ApplyTextPathToGlyphs(*textPath, MakeThreeGlyphs(), &out));
+  ASSERT_EQ(out.size(), 3u);
+  EXPECT_NEAR(MappedX(out[0], 10, 0), 90, 1e-4);
+  EXPECT_NEAR(MappedX(out[1], 10, 0), 50, 1e-4);
+  EXPECT_NEAR(MappedX(out[2], 10, 0), 10, 1e-4);
+}
+
+PAGX_TEST(PAGXUtilsTest, TextPath_ForceUsesPerGlyphAdvance) {
+  auto doc = pagx::PAGXDocument::Make(300, 200);
+  auto* textPath = MakeTextPathNode(doc.get(), "M0 0 L200 0");
+  textPath->forceAlignment = true;
+  doc->applyLayout();
+  std::vector<pagx::TextPathGlyphInput> glyphs = {{pagx::Matrix::Translate(0, 10), {10, 0}, 20},
+                                                  {pagx::Matrix::Translate(20, 10), {20, 0}, 40},
+                                                  {pagx::Matrix::Translate(40, 10), {30, 0}, 60}};
+  std::vector<pagx::Matrix> out;
+  ASSERT_TRUE(pagx::ApplyTextPathToGlyphs(*textPath, glyphs, &out));
+  ASSERT_EQ(out.size(), 3u);
+  EXPECT_NEAR(MappedX(out[0], 10, 0), 10, 1e-4);
+  EXPECT_NEAR(MappedX(out[1], 20, 0), 80, 1e-4);
+  EXPECT_NEAR(MappedX(out[2], 30, 0), 170, 1e-4);
+}
+
+PAGX_TEST(PAGXUtilsTest, TextPath_SingleGlyphForce) {
+  auto doc = pagx::PAGXDocument::Make(300, 200);
+  auto* textPath = MakeTextPathNode(doc.get(), "M0 0 L100 0");
+  textPath->forceAlignment = true;
+  textPath->firstMargin = 10;
+  doc->applyLayout();
+  std::vector<pagx::TextPathGlyphInput> glyphs = {{pagx::Matrix::Translate(0, 10), {10, 0}, 20}};
+  std::vector<pagx::Matrix> out;
+  ASSERT_TRUE(pagx::ApplyTextPathToGlyphs(*textPath, glyphs, &out));
+  ASSERT_EQ(out.size(), 1u);
+  EXPECT_NEAR(MappedX(out[0], 10, 0), 20, 1e-4);
+}
+
+PAGX_TEST(PAGXUtilsTest, TextPath_ClosedPathWrapAndEndTangent) {
+  auto doc = pagx::PAGXDocument::Make(300, 200);
+  auto* textPath = MakeTextPathNode(doc.get(), "M0 0 L50 0 L50 50 L0 50 Z");
+  textPath->firstMargin = -20;
+  doc->applyLayout();
+  std::vector<pagx::TextPathGlyphInput> glyphs = {{pagx::Matrix::Translate(0, 0), {10, 0}, 20}};
+  std::vector<pagx::Matrix> out;
+  ASSERT_TRUE(pagx::ApplyTextPathToGlyphs(*textPath, glyphs, &out));
+  EXPECT_NEAR(MappedX(out[0], 10, 0), 0, 1e-4);
+  EXPECT_NEAR(MappedY(out[0], 10, 0), 10, 1e-4);
+  textPath->firstMargin = 200;
+  ASSERT_TRUE(pagx::ApplyTextPathToGlyphs(*textPath, glyphs, &out));
+  EXPECT_NEAR(MappedX(out[0], 10, 0), 10, 1e-4);
+  EXPECT_NEAR(MappedY(out[0], 10, 0), 0, 1e-4);
+}
+
+PAGX_TEST(PAGXUtilsTest, TextPath_ReversedClosedPathWrapsAgain) {
+  auto doc = pagx::PAGXDocument::Make(300, 200);
+  auto* textPath = MakeTextPathNode(doc.get(), "M0 0 L50 0 L50 50 L0 50 Z");
+  textPath->reversed = true;
+  textPath->firstMargin = -20;
+  doc->applyLayout();
+  std::vector<pagx::TextPathGlyphInput> glyphs = {{pagx::Matrix::Translate(0, 0), {10, 0}, 20}};
+  std::vector<pagx::Matrix> out;
+  ASSERT_TRUE(pagx::ApplyTextPathToGlyphs(*textPath, glyphs, &out));
+  EXPECT_NEAR(MappedX(out[0], 10, 0), 10, 1e-4);
+  textPath->firstMargin = 200;
+  ASSERT_TRUE(pagx::ApplyTextPathToGlyphs(*textPath, glyphs, &out));
+  EXPECT_NEAR(MappedX(out[0], 10, 0), 0, 1e-4);
+  EXPECT_NEAR(MappedY(out[0], 10, 0), 10, 1e-4);
+}
+
+PAGX_TEST(PAGXUtilsTest, TextPath_MeasuresFirstContourOnly) {
+  auto doc = pagx::PAGXDocument::Make(300, 200);
+  auto* textPath = MakeTextPathNode(doc.get(), "M0 0 L100 0 M200 200 L200 400");
+  textPath->firstMargin = 110;
+  doc->applyLayout();
+  std::vector<pagx::TextPathGlyphInput> glyphs = {{pagx::Matrix::Translate(0, 0), {0, 0}, 20}};
+  std::vector<pagx::Matrix> out;
+  ASSERT_TRUE(pagx::ApplyTextPathToGlyphs(*textPath, glyphs, &out));
+  EXPECT_NEAR(MappedX(out[0], 0, 0), 110, 1e-4);
+  EXPECT_NEAR(MappedY(out[0], 0, 0), 0, 1e-4);
+}
+
+PAGX_TEST(PAGXUtilsTest, TextPath_LayoutScalesPathNotAdvance) {
+  auto doc = pagx::PAGXDocument::Make(300, 200);
+  auto* textPath = MakeTextPathNode(doc.get(), "M0 0 L100 0");
+  textPath->width = 200;
+  textPath->left = 30;
+  textPath->top = 40;
+  textPath->forceAlignment = true;
+  doc->applyLayout();
+  std::vector<pagx::Matrix> out;
+  ASSERT_TRUE(pagx::ApplyTextPathToGlyphs(*textPath, MakeThreeGlyphs(), &out));
+  ASSERT_EQ(out.size(), 3u);
+  EXPECT_NEAR(MappedX(out[0], 10, 0), 40, 1e-4);
+  EXPECT_NEAR(MappedX(out[1], 10, 0), 130, 1e-4);
+  EXPECT_NEAR(MappedX(out[2], 10, 0), 220, 1e-4);
+  EXPECT_NEAR(MappedY(out[0], 10, 0), 40, 1e-4);
+}
+
+PAGX_TEST(PAGXUtilsTest, TextPath_ForceIgnoresBaselineAndKeepsLinearPart) {
+  auto doc = pagx::PAGXDocument::Make(300, 200);
+  auto* textPath = MakeTextPathNode(doc.get(), "M0 0 L200 0");
+  textPath->forceAlignment = true;
+  textPath->baselineOrigin = {70, 80};
+  textPath->baselineAngle = 45;
+  doc->applyLayout();
+  auto glyphs = MakeThreeGlyphs();
+  glyphs[0].transform = pagx::Matrix::Rotate(90);
+  std::vector<pagx::Matrix> out;
+  ASSERT_TRUE(pagx::ApplyTextPathToGlyphs(*textPath, glyphs, &out));
+  ASSERT_EQ(out.size(), 3u);
+  EXPECT_NEAR(MappedX(out[0], 10, 0), 10, 1e-4);
+  EXPECT_NEAR(out[0].a, 0, 1e-4);
+  EXPECT_NEAR(out[0].b, 1, 1e-4);
+  EXPECT_NEAR(out[0].c, -1, 1e-4);
+  EXPECT_NEAR(out[0].d, 0, 1e-4);
+}
+
 // ---------------------------------------------------------------------------
 // MakeTextBoxParams / MakeStandaloneParams
 // ---------------------------------------------------------------------------
@@ -2916,6 +3525,235 @@ PAGX_TEST(PAGXUtilsTest, IsSupportedImageMimePinsTheSpecSet) {
   EXPECT_FALSE(pagx::IsSupportedImageMime("image/svg+xml"));
   EXPECT_FALSE(pagx::IsSupportedImageMime("application/octet-stream"));
   EXPECT_FALSE(pagx::IsSupportedImageMime(nullptr));
+}
+
+// ST31: vector and bitmap glyphs of one run must stay in glyph order so the writer can paint them
+// back to back; the two-list API loses that interleaving.
+PAGX_TEST(PAGXUtilsTest, ComputeGlyphDrawItems_PreservesGlyphOrder) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto* font = doc->makeNode<pagx::Font>();
+  font->unitsPerEm = 1000;
+  auto* pathGlyph = doc->makeNode<pagx::Glyph>();
+  pathGlyph->path = doc->makeNode<pagx::PathData>();
+  *pathGlyph->path = pagx::PathDataFromSVGString("M0 0 L10 0 L10 10 Z");
+  pathGlyph->advance = 10.0f;
+  font->glyphs.push_back(pathGlyph);
+  auto* imageGlyph = doc->makeNode<pagx::Glyph>();
+  imageGlyph->image = doc->makeNode<pagx::Image>();
+  imageGlyph->advance = 10.0f;
+  font->glyphs.push_back(imageGlyph);
+
+  auto* text = doc->makeNode<pagx::Text>();
+  auto* run = doc->makeNode<pagx::GlyphRun>();
+  run->font = font;
+  run->fontSize = 1000.0f;
+  run->glyphs = {1, 2, 1};
+  text->glyphRuns.push_back(run);
+
+  auto items = pagx::ComputeGlyphDrawItems(*text, 0, 0);
+  ASSERT_EQ(items.size(), 3u);
+  EXPECT_NE(items[0].pathData, nullptr);
+  EXPECT_EQ(items[0].image, nullptr);
+  EXPECT_NE(items[1].image, nullptr);
+  EXPECT_EQ(items[1].pathData, nullptr);
+  EXPECT_NE(items[2].pathData, nullptr);
+}
+
+// ---------------------------------------------------------------------------
+// TextSelectorEvaluator
+// ---------------------------------------------------------------------------
+
+// Index units address characters directly: [1, 3) selects the middle two of four.
+PAGX_TEST(PAGXUtilsTest, TextSelectorWeight_IndexRange) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto* selector = doc->makeNode<pagx::RangeSelector>();
+  selector->unit = pagx::SelectorUnit::Index;
+  selector->start = 1.0f;
+  selector->end = 3.0f;
+  pagx::TextSelectorEvaluator evaluator({selector}, 4);
+  EXPECT_FLOAT_EQ(evaluator.weight(0), 0.0f);
+  EXPECT_FLOAT_EQ(evaluator.weight(1), 1.0f);
+  EXPECT_FLOAT_EQ(evaluator.weight(2), 1.0f);
+  EXPECT_FLOAT_EQ(evaluator.weight(3), 0.0f);
+}
+
+// The offset shifts both ends before the range is normalized, so [0, 2) + 2 covers characters 2-3.
+PAGX_TEST(PAGXUtilsTest, TextSelectorWeight_IndexRangeWithOffset) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto* selector = doc->makeNode<pagx::RangeSelector>();
+  selector->unit = pagx::SelectorUnit::Index;
+  selector->start = 0.0f;
+  selector->end = 2.0f;
+  selector->offset = 2.0f;
+  pagx::TextSelectorEvaluator evaluator({selector}, 4);
+  EXPECT_FLOAT_EQ(evaluator.weight(0), 0.0f);
+  EXPECT_FLOAT_EQ(evaluator.weight(1), 0.0f);
+  EXPECT_FLOAT_EQ(evaluator.weight(2), 1.0f);
+  EXPECT_FLOAT_EQ(evaluator.weight(3), 1.0f);
+}
+
+// RampUp weights each character by its center's position inside the range.
+PAGX_TEST(PAGXUtilsTest, TextSelectorWeight_RampUpUsesCharacterCenter) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto* selector = doc->makeNode<pagx::RangeSelector>();
+  selector->unit = pagx::SelectorUnit::Percentage;
+  selector->start = 0.0f;
+  selector->end = 1.0f;
+  selector->shape = pagx::SelectorShape::RampUp;
+  pagx::TextSelectorEvaluator evaluator({selector}, 4);
+  EXPECT_NEAR(evaluator.weight(0), 0.125f, 1e-5f);
+  EXPECT_NEAR(evaluator.weight(1), 0.375f, 1e-5f);
+  EXPECT_NEAR(evaluator.weight(2), 0.625f, 1e-5f);
+  EXPECT_NEAR(evaluator.weight(3), 0.875f, 1e-5f);
+}
+
+// The first selector seeds the result: Subtract starts from 1 instead of taking its factor as is.
+PAGX_TEST(PAGXUtilsTest, TextSelectorWeight_FirstSubtractInverts) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto* selector = doc->makeNode<pagx::RangeSelector>();
+  selector->unit = pagx::SelectorUnit::Percentage;
+  selector->mode = pagx::SelectorMode::Subtract;
+  pagx::TextSelectorEvaluator evaluator({selector}, 2);
+  EXPECT_FLOAT_EQ(evaluator.weight(0), 0.0f);
+  EXPECT_FLOAT_EQ(evaluator.weight(1), 0.0f);
+}
+
+// A transform-only TextModifier is baked into the GlyphRun channels of a cloned Text and dropped
+// from the scope, so later writers no longer need a rasterized fallback.
+PAGX_TEST(PAGXUtilsTest, ModifierResolver_BakesTextModifier) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto* font = doc->makeNode<pagx::Font>();
+  font->unitsPerEm = 1000;
+  auto* glyph = doc->makeNode<pagx::Glyph>();
+  glyph->advance = 700;
+  font->glyphs.push_back(glyph);
+
+  auto* text = doc->makeNode<pagx::Text>();
+  auto* run = doc->makeNode<pagx::GlyphRun>();
+  run->font = font;
+  run->fontSize = 1000;
+  run->glyphs = {1, 1};
+  run->positions = {{0.0f, 0.0f}, {700.0f, 0.0f}};
+  text->glyphRuns.push_back(run);
+
+  auto* selector = doc->makeNode<pagx::RangeSelector>();
+  selector->unit = pagx::SelectorUnit::Index;
+  selector->start = 0.0f;
+  selector->end = 1.0f;
+  auto* modifier = doc->makeNode<pagx::TextModifier>();
+  modifier->position = {0.0f, -100.0f};
+  modifier->selectors = {selector};
+
+  std::vector<pagx::Element*> elements = {text, modifier};
+  pagx::ModifierResolver resolver(doc.get());
+  auto resolved = resolver.resolve(elements);
+  ASSERT_EQ(resolved.size(), 1u);
+  ASSERT_EQ(resolved[0]->nodeType(), pagx::NodeType::Text);
+  auto* baked = static_cast<pagx::Text*>(resolved[0]);
+  ASSERT_EQ(baked->glyphRuns.size(), 1u);
+  EXPECT_FLOAT_EQ(baked->glyphRuns[0]->positions[0].y, -100.0f);
+  EXPECT_FLOAT_EQ(baked->glyphRuns[0]->positions[1].y, 0.0f);
+}
+
+// A TextModifier after a Group cannot reach the glyphs nested inside it, so the resolver keeps the
+// modifier for the bake path instead of dropping it and losing the effect.
+PAGX_TEST(PAGXUtilsTest, ModifierResolver_KeepsTextModifierForNestedText) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto* font = doc->makeNode<pagx::Font>();
+  font->unitsPerEm = 1000;
+  auto* glyph = doc->makeNode<pagx::Glyph>();
+  glyph->advance = 700;
+  font->glyphs.push_back(glyph);
+
+  auto* text = doc->makeNode<pagx::Text>();
+  auto* run = doc->makeNode<pagx::GlyphRun>();
+  run->font = font;
+  run->fontSize = 1000;
+  run->glyphs = {1};
+  run->positions = {{0.0f, 0.0f}};
+  text->glyphRuns.push_back(run);
+  auto* group = doc->makeNode<pagx::Group>();
+  group->elements = {text};
+
+  auto* modifier = doc->makeNode<pagx::TextModifier>();
+  modifier->position = {0.0f, -100.0f};
+
+  std::vector<pagx::Element*> elements = {group, modifier};
+  pagx::ModifierResolver resolver(doc.get());
+  auto resolved = resolver.resolve(elements);
+  ASSERT_EQ(resolved.size(), 2u);
+  EXPECT_EQ(resolved[0]->nodeType(), pagx::NodeType::Group);
+  EXPECT_EQ(resolved[1]->nodeType(), pagx::NodeType::TextModifier);
+  EXPECT_FALSE(resolver.CanBakeTextModifiers(elements));
+}
+
+// MergePath follows tgfx: it discards every painter accumulated before it, so an earlier Fill
+// must not paint the merged geometry.
+PAGX_TEST(PAGXUtilsTest, ModifierResolver_MergeClearsPreviousPainters) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto* first = doc->makeNode<pagx::Rectangle>();
+  auto* fill = doc->makeNode<pagx::Fill>();
+  auto* second = doc->makeNode<pagx::Rectangle>();
+  auto* merge = doc->makeNode<pagx::MergePath>();
+  auto* stroke = doc->makeNode<pagx::Stroke>();
+  first->updateSize(nullptr);
+  second->updateSize(nullptr);
+
+  std::vector<pagx::Element*> elements = {first, fill, second, merge, stroke};
+  pagx::ModifierResolver resolver(doc.get());
+  auto resolved = resolver.resolve(elements);
+  ASSERT_EQ(resolved.size(), 2u);
+  EXPECT_EQ(resolved[0]->nodeType(), pagx::NodeType::Path);
+  EXPECT_EQ(resolved[1]->nodeType(), pagx::NodeType::Stroke);
+}
+
+PAGX_TEST(PAGXUtilsTest, ModifierResolver_RepeaterOrderAndNegativeScale) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto* rect = doc->makeNode<pagx::Rectangle>();
+  auto* fill = doc->makeNode<pagx::Fill>();
+  auto* repeater = doc->makeNode<pagx::Repeater>();
+  repeater->copies = 3;
+  repeater->position = {10, 0};
+  std::vector<pagx::Element*> elements = {rect, fill, repeater};
+  pagx::ModifierResolver resolver(doc.get());
+
+  repeater->order = pagx::RepeaterOrder::BelowOriginal;
+  auto resolved = resolver.resolve(elements);
+  ASSERT_EQ(resolved.size(), 3u);
+  EXPECT_FLOAT_EQ(static_cast<pagx::Group*>(resolved.front())->position.x, 20.0f);
+  EXPECT_FLOAT_EQ(static_cast<pagx::Group*>(resolved.back())->position.x, 0.0f);
+
+  repeater->order = pagx::RepeaterOrder::AboveOriginal;
+  resolved = resolver.resolve(elements);
+  ASSERT_EQ(resolved.size(), 3u);
+  EXPECT_FLOAT_EQ(static_cast<pagx::Group*>(resolved.front())->position.x, 0.0f);
+  EXPECT_FLOAT_EQ(static_cast<pagx::Group*>(resolved.back())->position.x, 20.0f);
+
+  repeater->copies = 1;
+  repeater->offset = 0.5f;
+  repeater->scale = {-1.2f, 1.0f};
+  resolved = resolver.resolve(elements);
+  EXPECT_TRUE(resolved.empty());
+
+  repeater->copies = 2;
+  repeater->offset = 0.0f;
+  repeater->scale = {-2.0f, 1.0f};
+  resolved = resolver.resolve(elements);
+  EXPECT_EQ(resolved.size(), 2u);
+}
+
+// With seed 0 AE always makes the first slot pick the table index for the character count; for four
+// characters that is index 2, so a range covering only index 2 weights slot 0.
+PAGX_TEST(PAGXUtilsTest, TextSelectorWeight_RandomOrderKeepsFirstSlotStable) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto* selector = doc->makeNode<pagx::RangeSelector>();
+  selector->unit = pagx::SelectorUnit::Index;
+  selector->start = 2.0f;
+  selector->end = 3.0f;
+  selector->randomOrder = true;
+  selector->randomSeed = 0;
+  pagx::TextSelectorEvaluator evaluator({selector}, 4);
+  EXPECT_FLOAT_EQ(evaluator.weight(0), 1.0f);
 }
 
 }  // namespace pag

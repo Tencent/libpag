@@ -66,6 +66,10 @@ Point LayoutNode::layoutPosition() const {
   return {layoutX, layoutY};
 }
 
+Size LayoutNode::resolvedLayoutSize() const {
+  return {layoutWidth, layoutHeight};
+}
+
 float LayoutNode::constraintExtentX() const {
   if (!std::isnan(centerX)) {
     return std::abs(centerX) * 2;
@@ -268,9 +272,14 @@ std::vector<LayoutNode*> LayoutNode::CollectLayoutNodes(const std::vector<Elemen
                                                         bool skipTextLayout) {
   std::vector<LayoutNode*> result = {};
   for (auto* element : elements) {
-    if (skipTextLayout &&
-        (element->nodeType() == NodeType::Text || element->nodeType() == NodeType::TextBox)) {
-      continue;
+    if (skipTextLayout) {
+      auto type = element->nodeType();
+      if (type == NodeType::Text) {
+        continue;
+      }
+      if (type == NodeType::TextBox && !static_cast<TextBox*>(element)->elements.empty()) {
+        continue;
+      }
     }
     auto* node = AsLayoutNode(element);
     if (node) {

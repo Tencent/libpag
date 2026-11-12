@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <optional>
 #include <string>
 #include <vector>
 #include "pagx/PAGXDocument.h"
@@ -25,6 +26,200 @@
 namespace pagx {
 
 class FontConfig;
+
+/**
+ * Controls how content SVG cannot represent natively is handled. VectorOnly forbids new effect
+ * bitmaps but keeps authored images and bitmap glyphs; PreserveAppearance may bake a complete
+ * isolated region and fails instead of silently degrading; BestEffort reports every approximation
+ * through the diagnostics sink.
+ */
+enum class SVGStaticExportPolicy {
+  VectorOnly,
+  PreserveAppearance,
+  BestEffort,
+};
+
+/**
+ * Controls text emission. Fidelity uses the layout-resolved glyph data (WOFF2 / outline / bitmap),
+ * while Native keeps readable text that the target may reshape.
+ */
+enum class SVGTextExportMode {
+  Native,
+  Fidelity,
+};
+
+/**
+ * Selects which document animations are compiled into SMIL. Default follows the runtime's
+ * getDefaultTimeline (the first declared Animation); Named selects one id; All exports every
+ * top-level Animation in declaration order.
+ */
+enum class SVGAnimationSelection {
+  Default,
+  All,
+  Named,
+};
+
+/**
+ * Controls whether animations with channels SVG cannot express are rejected or exported with
+ * explicit warnings. Strict fails the export; BestEffort keeps the expressible subset.
+ */
+enum class SVGAnimationPolicy {
+  Strict,
+  BestEffort,
+};
+
+/**
+ * Animation export options.
+ */
+struct SVGAnimationOptions {
+  /**
+   * Which animations to export. The default is Default.
+   */
+  SVGAnimationSelection selection = SVGAnimationSelection::Default;
+
+  /**
+   * The Animation id used when selection is Named. Ignored for the other modes.
+   */
+  std::string animationId = {};
+
+  /**
+   * The animation policy. The default is Strict.
+   */
+  SVGAnimationPolicy policy = SVGAnimationPolicy::Strict;
+};
+
+/**
+ * The action taken for a diagnostic entry.
+ */
+enum class SVGDiagnosticAction {
+  Exact,
+  Approximated,
+  Frozen,
+  Dropped,
+  Rejected,
+};
+
+/**
+ * A structured export diagnostic. reasonCode is stable for programmatic handling; the message is
+ * for humans. Empty fields mean the diagnostic is not tied to a specific node/channel.
+ */
+struct SVGDiagnostic {
+  /**
+   * Stable reason code, for example "unsupported-feature" or "budget-exceeded".
+   */
+  std::string reasonCode = {};
+
+  /**
+   * Stable path of the document instance that produced the diagnostic.
+   */
+  std::string instancePath = {};
+
+  /**
+   * Authored node id when the diagnostic is tied to a node.
+   */
+  std::string nodeId = {};
+
+  /**
+   * Channel name or affected output element.
+   */
+  std::string channelOrOutput = {};
+
+  /**
+   * The output class produced for the affected content: native, expanded, baked, or none.
+   */
+  std::string outputClass = {};
+
+  /**
+   * The state source used for evaluation, for example "template-static".
+   */
+  std::string stateSource = {};
+
+  /**
+   * Consumed draw range or the frozen export time, when the action is approximated or frozen.
+   */
+  std::string consumedRangeOrFreezeTime = {};
+
+  /**
+   * Human-readable message.
+   */
+  std::string message = {};
+
+  /**
+   * The action taken for this entry.
+   */
+  SVGDiagnosticAction action = SVGDiagnosticAction::Dropped;
+};
+
+/**
+ * Hard export budgets. A zero field selects the built-in fixed limit; the limit cannot be raised
+ * to infinity. Callers may pass smaller values to make a rejection testable.
+ */
+struct SVGBudget {
+  /**
+   * Maximum reference/instance nesting depth.
+   */
+  size_t maxReferenceDepth = 128;
+
+  /**
+   * Maximum number of expanded document instances.
+   */
+  size_t maxInstances = 10000;
+
+  /**
+   * Maximum total geometry points across the export session.
+   */
+  size_t maxGeometryPoints = 1000000;
+
+  /**
+   * Maximum total final glyphs across the export session.
+   */
+  size_t maxGlyphs = 1000000;
+
+  /**
+   * Maximum generated draw elements produced by modifiers such as Repeater.
+   */
+  size_t maxGeneratedElements = 200000;
+
+  /**
+   * Maximum samples emitted for one animation track.
+   */
+  size_t maxSamplesPerTrack = 4096;
+
+  /**
+   * Maximum samples emitted across the whole export session.
+   */
+  size_t maxTotalSamples = 65536;
+
+  /**
+   * Maximum subdivision depth used when certifying a continuous track.
+   */
+  size_t maxSubdivisionDepth = 24;
+
+  /**
+   * Maximum number of segments expanded from a bounded common animation period.
+   */
+  size_t maxCommonPeriodSegments = 10000;
+
+  /**
+   * Maximum total raster pixels produced by bake patches.
+   */
+  size_t maxRasterPixels = 67108864;
+
+  /**
+   * Maximum width or height of one bake surface.
+   */
+  size_t maxRasterEdge = 8192;
+
+  /**
+   * Maximum encoded image bytes across the export session.
+   */
+  size_t maxEncodedBytes = 67108864;
+
+  /**
+   * Maximum size of the produced SVG document.
+   */
+  size_t maxOutputBytes = 67108864;
+};
 
 /**
  * Export options for SVGExporter.
@@ -36,21 +231,24 @@ struct SVGExportOptions {
   int indent = 2;
 
   /**
+   * The static export policy. The default is PreserveAppearance: native output is preferred, and
+   * content that cannot be represented natively is baked only when a complete isolated composition
+   * can be produced; otherwise the export fails. VectorOnly rejects content that would need a new
+   * effect bitmap while keeping authored images and bitmap glyphs.
+   */
+  SVGStaticExportPolicy staticPolicy = SVGStaticExportPolicy::PreserveAppearance;
+
+  /**
+   * The text export mode. The default is Fidelity: the layout-resolved glyphs are authoritative and
+   * are emitted as WOFF2 @font-face text, outlines, or the original bitmap glyphs. Native keeps a
+   * readable string that the target may reshape with a different font.
+   */
+  SVGTextExportMode textMode = SVGTextExportMode::Fidelity;
+
+  /**
    * Whether to include the XML declaration (<?xml ...?>) at the top. The default value is true.
    */
   bool xmlDeclaration = true;
-
-  /**
-   * Whether to convert text elements to path elements using pre-shaped glyph outlines. When
-   * enabled, text with GlyphRun data is rendered as SVG <path> elements instead of <text> elements,
-   * ensuring identical rendering across platforms without font dependency. Falls back to <text>
-   * elements when glyph outline data is unavailable. The default value is false.
-   *
-   * Note: the default changed from true to false. Downstream callers that want
-   * the previous outline-based output must now opt in explicitly by setting
-   * this field to true.
-   */
-  bool convertTextToPath = false;
 
   /**
    * Optional FontConfig for text layout. When provided, registered and fallback fonts from the
@@ -60,26 +258,15 @@ struct SVGExportOptions {
   FontConfig* fontConfig = nullptr;
 
   /**
-   * Whether to resolve path-modifier elements (TrimPath, RoundCorner, MergePath, Polystar) into
-   * editable geometry by applying the modifier through tgfx::Path operations and emitting the
-   * resulting path as a regular <path>. When disabled, modifiers are dropped on the floor. When
-   * enabled, the modifier itself is no longer live but the resulting shape remains a fully editable
-   * SVG path. Naming is aligned with PPTExportOptions::resolveModifiers. The default value is true.
+   * Optional structured diagnostics sink. Entries mirror the warnings that affect output loss or
+   * approximation and additionally carry a stable reason code and the action taken.
    */
-  bool resolveModifiers = true;
+  std::vector<SVGDiagnostic>* diagnostics = nullptr;
 
   /**
-   * Whether to bake layers that carry features SVG cannot losslessly represent (TextPath,
-   * TextModifier, diamond/conic gradient) into embedded PNG patches. When true, such a layer is
-   * baked to an embedded PNG and emitted as an &lt;image&gt; so the visual result is preserved.
-   * When false, the exporter falls through to the vector path and those features degrade silently
-   * (TextPath / TextModifier drop, diamond/conic gradient fall back to radial). BackgroundBlurStyle
-   * and GlassStyle are always kept as vector output with the backdrop effect silently dropped,
-   * since SVG has no portable backdrop-blur / glass primitive. Naming is aligned with
-   * PPTExportOptions::bakeUnsupported.
-   * The default value is true.
+   * Hard budgets for generated geometry and output bytes.
    */
-  bool bakeUnsupported = true;
+  SVGBudget budget = {};
 
   /**
    * Oversampling factor applied when a layer or tiled pattern has to be baked to PNG. The Surface
@@ -89,8 +276,8 @@ struct SVGExportOptions {
    *
    * Valid range: (0, 4]. Values outside this range are clamped at the entry point — passing 0 or
    * a negative value would otherwise silently disable rasterization (the bake would produce a
-   * zero-pixel surface and the exporter would fall through to the vector path), contradicting the
-   * intent of `bakeUnsupported = true`. The default is 2.0 (i.e. @2x assets), matching the
+   * zero-pixel surface and the exporter would fall through to the vector path, contradicting the
+   * PreserveAppearance policy). The default is 2.0 (i.e. @2x assets), matching the
    * default of HTMLExportOptions::rasterScale.
    */
   float rasterScale = 2.0f;
@@ -102,11 +289,28 @@ struct SVGExportOptions {
    * selectable, searchable, and animatable per character — instead of opaque outline &lt;path&gt;
    * elements. Bitmap (CBDT) fonts and GlyphRuns that carry per-glyph scales / skews remain on the
    * outline path because plain SVG &lt;text&gt; cannot express them. When disabled, every Text
-   * with GlyphRun data is emitted as &lt;path&gt; (the legacy behaviour). Has no effect when
-   * `convertTextToPath` is true (the user has explicitly requested outline geometry). The default
-   * value is true.
+   * with GlyphRun data is emitted as &lt;path&gt;. This is a glyph encoding preference only: it does
+   * not allow TextBox to bypass the authoritative layout glyphs. The default value is true.
    */
   bool embedFontsAsWoff2 = true;
+
+  /**
+   * Whether to export PAGX animations as SVG SMIL elements. A document without animations produces
+   * byte-identical output either way, because the exporter only changes structure for elements that
+   * actually carry an exportable channel. Channels without a native SMIL equivalent (text content,
+   * blend modes, path data) are reported through the warnings sink and dropped.
+   *
+   * The export is template-static: it reads the document's authored state and serializes tracks, but
+   * never advances a timeline, evaluates a StateMachine, or applies a default DataBind. State that
+   * only exists at runtime (host input history, a scene snapshot) cannot be recovered here.
+   * The default value is true.
+   */
+  bool exportAnimation = true;
+
+  /**
+   * Animation selection options. Ignored when exportAnimation is false.
+   */
+  SVGAnimationOptions animation = {};
 };
 
 /**
@@ -139,7 +343,9 @@ class SVGExporter {
    * @param document the PAGXDocument to export. Passed as non-const because applyLayout() is run
    *        on first use to resolve renderPosition() for layers and groups.
    * @param warnings same semantics as ToSVG(); see that method for details.
-   * @return true on success.
+   * @return true on success. The file is written through a sibling temporary file and renamed into
+   *         place, so a failed export leaves an existing file untouched. This is not a crash
+   *         durability guarantee.
    */
   static bool ToFile(PAGXDocument& document, const std::string& filePath,
                      const Options& options = {}, std::vector<std::string>* warnings = nullptr);

@@ -20,9 +20,11 @@
 #include <algorithm>
 #include <cmath>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 #include "pagx/nodes/Ellipse.h"
 #include "pagx/nodes/Fill.h"
+#include "pagx/nodes/GlyphRun.h"
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/MergePath.h"
 #include "pagx/nodes/Path.h"
@@ -31,8 +33,15 @@
 #include "pagx/nodes/Rectangle.h"
 #include "pagx/nodes/Repeater.h"
 #include "pagx/nodes/RoundCorner.h"
+#include "pagx/nodes/Text.h"
+#include "pagx/nodes/TextBox.h"
+#include "pagx/nodes/TextModifier.h"
 #include "pagx/nodes/TrimPath.h"
 #include "pagx/types/MergePathMode.h"
+#include "pagx/utils/ExporterUtils.h"
+#include "pagx/utils/PolystarPath.h"
+#include "pagx/utils/TextSelectorUtils.h"
+#include "pagx/utils/TextUtils.h"
 #include "renderer/ToTGFX.h"
 #include "tgfx/core/Path.h"
 #include "tgfx/core/PathEffect.h"
@@ -41,13 +50,15 @@
 
 namespace pagx {
 
-// std::pow(negative, non-integer) returns NaN, which would propagate through
-// the downstream geometry when a Repeater uses a negative scale with a
-// fractional offset. Raise the magnitude and reapply the sign so a negative
-// base keeps producing a negative result.
-static float SignedPow(float base, float exp) {
-  float sign = base < 0.0f ? -1.0f : 1.0f;
-  return sign * std::pow(std::abs(base), exp);
+ModifierResolver::~ModifierResolver() {
+  if (_doc == nullptr || _doc->nodes.size() <= _nodeCountBefore) {
+    return;
+  }
+  std::unordered_set<Node*> temporary = {};
+  for (size_t i = _nodeCountBefore; i < _doc->nodes.size(); i++) {
+    temporary.insert(_doc->nodes[i].get());
+  }
+  _doc->removeNodes(temporary);
 }
 
 //==============================================================================
@@ -113,149 +124,11 @@ Element* ModifierResolver::makePathFromData(PathData* data) const {
 }
 
 //==============================================================================
-// Polystar -> tgfx::Path. Mirrors tgfx/src/layers/vectors/Polystar.cpp so the
-// emitted geometry matches what the PAG renderer would produce for the same
-// pagx::Polystar (fractional pointCount, roundness, and reversed all behave
-// identically).
-//==============================================================================
-
-static void AddPolystarCurve(tgfx::Path* path, float centerX, float centerY, float angleDelta,
-                             float dx1, float dy1, float roundness1, float dx2, float dy2,
-                             float roundness2) {
-  float control1X = dx1 - dy1 * roundness1 * angleDelta + centerX;
-  float control1Y = dy1 + dx1 * roundness1 * angleDelta + centerY;
-  float control2X = dx2 + dy2 * roundness2 * angleDelta + centerX;
-  float control2Y = dy2 - dx2 * roundness2 * angleDelta + centerY;
-  path->cubicTo(control1X, control1Y, control2X, control2Y, dx2 + centerX, dy2 + centerY);
-}
-
-static tgfx::Path StarToTGFXPath(const Polystar* star) {
-  tgfx::Path path = {};
-  float points = star->pointCount;
-  if (points <= 0.0f) {
-    return path;
-  }
-  auto renderPos = star->renderPosition();
-  float centerX = renderPos.x;
-  float centerY = renderPos.y;
-  float innerRadius = star->renderInnerRadius();
-  float outerRadius = star->renderOuterRadius();
-  float innerRoundness = star->innerRoundness;
-  float outerRoundness = star->outerRoundness;
-  float direction = star->reversed ? -1.0f : 1.0f;
-  float angleStep = static_cast<float>(M_PI) / points;
-  float currentAngle = (star->rotation - 90.0f) * static_cast<float>(M_PI) / 180.0f;
-  int numPoints = static_cast<int>(std::ceil(points)) * 2;
-  float decimalPart = points - std::floor(points);
-  int decimalIndex = -2;
-  if (decimalPart != 0.0f) {
-    decimalIndex = direction > 0.0f ? 1 : numPoints - 3;
-    currentAngle -= angleStep * decimalPart * 2.0f;
-  }
-
-  float firstDx = outerRadius * std::cos(currentAngle);
-  float firstDy = outerRadius * std::sin(currentAngle);
-  float lastDx = firstDx;
-  float lastDy = firstDy;
-  path.moveTo(lastDx + centerX, lastDy + centerY);
-
-  bool outerFlag = false;
-  for (int i = 0; i < numPoints; ++i) {
-    float angleDelta = angleStep * direction;
-    float dx;
-    float dy;
-    if (i == numPoints - 1) {
-      dx = firstDx;
-      dy = firstDy;
-    } else {
-      float radius = outerFlag ? outerRadius : innerRadius;
-      if (i == decimalIndex || i == decimalIndex + 1) {
-        radius = innerRadius + decimalPart * (radius - innerRadius);
-        angleDelta *= decimalPart;
-      }
-      currentAngle += angleDelta;
-      dx = radius * std::cos(currentAngle);
-      dy = radius * std::sin(currentAngle);
-    }
-    if (innerRoundness != 0.0f || outerRoundness != 0.0f) {
-      float lastRoundness;
-      float roundness;
-      if (outerFlag) {
-        lastRoundness = innerRoundness;
-        roundness = outerRoundness;
-      } else {
-        lastRoundness = outerRoundness;
-        roundness = innerRoundness;
-      }
-      AddPolystarCurve(&path, centerX, centerY, angleDelta * 0.5f, lastDx, lastDy, lastRoundness,
-                       dx, dy, roundness);
-      lastDx = dx;
-      lastDy = dy;
-    } else {
-      path.lineTo(dx + centerX, dy + centerY);
-    }
-    outerFlag = !outerFlag;
-  }
-  path.close();
-  return path;
-}
-
-static tgfx::Path PolygonToTGFXPath(const Polystar* poly) {
-  tgfx::Path path = {};
-  float points = poly->pointCount;
-  if (points <= 0.0f) {
-    return path;
-  }
-  int numPoints = static_cast<int>(std::floor(points));
-  if (numPoints < 3) {
-    return path;
-  }
-  auto renderPos = poly->renderPosition();
-  float centerX = renderPos.x;
-  float centerY = renderPos.y;
-  float radius = poly->renderOuterRadius();
-  float roundness = poly->outerRoundness;
-  float direction = poly->reversed ? -1.0f : 1.0f;
-  float angleStep = 2.0f * static_cast<float>(M_PI) / static_cast<float>(numPoints);
-  float currentAngle = (poly->rotation - 90.0f) * static_cast<float>(M_PI) / 180.0f;
-
-  float firstDx = radius * std::cos(currentAngle);
-  float firstDy = radius * std::sin(currentAngle);
-  float lastDx = firstDx;
-  float lastDy = firstDy;
-  path.moveTo(lastDx + centerX, lastDy + centerY);
-
-  for (int i = 0; i < numPoints; ++i) {
-    float angleDelta = angleStep * direction;
-    float dx;
-    float dy;
-    if (i == numPoints - 1) {
-      dx = firstDx;
-      dy = firstDy;
-    } else {
-      currentAngle += angleDelta;
-      dx = radius * std::cos(currentAngle);
-      dy = radius * std::sin(currentAngle);
-    }
-    if (roundness != 0.0f) {
-      AddPolystarCurve(&path, centerX, centerY, angleDelta * 0.25f, lastDx, lastDy, roundness, dx,
-                       dy, roundness);
-      lastDx = dx;
-      lastDy = dy;
-    } else {
-      path.lineTo(dx + centerX, dy + centerY);
-    }
-  }
-  path.close();
-  return path;
-}
-
-//==============================================================================
 // Primitive -> tgfx::Path. We honour position offsets so the path lives in the
 // same coordinate space the painter assumes.
 //==============================================================================
 
-static tgfx::Path PrimitiveToTGFXPath(const Element* el) {
+static tgfx::Path PrimitiveToTGFXPath(const Element* el, const ShapeGeometryOverride* override) {
   auto type = el->nodeType();
   if (type == NodeType::Path) {
     auto* p = static_cast<const Path*>(el);
@@ -283,11 +156,23 @@ static tgfx::Path PrimitiveToTGFXPath(const Element* el) {
     tgfx::Path tp = {};
     auto renderSize = r->renderSize();
     auto renderPos = r->renderPosition();
+    float roundness = r->roundness;
+    if (override != nullptr && override->target == el) {
+      if (override->hasPosition) {
+        renderPos = override->position;
+      }
+      if (override->hasSize) {
+        renderSize = override->size;
+      }
+      if (override->hasRoundness) {
+        roundness = override->roundness;
+      }
+    }
     float halfW = renderSize.width * 0.5f;
     float halfH = renderSize.height * 0.5f;
     tgfx::Rect rect = tgfx::Rect::MakeLTRB(renderPos.x - halfW, renderPos.y - halfH,
                                            renderPos.x + halfW, renderPos.y + halfH);
-    float rad = std::min({r->roundness, halfW, halfH});
+    float rad = std::min({roundness, halfW, halfH});
     if (rad < 0.0f) {
       rad = 0.0f;
     }
@@ -304,6 +189,14 @@ static tgfx::Path PrimitiveToTGFXPath(const Element* el) {
     auto* e = static_cast<const Ellipse*>(el);
     auto renderSize = e->renderSize();
     auto renderPos = e->renderPosition();
+    if (override != nullptr && override->target == el) {
+      if (override->hasPosition) {
+        renderPos = override->position;
+      }
+      if (override->hasSize) {
+        renderSize = override->size;
+      }
+    }
     float halfW = renderSize.width * 0.5f;
     float halfH = renderSize.height * 0.5f;
     tgfx::Rect rect = tgfx::Rect::MakeLTRB(renderPos.x - halfW, renderPos.y - halfH,
@@ -316,9 +209,45 @@ static tgfx::Path PrimitiveToTGFXPath(const Element* el) {
   }
   if (type == NodeType::Polystar) {
     auto* ps = static_cast<const Polystar*>(el);
-    return ps->type == PolystarType::Polygon ? PolygonToTGFXPath(ps) : StarToTGFXPath(ps);
+    return PolystarToTGFXPath(SamplePolystar(ps));
   }
   return tgfx::Path();
+}
+
+// Appends every shape accumulated by `el` to `combined`, applying the parent matrix. Groups are
+// traversed so a MergePath can consume geometry nested under earlier Groups, matching tgfx's
+// context-wide clear/merge. Painters and non-shape content are ignored.
+static void AppendGeometryToPath(const Element* el, const tgfx::Matrix& parent,
+                                 tgfx::Path* combined, tgfx::PathOp op, bool* first,
+                                 const ShapeGeometryOverride* override) {
+  if (el == nullptr) {
+    return;
+  }
+  if (el->nodeType() == NodeType::Group) {
+    auto* group = static_cast<const Group*>(el);
+    auto matrix = parent;
+    matrix.postConcat(ToTGFX(BuildGroupMatrix(group)));
+    for (const auto* child : group->elements) {
+      AppendGeometryToPath(child, matrix, combined, op, first, override);
+    }
+    return;
+  }
+  auto type = el->nodeType();
+  if (type != NodeType::Rectangle && type != NodeType::Ellipse && type != NodeType::Path &&
+      type != NodeType::Polystar) {
+    return;
+  }
+  auto path = PrimitiveToTGFXPath(el, override);
+  if (path.isEmpty()) {
+    return;
+  }
+  path.transform(parent);
+  if (*first) {
+    *combined = path;
+    *first = false;
+  } else {
+    combined->addPath(path, op);
+  }
 }
 
 //==============================================================================
@@ -328,7 +257,7 @@ static tgfx::Path PrimitiveToTGFXPath(const Element* el) {
 // Apply a TrimPath modifier to `shape`, returning a freshly allocated Path
 // (or `shape` unchanged when the trim collapses or the shape is degenerate).
 Element* ModifierResolver::applyTrimToElement(Element* shape, const TrimPath* trim) const {
-  auto tp = PrimitiveToTGFXPath(shape);
+  auto tp = PrimitiveToTGFXPath(shape, &shapeOverride);
   if (tp.isEmpty()) {
     return shape;
   }
@@ -337,7 +266,9 @@ Element* ModifierResolver::applyTrimToElement(Element* shape, const TrimPath* tr
   if (effect == nullptr || !effect->filterPath(&tp)) {
     return shape;
   }
-  return makePathFromData(MakePathDataFromTGFX(_doc, tp));
+  auto* result = makePathFromData(MakePathDataFromTGFX(_doc, tp));
+  RecordBake(shape, result);
+  return result;
 }
 
 // Distribute a Continuous-mode TrimPath across in-scope shapes by cumulative
@@ -369,7 +300,7 @@ void ModifierResolver::applyContinuousTrim(std::vector<Element*>& output,
   float totalLength = 0.0f;
   for (size_t i = 0; i < shapeCount; ++i) {
     size_t order = reversed ? (shapeCount - 1 - i) : i;
-    auto path = PrimitiveToTGFXPath(output[shapeSlots[order]]);
+    auto path = PrimitiveToTGFXPath(output[shapeSlots[order]], &shapeOverride);
     if (reversed) {
       path.reverse();
     }
@@ -447,7 +378,10 @@ void ModifierResolver::applyContinuousTrim(std::vector<Element*>& output,
     if (effect != nullptr) {
       effect->filterPath(&path);
     }
-    output[shapeSlots[order]] = makePathFromData(MakePathDataFromTGFX(_doc, path));
+    auto* before = output[shapeSlots[order]];
+    auto* after = makePathFromData(MakePathDataFromTGFX(_doc, path));
+    RecordBake(before, after);
+    output[shapeSlots[order]] = after;
   }
 
   // Drop shapes that have no surviving segment so downstream painters
@@ -476,7 +410,7 @@ Element* ModifierResolver::applyRoundCornerToElement(Element* shape,
   if (corner->radius <= 0.0f) {
     return shape;
   }
-  auto tp = PrimitiveToTGFXPath(shape);
+  auto tp = PrimitiveToTGFXPath(shape, &shapeOverride);
   if (tp.isEmpty()) {
     return shape;
   }
@@ -484,7 +418,9 @@ Element* ModifierResolver::applyRoundCornerToElement(Element* shape,
   if (effect == nullptr || !effect->filterPath(&tp)) {
     return shape;
   }
-  return makePathFromData(MakePathDataFromTGFX(_doc, tp));
+  auto* result = makePathFromData(MakePathDataFromTGFX(_doc, tp));
+  RecordBake(shape, result);
+  return result;
 }
 
 // MergePathMode::Append preserves each sub-path verbatim and relies on the
@@ -516,21 +452,6 @@ static tgfx::PathOp MergeModeToPathOp(MergePathMode mode) {
 // slot's position, then rewrites `shapeSlots` to reference only that surviving
 // slot. Used by TrimPath (Continuous) and MergePath which fuse all in-scope
 // shapes into one resolved geometry.
-static void CollapseShapeSlotsToSinglePath(std::vector<Element*>& output,
-                                           std::vector<size_t>& shapeSlots, Element* replacement) {
-  size_t firstSlot = shapeSlots.front();
-  output[firstSlot] = replacement;
-  // Erase right-to-left so earlier indices remain valid; shapeSlots is built
-  // in ascending order during traversal.
-  for (auto it = shapeSlots.rbegin(); it != shapeSlots.rend(); ++it) {
-    if (*it != firstSlot) {
-      output.erase(output.begin() + static_cast<long>(*it));
-    }
-  }
-  shapeSlots.clear();
-  shapeSlots.push_back(firstSlot);
-}
-
 //==============================================================================
 // Repeater expansion. Each generated copy reuses the source element pointer; the
 // transform is folded into a fresh wrapping Group.
@@ -562,6 +483,249 @@ static Group* MakeCopyGroup(PAGXDocument* doc, const std::vector<Element*>& body
 // resolve()
 //==============================================================================
 
+//==============================================================================
+// TextModifier -> per-glyph channels.
+//
+// A TextModifier transforms every glyph accumulated before it in the scope. GlyphRun already
+// carries positions / rotations / scales / skews / anchors per glyph, so a modifier whose only
+// channels are geometric maps onto a cloned Text without losing anything. Per-character alpha and
+// paint overrides have no GlyphRun channel, so those modifiers are left in place for the caller's
+// bake path.
+//==============================================================================
+
+static size_t GlyphCount(const Text* text) {
+  return TextGlyphCount(*text);
+}
+
+// True when any element in the list (recursively) is a Text. An outer TextModifier cannot reach
+// such glyphs through the element list alone, so a scope containing one is never fully bakeable.
+static bool ContainsText(const std::vector<Element*>& elements) {
+  for (auto* element : elements) {
+    if (element == nullptr) {
+      continue;
+    }
+    if (element->nodeType() == NodeType::Text) {
+      return true;
+    }
+    if (element->nodeType() == NodeType::Group &&
+        ContainsText(static_cast<const Group*>(element)->elements)) {
+      return true;
+    }
+    if (element->nodeType() == NodeType::TextBox &&
+        !static_cast<const TextBox*>(element)->elements.empty()) {
+      return true;
+    }
+  }
+  return false;
+}
+
+static bool HasPaintChannels(const TextModifier* modifier) {
+  return modifier->fillColor.has_value() || modifier->strokeColor.has_value() ||
+         modifier->strokeWidth.has_value() || modifier->alpha < 1.0f;
+}
+
+static bool CanBakeText(const Text* text) {
+  if (text->glyphRuns.empty() || GlyphCount(text) == 0) {
+    return false;
+  }
+  // The clone writes per-glyph offsets, so every run needs an explicit position for each glyph;
+  // otherwise adding one entry would shift the advance-fallback glyphs onto the wrong pen.
+  for (const auto* run : text->glyphRuns) {
+    if (run->positions.size() != run->glyphs.size()) {
+      return false;
+    }
+  }
+  return true;
+}
+
+static bool HasGeometryChannels(const TextModifier* modifier) {
+  return modifier->position.x != 0.0f || modifier->position.y != 0.0f ||
+         modifier->rotation != 0.0f || modifier->scale.x != 1.0f || modifier->scale.y != 1.0f ||
+         modifier->skew != 0.0f || modifier->anchor.x != 0.0f || modifier->anchor.y != 0.0f;
+}
+
+static bool CanBakeTextModifier(const Text* text, const TextModifier* modifier) {
+  return modifier->skewAxis == 0.0f && CanBakeText(text);
+}
+
+static bool IsIdentityModifier(const TextModifier* modifier) {
+  return modifier->position.x == 0.0f && modifier->position.y == 0.0f &&
+         modifier->rotation == 0.0f && modifier->scale.x == 1.0f && modifier->scale.y == 1.0f &&
+         modifier->skew == 0.0f && modifier->anchor.x == 0.0f && modifier->anchor.y == 0.0f &&
+         !HasPaintChannels(modifier);
+}
+
+Text* ModifierResolver::bakeTextModifier(const Text* text, const TextModifier* modifier,
+                                         size_t baseIndex, size_t totalCount) {
+  if (!CanBakeTextModifier(text, modifier)) {
+    return nullptr;
+  }
+  auto* clone = _doc->makeNode<Text>();
+  *clone = *text;
+  // The implicit copy shares the owning glyph cache pointer, which would be freed twice; the clone
+  // rebuilds that cache from the modified runs instead.
+  clone->glyphData = nullptr;
+  // Keeping the source id would leave two nodes with the same id in the document, which breaks
+  // id-keyed lookups and makes repeated exports pile up duplicates.
+  clone->id.clear();
+  clone->glyphRuns.clear();
+  TextSelectorEvaluator evaluator(modifier->selectors, totalCount);
+  bool touchesRotation = modifier->rotation != 0.0f;
+  bool touchesSkew = modifier->skew != 0.0f;
+  bool touchesScale = modifier->scale.x != 1.0f || modifier->scale.y != 1.0f;
+  bool touchesAnchor = modifier->anchor.x != 0.0f || modifier->anchor.y != 0.0f;
+  size_t index = baseIndex;
+  for (const auto* run : text->glyphRuns) {
+    auto* runClone = _doc->makeNode<GlyphRun>();
+    *runClone = *run;
+    auto glyphCount = runClone->glyphs.size();
+    // Materialize only the channels the modifier changes: an empty channel means identity
+    // downstream and keeps the run eligible for the native <text> path.
+    if (touchesRotation) {
+      runClone->rotations.resize(glyphCount, 0.0f);
+    }
+    if (touchesSkew) {
+      runClone->skews.resize(glyphCount, 0.0f);
+    }
+    if (touchesScale) {
+      runClone->scales.resize(glyphCount, Point{1.0f, 1.0f});
+    }
+    if (touchesAnchor) {
+      runClone->anchors.resize(glyphCount, Point{0.0f, 0.0f});
+    }
+    for (size_t i = 0; i < glyphCount; ++i) {
+      auto weight = evaluator.weight(index++);
+      if (weight == 0.0f) {
+        continue;
+      }
+      runClone->positions[i].x += modifier->position.x * weight;
+      runClone->positions[i].y += modifier->position.y * weight;
+      if (touchesRotation) {
+        runClone->rotations[i] += modifier->rotation * weight;
+      }
+      if (touchesScale) {
+        runClone->scales[i].x *= 1.0f + (modifier->scale.x - 1.0f) * weight;
+        runClone->scales[i].y *= 1.0f + (modifier->scale.y - 1.0f) * weight;
+      }
+      if (touchesSkew) {
+        runClone->skews[i] += modifier->skew * weight;
+      }
+      if (touchesAnchor) {
+        runClone->anchors[i].x += modifier->anchor.x * weight;
+        runClone->anchors[i].y += modifier->anchor.y * weight;
+      }
+    }
+    clone->glyphRuns.push_back(runClone);
+  }
+  return clone;
+}
+
+TextModifier* ModifierResolver::makePaintOnlyModifier(const TextModifier* modifier) {
+  auto* clone = _doc->makeNode<TextModifier>();
+  *clone = *modifier;
+  clone->anchor = {};
+  clone->position = {};
+  clone->rotation = 0.0f;
+  clone->scale = {1.0f, 1.0f};
+  clone->skew = 0.0f;
+  clone->skewAxis = 0.0f;
+  clone->id.clear();
+  return clone;
+}
+
+void ModifierResolver::RecordBake(const Element* before, const Element* after) const {
+  if (after == nullptr) {
+    return;
+  }
+  bakedSources[after] = SourceRoot(before);
+}
+
+const Element* ModifierResolver::SourceRoot(const Element* element) const {
+  auto iter = bakedSources.find(element);
+  return iter == bakedSources.end() ? element : iter->second;
+}
+
+const Element* ModifierResolver::sourceOf(const Element* baked) const {
+  if (baked == nullptr) {
+    return nullptr;
+  }
+  auto iter = bakedSources.find(baked);
+  return iter == bakedSources.end() ? nullptr : iter->second;
+}
+
+bool ModifierResolver::CanBakeTextModifiers(const std::vector<Element*>& elements) const {
+  std::vector<const Text*> texts = {};
+  for (auto* element : elements) {
+    if (element == nullptr) {
+      continue;
+    }
+    switch (element->nodeType()) {
+      case NodeType::Text:
+        texts.push_back(static_cast<const Text*>(element));
+        break;
+      case NodeType::TextModifier: {
+        auto* modifier = static_cast<const TextModifier*>(element);
+        if (IsIdentityModifier(modifier)) {
+          break;
+        }
+        if (HasGeometryChannels(modifier)) {
+          if (modifier->skewAxis != 0.0f) {
+            return false;
+          }
+          for (const auto* text : texts) {
+            if (!CanBakeText(text)) {
+              return false;
+            }
+          }
+        }
+        break;
+      }
+      case NodeType::Group:
+        if (ContainsText(static_cast<const Group*>(element)->elements)) {
+          return false;
+        }
+        break;
+      case NodeType::TextBox: {
+        auto* textBox = static_cast<const TextBox*>(element);
+        if (textBox->elements.empty()) {
+          break;
+        }
+        bool hasPaintModifier = false;
+        for (auto* child : textBox->elements) {
+          if (child != nullptr && child->nodeType() == NodeType::TextModifier &&
+              HasPaintChannels(static_cast<const TextModifier*>(child))) {
+            hasPaintModifier = true;
+            break;
+          }
+        }
+        if (hasPaintModifier) {
+          for (auto* child : textBox->elements) {
+            if (child != nullptr && child->nodeType() == NodeType::Text &&
+                static_cast<const Text*>(child)->glyphRuns.empty()) {
+              return false;
+            }
+          }
+        }
+        if (!CanBakeTextModifiers(textBox->elements)) {
+          return false;
+        }
+        break;
+      }
+      default:
+        break;
+    }
+  }
+  return true;
+}
+
+std::vector<Element*> ModifierResolver::resolveWithOverride(const std::vector<Element*>& elements,
+                                                            const ShapeGeometryOverride& override) {
+  shapeOverride = override;
+  auto result = resolve(elements);
+  shapeOverride = {};
+  return result;
+}
+
 std::vector<Element*> ModifierResolver::resolve(const std::vector<Element*>& elements) {
   std::vector<Element*> output;
   output.reserve(elements.size());
@@ -580,19 +744,39 @@ std::vector<Element*> ModifierResolver::resolve(const std::vector<Element*>& ele
         // geometry. Round-tripping through tgfx keeps this consistent with how
         // the renderer would interpret the same Polystar.
         auto* ps = static_cast<const Polystar*>(element);
-        auto tp = ps->type == PolystarType::Polygon ? PolygonToTGFXPath(ps) : StarToTGFXPath(ps);
+        auto tp = PolystarToTGFXPath(SamplePolystar(ps));
         auto* pd = MakePathDataFromTGFX(_doc, tp);
         auto* path = makePathFromData(pd);
+        RecordBake(element, path);
         shapeSlots.push_back(output.size());
         output.push_back(path);
         break;
       }
       case NodeType::Rectangle:
       case NodeType::Ellipse:
-      case NodeType::Path:
+      case NodeType::Path: {
+        bool reversed = false;
+        if (type == NodeType::Rectangle) {
+          reversed = static_cast<const Rectangle*>(element)->reversed;
+        } else if (type == NodeType::Ellipse) {
+          reversed = static_cast<const Ellipse*>(element)->reversed;
+        } else {
+          reversed = static_cast<const Path*>(element)->reversed;
+        }
+        if (reversed) {
+          // SVG / PPT primitives cannot express contour direction, and dash phase depends on it.
+          // Bake the reversed primitive into an editable Path while preserving its rendered space.
+          auto tp = PrimitiveToTGFXPath(element, &shapeOverride);
+          auto* path = makePathFromData(MakePathDataFromTGFX(_doc, tp));
+          RecordBake(element, path);
+          shapeSlots.push_back(output.size());
+          output.push_back(path);
+          break;
+        }
         shapeSlots.push_back(output.size());
         output.push_back(element);
         break;
+      }
       case NodeType::Group:
         // Groups pass through unmodified; the writer recurses into them and will
         // re-invoke `resolve` on the inner element list with its own scope. This
@@ -622,16 +806,20 @@ std::vector<Element*> ModifierResolver::resolve(const std::vector<Element*>& ele
       }
       case NodeType::MergePath: {
         auto* mp = static_cast<const MergePath*>(element);
-        if (shapeSlots.empty()) {
+        if (output.empty()) {
           break;
         }
-        tgfx::Path combined = PrimitiveToTGFXPath(output[shapeSlots.front()]);
+        tgfx::Path combined = {};
         auto op = MergeModeToPathOp(mp->mode);
-        for (size_t i = 1; i < shapeSlots.size(); ++i) {
-          combined.addPath(PrimitiveToTGFXPath(output[shapeSlots[i]]), op);
+        bool firstPath = true;
+        for (const auto* element : output) {
+          AppendGeometryToPath(element, tgfx::Matrix::I(), &combined, op, &firstPath,
+                               &shapeOverride);
         }
+        output.clear();
         auto* path = makePathFromData(MakePathDataFromTGFX(_doc, combined));
-        CollapseShapeSlotsToSinglePath(output, shapeSlots, path);
+        output.push_back(path);
+        shapeSlots.assign(1, 0);
         // tgfx boolean ops (Skia path-ops) emit geometry oriented for even-odd
         // coverage, not winding: e.g. a Difference hole keeps the inner contour
         // wound the same way as the outer one and relies on the path's even-odd
@@ -671,6 +859,20 @@ std::vector<Element*> ModifierResolver::resolve(const std::vector<Element*>& ele
         // below. 10000 is comfortably above any visually meaningful copy count.
         constexpr float MAX_REPEATER_COPIES = 10000.0f;
         copiesF = std::min(copiesF, MAX_REPEATER_COPIES);
+        // Bound the total expanded element count across nested resolvers. Repeaters multiply, so a
+        // per-repeater cap alone still allows an exponential document to exhaust memory.
+        size_t bodySize = std::max<size_t>(1, output.size());
+        size_t remaining = _maxGeneratedElements > _generatedElements
+                               ? _maxGeneratedElements - _generatedElements
+                               : 0;
+        size_t allowedCopies = remaining / bodySize;
+        if (allowedCopies == 0) {
+          output.clear();
+          shapeSlots.clear();
+          break;
+        }
+        copiesF = std::min(copiesF, static_cast<float>(allowedCopies));
+        _generatedElements += bodySize * static_cast<size_t>(copiesF);
 
         // Snapshot the entire current scope (shapes + painters + nested groups
         // + anything else accumulated so far) as the body of every copy. This
@@ -685,8 +887,11 @@ std::vector<Element*> ModifierResolver::resolve(const std::vector<Element*>& ele
         generated.reserve(static_cast<size_t>(maxCount));
         for (int i = 0; i < maxCount; ++i) {
           float progress = static_cast<float>(i) + rep->offset;
-          float sx = SignedPow(rep->scale.x, progress);
-          float sy = SignedPow(rep->scale.y, progress);
+          float sx = std::pow(rep->scale.x, progress);
+          float sy = std::pow(rep->scale.y, progress);
+          if (!std::isfinite(sx) || !std::isfinite(sy)) {
+            continue;
+          }
           float rotation = rep->rotation * progress;
           float tx = rep->position.x * progress;
           float ty = rep->position.y * progress;
@@ -702,13 +907,10 @@ std::vector<Element*> ModifierResolver::resolve(const std::vector<Element*>& ele
           generated.push_back(g);
         }
 
-        // Drawing order:
-        //   BelowOriginal -> [c0, c1, ..., cN-1]: c0 drawn first (bottom),
-        //     cN-1 drawn last (top). The original (smallest progress) sits at
-        //     the bottom of the stack, copies layered above.
-        //   AboveOriginal -> [cN-1, ..., c1, c0]: c0 drawn last (top). The
-        //     original sits on top of the stack.
-        if (rep->order == RepeaterOrder::AboveOriginal) {
+        // tgfx's Repeater walks copies in reverse for BelowOriginal and forward for
+        // AboveOriginal. Later elements paint on top, so BelowOriginal must emit [cN-1..c0] to
+        // leave the original (c0) on top, while AboveOriginal emits [c0..cN-1].
+        if (rep->order == RepeaterOrder::BelowOriginal) {
           std::reverse(generated.begin(), generated.end());
         }
 
@@ -721,20 +923,92 @@ std::vector<Element*> ModifierResolver::resolve(const std::vector<Element*>& ele
         shapeSlots.clear();
         break;
       }
+      case NodeType::TextModifier: {
+        auto* modifier = static_cast<const TextModifier*>(element);
+        if (IsIdentityModifier(modifier)) {
+          break;
+        }
+        // A Text nested in an earlier Group / TextBox also accumulates glyphs, but it lives in its
+        // own scope and cannot be reached from here; keeping the modifier lets the bake path cover
+        // it instead of silently losing the effect.
+        bool bakedAll = true;
+        for (const auto* prior : output) {
+          if ((prior->nodeType() == NodeType::Group &&
+               ContainsText(static_cast<const Group*>(prior)->elements)) ||
+              (prior->nodeType() == NodeType::TextBox &&
+               !static_cast<const TextBox*>(prior)->elements.empty())) {
+            bakedAll = false;
+            break;
+          }
+        }
+        bool bakeGeometry = HasGeometryChannels(modifier);
+        if (bakedAll && bakeGeometry) {
+          for (const auto* prior : output) {
+            if (prior->nodeType() == NodeType::Text &&
+                !CanBakeTextModifier(static_cast<const Text*>(prior), modifier)) {
+              bakedAll = false;
+              break;
+            }
+          }
+        }
+        if (!bakedAll) {
+          output.push_back(element);
+          break;
+        }
+        size_t totalGlyphs = 0;
+        if (bakeGeometry) {
+          for (const auto* prior : output) {
+            if (prior->nodeType() == NodeType::Text) {
+              totalGlyphs += GlyphCount(static_cast<const Text*>(prior));
+            }
+          }
+        }
+        size_t baseIndex = 0;
+        bool geometryBaked = true;
+        if (bakeGeometry) {
+          for (auto*& slot : output) {
+            if (slot->nodeType() != NodeType::Text) {
+              continue;
+            }
+            auto* text = static_cast<const Text*>(slot);
+            auto count = GlyphCount(text);
+            auto* baked = bakeTextModifier(text, modifier, baseIndex, totalGlyphs);
+            if (baked == nullptr) {
+              geometryBaked = false;
+              break;
+            }
+            slot = baked;
+            baseIndex += count;
+          }
+        }
+        if (!geometryBaked) {
+          output.push_back(element);
+          break;
+        }
+        if (HasPaintChannels(modifier)) {
+          output.push_back(makePaintOnlyModifier(modifier));
+        }
+        break;
+      }
       default:
-        // Fill, Stroke, Text, TextBox, TextPath, TextModifier, RangeSelector,
-        // and any other element pass through unchanged. They are written by
-        // dedicated writers downstream.
+        // Fill, Stroke, Text, TextBox, TextPath, RangeSelector, and any other
+        // element pass through unchanged. They are written by dedicated writers
+        // downstream.
         output.push_back(element);
         break;
     }
   }
 
   if (scopeNeedsEvenOddFill) {
-    for (auto* el : output) {
-      if (el->nodeType() == NodeType::Fill) {
-        static_cast<Fill*>(el)->fillRule = FillRule::EvenOdd;
+    for (auto*& el : output) {
+      if (el->nodeType() != NodeType::Fill) {
+        continue;
       }
+      auto* clone = _doc->makeNode<Fill>();
+      *clone = *static_cast<const Fill*>(el);
+      clone->id.clear();
+      clone->fillRule = FillRule::EvenOdd;
+      el = clone;
     }
   }
 

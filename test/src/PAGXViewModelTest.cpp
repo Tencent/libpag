@@ -28,9 +28,12 @@
 #include "pagx/nodes/DataBind.h"
 #include "pagx/nodes/DataConverter.h"
 #include "pagx/nodes/Fill.h"
+#include "pagx/nodes/Font.h"
+#include "pagx/nodes/GlyphRun.h"
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/ImagePattern.h"
+#include "pagx/nodes/PathData.h"
 #include "pagx/nodes/Rectangle.h"
 #include "pagx/nodes/SolidColor.h"
 #include "pagx/nodes/Text.h"
@@ -38,6 +41,7 @@
 #include "pagx/nodes/TextModifier.h"
 #include "pagx/nodes/ViewModel.h"
 #include "pagx/nodes/ViewModelProperty.h"
+#include "pagx/svg/SVGPathParser.h"
 #include "pagx/utils/Base64.h"
 #include "renderer/LayerBuilder.h"
 #include "tgfx/layers/Layer.h"
@@ -2919,6 +2923,13 @@ static std::shared_ptr<pagx::PAGScene> MakeReshapeScene(
   auto* prop = doc->makeNode<pagx::ViewModelProperty>();
   prop->name = propName;
   prop->propertyType = propType;
+  // Seed the binding with the authored value so the first draw does not reshape to a default that
+  // a later test assignment would only apply on the second frame.
+  if (propType == pagx::ViewModelPropertyType::String) {
+    prop->defaultString = text->text;
+  } else if (propType == pagx::ViewModelPropertyType::Number) {
+    prop->defaultNumber = text->fontSize;
+  }
   schema->properties.push_back(prop);
   doc->viewModel = schema;
   auto* layer = doc->makeNode<pagx::Layer>("textLayer");
@@ -3016,6 +3027,135 @@ PAGX_TEST(PAGXViewModelTest, TextReshapePreservesRuntimePosition) {
   EXPECT_EQ(reshaped.get(), runtimeText.get());
   EXPECT_FLOAT_EQ(reshaped->position().x, 37.0f);
   EXPECT_FLOAT_EQ(reshaped->position().y, 42.0f);
+}
+
+// M5.3: a reshape that legitimately produces no glyphs clears the blob instead of keeping the
+// previous content, and a later non-empty reshape restores it on the same Text object.
+PAGX_TEST(PAGXViewModelTest, TextReshapeToEmptyClearsBlob) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto* text = doc->makeNode<pagx::Text>("emptyText");
+  text->text = "AB";
+  text->fontSize = 20;
+  std::shared_ptr<pagx::PAGSurface> surface;
+  auto scene = MakeReshapeScene(doc, "title", pagx::ViewModelPropertyType::String, text, "text",
+                                pagx::DataBindDirection::ToTarget, surface);
+  ASSERT_NE(scene, nullptr);
+  ASSERT_NE(surface, nullptr);
+  doc->viewModel->properties[0]->defaultString = "AB";
+
+  EXPECT_TRUE(scene->draw(surface));
+  auto binding = scene->mutableBinding();
+  ASSERT_NE(binding, nullptr);
+  auto runtimeText = binding->get<tgfx::Text>(text);
+  ASSERT_NE(runtimeText, nullptr);
+  ASSERT_NE(runtimeText->textBlob(), nullptr);
+  runtimeText->setPosition(tgfx::Point::Make(37.0f, 42.0f));
+
+  scene->viewModel()->propertyString("title")->value("");
+  EXPECT_TRUE(scene->draw(surface));
+  auto emptied = binding->get<tgfx::Text>(text);
+  ASSERT_NE(emptied, nullptr);
+  EXPECT_EQ(emptied.get(), runtimeText.get());
+  EXPECT_EQ(emptied->textBlob(), nullptr);
+  EXPECT_FLOAT_EQ(emptied->position().x, 37.0f);
+  EXPECT_FLOAT_EQ(emptied->position().y, 42.0f);
+
+  scene->viewModel()->propertyString("title")->value("AB");
+  EXPECT_TRUE(scene->draw(surface));
+  auto restored = binding->get<tgfx::Text>(text);
+  ASSERT_NE(restored, nullptr);
+  EXPECT_NE(restored->textBlob(), nullptr);
+}
+
+// M5.3: an explicit anchor array is kept per glyph order across a reshape; new glyphs fall back to
+// the default anchor offset and removed glyphs are truncated.
+PAGX_TEST(PAGXViewModelTest, TextReshapeResizesExplicitAnchors) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto* text = doc->makeNode<pagx::Text>("anchoredText");
+  text->text = "AB";
+  text->fontSize = 20;
+  std::shared_ptr<pagx::PAGSurface> surface;
+  auto scene = MakeReshapeScene(doc, "title", pagx::ViewModelPropertyType::String, text, "text",
+                                pagx::DataBindDirection::ToTarget, surface);
+  ASSERT_NE(scene, nullptr);
+  ASSERT_NE(surface, nullptr);
+  doc->viewModel->properties[0]->defaultString = "AB";
+
+  EXPECT_TRUE(scene->draw(surface));
+  auto binding = scene->mutableBinding();
+  ASSERT_NE(binding, nullptr);
+  auto runtimeText = binding->get<tgfx::Text>(text);
+  ASSERT_NE(runtimeText, nullptr);
+  ASSERT_NE(runtimeText->textBlob(), nullptr);
+  runtimeText->setTextBlob(runtimeText->textBlob(),
+                           {tgfx::Point::Make(3.0f, 0.0f), tgfx::Point::Make(4.0f, 0.0f)});
+  ASSERT_EQ(runtimeText->anchors().size(), 2u);
+
+  scene->viewModel()->propertyString("title")->value("ABCD");
+  EXPECT_TRUE(scene->draw(surface));
+  auto reshaped = binding->get<tgfx::Text>(text);
+  ASSERT_NE(reshaped, nullptr);
+  ASSERT_EQ(reshaped->anchors().size(), 4u) << "anchors must be resized to the new glyph count";
+  EXPECT_FLOAT_EQ(reshaped->anchors()[0].x, 3.0f);
+  EXPECT_FLOAT_EQ(reshaped->anchors()[1].x, 4.0f);
+  EXPECT_FLOAT_EQ(reshaped->anchors()[2].x, 0.0f);
+  EXPECT_FLOAT_EQ(reshaped->anchors()[3].x, 0.0f);
+}
+
+// M5.3: a Text authored with embedded GlyphRuns reshapes from its readable content when a shaping
+// channel changes; the embedded fast path must not keep the authored glyphs.
+PAGX_TEST(PAGXViewModelTest, TextReshapeOverridesEmbeddedGlyphRuns) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto* text = doc->makeNode<pagx::Text>("embeddedText");
+  text->text = "AB";
+  text->fontSize = 20;
+  auto* font = doc->makeNode<pagx::Font>("font");
+  for (int i = 0; i < 2; i++) {
+    auto* glyph = doc->makeNode<pagx::Glyph>();
+    glyph->path = doc->makeNode<pagx::PathData>();
+    *glyph->path = pagx::PathDataFromSVGString("M0 0 L10 0 L10 10 Z");
+    glyph->advance = 10;
+    font->glyphs.push_back(glyph);
+  }
+  auto* run = doc->makeNode<pagx::GlyphRun>();
+  run->font = font;
+  run->fontSize = 20;
+  run->glyphs = {1, 2};
+  run->xOffsets = {0, 10};
+  text->glyphRuns.push_back(run);
+
+  std::shared_ptr<pagx::PAGSurface> surface;
+  auto scene = MakeReshapeScene(doc, "title", pagx::ViewModelPropertyType::String, text, "text",
+                                pagx::DataBindDirection::ToTarget, surface);
+  ASSERT_NE(scene, nullptr);
+  ASSERT_NE(surface, nullptr);
+
+  auto countGlyphs = [](const std::shared_ptr<tgfx::TextBlob>& blob) {
+    size_t count = 0;
+    for (auto blobRun : *blob) {
+      count += blobRun.glyphCount;
+    }
+    return count;
+  };
+
+  EXPECT_TRUE(scene->draw(surface));
+  auto binding = scene->mutableBinding();
+  ASSERT_NE(binding, nullptr);
+  auto runtimeText = binding->get<tgfx::Text>(text);
+  ASSERT_NE(runtimeText, nullptr);
+  ASSERT_NE(runtimeText->textBlob(), nullptr);
+  EXPECT_EQ(countGlyphs(runtimeText->textBlob()), 2u);
+
+  scene->viewModel()->propertyString("title")->value("ABCD");
+  EXPECT_TRUE(scene->draw(surface));
+  auto reshaped = binding->get<tgfx::Text>(text);
+  ASSERT_NE(reshaped, nullptr);
+  EXPECT_EQ(reshaped.get(), runtimeText.get());
+  ASSERT_NE(reshaped->textBlob(), nullptr);
+  EXPECT_EQ(countGlyphs(reshaped->textBlob()), 4u);
+  // The authored GlyphRuns on the document are untouched; only the runtime blob changed.
+  ASSERT_EQ(text->glyphRuns.size(), 1u);
+  EXPECT_EQ(text->glyphRuns.front()->glyphs.size(), 2u);
 }
 
 // A TextBox child bound to the "text" channel reshapes through the box's shared holder: the runtime
