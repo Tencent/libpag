@@ -404,9 +404,6 @@ class SVGParserContext {
   // may map to the same filter). Populated by registerFilterAnimationTarget, consumed by
   // registerAnimatedElement to route <animate> children of fe* elements to the filter node.
   std::unordered_map<const DOMNode*, LayerFilter*> _feToFilterMap = {};
-
-  // Frame rate used to convert SMIL time values to PAGX Frame indices.
-  float _animationFrameRate = 60.0f;
 };
 
 }  // namespace pagx

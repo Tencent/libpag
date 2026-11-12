@@ -7473,4 +7473,89 @@ PAGX_TEST(PAGXSVGTest, SVGImport_MixedNoneTspanStaysUnpainted) {
   EXPECT_EQ(fills.size(), 1u);
 }
 
+/**
+ * animateTransform + repeatCount="indefinite" + end: the transform keeps rotating up to `end`
+ * instead of stopping after a single cycle.
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_IndefiniteRepeatHonoursEndForTransform) {
+  std::string svg =
+      "<svg width=\"100\" height=\"100\" viewBox=\"0 0 100 100\">"
+      "<rect width=\"50\" height=\"50\" fill=\"red\">"
+      "<animateTransform attributeName=\"transform\" type=\"rotate\" values=\"0;360\" dur=\"1s\" "
+      "repeatCount=\"indefinite\" end=\"3s\"/>"
+      "</rect></svg>";
+  auto doc = pagx::SVGImporter::ParseString(svg);
+  ASSERT_NE(doc, nullptr);
+  ASSERT_FALSE(doc->animations.empty());
+  auto* anim = static_cast<pagx::Animation*>(doc->animations[0]);
+  EXPECT_NE(anim->loop, pagx::LoopMode::Loop);
+  EXPECT_EQ(anim->duration, 180);
+  ASSERT_FALSE(anim->objects.empty());
+  auto* ch = static_cast<pagx::TypedChannel<pagx::Matrix>*>(anim->objects[0]->channels[0]);
+  ASSERT_NE(ch, nullptr);
+  // 90 frames is half of the second cycle: 180 degrees. Without the expansion the track would clamp
+  // at the end of the first cycle (360 degrees) and read 0 here.
+  const auto matrix = std::get<pagx::Matrix>(ch->evaluateAt(90));
+  // The sign follows the rotate direction convention; the magnitude proves the second cycle ran.
+  const float degrees =
+      std::abs(std::atan2(matrix.b, matrix.a) * 180.0f / static_cast<float>(M_PI));
+  EXPECT_NEAR(degrees, 180.0f, 2.0f);
+}
+
+/**
+ * animateMotion + repeatCount="indefinite" + end: the motion repeats until `end` instead of
+ * finishing after one pass.
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_IndefiniteRepeatHonoursEndForMotion) {
+  std::string svg =
+      "<svg width=\"100\" height=\"100\" viewBox=\"0 0 100 100\">"
+      "<rect width=\"10\" height=\"10\" fill=\"red\">"
+      "<animateMotion path=\"M0,0 L100,0\" dur=\"1s\" repeatCount=\"indefinite\" end=\"3s\"/>"
+      "</rect></svg>";
+  auto doc = pagx::SVGImporter::ParseString(svg);
+  ASSERT_NE(doc, nullptr);
+  ASSERT_FALSE(doc->animations.empty());
+  auto* anim = static_cast<pagx::Animation*>(doc->animations[0]);
+  EXPECT_NE(anim->loop, pagx::LoopMode::Loop);
+  EXPECT_EQ(anim->duration, 180);
+  ASSERT_FALSE(anim->objects.empty());
+  auto* ch = static_cast<pagx::TypedChannel<pagx::Matrix>*>(anim->objects[0]->channels[0]);
+  ASSERT_NE(ch, nullptr);
+  // Frame 90 sits at the same phase as frame 30 of the first cycle.
+  const auto first = std::get<pagx::Matrix>(ch->evaluateAt(30));
+  const auto second = std::get<pagx::Matrix>(ch->evaluateAt(90));
+  EXPECT_NEAR(second.tx, first.tx, 1.0f);
+}
+
+/**
+ * A centred CJK run: the objectBoundingBox box counts code points (one em per full-width glyph) and
+ * shifts its origin by half the width for text-anchor="middle".
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_TextBoundsCountsCodePointsAndAnchor) {
+  std::string svg =
+      "<svg width=\"400\" height=\"200\" viewBox=\"0 0 400 200\">"
+      "<defs><linearGradient id=\"g\"><stop offset=\"0\" stop-color=\"#FF0000\"/>"
+      "<stop offset=\"1\" stop-color=\"#0000FF\"/></linearGradient></defs>"
+      "<text x=\"100\" y=\"40\" font-size=\"20\" text-anchor=\"middle\" fill=\"url(#g)\">"
+      "\xE4\xB8\xAD\xE6\x96\x87\xE4\xB8\xAD\xE6\x96\x87</text></svg>";
+  auto doc = pagx::SVGImporter::ParseString(svg);
+  ASSERT_NE(doc, nullptr);
+  ASSERT_FALSE(doc->layers.empty());
+  std::vector<pagx::Element*> fills = {};
+  for (auto* layer : doc->layers) {
+    CollectElementsByType(layer, pagx::NodeType::Fill, fills);
+  }
+  pagx::LinearGradient* gradient = nullptr;
+  for (auto* element : fills) {
+    auto* fill = static_cast<pagx::Fill*>(element);
+    if (fill->color != nullptr && fill->color->nodeType() == pagx::NodeType::LinearGradient) {
+      gradient = static_cast<pagx::LinearGradient*>(fill->color);
+    }
+  }
+  ASSERT_NE(gradient, nullptr);
+  // Four full-width glyphs at 20px = 80 wide, centred on x=100 → the box starts at 60.
+  EXPECT_NEAR(gradient->startPoint.x, 60.0f, 2.0f);
+  EXPECT_NEAR(gradient->endPoint.x - gradient->startPoint.x, 80.0f, 3.0f);
+}
+
 }  // namespace pag

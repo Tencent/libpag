@@ -360,6 +360,18 @@ static double ResolveRepeatCount(const std::string& repeatCountStr, const std::s
   return count;
 }
 
+// A finite `end` bounds a repeatCount="indefinite" animation: SMIL stops the active duration at
+// `end`, so the parser plays the iterations that fit before it instead of a single cycle that ends
+// early. Shared by every parse entry so <animate>, <animateTransform> and <animateMotion> agree.
+static double BoundRepeatCountByEnd(double repeatCount, const ResolvedTiming& timing,
+                                    double durSeconds) {
+  if (repeatCount >= 0.0 || durSeconds <= 0.0 || timing.endSeconds < 0.0 ||
+      timing.endSeconds <= timing.beginSeconds) {
+    return repeatCount;
+  }
+  return (timing.endSeconds - timing.beginSeconds) / durSeconds;
+}
+
 // A single syncbase reference parsed from a begin/end list item:
 //   id                    → target's begin
 //   id.begin (+offset)    → target's begin + offset
@@ -2623,12 +2635,7 @@ std::vector<Channel*> SMILAnimationParser::parseAnimate(
   // not expanded here.
   double repeatCount = ResolveRepeatCount(ctx.getAttribute(animElement, "repeatCount"),
                                           ctx.getAttribute(animElement, "repeatDur"), durSeconds);
-  if (repeatCount < 0.0 && durSeconds > 0.0 && timing.endSeconds >= 0.0 &&
-      timing.endSeconds > timing.beginSeconds) {
-    // A finite end bounds an otherwise endless repeat: play the iterations that fit before the end
-    // and let the end limit truncate the last one, instead of expanding without bound.
-    repeatCount = (timing.endSeconds - timing.beginSeconds) / durSeconds;
-  }
+  repeatCount = BoundRepeatCountByEnd(repeatCount, timing, durSeconds);
   // SMIL ignores accumulate on a to-animation: there is no per-iteration delta to add, the end
   // value is the animation's target.
   const bool toOnly = valuesStr.empty() && fromStr.empty() && !toStr.empty() && byStr.empty();
@@ -2971,6 +2978,7 @@ std::vector<Channel*> SMILAnimationParser::parseAnimateTransform(
 
   double repeatCount = ResolveRepeatCount(ctx.getAttribute(animElement, "repeatCount"),
                                           ctx.getAttribute(animElement, "repeatDur"), durSeconds);
+  repeatCount = BoundRepeatCountByEnd(repeatCount, timing, durSeconds);
   if (repeatCount > 1.0) {
     ExpandRepeatCount(ch, ChannelValueType::Matrix, durFrames, beginFrames, repeatCount, false);
     outEndFrame = beginFrames + static_cast<Frame>(durFrames * repeatCount);
@@ -3288,6 +3296,7 @@ std::vector<Channel*> SMILAnimationParser::parseAnimateMotion(
 
   double repeatCount = ResolveRepeatCount(ctx.getAttribute(animElement, "repeatCount"),
                                           ctx.getAttribute(animElement, "repeatDur"), durSeconds);
+  repeatCount = BoundRepeatCountByEnd(repeatCount, timing, durSeconds);
   if (repeatCount > 1.0) {
     ExpandRepeatCount(ch, ChannelValueType::Matrix, durFrames, beginFrames, repeatCount, false);
     outEndFrame = beginFrames + static_cast<Frame>(durFrames * repeatCount);

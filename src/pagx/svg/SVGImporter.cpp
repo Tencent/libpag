@@ -2623,23 +2623,57 @@ void SVGParserContext::addFillStroke(const std::shared_ptr<DOMNode>& element,
     contents.push_back(strokeNode);
   }
 }
-// Approximate advance width of a proportional glyph, in em. Only used to size a <text> box for
-// objectBoundingBox paints; the exact advance needs the font layout pass.
-constexpr float kTextAverageAdvance = 0.6f;
+// Text box estimation for objectBoundingBox paints: no font metrics are available at import time,
+// so a glyph contributes about one em when it is full-width (CJK) and 0.6 em otherwise. Only the
+// gradient reference geometry depends on this — the text layout itself still uses the real font.
+constexpr float kFullWidthAdvanceEm = 1.0f;
+constexpr float kProportionalAdvanceEm = 0.6f;
 
-static void CollectTextNodeLength(const std::shared_ptr<DOMNode>& node, size_t* length) {
-  if (node == nullptr || length == nullptr) {
-    return;
+// Decodes one UTF-8 sequence and returns its advance in em. Counting code points instead of bytes
+// keeps a CJK string from being sized three times too wide.
+static float Utf8AdvanceEm(const std::string& text, size_t* index) {
+  const auto lead = static_cast<unsigned char>(text[*index]);
+  uint32_t code = lead;
+  size_t length = 1;
+  if ((lead & 0xE0) == 0xC0) {
+    length = 2;
+    code = lead & 0x1Fu;
+  } else if ((lead & 0xF0) == 0xE0) {
+    length = 3;
+    code = lead & 0x0Fu;
+  } else if ((lead & 0xF8) == 0xF0) {
+    length = 4;
+    code = lead & 0x07u;
   }
+  if (*index + length > text.size()) {
+    length = 1;
+  }
+  for (size_t i = 1; i < length; ++i) {
+    code = (code << 6) | (static_cast<unsigned char>(text[(*index) + i]) & 0x3Fu);
+  }
+  *index += length;
+  // CJK Unified Ideographs, Hiragana / Katakana, Hangul and full-width forms start at U+2E80.
+  return code >= 0x2E80u ? kFullWidthAdvanceEm : kProportionalAdvanceEm;
+}
+
+static float CollectTextAdvanceEm(const std::shared_ptr<DOMNode>& node) {
+  if (node == nullptr) {
+    return 0.0f;
+  }
+  float advance = 0.0f;
   auto child = node->getFirstChild();
   while (child) {
     if (child->type == DOMNodeType::Text) {
-      *length += child->name.size();
+      const auto& text = child->name;
+      for (size_t index = 0; index < text.size();) {
+        advance += Utf8AdvanceEm(text, &index);
+      }
     } else {
-      CollectTextNodeLength(child, length);
+      advance += CollectTextAdvanceEm(child);
     }
     child = child->getNextSibling();
   }
+  return advance;
 }
 
 Rect SVGParserContext::getShapeBounds(const std::shared_ptr<DOMNode>& element) {
@@ -2717,14 +2751,20 @@ Rect SVGParserContext::getShapeBounds(const std::shared_ptr<DOMNode>& element) {
   // Text has no geometry branch of its own: without an estimate the box stays empty and an
   // objectBoundingBox gradient or pattern collapses onto a single point.
   if (tag == "text") {
-    const float x = parseLength(getAttribute(element, "x"), _viewBoxWidth);
+    float x = parseLength(getAttribute(element, "x"), _viewBoxWidth);
     const float y = parseLength(getAttribute(element, "y"), _viewBoxHeight);
     std::string fontSizeStr = getAttribute(element, "font-size");
     const float fontSize =
         fontSizeStr.empty() ? DEFAULT_FONT_SIZE : parseLength(fontSizeStr, _viewBoxHeight);
-    size_t length = 0;
-    CollectTextNodeLength(element, &length);
-    const float width = static_cast<float>(length) * fontSize * kTextAverageAdvance;
+    const float width = CollectTextAdvanceEm(element) * fontSize;
+    // The anchor decides which side of `x` the glyphs run to; without this a centred or end-anchored
+    // run would shift an objectBoundingBox paint by up to a full width.
+    const auto anchor = getAttribute(element, "text-anchor");
+    if (anchor == "middle") {
+      x -= width * 0.5f;
+    } else if (anchor == "end") {
+      x -= width;
+    }
     // The baseline sits at `y`: the box reaches one line above it and a descender below.
     return Rect::MakeXYWH(x, y - fontSize, width, fontSize * 1.2f);
   }
@@ -4011,12 +4051,16 @@ static void NormalizePivotKeyframes(
   }
 }
 
+// SMIL time values are converted with the animation frame rate PAGX stores in Animation::frameRate;
+// keeping one constant here means keyframe indices and the serialized metadata always agree.
+constexpr float kAnimationFrameRate = 60.0f;
+
 void SVGParserContext::buildAnimation(Layer* rootLayer) {
   if (_animatedNodeMap.empty() || !rootLayer) {
     return;
   }
   auto* animation = SMILAnimationParser::buildAnimation(*this, _document.get(), _smilAnimations,
-                                                        _animatedNodeMap, _animationFrameRate);
+                                                        _animatedNodeMap, kAnimationFrameRate);
   if (animation == nullptr) {
     return;
   }
