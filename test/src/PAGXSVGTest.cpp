@@ -5903,6 +5903,83 @@ PAGX_TEST(PAGXSVGTest, SVGCoverageLedgerIsComplete) {
   }
 }
 
+// The capability document is generated from the ledger. Regenerate it by running this test and
+// copying test/out/PAGXSVGTest/svg-animation-capabilities.md when the ledger changes.
+PAGX_TEST(PAGXSVGTest, SVGAnimationCapabilitiesDocIsCurrent) {
+  std::string doc;
+  doc += "# PAGX to SVG animation capability matrix\n\n";
+  doc += "Generated from `SVGChannelLedger()` in `src/pagx/svg/SVGCoverageLedger.cpp`. Do not edit "
+         "this file by hand: `PAGXSVGTest.SVGAnimationCapabilitiesDocIsCurrent` regenerates it "
+         "into `test/out/PAGXSVGTest/svg-animation-capabilities.md` whenever the ledger changes.\n\n";
+  size_t supported = 0;
+  size_t planned = 0;
+  size_t notExpressible = 0;
+  for (const auto& entry : pagx::SVGChannelLedger()) {
+    switch (entry.status) {
+      case pagx::SVGChannelStatus::Supported:
+        ++supported;
+        break;
+      case pagx::SVGChannelStatus::Planned:
+        ++planned;
+        break;
+      case pagx::SVGChannelStatus::NotExpressible:
+        ++notExpressible;
+        break;
+    }
+  }
+  doc += "- Reflective animatable channels: " + std::to_string(pagx::SVGChannelLedger().size()) +
+         "\n";
+  doc += "- Supported: " + std::to_string(supported) + "\n";
+  doc += "- Planned: " + std::to_string(planned) + "\n";
+  doc += "- Not expressible: " + std::to_string(notExpressible) + "\n";
+  doc += "- Table-external family: Path `point{N}.x` / `point{N}.y` (not counted in the rows "
+         "above)\n";
+  doc += "- Browser gate cases: `SVGBrowserAnimTest` covers SolidColor, ColorStop, linear "
+         "endpoint, Text.x and Polystar roundness at a paused SMIL seek time.\n\n";
+
+  pagx::NodeType currentType = pagx::NodeType::Document;
+  bool firstType = true;
+  for (const auto& entry : pagx::SVGChannelLedger()) {
+    if (firstType || entry.type != currentType) {
+      if (!firstType) {
+        doc += "\n";
+      }
+      currentType = entry.type;
+      firstType = false;
+      doc += "## ";
+      doc += pagx::NodeTypeName(currentType);
+      doc += "\n\n| Channel | Status | Notes |\n|---|---|---|\n";
+    }
+    const char* status = "Supported";
+    if (entry.status == pagx::SVGChannelStatus::Planned) {
+      status = "Planned";
+    } else if (entry.status == pagx::SVGChannelStatus::NotExpressible) {
+      status = "Not expressible";
+    }
+    doc += "| `";
+    doc += entry.channel;
+    doc += "` | ";
+    doc += status;
+    doc += " | ";
+    doc += entry.note != nullptr ? entry.note : "";
+    doc += " |\n";
+  }
+
+  auto expectedPath = ProjectPath::Absolute("docs/pagx-svg-animation-capabilities.md");
+  auto outDir = ProjectPath::Absolute("test/out/PAGXSVGTest");
+  std::filesystem::create_directories(outDir);
+  auto generatedPath = outDir + "/svg-animation-capabilities.md";
+  {
+    std::ofstream out(generatedPath, std::ios::binary);
+    ASSERT_TRUE(out.good());
+    out << doc;
+  }
+  std::ifstream in(expectedPath, std::ios::binary);
+  std::string expected((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+  EXPECT_EQ(expected, doc) << "capability document is stale; copy " << generatedPath << " to "
+                           << expectedPath;
+}
+
 // Two animations driving the same attribute cannot share one SMIL track: Strict rejects, and
 // BestEffort keeps the later animation's track (the runtime's last-writer-wins order).
 PAGX_TEST(PAGXSVGTest, SVGExport_AnimMultiClockChannelRejected) {
