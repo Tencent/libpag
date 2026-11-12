@@ -97,7 +97,17 @@ async function main() {
       viewport: { width: 1400, height: 900 },
       deviceScaleFactor: 1,
     });
-    await page.goto('file://' + svgPath, { waitUntil: 'networkidle' });
+    await page.goto('file://' + svgPath, { waitUntil: 'domcontentloaded' });
+    // Pause before the timeline can run to completion: seeking a filled transform animation
+    // backward after it finished leaves Chrome's painted output stale even though getScreenCTM
+    // already reports the new transform.
+    await page.evaluate(() => {
+      const svg = document.querySelector('svg');
+      if (svg && typeof svg.pauseAnimations === 'function') {
+        svg.pauseAnimations();
+        svg.setCurrentTime(0);
+      }
+    });
     await page.evaluate(() => {
       document.documentElement.style.background = '#fff';
       document.documentElement.style.margin = '0';
