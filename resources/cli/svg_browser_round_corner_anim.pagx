@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- D6 animated gate case: a rounded rectangle grows its width from 80 to 140 over one second.
+     The browser gate pauses SMIL, seeks to 0.5s and compares the re-baked d track against the
+     runtime renderer at the same time. -->
+<pagx width="200" height="200">
+  <Layer x="0" y="0" width="200" height="200">
+    <Rectangle id="rect" position="100,100" size="80,80"/>
+    <RoundCorner radius="12"/>
+    <Stroke width="6">
+      <SolidColor color="#2266CC"/>
+    </Stroke>
+  </Layer>
+  <Animations>
+    <Animation id="grow" duration="60" frameRate="60" loop="once">
+      <Object target="rect">
+        <Channel name="size.width" type="float">
+          <Key time="0" value="80" interpolation="linear"/>
+          <Key time="60" value="140" interpolation="linear"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>

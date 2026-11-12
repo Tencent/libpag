@@ -5159,6 +5159,88 @@ PAGX_TEST(PAGXSVGTest, SVGExport_AnimShapeGeometryWithModifierRebakesData) {
   EXPECT_NE(values.substr(0, separator), values.substr(separator + 1));
 }
 
+// A14: continuous trim splits the sampled geometry per shape; the animated source still gets its
+// own d track while the untouched sibling keeps the static bake.
+PAGX_TEST(PAGXSVGTest, SVGExport_AnimPathPointWithContinuousTrimRebakesData) {
+  auto doc = pagx::PAGXDocument::Make(300, 200);
+  auto* layer = doc->makeNode<pagx::Layer>("layer");
+  auto* first = doc->makeNode<pagx::Path>("first");
+  first->data = doc->makeNode<pagx::PathData>();
+  *first->data = pagx::PathDataFromSVGString("M40 40 L140 40 L140 140 L40 140 Z");
+  auto* second = doc->makeNode<pagx::Path>("second");
+  second->data = doc->makeNode<pagx::PathData>();
+  *second->data = pagx::PathDataFromSVGString("M170 40 L260 40 L260 140 L170 140 Z");
+  auto* trim = doc->makeNode<pagx::TrimPath>("trim");
+  trim->type = pagx::TrimType::Continuous;
+  trim->start = 0.0f;
+  trim->end = 0.5f;
+  auto* stroke = doc->makeNode<pagx::Stroke>("stroke");
+  auto* solid = doc->makeNode<pagx::SolidColor>("color");
+  solid->color = {0, 0, 0, 1};
+  stroke->color = solid;
+  stroke->width = 3;
+  layer->contents = {first, second, trim, stroke};
+  doc->layers.push_back(layer);
+
+  auto* animation = MakeAnimation(doc.get(), 60, pagx::LoopMode::Once);
+  auto* object = MakeAnimationObject(doc.get(), animation, "first");
+  auto* channel = MakeChannel<float>(doc.get(), object, "point1.x");
+  channel->keyframes.push_back({0, 140.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  channel->keyframes.push_back({60, 120.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  AttachTimeline(layer, "anim");
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  auto marker = svg.find("attributeName=\"d\"");
+  ASSERT_NE(marker, std::string::npos) << svg;
+  auto valuesStart = svg.find("values=\"", marker);
+  ASSERT_NE(valuesStart, std::string::npos);
+  valuesStart += 8;
+  auto valuesEnd = svg.find('"', valuesStart);
+  ASSERT_NE(valuesEnd, std::string::npos);
+  auto values = svg.substr(valuesStart, valuesEnd - valuesStart);
+  auto separator = values.find(';');
+  ASSERT_NE(separator, std::string::npos) << values;
+  EXPECT_NE(values.substr(0, separator), values.substr(separator + 1));
+}
+
+// A14: a RoundCorner chain re-bakes sampled Rectangle geometry through the same override.
+PAGX_TEST(PAGXSVGTest, SVGExport_AnimShapeGeometryWithRoundCornerRebakesData) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto* layer = doc->makeNode<pagx::Layer>("layer");
+  auto* rect = doc->makeNode<pagx::Rectangle>("rect");
+  rect->position = {100, 100};
+  rect->size = {80, 80};
+  auto* corner = doc->makeNode<pagx::RoundCorner>("corner");
+  corner->radius = 10;
+  auto* stroke = doc->makeNode<pagx::Stroke>("stroke");
+  auto* solid = doc->makeNode<pagx::SolidColor>("color");
+  solid->color = {0, 0, 0, 1};
+  stroke->color = solid;
+  stroke->width = 3;
+  layer->contents = {rect, corner, stroke};
+  doc->layers.push_back(layer);
+
+  auto* animation = MakeAnimation(doc.get(), 60, pagx::LoopMode::Once);
+  auto* object = MakeAnimationObject(doc.get(), animation, "rect");
+  auto* channel = MakeChannel<float>(doc.get(), object, "size.width");
+  channel->keyframes.push_back({0, 80.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  channel->keyframes.push_back({60, 140.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  AttachTimeline(layer, "anim");
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  auto marker = svg.find("attributeName=\"d\"");
+  ASSERT_NE(marker, std::string::npos) << svg;
+  auto valuesStart = svg.find("values=\"", marker);
+  ASSERT_NE(valuesStart, std::string::npos);
+  valuesStart += 8;
+  auto valuesEnd = svg.find('"', valuesStart);
+  ASSERT_NE(valuesEnd, std::string::npos);
+  auto values = svg.substr(valuesStart, valuesEnd - valuesStart);
+  auto separator = values.find(';');
+  ASSERT_NE(separator, std::string::npos) << values;
+  EXPECT_NE(values.substr(0, separator), values.substr(separator + 1));
+}
+
 // A14: Path point channels also survive a TrimPath through the same per-frame re-bake.
 PAGX_TEST(PAGXSVGTest, SVGExport_AnimPathPointWithTrimRebakesData) {
   auto doc = pagx::PAGXDocument::Make(200, 200);
