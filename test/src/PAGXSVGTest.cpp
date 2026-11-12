@@ -5274,6 +5274,46 @@ PAGX_TEST(PAGXSVGTest, SVGExport_AnimPathPointWithContinuousTrimRebakesData) {
   EXPECT_NE(values.substr(0, separator), values.substr(separator + 1));
 }
 
+// M5.4: an animated TrimPath on a static shape re-bakes the trimmed outline into a d track.
+PAGX_TEST(PAGXSVGTest, SVGExport_AnimTrimPathRebakesData) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto* layer = doc->makeNode<pagx::Layer>("layer");
+  auto* rect = doc->makeNode<pagx::Rectangle>("rect");
+  rect->position = {100, 100};
+  rect->size = {80, 80};
+  auto* trim = doc->makeNode<pagx::TrimPath>("trim");
+  trim->start = 0.0f;
+  trim->end = 0.3f;
+  auto* stroke = doc->makeNode<pagx::Stroke>("stroke");
+  auto* solid = doc->makeNode<pagx::SolidColor>("color");
+  solid->color = {0, 0, 0, 1};
+  stroke->color = solid;
+  stroke->width = 3;
+  layer->contents = {rect, trim, stroke};
+  doc->layers.push_back(layer);
+
+  auto* animation = MakeAnimation(doc.get(), 60, pagx::LoopMode::Once);
+  auto* object = MakeAnimationObject(doc.get(), animation, "trim");
+  auto* channel = MakeChannel<float>(doc.get(), object, "end");
+  channel->keyframes.push_back({0, 0.3f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  channel->keyframes.push_back({60, 0.9f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  AttachTimeline(layer, "anim");
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  auto marker = svg.find("attributeName=\"d\"");
+  ASSERT_NE(marker, std::string::npos) << svg;
+  auto valuesStart = svg.find("values=\"", marker);
+  ASSERT_NE(valuesStart, std::string::npos);
+  valuesStart += 8;
+  auto valuesEnd = svg.find('"', valuesStart);
+  ASSERT_NE(valuesEnd, std::string::npos);
+  auto values = svg.substr(valuesStart, valuesEnd - valuesStart);
+  auto separator = values.find(';');
+  ASSERT_NE(separator, std::string::npos) << values;
+  EXPECT_EQ(separator, values.rfind(';'));
+  EXPECT_NE(values.substr(0, separator), values.substr(separator + 1));
+}
+
 // A14: a RoundCorner chain re-bakes sampled Rectangle geometry through the same override.
 PAGX_TEST(PAGXSVGTest, SVGExport_AnimShapeGeometryWithRoundCornerRebakesData) {
   auto doc = pagx::PAGXDocument::Make(200, 200);

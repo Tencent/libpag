@@ -663,6 +663,10 @@ class SVGWriter {
           }
         }
       }
+      // An animated TrimPath is consumed by the re-baked `d` track of the shape it trims.
+      if (!kept && element->nodeType() == NodeType::TrimPath && _animWriter.CanBakeTrim(element)) {
+        kept = true;
+      }
       if (kept) {
         continue;
       }
@@ -2521,9 +2525,7 @@ void SVGWriter::finishShapeElement(SVGBuilder& out, const FillStrokeInfo& fs, fl
     _animWriter.WritePolystarDataAnimates(out, _pendingPolystarAnimated);
   }
   if (hasBakedDataAnimation) {
-    _animWriter.WriteSampledDataAnimates(out, _pendingBakedTrack.source,
-                                         _pendingBakedTrack.values, _pendingBakedTrack.keyTimes,
-                                         _pendingBakedTrack.discrete);
+    _animWriter.WriteSampledDataAnimates(out, _pendingBakedTrack);
   }
   if (hasGroupOpacity) {
     if (fs.fill != nullptr) {
@@ -2827,7 +2829,11 @@ void SVGWriter::writePath(SVGBuilder& out, const Path* path, const FillStrokeInf
   if (!clipInside && !maskOutside && !adaptiveDash && _pendingPolystarAnimated == nullptr) {
     const Element* bakedSource = _resolver.sourceOf(path);
     auto scope = _elementScopes.find(path);
-    if (bakedSource != nullptr && _animWriter.HasBakedShapeAnimates(bakedSource) &&
+    bool sourceAnimated =
+        bakedSource != nullptr && _animWriter.HasBakedShapeAnimates(bakedSource);
+    bool trimAnimated = scope != _elementScopes.end() && scope->second != nullptr &&
+                        _animWriter.HasAnimatedTrimScope(*scope->second);
+    if (bakedSource != nullptr && (sourceAnimated || trimAnimated) &&
         scope != _elementScopes.end() && scope->second != nullptr) {
       if (!_animWriter.BuildBakedShapeDataTrack(path, &_resolver, *scope->second,
                                                 &_pendingBakedTrack)) {

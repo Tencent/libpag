@@ -38,6 +38,9 @@ class Stroke;
 class SVGAnimationPlan;
 class XMLBuilder;
 
+class Animation;
+class AnimationTimeline;
+
 /**
  * One animated Group on the path from a Layer to a geometry element. `prefix` is the accumulated
  * transform right before the group's own matrix, captured during the element walk so the total
@@ -55,6 +58,8 @@ struct SVGGroupTransformStep {
 struct SVGSampledDataTrack {
   const Path* baked = nullptr;
   const Node* source = nullptr;
+  const Animation* animation = nullptr;
+  const AnimationTimeline* timeline = nullptr;
   std::vector<std::string> values = {};
   std::vector<double> keyTimes = {};
   bool discrete = false;
@@ -224,6 +229,17 @@ class SVGAnimationWriter {
   bool HasBakedShapeAnimates(const Node* source) const;
 
   /**
+   * Returns true when `trim` only drives start / end / offset, the channels the exporter bakes
+   * into a sibling shape's `d` track.
+   */
+  static bool CanBakeTrim(const Node* trim);
+
+  /**
+   * Returns true when the scope contains a TrimPath with at least one bakeable channel.
+   */
+  bool HasAnimatedTrimScope(const std::vector<Element*>& scope) const;
+
+  /**
    * Samples the source through the modifier chain by writing each frame's channel values onto the
    * source, re-running the resolver and reading the baked Path back. Restores the source before
    * returning. Returns false when the source is not re-bakeable or a frame fails.
@@ -243,8 +259,7 @@ class SVGAnimationWriter {
    * Emits a `d` track from geometry the exporter sampled by re-resolving the source's scope at
    * each frame. `keyTimes` are normalized to the animation duration.
    */
-  bool WriteSampledDataAnimates(XMLBuilder& out, const Node* source, std::vector<std::string> values,
-                                std::vector<double> keyTimes, bool discrete);
+  bool WriteSampledDataAnimates(XMLBuilder& out, const SVGSampledDataTrack& track);
 
   /**
    * Emits the opacity animation for a geometry element that sits under animated Group alpha

@@ -40,6 +40,7 @@
 #include "pagx/nodes/SolidColor.h"
 #include "pagx/nodes/Stroke.h"
 #include "pagx/nodes/Text.h"
+#include "pagx/nodes/TrimPath.h"
 #include "pagx/runtime/MatrixDecompose.h"
 #include "pagx/svg/SVGAnimationPlan.h"
 #include "pagx/svg/SVGPathParser.h"
@@ -2194,6 +2195,40 @@ bool SVGAnimationWriter::WriteNoiseSeedAnimates(XMLBuilder& out, const Node* noi
   return WriteChannelAnimate(out, noise, "seed", "seed");
 }
 
+bool SVGAnimationWriter::CanBakeTrim(const Node* trim) {
+  if (trim == nullptr || trim->nodeType() != NodeType::TrimPath) {
+    return false;
+  }
+  return true;
+}
+
+bool SVGAnimationWriter::HasAnimatedTrimScope(const std::vector<Element*>& scope) const {
+  if (_plan == nullptr) {
+    return false;
+  }
+  for (auto* element : scope) {
+    if (element == nullptr || element->nodeType() != NodeType::TrimPath) {
+      continue;
+    }
+    auto* list = _plan->BindingsFor(element);
+    if (list == nullptr || list->empty()) {
+      continue;
+    }
+    bool ok = true;
+    for (const auto& binding : *list) {
+      const auto& name = binding.channel->name;
+      if (name != "start" && name != "end" && name != "offset") {
+        ok = false;
+        break;
+      }
+    }
+    if (ok) {
+      return true;
+    }
+  }
+  return false;
+}
+
 bool SVGAnimationWriter::HasBakedShapeAnimates(const Node* source) const {
   if (_plan == nullptr || source == nullptr) {
     return false;
@@ -2227,25 +2262,20 @@ bool SVGAnimationWriter::HasBakedShapeAnimates(const Node* source) const {
   return true;
 }
 
-bool SVGAnimationWriter::WriteSampledDataAnimates(XMLBuilder& out, const Node* source,
-                                                  std::vector<std::string> values,
-                                                  std::vector<double> keyTimes, bool discrete) {
-  if (_plan == nullptr || source == nullptr || values.size() < 2 ||
-      values.size() != keyTimes.size()) {
-    return false;
-  }
-  auto* list = _plan->BindingsFor(source);
-  if (list == nullptr || list->empty()) {
+bool SVGAnimationWriter::WriteSampledDataAnimates(XMLBuilder& out,
+                                                  const SVGSampledDataTrack& track) {
+  if (_plan == nullptr || track.animation == nullptr || track.values.size() < 2 ||
+      track.values.size() != track.keyTimes.size()) {
     return false;
   }
   SmilTiming timing;
-  if (!ResolveTiming(list->front().animation, list->front().timeline, &timing)) {
+  if (!ResolveTiming(track.animation, track.timeline, &timing)) {
     return false;
   }
   SmilSequence sequence;
-  sequence.values = std::move(values);
-  sequence.keyTimes = std::move(keyTimes);
-  sequence.discrete = discrete;
+  sequence.values = track.values;
+  sequence.keyTimes = track.keyTimes;
+  sequence.discrete = track.discrete;
   if (timing.mirror) {
     ApplyPingPong(&sequence);
     timing.durationSeconds *= 2.0;
@@ -2261,16 +2291,53 @@ bool SVGAnimationWriter::BuildBakedShapeDataTrack(const Path* baked, ModifierRes
     return false;
   }
   const Element* source = resolver->sourceOf(baked);
-  if (source == nullptr || !HasBakedShapeAnimates(source)) {
+  if (source == nullptr) {
     return false;
   }
-  auto* list = _plan->BindingsFor(source);
-  if (list == nullptr || list->empty()) {
+  struct SampledBinding {
+    const Node* target = nullptr;
+    const SVGAnimationBinding* binding = nullptr;
+  };
+  std::vector<SampledBinding> sampled;
+  std::vector<TrimPath*> animatedTrims;
+  if (HasBakedShapeAnimates(source)) {
+    auto* list = _plan->BindingsFor(source);
+    if (list != nullptr) {
+      for (const auto& binding : *list) {
+        sampled.push_back({source, &binding});
+      }
+    }
+  }
+  for (auto* element : scope) {
+    if (element == nullptr || element->nodeType() != NodeType::TrimPath) {
+      continue;
+    }
+    auto* list = _plan->BindingsFor(element);
+    if (list == nullptr || list->empty()) {
+      continue;
+    }
+    bool bakeable = true;
+    for (const auto& binding : *list) {
+      const auto& name = binding.channel->name;
+      if (name != "start" && name != "end" && name != "offset") {
+        bakeable = false;
+        break;
+      }
+    }
+    if (!bakeable) {
+      continue;
+    }
+    for (const auto& binding : *list) {
+      sampled.push_back({element, &binding});
+    }
+    animatedTrims.push_back(static_cast<TrimPath*>(element));
+  }
+  if (sampled.empty()) {
     return false;
   }
-  const Animation* animation = list->front().animation;
-  for (const auto& binding : *list) {
-    if (binding.animation != animation) {
+  const Animation* animation = sampled.front().binding->animation;
+  for (const auto& entry : sampled) {
+    if (entry.binding->animation != animation) {
       AddWarning("geometry channels on <" + std::string(NodeTypeName(source->nodeType())) + "> '" +
                  source->id + "' span multiple animations; the d track is dropped.");
       return false;
@@ -2291,9 +2358,9 @@ bool SVGAnimationWriter::BuildBakedShapeDataTrack(const Path* baked, ModifierRes
   bool allHold = true;
   bool hasCurve = false;
   std::vector<Frame> detail;
-  for (const auto& binding : *list) {
-    const auto* typed = static_cast<const TypedChannel<float>*>(binding.channel);
-    AppendTrackFrames(binding.channel, animation->duration, &frames);
+  for (const auto& entry : sampled) {
+    const auto* typed = static_cast<const TypedChannel<float>*>(entry.binding->channel);
+    AppendTrackFrames(entry.binding->channel, animation->duration, &frames);
     for (size_t i = 0; i + 1 < typed->keyframes.size(); i++) {
       auto type = typed->keyframes[i].interpolation;
       if (!IsHold(type)) {
@@ -2348,6 +2415,12 @@ bool SVGAnimationWriter::BuildBakedShapeDataTrack(const Path* baked, ModifierRes
                source->id + "' exceeded 32 re-bake samples and was downsampled.");
   }
 
+  struct TrimSnapshot {
+    TrimPath* trim = nullptr;
+    float start = 0;
+    float end = 1;
+    float offset = 0;
+  };
   track->values.clear();
   track->keyTimes.clear();
   for (auto frame : frames) {
@@ -2361,60 +2434,49 @@ bool SVGAnimationWriter::BuildBakedShapeDataTrack(const Path* baked, ModifierRes
       override.hasPosition = true;
       override.hasSize = true;
       override.hasRoundness = true;
-      for (const auto& binding : *list) {
-        auto value = binding.channel->evaluateAt(frame);
-        const auto* number = std::get_if<float>(&value);
-        if (number == nullptr) {
-          continue;
-        }
-        const auto& name = binding.channel->name;
-        if (name == "position.x") {
-          override.position.x = *number;
-        } else if (name == "position.y") {
-          override.position.y = *number;
-        } else if (name == "size.width") {
-          override.size.width = *number;
-        } else if (name == "size.height") {
-          override.size.height = *number;
-        } else if (name == "roundness") {
-          override.roundness = *number;
-        }
-      }
     } else if (source->nodeType() == NodeType::Ellipse) {
       const auto* ellipse = static_cast<const Ellipse*>(source);
       override.position = ellipse->renderPosition();
       override.size = ellipse->renderSize();
       override.hasPosition = true;
       override.hasSize = true;
-      for (const auto& binding : *list) {
-        auto value = binding.channel->evaluateAt(frame);
-        const auto* number = std::get_if<float>(&value);
-        if (number == nullptr) {
-          continue;
-        }
-        const auto& name = binding.channel->name;
-        if (name == "position.x") {
-          override.position.x = *number;
-        } else if (name == "position.y") {
-          override.position.y = *number;
-        } else if (name == "size.width") {
-          override.size.width = *number;
-        } else if (name == "size.height") {
-          override.size.height = *number;
-        }
+    }
+    for (const auto& entry : sampled) {
+      if (entry.target != source) {
+        continue;
+      }
+      auto value = entry.binding->channel->evaluateAt(frame);
+      const auto* number = std::get_if<float>(&value);
+      if (number == nullptr) {
+        continue;
+      }
+      const auto& name = entry.binding->channel->name;
+      if (name == "position.x") {
+        override.position.x = *number;
+      } else if (name == "position.y") {
+        override.position.y = *number;
+      } else if (name == "size.width") {
+        override.size.width = *number;
+      } else if (name == "size.height") {
+        override.size.height = *number;
+      } else if (name == "roundness") {
+        override.roundness = *number;
       }
     }
     PathData local = PathDataFromSVGString("");
     PathData* savedData = nullptr;
     if (sourcePath != nullptr) {
       std::vector<Point> points = sourcePath->data->points();
-      for (const auto& binding : *list) {
-        auto value = binding.channel->evaluateAt(frame);
+      for (const auto& entry : sampled) {
+        if (entry.target != source) {
+          continue;
+        }
+        auto value = entry.binding->channel->evaluateAt(frame);
         const auto* number = std::get_if<float>(&value);
         size_t pointIndex = 0;
         bool isX = false;
         if (number == nullptr ||
-            !ParsePathPointChannel(binding.channel->name, &pointIndex, &isX) ||
+            !ParsePathPointChannel(entry.binding->channel->name, &pointIndex, &isX) ||
             pointIndex >= points.size()) {
           continue;
         }
@@ -2428,10 +2490,33 @@ bool SVGAnimationWriter::BuildBakedShapeDataTrack(const Path* baked, ModifierRes
       savedData = sourcePath->data;
       sourcePath->data = &local;
     }
+    std::vector<TrimSnapshot> savedTrims;
+    for (auto* trim : animatedTrims) {
+      savedTrims.push_back({trim, trim->start, trim->end, trim->offset});
+      for (const auto& entry : sampled) {
+        if (entry.target != trim) {
+          continue;
+        }
+        float number = EvaluateChannelFloat(entry.binding->channel, frame);
+        const auto& name = entry.binding->channel->name;
+        if (name == "start") {
+          trim->start = number;
+        } else if (name == "end") {
+          trim->end = number;
+        } else {
+          trim->offset = number;
+        }
+      }
+    }
     std::string d;
     auto resolved = resolver->resolveWithOverride(scope, override);
     if (savedData != nullptr) {
       sourcePath->data = savedData;
+    }
+    for (const auto& snapshot : savedTrims) {
+      snapshot.trim->start = snapshot.start;
+      snapshot.trim->end = snapshot.end;
+      snapshot.trim->offset = snapshot.offset;
     }
     for (auto* element : resolved) {
       if (element->nodeType() != NodeType::Path) {
@@ -2456,6 +2541,8 @@ bool SVGAnimationWriter::BuildBakedShapeDataTrack(const Path* baked, ModifierRes
   }
   track->baked = baked;
   track->source = source;
+  track->animation = animation;
+  track->timeline = sampled.front().binding->timeline;
   track->discrete = allHold;
   return true;
 }

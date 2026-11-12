@@ -82,6 +82,9 @@ bool IsSupportedChannel(NodeType nodeType, const std::string& name) {
       // Text.x / Text.y translate the shaped run without reshaping it, so the exporter wraps the
       // emitted text in a <g> that carries the translation track.
       return name == "x" || name == "y";
+    case NodeType::TrimPath:
+      // Bakeable into a sibling shape's d track by the per-frame re-resolve sampler.
+      return name == "start" || name == "end" || name == "offset";
     case NodeType::Polystar:
       // Fixed-topology geometry channels are sampled per frame and re-baked into a d track; the
       // content bounds (and therefore render scale) are recomputed from the sampled fields.

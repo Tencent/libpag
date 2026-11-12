@@ -112,9 +112,9 @@ std::vector<SVGChannelEntry> BuildLedger() {
   entries.push_back({NodeType::Stroke, "dashOffset", S, "animate stroke-dashoffset"});
 
   // Path modifiers
-  entries.push_back({NodeType::TrimPath, "start", P, "needs a d track"});
-  entries.push_back({NodeType::TrimPath, "end", P, "needs a d track"});
-  entries.push_back({NodeType::TrimPath, "offset", P, "needs a d track"});
+  entries.push_back({NodeType::TrimPath, "start", S, "baked into the sibling shape d track"});
+  entries.push_back({NodeType::TrimPath, "end", S, "baked into the sibling shape d track"});
+  entries.push_back({NodeType::TrimPath, "offset", S, "baked into the sibling shape d track"});
   entries.push_back({NodeType::RoundCorner, "radius", P, "needs a d track"});
   entries.push_back({NodeType::Repeater, "copies", P, "structural, bake only"});
   entries.push_back({NodeType::Repeater, "offset", P, "per-copy transform, not implemented"});
