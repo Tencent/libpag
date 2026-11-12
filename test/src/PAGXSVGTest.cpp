@@ -6079,7 +6079,23 @@ PAGX_TEST(PAGXSVGTest, SVGExport_AnimNoiseFilterSeed) {
   EXPECT_NE(svg.find("</feTurbulence>"), std::string::npos) << svg;
 }
 
-// Two animations driving the same attribute cannot share one SMIL track: Strict rejects, and
+// F3: a ping-pong visibility track mirrors its discrete values and doubles the duration.
+PAGX_TEST(PAGXSVGTest, SVGExport_AnimVisibilityPingPongMirrors) {
+  auto doc = MakeRectDocument();
+  auto* animation = MakeAnimation(doc.get(), 60, pagx::LoopMode::PingPong);
+  auto* object = MakeAnimationObject(doc.get(), animation, "layer");
+  auto* channel = MakeChannel<bool>(doc.get(), object, "visible");
+  channel->keyframes.push_back({0, true, pagx::KeyframeInterpolationType::Hold, {}, {}});
+  channel->keyframes.push_back({60, false, pagx::KeyframeInterpolationType::Hold, {}, {}});
+  AttachTimeline(doc->layers[0], "anim");
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("attributeName=\"visibility\""), std::string::npos) << svg;
+  EXPECT_NE(svg.find("values=\"visible;hidden;visible\""), std::string::npos) << svg;
+  EXPECT_NE(svg.find("dur=\"2s\""), std::string::npos) << svg;
+}
+
+// Two animations driving the same attribute cannot share one SMIL track: Strict rejects, and// Two animations driving the same attribute cannot share one SMIL track: Strict rejects, and
 // BestEffort keeps the later animation's track (the runtime's last-writer-wins order).
 PAGX_TEST(PAGXSVGTest, SVGExport_AnimMultiClockChannelRejected) {
   auto doc = MakeRectDocument();

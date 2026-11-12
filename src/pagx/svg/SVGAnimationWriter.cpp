@@ -1609,6 +1609,10 @@ bool SVGAnimationWriter::WriteVisibilityAnimate(XMLBuilder& out, const Node* tar
     return false;
   }
   sequence.discrete = true;
+  if (timing.mirror) {
+    ApplyPingPong(&sequence);
+    timing.durationSeconds *= 2.0;
+  }
   WriteAnimateElement(out, "visibility", nullptr, false, sequence, timing, nullptr, nullptr);
   return true;
 }
