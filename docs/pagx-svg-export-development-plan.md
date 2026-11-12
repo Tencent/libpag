@@ -25,7 +25,7 @@ N/G承诺项必须实现；不能把未写算法降为B/U或拒绝所有输入�
 
 执行者必须在同一工作区只有一个实现进程时工作；本说明不授权丢弃另一个终端的未提交内容。若新终端启动时代码已前进，核实差异，保留正确实现并更新剩余状态，不重放旧补丁。
 
-## 1. 总览、范围与待确认决策
+## 1. 总览、范围与已定决策
 
 ### 1.1 结论与阅读顺序
 
@@ -1305,7 +1305,7 @@ F1—F12 原 ID 全保留；F13—F18 是动态补审。除历史官方样例证
 
 ### 6.1 基点、现状和必须完成的边界
 
-本节依据 `aeb346c05` 整体核查；编写期间新增 `c60e9e2e2`（四种阴影color）与 `6a0d91368`（NoiseStyle.seed），已接入的子集续作保留。335字段计数已按此阶段声明含Layer.scrollRectFromLayout重新核对，不沿用历史334。启动时重新读取HEAD和相关diff；进度日记与ledger是线索，不是验收结果。本次只整理文档，未执行源码修复或渲染。
+本节依据 `aeb346c05` 整体核查；编写期间新增 `c60e9e2e2`（四种阴影color）、`6a0d91368`（NoiseStyle.seed）与 `c53424cad`（Noise颜色轨道），已接入的子集续作保留，但Noise轨道存在不等于像素算法已等价。335字段计数已按此阶段声明含Layer.scrollRectFromLayout重新核对，不沿用历史334。启动时重新读取HEAD和相关diff；进度日记与ledger是线索，不是验收结果。本次只整理文档，未执行源码修复或渲染。
 
 当前需要保留的有效进展：Default/Named/All入口、全反射ledger与白名单双向检查、CLI warnings、三静态policy与文字mode、ST28最终尺寸/空子盒分配、TextHolder强制塑形/清空/保anchor、颜色源/stop/渐变参数、固定拓扑Polystar/Path/Rectangle/Ellipse+Trim/Round重烘焙、纯旋转整圈、Bezier加密采样、Mask上下文、Native TextBox变换、同目录文件替换和少量浏览器门禁。
 
