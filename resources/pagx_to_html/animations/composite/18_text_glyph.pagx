@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: Per-glyph channels only, the case the glyph path owns: the modifier poses each glyph and
+     the selector sweeps its window, while the colour re-tints per glyph. Nothing here changes the
+     text's layout, so the baked glyph positions stay valid.
+     Target: Composite  Channel: position.y,rotation,fillColor,start,end,easeIn,easeOut,weight  Type: mixed
+     Ref: - -->
+<pagx width="320" height="200">
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F8FAFC"/>
+  </Layer>
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Text id="glyphBody" text="WAVE" fontFamily="Arial" fontStyle="Bold" fontSize="56"
+          letterSpacing="0" position="50,120"/>
+    <TextModifier id="glyphMod" position="0,-10" fillColor="#9333EA">
+      <RangeSelector id="glyphSel" start="0" end="1" offset="0" unit="percentage" shape="rampUp"/>
+    </TextModifier>
+    <Fill color="#BE123C"/>
+  </Layer>
+  <Animations>
+    <Animation id="glyphText" duration="60" frameRate="60" loop="once">
+      <Object target="glyphSel">
+        <Channel name="start" type="float">
+          <Key time="0" value="0" interpolation="linear"/>
+          <Key time="60" value="0.35"/>
+        </Channel>
+        <Channel name="end" type="float">
+          <Key time="0" value="1" interpolation="linear"/>
+          <Key time="60" value="0.85"/>
+        </Channel>
+        <Channel name="easeIn" type="float">
+          <Key time="0" value="0" interpolation="linear"/>
+          <Key time="60" value="0.5"/>
+        </Channel>
+        <Channel name="easeOut" type="float">
+          <Key time="0" value="0" interpolation="linear"/>
+          <Key time="60" value="0.4"/>
+        </Channel>
+        <Channel name="weight" type="float">
+          <Key time="0" value="1" interpolation="linear"/>
+          <Key time="60" value="0.6"/>
+        </Channel>
+      </Object>
+      <Object target="glyphMod">
+        <Channel name="position.y" type="float">
+          <Key time="0" value="0" interpolation="linear"/>
+          <Key time="60" value="-18"/>
+        </Channel>
+        <Channel name="rotation" type="float">
+          <Key time="0" value="0" interpolation="linear"/>
+          <Key time="60" value="14"/>
+        </Channel>
+        <Channel name="fillColor" type="color">
+          <Key time="0" value="#9333EA" interpolation="linear"/>
+          <Key time="60" value="#0891B2"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>
