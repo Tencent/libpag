@@ -2190,16 +2190,25 @@ bool SVGAnimationWriter::HasBakedShapeAnimates(const Node* source) const {
   if (list == nullptr || list->empty()) {
     return false;
   }
-  // Only Path points can be sampled without re-running layout. Rectangle / Ellipse size channels
-  // live in the layout-resolved bounds, so they stay classified as unsupported under a modifier
-  // until the sampler can bypass the resolved layout.
-  if (source->nodeType() != NodeType::Path) {
-    return false;
-  }
   for (const auto& binding : *list) {
-    size_t index = 0;
-    bool isX = false;
-    if (!ParsePathPointChannel(binding.channel->name, &index, &isX)) {
+    const auto& name = binding.channel->name;
+    if (source->nodeType() == NodeType::Rectangle) {
+      if (name != "position.x" && name != "position.y" && name != "size.width" &&
+          name != "size.height" && name != "roundness") {
+        return false;
+      }
+    } else if (source->nodeType() == NodeType::Ellipse) {
+      if (name != "position.x" && name != "position.y" && name != "size.width" &&
+          name != "size.height") {
+        return false;
+      }
+    } else if (source->nodeType() == NodeType::Path) {
+      size_t index = 0;
+      bool isX = false;
+      if (!ParsePathPointChannel(name, &index, &isX)) {
+        return false;
+      }
+    } else {
       return false;
     }
   }
@@ -2327,35 +2336,91 @@ bool SVGAnimationWriter::BuildBakedShapeDataTrack(const Path* baked, ModifierRes
                source->id + "' exceeded 32 re-bake samples and was downsampled.");
   }
 
-  if (sourcePath == nullptr) {
-    return false;
-  }
   track->values.clear();
   track->keyTimes.clear();
   for (auto frame : frames) {
-    std::vector<Point> points = sourcePath->data->points();
-    for (const auto& binding : *list) {
-      auto value = binding.channel->evaluateAt(frame);
-      const auto* number = std::get_if<float>(&value);
-      size_t pointIndex = 0;
-      bool isX = false;
-      if (number == nullptr ||
-          !ParsePathPointChannel(binding.channel->name, &pointIndex, &isX) ||
-          pointIndex >= points.size()) {
-        continue;
+    ShapeGeometryOverride override = {};
+    override.target = source;
+    if (source->nodeType() == NodeType::Rectangle) {
+      const auto* rect = static_cast<const Rectangle*>(source);
+      override.position = rect->renderPosition();
+      override.size = rect->renderSize();
+      override.roundness = rect->roundness;
+      override.hasPosition = true;
+      override.hasSize = true;
+      override.hasRoundness = true;
+      for (const auto& binding : *list) {
+        auto value = binding.channel->evaluateAt(frame);
+        const auto* number = std::get_if<float>(&value);
+        if (number == nullptr) {
+          continue;
+        }
+        const auto& name = binding.channel->name;
+        if (name == "position.x") {
+          override.position.x = *number;
+        } else if (name == "position.y") {
+          override.position.y = *number;
+        } else if (name == "size.width") {
+          override.size.width = *number;
+        } else if (name == "size.height") {
+          override.size.height = *number;
+        } else if (name == "roundness") {
+          override.roundness = *number;
+        }
       }
-      if (isX) {
-        points[pointIndex].x = *number;
-      } else {
-        points[pointIndex].y = *number;
+    } else if (source->nodeType() == NodeType::Ellipse) {
+      const auto* ellipse = static_cast<const Ellipse*>(source);
+      override.position = ellipse->renderPosition();
+      override.size = ellipse->renderSize();
+      override.hasPosition = true;
+      override.hasSize = true;
+      for (const auto& binding : *list) {
+        auto value = binding.channel->evaluateAt(frame);
+        const auto* number = std::get_if<float>(&value);
+        if (number == nullptr) {
+          continue;
+        }
+        const auto& name = binding.channel->name;
+        if (name == "position.x") {
+          override.position.x = *number;
+        } else if (name == "position.y") {
+          override.position.y = *number;
+        } else if (name == "size.width") {
+          override.size.width = *number;
+        } else if (name == "size.height") {
+          override.size.height = *number;
+        }
       }
     }
     PathData local = PathDataFromSVGString("");
-    FillPathDataFromPoints(*sourcePath->data, points, &local);
-    PathData* savedData = sourcePath->data;
-    sourcePath->data = &local;
+    PathData* savedData = nullptr;
+    if (sourcePath != nullptr) {
+      std::vector<Point> points = sourcePath->data->points();
+      for (const auto& binding : *list) {
+        auto value = binding.channel->evaluateAt(frame);
+        const auto* number = std::get_if<float>(&value);
+        size_t pointIndex = 0;
+        bool isX = false;
+        if (number == nullptr ||
+            !ParsePathPointChannel(binding.channel->name, &pointIndex, &isX) ||
+            pointIndex >= points.size()) {
+          continue;
+        }
+        if (isX) {
+          points[pointIndex].x = *number;
+        } else {
+          points[pointIndex].y = *number;
+        }
+      }
+      FillPathDataFromPoints(*sourcePath->data, points, &local);
+      savedData = sourcePath->data;
+      sourcePath->data = &local;
+    }
     std::string d;
-    auto resolved = resolver->resolve(scope);
+    auto resolved = resolver->resolveWithOverride(scope, override);
+    if (savedData != nullptr) {
+      sourcePath->data = savedData;
+    }
     for (auto* element : resolved) {
       if (element->nodeType() != NodeType::Path) {
         continue;
@@ -2366,10 +2431,9 @@ bool SVGAnimationWriter::BuildBakedShapeDataTrack(const Path* baked, ModifierRes
       d = PathDataToSVGString(*static_cast<const Path*>(element)->data);
       break;
     }
-    sourcePath->data = savedData;
     if (d.empty()) {
-      AddWarning("geometry track on <Path> '" + source->id +
-                 "' could not be re-baked through its modifiers.");
+      AddWarning("geometry track on <" + std::string(NodeTypeName(source->nodeType())) + "> '" +
+                 source->id + "' could not be re-baked through its modifiers.");
       return false;
     }
     track->values.push_back(std::move(d));

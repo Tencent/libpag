@@ -5118,6 +5118,87 @@ PAGX_TEST(PAGXSVGTest, SVGExport_AnimTextPositionEmitsTranslate) {
   EXPECT_NE(svg.find("</g>"), std::string::npos) << svg;
 }
 
+// A14: an animated Rectangle re-resolves through the static TrimPath with an explicit geometry
+// override, so the d track follows the size change without touching the document's layout.
+PAGX_TEST(PAGXSVGTest, SVGExport_AnimShapeGeometryWithModifierRebakesData) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto* layer = doc->makeNode<pagx::Layer>("layer");
+  auto* rect = doc->makeNode<pagx::Rectangle>("rect");
+  rect->position = {100, 100};
+  rect->size = {80, 80};
+  auto* trim = doc->makeNode<pagx::TrimPath>("trim");
+  trim->start = 0.0f;
+  trim->end = 0.5f;
+  auto* stroke = doc->makeNode<pagx::Stroke>("stroke");
+  auto* solid = doc->makeNode<pagx::SolidColor>("color");
+  solid->color = {0, 0, 0, 1};
+  stroke->color = solid;
+  stroke->width = 3;
+  layer->contents = {rect, trim, stroke};
+  doc->layers.push_back(layer);
+
+  auto* animation = MakeAnimation(doc.get(), 60, pagx::LoopMode::Once);
+  auto* object = MakeAnimationObject(doc.get(), animation, "rect");
+  auto* channel = MakeChannel<float>(doc.get(), object, "size.width");
+  channel->keyframes.push_back({0, 80.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  channel->keyframes.push_back({60, 120.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  AttachTimeline(layer, "anim");
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  auto marker = svg.find("attributeName=\"d\"");
+  ASSERT_NE(marker, std::string::npos) << svg;
+  auto valuesStart = svg.find("values=\"", marker);
+  ASSERT_NE(valuesStart, std::string::npos);
+  valuesStart += 8;
+  auto valuesEnd = svg.find('"', valuesStart);
+  ASSERT_NE(valuesEnd, std::string::npos);
+  auto values = svg.substr(valuesStart, valuesEnd - valuesStart);
+  auto separator = values.find(';');
+  ASSERT_NE(separator, std::string::npos) << values;
+  EXPECT_EQ(separator, values.rfind(';'));
+  EXPECT_NE(values.substr(0, separator), values.substr(separator + 1));
+}
+
+// A14: Path point channels also survive a TrimPath through the same per-frame re-bake.
+PAGX_TEST(PAGXSVGTest, SVGExport_AnimPathPointWithTrimRebakesData) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto* layer = doc->makeNode<pagx::Layer>("layer");
+  auto* path = doc->makeNode<pagx::Path>("path");
+  auto* data = doc->makeNode<pagx::PathData>();
+  *data = pagx::PathDataFromSVGString("M40 40 L160 40 L160 160 L40 160 Z");
+  path->data = data;
+  auto* trim = doc->makeNode<pagx::TrimPath>("trim");
+  trim->start = 0.0f;
+  trim->end = 0.6f;
+  auto* stroke = doc->makeNode<pagx::Stroke>("stroke");
+  auto* solid = doc->makeNode<pagx::SolidColor>("color");
+  solid->color = {0, 0, 0, 1};
+  stroke->color = solid;
+  stroke->width = 3;
+  layer->contents = {path, trim, stroke};
+  doc->layers.push_back(layer);
+
+  auto* animation = MakeAnimation(doc.get(), 60, pagx::LoopMode::Once);
+  auto* object = MakeAnimationObject(doc.get(), animation, "path");
+  auto* channel = MakeChannel<float>(doc.get(), object, "point2.x");
+  channel->keyframes.push_back({0, 160.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  channel->keyframes.push_back({60, 120.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  AttachTimeline(layer, "anim");
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  auto marker = svg.find("attributeName=\"d\"");
+  ASSERT_NE(marker, std::string::npos) << svg;
+  auto valuesStart = svg.find("values=\"", marker);
+  ASSERT_NE(valuesStart, std::string::npos);
+  valuesStart += 8;
+  auto valuesEnd = svg.find('"', valuesStart);
+  ASSERT_NE(valuesEnd, std::string::npos);
+  auto values = svg.substr(valuesStart, valuesEnd - valuesStart);
+  auto separator = values.find(';');
+  ASSERT_NE(separator, std::string::npos) << values;
+  EXPECT_NE(values.substr(0, separator), values.substr(separator + 1));
+}
+
 // M5.4 / A14: Polystar roundness keeps the vertex count and content bounds, so the baked path can
 // carry a d track with one stable cubic verb list.
 PAGX_TEST(PAGXSVGTest, SVGExport_AnimPolystarRoundnessEmitsDataTrack) {

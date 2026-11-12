@@ -22,6 +22,8 @@
 #include <vector>
 #include "pagx/PAGXDocument.h"
 #include "pagx/nodes/Element.h"
+#include "pagx/types/Point.h"
+#include "pagx/types/Size.h"
 
 namespace pagx {
 
@@ -50,6 +52,21 @@ class TrimPath;
  * remain owned by the document for the lifetime of the export. It never mutates the original
  * elements.
  */
+/**
+ * Per-frame geometry values for one authored shape. The resolver substitutes these values when it
+ * converts the target to a tgfx::Path, so sampling never mutates the document or its resolved
+ * layout. Unset fields fall back to the node's current values.
+ */
+struct ShapeGeometryOverride {
+  const Element* target = nullptr;
+  bool hasPosition = false;
+  Point position = {};
+  bool hasSize = false;
+  Size size = {};
+  bool hasRoundness = false;
+  float roundness = 0.0f;
+};
+
 class ModifierResolver {
  public:
   explicit ModifierResolver(PAGXDocument* doc, size_t maxGeneratedElements = 200000)
@@ -65,6 +82,13 @@ class ModifierResolver {
    * not recursed (the caller invokes the resolver again when descending).
    */
   std::vector<Element*> resolve(const std::vector<Element*>& elements);
+
+  /**
+   * Resolves with ShapeGeometryOverride applied to its target. The override has no effect on any
+   * other element and is cleared before returning.
+   */
+  std::vector<Element*> resolveWithOverride(const std::vector<Element*>& elements,
+                                            const ShapeGeometryOverride& override);
 
   /**
    * Returns true when every TextModifier inside `elements` can be baked into its target Texts
@@ -132,6 +156,7 @@ class ModifierResolver {
   // Baked Path -> authored source element. Entries are only consulted for Paths that survive in
   // the resolved output, so a modifier replacing the bake naturally drops the mapping.
   mutable std::unordered_map<const Element*, const Element*> bakedSources = {};
+  ShapeGeometryOverride shapeOverride = {};
 };
 
 }  // namespace pagx

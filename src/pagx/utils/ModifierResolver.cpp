@@ -128,7 +128,7 @@ Element* ModifierResolver::makePathFromData(PathData* data) const {
 // same coordinate space the painter assumes.
 //==============================================================================
 
-static tgfx::Path PrimitiveToTGFXPath(const Element* el) {
+static tgfx::Path PrimitiveToTGFXPath(const Element* el, const ShapeGeometryOverride* override) {
   auto type = el->nodeType();
   if (type == NodeType::Path) {
     auto* p = static_cast<const Path*>(el);
@@ -156,11 +156,23 @@ static tgfx::Path PrimitiveToTGFXPath(const Element* el) {
     tgfx::Path tp = {};
     auto renderSize = r->renderSize();
     auto renderPos = r->renderPosition();
+    float roundness = r->roundness;
+    if (override != nullptr && override->target == el) {
+      if (override->hasPosition) {
+        renderPos = override->position;
+      }
+      if (override->hasSize) {
+        renderSize = override->size;
+      }
+      if (override->hasRoundness) {
+        roundness = override->roundness;
+      }
+    }
     float halfW = renderSize.width * 0.5f;
     float halfH = renderSize.height * 0.5f;
     tgfx::Rect rect = tgfx::Rect::MakeLTRB(renderPos.x - halfW, renderPos.y - halfH,
                                            renderPos.x + halfW, renderPos.y + halfH);
-    float rad = std::min({r->roundness, halfW, halfH});
+    float rad = std::min({roundness, halfW, halfH});
     if (rad < 0.0f) {
       rad = 0.0f;
     }
@@ -177,6 +189,14 @@ static tgfx::Path PrimitiveToTGFXPath(const Element* el) {
     auto* e = static_cast<const Ellipse*>(el);
     auto renderSize = e->renderSize();
     auto renderPos = e->renderPosition();
+    if (override != nullptr && override->target == el) {
+      if (override->hasPosition) {
+        renderPos = override->position;
+      }
+      if (override->hasSize) {
+        renderSize = override->size;
+      }
+    }
     float halfW = renderSize.width * 0.5f;
     float halfH = renderSize.height * 0.5f;
     tgfx::Rect rect = tgfx::Rect::MakeLTRB(renderPos.x - halfW, renderPos.y - halfH,
@@ -198,7 +218,8 @@ static tgfx::Path PrimitiveToTGFXPath(const Element* el) {
 // traversed so a MergePath can consume geometry nested under earlier Groups, matching tgfx's
 // context-wide clear/merge. Painters and non-shape content are ignored.
 static void AppendGeometryToPath(const Element* el, const tgfx::Matrix& parent,
-                                 tgfx::Path* combined, tgfx::PathOp op, bool* first) {
+                                 tgfx::Path* combined, tgfx::PathOp op, bool* first,
+                                 const ShapeGeometryOverride* override) {
   if (el == nullptr) {
     return;
   }
@@ -207,7 +228,7 @@ static void AppendGeometryToPath(const Element* el, const tgfx::Matrix& parent,
     auto matrix = parent;
     matrix.postConcat(ToTGFX(BuildGroupMatrix(group)));
     for (const auto* child : group->elements) {
-      AppendGeometryToPath(child, matrix, combined, op, first);
+      AppendGeometryToPath(child, matrix, combined, op, first, override);
     }
     return;
   }
@@ -216,7 +237,7 @@ static void AppendGeometryToPath(const Element* el, const tgfx::Matrix& parent,
       type != NodeType::Polystar) {
     return;
   }
-  auto path = PrimitiveToTGFXPath(el);
+  auto path = PrimitiveToTGFXPath(el, override);
   if (path.isEmpty()) {
     return;
   }
@@ -236,7 +257,7 @@ static void AppendGeometryToPath(const Element* el, const tgfx::Matrix& parent,
 // Apply a TrimPath modifier to `shape`, returning a freshly allocated Path
 // (or `shape` unchanged when the trim collapses or the shape is degenerate).
 Element* ModifierResolver::applyTrimToElement(Element* shape, const TrimPath* trim) const {
-  auto tp = PrimitiveToTGFXPath(shape);
+  auto tp = PrimitiveToTGFXPath(shape, &shapeOverride);
   if (tp.isEmpty()) {
     return shape;
   }
@@ -279,7 +300,7 @@ void ModifierResolver::applyContinuousTrim(std::vector<Element*>& output,
   float totalLength = 0.0f;
   for (size_t i = 0; i < shapeCount; ++i) {
     size_t order = reversed ? (shapeCount - 1 - i) : i;
-    auto path = PrimitiveToTGFXPath(output[shapeSlots[order]]);
+    auto path = PrimitiveToTGFXPath(output[shapeSlots[order]], &shapeOverride);
     if (reversed) {
       path.reverse();
     }
@@ -389,7 +410,7 @@ Element* ModifierResolver::applyRoundCornerToElement(Element* shape,
   if (corner->radius <= 0.0f) {
     return shape;
   }
-  auto tp = PrimitiveToTGFXPath(shape);
+  auto tp = PrimitiveToTGFXPath(shape, &shapeOverride);
   if (tp.isEmpty()) {
     return shape;
   }
@@ -697,6 +718,14 @@ bool ModifierResolver::CanBakeTextModifiers(const std::vector<Element*>& element
   return true;
 }
 
+std::vector<Element*> ModifierResolver::resolveWithOverride(
+    const std::vector<Element*>& elements, const ShapeGeometryOverride& override) {
+  shapeOverride = override;
+  auto result = resolve(elements);
+  shapeOverride = {};
+  return result;
+}
+
 std::vector<Element*> ModifierResolver::resolve(const std::vector<Element*>& elements) {
   std::vector<Element*> output;
   output.reserve(elements.size());
@@ -737,7 +766,7 @@ std::vector<Element*> ModifierResolver::resolve(const std::vector<Element*>& ele
         if (reversed) {
           // SVG / PPT primitives cannot express contour direction, and dash phase depends on it.
           // Bake the reversed primitive into an editable Path while preserving its rendered space.
-          auto tp = PrimitiveToTGFXPath(element);
+          auto tp = PrimitiveToTGFXPath(element, &shapeOverride);
           auto* path = makePathFromData(MakePathDataFromTGFX(_doc, tp));
           RecordBake(element, path);
           shapeSlots.push_back(output.size());
@@ -784,7 +813,8 @@ std::vector<Element*> ModifierResolver::resolve(const std::vector<Element*>& ele
         auto op = MergeModeToPathOp(mp->mode);
         bool firstPath = true;
         for (const auto* element : output) {
-          AppendGeometryToPath(element, tgfx::Matrix::I(), &combined, op, &firstPath);
+          AppendGeometryToPath(element, tgfx::Matrix::I(), &combined, op, &firstPath,
+                               &shapeOverride);
         }
         output.clear();
         auto* path = makePathFromData(MakePathDataFromTGFX(_doc, combined));
