@@ -261,6 +261,40 @@ static int ParseVideoOption(int argc, char* argv[], int* index, ExportOptions* o
   return 0;
 }
 
+static int ResolveExportOptions(ExportOptions* options) {
+  if (options->inputFiles.empty()) {
+    std::cerr << "pagx export: error: missing --input file\n";
+    return 1;
+  }
+  if (options->format.empty() && !options->outputFile.empty()) {
+    options->format = GetFileExtension(options->outputFile);
+  }
+  if (options->format.empty()) {
+    std::cerr << "pagx export: error: cannot infer output format, use --format or specify an "
+                 "output file with a known extension\n";
+    return 1;
+  }
+  if (options->format != "pptx" && options->inputFiles.size() > 1) {
+    std::cerr << "pagx export: error: multiple --input files are only supported for pptx output\n";
+    return 1;
+  }
+  auto* videoFormat = FindVideoFormat(options->format);
+  if (videoFormat == nullptr && !options->firstVideoOnlyOption.empty()) {
+    std::cerr << "pagx export: error: " << options->firstVideoOnlyOption
+              << " is only supported for video formats (mp4)\n";
+    return 1;
+  }
+  if (videoFormat != nullptr && videoFormat->requiresOpaque && options->bgAlpha < 1.0f) {
+    std::cerr << "pagx export: error: " << videoFormat->name
+              << " output cannot carry alpha, --background must be opaque\n";
+    return 1;
+  }
+  if (options->outputFile.empty()) {
+    options->outputFile = ReplaceExtension(options->inputFiles.front(), options->format);
+  }
+  return 0;
+}
+
 static int ParseOptions(int argc, char* argv[], ExportOptions* options) {
   int i = 1;
   while (i < argc) {
@@ -316,42 +350,7 @@ static int ParseOptions(int argc, char* argv[], ExportOptions* options) {
     i++;
   }
 
-  if (options->inputFiles.empty()) {
-    std::cerr << "pagx export: error: missing --input file\n";
-    return 1;
-  }
-
-  if (options->format.empty() && !options->outputFile.empty()) {
-    options->format = GetFileExtension(options->outputFile);
-  }
-  if (options->format.empty()) {
-    std::cerr << "pagx export: error: cannot infer output format, use --format or specify an "
-                 "output file with a known extension\n";
-    return 1;
-  }
-
-  if (options->format != "pptx" && options->inputFiles.size() > 1) {
-    std::cerr << "pagx export: error: multiple --input files are only supported for pptx output\n";
-    return 1;
-  }
-
-  auto* videoFormat = FindVideoFormat(options->format);
-  if (videoFormat == nullptr && !options->firstVideoOnlyOption.empty()) {
-    std::cerr << "pagx export: error: " << options->firstVideoOnlyOption
-              << " is only supported for video formats (mp4)\n";
-    return 1;
-  }
-  if (videoFormat != nullptr && videoFormat->requiresOpaque && options->bgAlpha < 1.0f) {
-    std::cerr << "pagx export: error: " << videoFormat->name
-              << " output cannot carry alpha, --background must be opaque\n";
-    return 1;
-  }
-
-  if (options->outputFile.empty()) {
-    options->outputFile = ReplaceExtension(options->inputFiles.front(), options->format);
-  }
-
-  return 0;
+  return ResolveExportOptions(options);
 }
 
 static void LimitOutputToTextureSize(const PAGXDocument& document, VideoExportOptions* options) {

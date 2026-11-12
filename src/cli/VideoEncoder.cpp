@@ -17,11 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "cli/VideoEncoder.h"
+#include "cli/VideoEncoderProcessInternal.h"
 #ifdef _WIN32
 #include <windows.h>
-// ACL headers require the Win32 base types and macros from windows.h.
-#include <accctrl.h>
-#include <aclapi.h>
 #else
 #include <fcntl.h>
 #include <signal.h>
@@ -41,6 +39,7 @@
 #include <cstring>
 #include <filesystem>
 #include <fstream>
+#include <iostream>
 #include <limits>
 #include <random>
 #include <system_error>
@@ -51,6 +50,12 @@
 
 namespace pagx::cli {
 
+void SetError(std::string* errorMsg, const std::string& text) {
+  if (errorMsg != nullptr) {
+    *errorMsg = text;
+  }
+}
+
 namespace {
 
 const char* const kPartSuffix = ".part";
@@ -58,12 +63,6 @@ const char* const kPartSuffix = ".part";
 const VideoFormatSpec kVideoFormats[] = {
     {"mp4", "mp4", "libx264", "yuv420p", true, true},
 };
-
-void SetError(std::string* errorMsg, const std::string& text) {
-  if (errorMsg != nullptr) {
-    *errorMsg = text;
-  }
-}
 
 bool IsExecutableFile(const std::string& path) {
   std::error_code ec;
@@ -278,76 +277,6 @@ std::error_code RemoveFileSystemPath(const std::string& path) {
 #endif
   return error;
 }
-
-#ifdef _WIN32
-bool CreatePrivateDirectory(const std::string& path, DWORD* error) {
-  *error = ERROR_SUCCESS;
-  HANDLE token = nullptr;
-  if (!OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &token)) {
-    *error = GetLastError();
-    return false;
-  }
-  DWORD tokenSize = 0;
-  GetTokenInformation(token, TokenUser, nullptr, 0, &tokenSize);
-  if (tokenSize == 0) {
-    *error = GetLastError();
-    CloseHandle(token);
-    return false;
-  }
-  std::vector<uint8_t> tokenData(tokenSize);
-  if (!GetTokenInformation(token, TokenUser, tokenData.data(), tokenSize, &tokenSize)) {
-    *error = GetLastError();
-    CloseHandle(token);
-    return false;
-  }
-  auto* tokenUser = reinterpret_cast<TOKEN_USER*>(tokenData.data());
-  EXPLICIT_ACCESS_W access = {};
-  access.grfAccessPermissions = GENERIC_ALL;
-  access.grfAccessMode = SET_ACCESS;
-  access.grfInheritance = SUB_CONTAINERS_AND_OBJECTS_INHERIT;
-  BuildTrusteeWithSidW(&access.Trustee, static_cast<PSID>(tokenUser->User.Sid));
-  ACL* acl = nullptr;
-  auto aclResult = SetEntriesInAclW(1, &access, nullptr, &acl);
-  if (aclResult != ERROR_SUCCESS) {
-    *error = aclResult;
-    CloseHandle(token);
-    return false;
-  }
-  SECURITY_DESCRIPTOR descriptor = {};
-  SECURITY_ATTRIBUTES security = {};
-  security.nLength = sizeof(security);
-  security.lpSecurityDescriptor = &descriptor;
-  if (!InitializeSecurityDescriptor(&descriptor, SECURITY_DESCRIPTOR_REVISION) ||
-      !SetSecurityDescriptorDacl(&descriptor, TRUE, acl, FALSE)) {
-    *error = GetLastError();
-    LocalFree(acl);
-    CloseHandle(token);
-    return false;
-  }
-  auto widePath = UTF8ToWide(path);
-  if (widePath.empty()) {
-    *error = ERROR_INVALID_DATA;
-    LocalFree(acl);
-    CloseHandle(token);
-    return false;
-  }
-  auto created = CreateDirectoryW(widePath.c_str(), &security) != 0;
-  if (!created) {
-    *error = GetLastError();
-  }
-  LocalFree(acl);
-  CloseHandle(token);
-  return created;
-}
-#else
-bool CreatePrivateDirectory(const std::string& path, int* error) {
-  if (mkdir(path.c_str(), 0700) == 0) {
-    return true;
-  }
-  *error = errno;
-  return false;
-}
-#endif
 
 bool CreateStagingFile(const std::string& outputFile, std::string* partFile,
                        std::string* stagingDirectory, std::string* errorMsg) {
@@ -638,31 +567,6 @@ FFmpegLocation FindFFmpeg(const std::string& explicitPath) {
   return location;
 }
 
-struct VideoEncoder::ChildProcess {
-#ifdef _WIN32
-  HANDLE process = nullptr;
-  HANDLE thread = nullptr;
-  HANDLE stdinPipe = nullptr;
-#else
-  pid_t processId = -1;
-  int stdinPipe = -1;
-  int execErrorPipe = -1;
-  int execError = 0;
-#endif
-  bool reaped = false;
-  bool exitStatusValid = false;
-  int exitCode = 0;
-};
-
-void InitializeVideoEncoderProcess() {
-#ifndef _WIN32
-  struct sigaction action = {};
-  action.sa_handler = SIG_IGN;
-  sigemptyset(&action.sa_mask);
-  sigaction(SIGPIPE, &action, nullptr);
-#endif
-}
-
 VideoEncoder::VideoEncoder(const VideoEncodeOptions& options, std::string partFile,
                            std::string stagingDirectory)
     : width(options.width), height(options.height), outputFile(options.outputFile),
@@ -708,152 +612,6 @@ bool VideoEncoder::spawnChild(const std::vector<std::string>& arguments, std::st
   return spawnChildPosix(arguments, errorMsg);
 #endif
 }
-
-#ifdef _WIN32
-bool VideoEncoder::spawnChildWindows(const std::vector<std::string>& arguments,
-                                     std::string* errorMsg) {
-  auto process = std::make_unique<ChildProcess>();
-  auto applicationName = UTF8ToWide(arguments.front());
-  if (applicationName.empty()) {
-    SetError(errorMsg, "failed to encode the ffmpeg path as UTF-16");
-    return false;
-  }
-  std::wstring commandLine = {};
-  for (const auto& argument : arguments) {
-    auto wide = UTF8ToWide(argument);
-    if (wide.empty() && !argument.empty()) {
-      SetError(errorMsg, "failed to encode the ffmpeg command line as UTF-16");
-      return false;
-    }
-    if (!commandLine.empty()) {
-      commandLine += L' ';
-    }
-    commandLine += QuoteWindowsArg(wide);
-  }
-  SECURITY_ATTRIBUTES security = {};
-  security.nLength = sizeof(security);
-  security.bInheritHandle = TRUE;
-  HANDLE readPipe = nullptr;
-  HANDLE writePipe = nullptr;
-  if (!CreatePipe(&readPipe, &writePipe, &security, 0)) {
-    SetError(errorMsg, "failed to create the ffmpeg input pipe (Windows error " +
-                           std::to_string(GetLastError()) + ")");
-    return false;
-  }
-  if (!SetHandleInformation(writePipe, HANDLE_FLAG_INHERIT, 0)) {
-    SetError(errorMsg, "failed to configure the ffmpeg input pipe (Windows error " +
-                           std::to_string(GetLastError()) + ")");
-    CloseHandle(readPipe);
-    CloseHandle(writePipe);
-    return false;
-  }
-  STARTUPINFOW startup = {};
-  startup.cb = sizeof(startup);
-  startup.dwFlags = STARTF_USESTDHANDLES;
-  startup.hStdInput = readPipe;
-  startup.hStdOutput = GetStdHandle(STD_OUTPUT_HANDLE);
-  startup.hStdError = GetStdHandle(STD_ERROR_HANDLE);
-  PROCESS_INFORMATION info = {};
-  if (!CreateProcessW(applicationName.c_str(), commandLine.data(), nullptr, nullptr, TRUE, 0,
-                      nullptr, nullptr, &startup, &info)) {
-    SetError(errorMsg,
-             "failed to spawn ffmpeg (Windows error " + std::to_string(GetLastError()) + ")");
-    CloseHandle(readPipe);
-    CloseHandle(writePipe);
-    return false;
-  }
-  CloseHandle(readPipe);
-  process->process = info.hProcess;
-  process->thread = info.hThread;
-  process->stdinPipe = writePipe;
-  child = std::move(process);
-  return true;
-}
-#else
-bool VideoEncoder::spawnChildPosix(const std::vector<std::string>& arguments,
-                                   std::string* errorMsg) {
-  auto process = std::make_unique<ChildProcess>();
-  int fds[2] = {-1, -1};
-  if (pipe(fds) != 0) {
-    SetError(errorMsg,
-             "failed to create the ffmpeg input pipe: " + std::string(std::strerror(errno)));
-    return false;
-  }
-  // A later encoder must not inherit an earlier encoder's stdin writer, or the earlier ffmpeg will
-  // never observe EOF while both processes are alive.
-  if (fcntl(fds[0], F_SETFD, FD_CLOEXEC) != 0 || fcntl(fds[1], F_SETFD, FD_CLOEXEC) != 0) {
-    auto error = errno;
-    close(fds[0]);
-    close(fds[1]);
-    SetError(errorMsg,
-             "failed to configure the ffmpeg input pipe: " + std::string(std::strerror(error)));
-    return false;
-  }
-  int execErrors[2] = {-1, -1};
-  if (pipe(execErrors) != 0) {
-    auto error = errno;
-    close(fds[0]);
-    close(fds[1]);
-    SetError(errorMsg,
-             "failed to create the exec error pipe: " + std::string(std::strerror(error)));
-    return false;
-  }
-  if (fcntl(execErrors[0], F_SETFD, FD_CLOEXEC) != 0 ||
-      fcntl(execErrors[1], F_SETFD, FD_CLOEXEC) != 0) {
-    auto error = errno;
-    close(fds[0]);
-    close(fds[1]);
-    close(execErrors[0]);
-    close(execErrors[1]);
-    SetError(errorMsg,
-             "failed to configure the exec error pipe: " + std::string(std::strerror(error)));
-    return false;
-  }
-  std::vector<char*> argv = {};
-  argv.reserve(arguments.size() + 1);
-  for (const auto& argument : arguments) {
-    argv.emplace_back(const_cast<char*>(argument.c_str()));
-  }
-  argv.emplace_back(nullptr);
-  auto processId = fork();
-  if (processId < 0) {
-    auto error = errno;
-    close(fds[0]);
-    close(fds[1]);
-    close(execErrors[0]);
-    close(execErrors[1]);
-    SetError(errorMsg, "failed to fork the ffmpeg process: " + std::string(std::strerror(error)));
-    return false;
-  }
-  if (processId == 0) {
-    close(execErrors[0]);
-    struct sigaction defaultPipe = {};
-    defaultPipe.sa_handler = SIG_DFL;
-    sigemptyset(&defaultPipe.sa_mask);
-    bool inputReady = dup2(fds[0], STDIN_FILENO) >= 0 && fcntl(STDIN_FILENO, F_SETFD, 0) >= 0;
-    if (!inputReady || sigaction(SIGPIPE, &defaultPipe, nullptr) != 0) {
-      int error = errno;
-      write(execErrors[1], &error, sizeof(error));
-      _exit(127);
-    }
-    if (fds[0] != STDIN_FILENO) {
-      close(fds[0]);
-    }
-    close(fds[1]);
-    execv(argv[0], argv.data());
-    int error = errno;
-    write(execErrors[1], &error, sizeof(error));
-    _exit(127);
-  }
-  close(fds[0]);
-  close(execErrors[1]);
-  process->processId = processId;
-  process->stdinPipe = fds[1];
-  process->execErrorPipe = execErrors[0];
-  child = std::move(process);
-  return true;
-}
-#endif
 
 bool VideoEncoder::writeFrame(const uint8_t* pixels, size_t rowBytes, std::string* errorMsg) {
   if (stopped || child == nullptr) {
@@ -1206,8 +964,7 @@ bool VideoEncoder::finish(std::string* errorMsg) {
 #endif
   std::string cleanupError = {};
   if (!removeStagingDirectory(&cleanupError)) {
-    SetError(errorMsg, "published '" + outputFile + "'; " + cleanupError);
-    return false;
+    std::cerr << "pagx export: warning: published '" << outputFile << "'; " << cleanupError << "\n";
   }
   return true;
 }

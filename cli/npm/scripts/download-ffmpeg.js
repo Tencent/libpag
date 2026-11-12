@@ -87,18 +87,6 @@ function isExecutable(filePath, platform = process.platform) {
   }
 }
 
-function findCachedFFmpeg(options = {}) {
-  try {
-    const target = resolveTarget(options.platform, options.arch);
-    const env = options.env || process.env;
-    const cacheRoot = options.cacheRoot || defaultCacheRoot(env);
-    const executable = path.join(cacheRoot, DEFAULT_RELEASE, target.name, 'bin', target.executableName);
-    return isExecutable(executable, target.platform) ? executable : null;
-  } catch {
-    return null;
-  }
-}
-
 function releaseBaseURL(env = process.env) {
   if (env.PAGX_FFMPEG_BASE_URL) return env.PAGX_FFMPEG_BASE_URL.replace(/\/$/, '');
   return `https://github.com/libpag/ffmpeg-builder/releases/download/${encodeURIComponent(DEFAULT_RELEASE)}`;
@@ -595,7 +583,6 @@ module.exports = {
   downloadFile,
   ensureFFmpeg,
   extractArchive,
-  findCachedFFmpeg,
   formatDownloadError,
   isExecutable,
   resolveTarget,

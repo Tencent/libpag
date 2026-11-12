@@ -219,11 +219,11 @@ if (PAG_BUILD_TESTS)
     set(PAG_BUILD_SHARED OFF)
 endif ()
 
-# VideoExporter is native-only in the current support matrix.
+# VideoExporter is native-only in the current support matrix. Respect an explicit user override.
 if (WEB)
     set(PAG_BUILD_VIDEO_EXPORTER OFF)
-elseif (PAG_BUILD_CLI OR PAG_BUILD_TESTS)
-    set(PAG_BUILD_VIDEO_EXPORTER ON)
+elseif ((PAG_BUILD_CLI OR PAG_BUILD_TESTS) AND NOT PAG_BUILD_VIDEO_EXPORTER)
+    message(FATAL_ERROR "PAG_BUILD_CLI and PAG_BUILD_TESTS require PAG_BUILD_VIDEO_EXPORTER=ON")
 endif ()
 
 set(TGFX_BUILD_LAYERS ON)

@@ -17,7 +17,6 @@ const {
   downloadFile,
   ensureFFmpeg,
   extractArchive,
-  findCachedFFmpeg,
   formatDownloadError,
   resolveTarget,
   validateArchiveEntry,
@@ -335,7 +334,6 @@ test('installs atomically and reuses the cache', async () => {
     assert.strictEqual(executable, path.join(root, 'v1.0.0', 'darwin-arm64', 'bin', 'ffmpeg'));
     assert.strictEqual(downloads.length, 1);
     assert.strictEqual(await ensureFFmpeg(options), executable);
-    assert.strictEqual(findCachedFFmpeg(options), executable);
     assert.strictEqual(downloads.length, 1);
   } finally {
     fs.rmSync(root, { recursive: true, force: true });

@@ -16,6 +16,8 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+// This file intentionally keeps the PAGXCliTest fixture name so existing gtest filters and output
+// directories continue to select both the general and video CLI tests after the source split.
 #ifdef _WIN32
 #include <windows.h>
 #else
