@@ -5113,7 +5113,7 @@ PAGX_TEST(PAGXSVGTest, SVGExport_AnimPathPointWithModifierIsRejected) {
   EXPECT_TRUE(strictSvg.empty());
   bool reported = false;
   for (const auto& warning : warnings) {
-    reported = reported || warning.find("bakes this path into new geometry") != std::string::npos;
+    reported = reported || warning.find("bakes this element into new geometry") != std::string::npos;
   }
   EXPECT_TRUE(reported) << (warnings.empty() ? "no warnings" : warnings[0]);
 
@@ -5122,6 +5122,50 @@ PAGX_TEST(PAGXSVGTest, SVGExport_AnimPathPointWithModifierIsRejected) {
   auto bestEffortSvg = pagx::SVGExporter::ToSVG(*doc, bestEffort);
   EXPECT_NE(bestEffortSvg.find("<path"), std::string::npos);
   EXPECT_EQ(bestEffortSvg.find("attributeName=\"d\""), std::string::npos);
+}
+
+// A14: an animated Rectangle baked by a static TrimPath must not freeze silently. Strict rejects
+// the export; BestEffort keeps the baked static geometry and drops the geometry track.
+PAGX_TEST(PAGXSVGTest, SVGExport_AnimShapeGeometryWithModifierIsRejected) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto* layer = doc->makeNode<pagx::Layer>("layer");
+  auto* rect = doc->makeNode<pagx::Rectangle>("rect");
+  rect->position = {100, 100};
+  rect->size = {80, 80};
+  auto* trim = doc->makeNode<pagx::TrimPath>("trim");
+  trim->start = 0.0f;
+  trim->end = 0.5f;
+  auto* stroke = doc->makeNode<pagx::Stroke>("stroke");
+  auto* solid = doc->makeNode<pagx::SolidColor>("color");
+  solid->color = {0, 0, 0, 1};
+  stroke->color = solid;
+  stroke->width = 3;
+  layer->contents = {rect, trim, stroke};
+  doc->layers.push_back(layer);
+
+  auto* animation = MakeAnimation(doc.get(), 60, pagx::LoopMode::Once);
+  auto* object = MakeAnimationObject(doc.get(), animation, "rect");
+  auto* channel = MakeChannel<float>(doc.get(), object, "size.width");
+  channel->keyframes.push_back({0, 80.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  channel->keyframes.push_back({60, 120.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  AttachTimeline(layer, "anim");
+
+  std::vector<std::string> warnings;
+  pagx::SVGExportOptions strict = {};
+  strict.animation.policy = pagx::SVGAnimationPolicy::Strict;
+  auto strictSvg = pagx::SVGExporter::ToSVG(*doc, strict, &warnings);
+  EXPECT_TRUE(strictSvg.empty());
+  bool reported = false;
+  for (const auto& warning : warnings) {
+    reported = reported || warning.find("bakes this element into new geometry") != std::string::npos;
+  }
+  EXPECT_TRUE(reported) << (warnings.empty() ? "no warnings" : warnings[0]);
+
+  pagx::SVGExportOptions bestEffort = {};
+  bestEffort.animation.policy = pagx::SVGAnimationPolicy::BestEffort;
+  auto bestEffortSvg = pagx::SVGExporter::ToSVG(*doc, bestEffort);
+  EXPECT_NE(bestEffortSvg.find("<path"), std::string::npos);
+  EXPECT_EQ(bestEffortSvg.find("<animate"), std::string::npos);
 }
 
 // M5.2: Text.x / Text.y translate the shaped run through a wrapping <g> without reshaping it.

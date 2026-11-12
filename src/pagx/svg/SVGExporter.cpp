@@ -610,19 +610,25 @@ class SVGWriter {
     // TrimPath and Repeater have no SVG counterpart, so the shapes simply disappear from the
     // output. A wrong picture is worse than a baked one.
     std::vector<Element*> resolved = _resolver.resolve(elements);
-    reportBakedPathAnimates(elements, resolved);
+    reportBakedAnimates(elements, resolved);
     return resolved;
   }
 
-  // A path modifier replaces the authored Path with baked geometry, so a point channel bound to
-  // the original node has no host left. Report the loss instead of silently emitting static d.
-  void reportBakedPathAnimates(const std::vector<Element*>& originals,
-                               const std::vector<Element*>& resolved) {
+  // A path modifier replaces the authored element with baked geometry, so any animation bound to
+  // the original node has no host left. Report the loss instead of silently emitting static
+  // geometry, which would freeze the animation without a diagnostic.
+  void reportBakedAnimates(const std::vector<Element*>& originals,
+                           const std::vector<Element*>& resolved) {
+    auto* plan = _animWriter.plan();
+    if (plan == nullptr) {
+      return;
+    }
     for (auto* element : originals) {
-      if (element == nullptr || element->nodeType() != NodeType::Path) {
+      if (element == nullptr) {
         continue;
       }
-      if (!_animWriter.HasPathPointAnimates(element)) {
+      auto* bindings = plan->BindingsFor(element);
+      if (bindings == nullptr || bindings->empty()) {
         continue;
       }
       bool kept = false;
@@ -635,8 +641,9 @@ class SVGWriter {
       if (kept) {
         continue;
       }
-      addWarning("point channels on <Path> '" + element->id +
-                     "' are dropped: a path modifier bakes this path into new geometry.",
+      addWarning("animation channels on <" + std::string(NodeTypeName(element->nodeType())) +
+                     "> '" + element->id +
+                     "' are dropped: a path modifier bakes this element into new geometry.",
                  "animation-rejected");
       _rejected = _rejected || _rejectUnsupported || _animationStrict;
     }
