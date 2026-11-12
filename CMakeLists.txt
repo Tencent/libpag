@@ -1183,6 +1183,7 @@ if (PAG_BUILD_CLI)
             ${CMAKE_CURRENT_SOURCE_DIR}/resources/cli/svg_browser_star_anim.pagx@0.5
             ${CMAKE_CURRENT_SOURCE_DIR}/resources/cli/svg_browser_rect_trim_anim.pagx@0.5
             ${CMAKE_CURRENT_SOURCE_DIR}/resources/cli/svg_browser_round_corner_anim.pagx@0.5
+            ${CMAKE_CURRENT_SOURCE_DIR}/resources/cli/svg_browser_ellipse_trim_anim.pagx@0.5
             DEPENDS pagx-cli
             WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
             USES_TERMINAL

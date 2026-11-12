@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- D6 animated gate case: a trimmed ellipse grows its width from 90 to 150 over one second.
+     The browser gate pauses SMIL, seeks to 0.5s and compares the re-baked d track against the
+     runtime renderer at the same time. -->
+<pagx width="220" height="200">
+  <Layer x="0" y="0" width="220" height="200">
+    <Ellipse id="ellipse" position="110,100" size="90,60"/>
+    <TrimPath start="0" end="0.7"/>
+    <Stroke width="6">
+      <SolidColor color="#118844"/>
+    </Stroke>
+  </Layer>
+  <Animations>
+    <Animation id="grow" duration="60" frameRate="60" loop="once">
+      <Object target="ellipse">
+        <Channel name="size.width" type="float">
+          <Key time="0" value="90" interpolation="linear"/>
+          <Key time="60" value="150" interpolation="linear"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>
