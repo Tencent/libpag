@@ -596,6 +596,12 @@ bool PAGScene::renderTo(const std::shared_ptr<PAGSurface>& surface, tgfx::Contex
     canvas->translate(contentOffset.x, contentOffset.y);
     canvas->scale(zoomScale, zoomScale);
     canvas->translate(-bounds.x, -bounds.y);
+    // The output window is the only visible area. A host that keeps sizing its surface from
+    // width()/height() must not see target content painted outside the declared rectangle, and
+    // the extra pixel that ceil(bounds * scale) adds for fractional bounds must stay transparent.
+    // The clip is expressed in root coordinates, which is the space the current canvas matrix
+    // maps to the surface.
+    canvas->clipRect(tgfx::Rect::MakeXYWH(bounds.x, bounds.y, bounds.width, bounds.height));
     DrawOutputTarget(canvas, _rootComposition->runtimeLayer, target);
     clearAllViewModelsDirty();
     outputViewDirty = false;

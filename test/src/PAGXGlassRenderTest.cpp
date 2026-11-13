@@ -947,6 +947,42 @@ PAGX_TEST(PAGXGlassRenderTest, TargetViewAppliesTargetMask) {
   EXPECT_NEAR(view.getColor(10, 10).alpha, 0.0f, 0.01f);
 }
 
+PAGX_TEST(PAGXGlassRenderTest, TargetViewClipsToOutputBounds) {
+  auto document = pagx::PAGXDocument::Make(200, 200);
+  auto* target = document->makeNode<pagx::Layer>("target");
+  auto* rect = document->makeNode<pagx::Rectangle>();
+  rect->size = {200.0f, 200.0f};
+  auto* fill = document->makeNode<pagx::Fill>();
+  auto* color = document->makeNode<pagx::SolidColor>();
+  color->color = {1.0f, 0.0f, 0.0f, 1.0f};
+  fill->color = color;
+  target->contents = {rect, fill};
+  document->layers.push_back(target);
+  document->targetLayerId = "target";
+  document->outputBounds = pagx::Rect::MakeXYWH(0, 0, 100, 80);
+
+  auto scene = pagx::PAGScene::Make(document);
+  ASSERT_NE(scene, nullptr);
+  // The surface covers the whole canvas instead of the output window, so anything the target
+  // draws outside outputBounds would land in the extra area without a clip.
+  auto surface = pagx::PAGSurface::MakeOffscreen(200, 200);
+  ASSERT_NE(surface, nullptr);
+  ASSERT_TRUE(scene->draw(surface));
+  tgfx::Bitmap bitmap(200, 200, false, false);
+  {
+    // The Pixmap keeps the bitmap's pixels locked, so it has to go out of scope before getColor()
+    // can create its own Pixmap over the same Bitmap.
+    tgfx::Pixmap pixmap(bitmap);
+    ASSERT_TRUE(surface->readPixels(pixmap.writablePixels(), pixmap.rowBytes()));
+  }
+
+  auto inside = bitmap.getColor(50, 40);
+  EXPECT_GT(inside.red, 0.9f);
+  EXPECT_NEAR(inside.alpha, 1.0f, 0.01f);
+  EXPECT_NEAR(bitmap.getColor(150, 40).alpha, 0.0f, 0.01f);
+  EXPECT_NEAR(bitmap.getColor(50, 120).alpha, 0.0f, 0.01f);
+}
+
 PAGX_TEST(PAGXGlassRenderTest, TargetViewSurvivesXmlReload) {
   auto document = MakeGlassDocument(true);
   document->targetLayerId = "glass";
