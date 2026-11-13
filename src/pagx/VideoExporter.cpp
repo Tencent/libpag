@@ -286,6 +286,7 @@ std::shared_ptr<VideoExporter> VideoExporter::MakeInternal(std::shared_ptr<PAGXD
   }
 
   auto* displayOptions = scene->getDisplayOptions();
+  displayOptions->setRenderMode(options.renderMode);
   displayOptions->setZoomScale(scale);
   if (options.hasBackground) {
     displayOptions->setBackgroundColor(options.background);
@@ -304,6 +305,11 @@ std::shared_ptr<VideoExporter> VideoExporter::MakeInternal(std::shared_ptr<PAGXD
   exporter->frameCount_ = frameCount;
   exporter->reuseStaticFrame_ = !HasTimelineDefinitions(*document);
   return exporter;
+}
+
+PAGRenderMode VideoExporter::renderMode() const {
+  auto* options = scene != nullptr ? scene->getDisplayOptions() : nullptr;
+  return options != nullptr ? options->getRenderMode() : PAGRenderMode::Partial;
 }
 
 int VideoExporter::width() const {

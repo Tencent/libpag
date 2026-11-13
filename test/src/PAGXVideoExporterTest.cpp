@@ -280,6 +280,22 @@ PAGX_TEST(PAGXVideoExporterTest, MakeExportsStaticDocumentAsSingleFrameByDefault
   EXPECT_FALSE(exporter->nextFrame());
 }
 
+PAGX_TEST(PAGXVideoExporterTest, RenderModeDefaultsToPartialAndSupportsDirect) {
+  auto document = MakeStaticDocument();
+  ASSERT_TRUE(document != nullptr);
+  auto defaultExporter = pagx::VideoExporter::Make(document);
+  ASSERT_TRUE(defaultExporter != nullptr);
+  EXPECT_EQ(defaultExporter->renderMode(), pagx::PAGRenderMode::Partial);
+
+  pagx::VideoExportOptions options = {};
+  options.renderMode = pagx::PAGRenderMode::Direct;
+  auto surface = MakeHostSurface(200, 200);
+  ASSERT_TRUE(surface != nullptr);
+  auto directExporter = pagx::VideoExporter::MakeWithSurface(document, std::move(surface), options);
+  ASSERT_TRUE(directExporter != nullptr);
+  EXPECT_EQ(directExporter->renderMode(), pagx::PAGRenderMode::Direct);
+}
+
 PAGX_TEST(PAGXVideoExporterTest, MakeWithSurfaceRejectsInvalidInput) {
   auto document = MakeStaticDocument();
   std::string errorMsg = {};
