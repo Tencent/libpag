@@ -240,10 +240,16 @@ std::shared_ptr<VideoExporter> VideoExporter::MakeInternal(std::shared_ptr<PAGXD
   }
 
   float scale = options.scale;
-  int width = 0;
-  int height = 0;
-  if (!ComputeOutputDimension(document->width, scale, options.alignToEvenSize, &width) ||
-      !ComputeOutputDimension(document->height, scale, options.alignToEvenSize, &height)) {
+  int width = options.outputWidth;
+  int height = options.outputHeight;
+  const bool hasExplicitSize = width > 0 && height > 0;
+  if ((width == 0) != (height == 0) || width < 0 || height < 0) {
+    SetError(errorMsg, "explicit output dimensions must both be positive or both be zero");
+    return nullptr;
+  }
+  if (!hasExplicitSize &&
+      (!ComputeOutputDimension(document->width, scale, options.alignToEvenSize, &width) ||
+       !ComputeOutputDimension(document->height, scale, options.alignToEvenSize, &height))) {
     SetError(errorMsg, "the output dimensions must be finite, positive, and fit in an int");
     return nullptr;
   }

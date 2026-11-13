@@ -99,6 +99,14 @@ struct VideoExportOptions {
    * match a full-frame readback pipeline.
    */
   PAGRenderMode renderMode = PAGRenderMode::Partial;
+
+  /**
+   * Optional explicit output dimensions. Both values must be positive to take effect; leaving both
+   * at zero derives dimensions from documentSize * scale. Hosts with their own even rounding and
+   * texture/pixel-budget clamping can use these fields without changing the scene zoom scale.
+   */
+  int outputWidth = 0;
+  int outputHeight = 0;
 };
 
 /** Result of attempting to start an asynchronous frame. */

@@ -296,6 +296,20 @@ PAGX_TEST(PAGXVideoExporterTest, RenderModeDefaultsToPartialAndSupportsDirect) {
   EXPECT_EQ(directExporter->renderMode(), pagx::PAGRenderMode::Direct);
 }
 
+PAGX_TEST(PAGXVideoExporterTest, MakeWithSurfaceAcceptsExplicitOutputDimensions) {
+  pagx::VideoExportOptions options = {};
+  options.outputWidth = 100;
+  options.outputHeight = 80;
+  options.renderMode = pagx::PAGRenderMode::Direct;
+  auto surface = MakeHostSurface(100, 80);
+  ASSERT_TRUE(surface != nullptr);
+  auto exporter = pagx::VideoExporter::MakeWithSurface(MakeStaticDocument(), std::move(surface), options);
+  ASSERT_TRUE(exporter != nullptr);
+  EXPECT_EQ(exporter->width(), 100);
+  EXPECT_EQ(exporter->height(), 80);
+  EXPECT_EQ(exporter->renderMode(), pagx::PAGRenderMode::Direct);
+}
+
 PAGX_TEST(PAGXVideoExporterTest, MakeWithSurfaceRejectsInvalidInput) {
   auto document = MakeStaticDocument();
   std::string errorMsg = {};
