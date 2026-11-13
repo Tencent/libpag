@@ -16,6 +16,8 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include <mutex>
+#include <unordered_map>
 #include "base/utils/MatrixUtil.h"
 #include "base/utils/TimeUtil.h"
 #include "pag/file.h"
@@ -23,13 +25,39 @@
 #include "rendering/caches/CompositionCache.h"
 #include "rendering/caches/LayerCache.h"
 #include "rendering/caches/RenderCache.h"
+#include "rendering/filters/utils/Filter3DFactory.h"
 #include "rendering/graphics/Recorder.h"
+#include "rendering/graphics/Transform3DScene.h"
 #include "rendering/layers/PAGStage.h"
 #include "rendering/renderers/LayerRenderer.h"
 #include "rendering/utils/LockGuard.h"
 #include "rendering/utils/ScopedLock.h"
 
 namespace pag {
+namespace {
+struct Cached3DGraphic {
+  std::shared_ptr<Graphic> graphic = nullptr;
+  uint32_t contentVersion = 0;
+};
+
+static std::mutex& Cached3DGraphicMutex() {
+  static std::mutex mutex;
+  return mutex;
+}
+
+static std::unordered_map<const PAGComposition*, Cached3DGraphic>& Cached3DGraphicTable() {
+  static std::unordered_map<const PAGComposition*, Cached3DGraphic> table;
+  return table;
+}
+}  // namespace
+
+std::shared_ptr<Graphic> GetCached3DGraphic(const PAGComposition* composition) {
+  std::lock_guard<std::mutex> autoLock(Cached3DGraphicMutex());
+  auto& table = Cached3DGraphicTable();
+  auto item = table.find(composition);
+  return item != table.end() ? item->second.graphic : nullptr;
+}
+
 std::shared_ptr<PAGComposition> PAGComposition::Make(int width, int height) {
   auto pagComposition = std::shared_ptr<PAGComposition>(new PAGComposition(width, height));
   pagComposition->weakThis = pagComposition;
@@ -61,6 +89,10 @@ PAGComposition::PAGComposition(std::shared_ptr<File> file, PreComposeLayer* laye
 }
 
 PAGComposition::~PAGComposition() {
+  {
+    std::lock_guard<std::mutex> autoLock(Cached3DGraphicMutex());
+    Cached3DGraphicTable().erase(this);
+  }
   removeAllLayers();
   if (emptyComposition) {
     delete emptyComposition;  // created by PAGComposition(width, height).
@@ -396,6 +428,10 @@ bool PAGComposition::gotoTime(int64_t layerTime) {
       changed = true;
     }
   }
+  if (changed) {
+    std::lock_guard<std::mutex> autoLock(Cached3DGraphicMutex());
+    Cached3DGraphicTable().erase(this);
+  }
   return changed;
 }
 
@@ -420,21 +456,74 @@ void PAGComposition::draw(Recorder* recorder) {
   if (hasClip()) {
     recorder->saveClip(0, 0, static_cast<float>(_width), static_cast<float>(_height));
   }
-  auto count = static_cast<int>(layers.size());
-  for (int i = 0; i < count; i++) {
-    auto& childLayer = layers[i];
+  std::shared_ptr<Transform3DContext> context;
+  for (const auto& child : layers) {
+    if (child->layerVisible && child->frameVisible() && Has3DTransform(child->layer)) {
+      context = child->createTransform3DContext();
+      break;
+    }
+  }
+  if (context == nullptr) {
+    // 无 3D 子层时保留原直录路径，避免对纯 2D 文件引入逐层 Recorder 与合批退化。
+    for (auto& childLayer : layers) {
+      if (!childLayer->layerVisible) {
+        continue;
+      }
+      auto filter = childLayer->cacheFilters()
+                        ? nullptr
+                        : FilterModifier::Make(childLayer->layer, childLayer->contentFrame +
+                                                                      childLayer->layer->startTime);
+      DrawChildLayer(recorder, childLayer.get(), filter);
+    }
+    if (hasClip()) {
+      recorder->restore();
+    }
+    return;
+  }
+  {
+    std::lock_guard<std::mutex> autoLock(Cached3DGraphicMutex());
+    auto& table = Cached3DGraphicTable();
+    auto item = table.find(this);
+    if (item != table.end() && item->second.graphic != nullptr &&
+        item->second.contentVersion == contentVersion) {
+      recorder->drawGraphic(item->second.graphic);
+      if (hasClip()) {
+        recorder->restore();
+      }
+      return;
+    }
+  }
+  Transform3DSceneBuilder scene(_width, _height);
+  for (auto& childLayer : layers) {
     if (!childLayer->layerVisible) {
       continue;
     }
-    DrawChildLayer(recorder, childLayer.get());
+    auto filter = childLayer->cacheFilters()
+                      ? nullptr
+                      : FilterModifier::Make(childLayer->layer, childLayer->contentFrame +
+                                                                    childLayer->layer->startTime);
+    if (filter != nullptr) {
+      filter->transform3DContext = context;
+    }
+    Recorder childRecorder;
+    DrawChildLayer(&childRecorder, childLayer.get(), filter);
+    scene.addLayer(childRecorder.makeGraphic(), childLayer->layer,
+                   childLayer->contentFrame + childLayer->layer->startTime, context,
+                   ToTGFX(childLayer->layerMatrix));
   }
+  auto graphic = scene.makeGraphic();
+  {
+    std::lock_guard<std::mutex> autoLock(Cached3DGraphicMutex());
+    Cached3DGraphicTable()[this] = {graphic, contentVersion};
+  }
+  recorder->drawGraphic(std::move(graphic));
   if (hasClip()) {
     recorder->restore();
   }
 }
 
-void PAGComposition::DrawChildLayer(Recorder* recorder, PAGLayer* childLayer) {
-  auto filterModifier = childLayer->cacheFilters() ? nullptr : FilterModifier::Make(childLayer);
+void PAGComposition::DrawChildLayer(Recorder* recorder, PAGLayer* childLayer,
+                                    std::shared_ptr<FilterModifier> filterModifier) {
   auto trackMatte = TrackMatteRenderer::Make(childLayer);
   Transform extraTransform = {ToTGFX(childLayer->layerMatrix), childLayer->layerAlpha};
   LayerRenderer::DrawLayer(recorder, childLayer->layer,
@@ -483,7 +572,7 @@ void PAGComposition::MeasureChildLayer(tgfx::Rect* bounds, PAGLayer* childLayer)
                                       &extraTransform);
   }
   auto layerFrame = childLayer->contentFrame + childLayer->layer->startTime;
-  auto filterModifier = FilterModifier::Make(childLayer->layer, layerFrame);
+  auto filterModifier = FilterModifier::Make(childLayer);
   Transform extraTransform = {ToTGFX(childLayer->layerMatrix), childLayer->layerAlpha};
   LayerRenderer::MeasureLayerBounds(bounds, childLayer->layer, layerFrame, filterModifier,
                                     trackMatteBounds.get(), childLayer, &extraTransform);
@@ -517,10 +606,15 @@ bool PAGComposition::GetTrackMatteLayerAtPoint(PAGLayer* childLayer, float x, fl
   auto trackMatteLayer = childLayer->_trackMatteLayer.get();
   if (trackMatteLayer->getTransform(&trackMatteTransform)) {
     tgfx::Point local = {x, y};
-    MapPointInverted(trackMatteTransform.matrix, &local);
-    tgfx::Rect trackMatteBounds = {};
-    trackMatteLayer->measureBounds(&trackMatteBounds);
-    contains = trackMatteBounds.contains(local.x, local.y);
+    if (Has3DTransform(trackMatteLayer->layer)) {
+      tgfx::Rect projectedBounds;
+      MeasureChildLayer(&projectedBounds, trackMatteLayer);
+      contains = projectedBounds.contains(x, y);
+    } else if (MapPointInverted(trackMatteTransform.matrix, &local)) {
+      tgfx::Rect trackMatteBounds;
+      trackMatteLayer->measureBounds(&trackMatteBounds);
+      contains = trackMatteBounds.contains(local.x, local.y);
+    }
     if (contains) {
       results->push_back(childLayer->_trackMatteLayer);
     }
@@ -538,7 +632,28 @@ bool PAGComposition::GetChildLayerAtPoint(PAGLayer* childLayer, float x, float y
     return false;
   }
   tgfx::Point localPoint = {x, y};
-  MapPointInverted(layerTransform.matrix, &localPoint);
+  if (Has3DTransform(childLayer->layer)) {
+    tgfx::Rect projectedBounds;
+    MeasureChildLayer(&projectedBounds, childLayer);
+    if (!projectedBounds.contains(x, y)) {
+      return false;
+    }
+    if (!childLayer->layer->effects.empty() || !childLayer->layer->layerStyles.empty()) {
+      return true;
+    }
+    auto context = childLayer->createTransform3DContext();
+    if (context == nullptr) {
+      return false;
+    }
+    auto projected = Transform3DFilter::ProjectedMatrix(
+        childLayer->layer, childLayer->contentFrame + childLayer->layer->startTime, *context);
+    projected.postConcat(ToTGFX(childLayer->layerMatrix));
+    if (!MapPointInverted(projected, &localPoint)) {
+      return false;
+    }
+  } else if (!MapPointInverted(layerTransform.matrix, &localPoint)) {
+    return false;
+  }
   auto mask = childLayer->layerCache->getMasks(childLayer->contentFrame);
   if (mask) {
     auto maskBounds = mask->getBounds();
