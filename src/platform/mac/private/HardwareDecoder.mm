@@ -60,6 +60,12 @@ HardwareDecoder::~HardwareDecoder() {
   }
 
   cleanResources();
+  // Released only after the session has been invalidated and released, so no callback delivered by
+  // VideoToolbox can write into them anymore.
+  for (auto* context : staleContexts) {
+    delete context;
+  }
+  staleContexts.clear();
 }
 
 void HardwareDecoder::cleanResources() {
@@ -90,10 +96,15 @@ void HardwareDecoder::cleanResources() {
 
 void DidDecompress(void*, void* sourceFrameRefCon, OSStatus status, VTDecodeInfoFlags,
                    CVImageBufferRef pixelBuffer, CMTime, CMTime) {
-  if (status == noErr && pixelBuffer) {
-    CVPixelBufferRef* outputPixelBuffer = static_cast<CVPixelBufferRef*>(sourceFrameRefCon);
-    *outputPixelBuffer = CVPixelBufferRetain(pixelBuffer);
+  auto* context = static_cast<HardwareDecodeContext*>(sourceFrameRefCon);
+  if (context == nullptr) {
+    return;
   }
+  CVPixelBufferRef outputPixelBuffer = nullptr;
+  if (status == noErr && pixelBuffer) {
+    outputPixelBuffer = CVPixelBufferRetain(pixelBuffer);
+  }
+  context->complete(outputPixelBuffer);
 }
 
 bool HardwareDecoder::initVideoToolBox(const std::vector<std::shared_ptr<tgfx::Data>>& headers,
@@ -143,6 +154,11 @@ bool HardwareDecoder::resetVideoToolBox() {
     CFRelease(session);
     session = nullptr;
   }
+
+  for (auto* context : staleContexts) {
+    delete context;
+  }
+  staleContexts.clear();
 
   // create decompression session
   CFDictionaryRef inAttrs = NULL;
@@ -269,9 +285,17 @@ pag::DecodingResult HardwareDecoder::onDecodeFrame() {
   if (sampleBuffer) {
     OSStatus status = 0;
     VTDecodeInfoFlags infoFlags = 0;
+    auto* context = new HardwareDecodeContext();
 
-    status =
-        VTDecompressionSessionDecodeFrame(session, sampleBuffer, 0, &outputPixelBuffer, &infoFlags);
+    status = VTDecompressionSessionDecodeFrame(session, sampleBuffer, 0, context, &infoFlags);
+
+    bool abandoned = false;
+    outputPixelBuffer = context->takeOutput(status == noErr, &abandoned);
+    if (abandoned) {
+      // VideoToolbox promised no callback for a failed call, but a late one would still write into
+      // this context, so it is only released together with the session.
+      staleContexts.push_back(context);
+    }
 
     if (status != noErr && !outputPixelBuffer) {
       LOGE("HardwareDecoder:Decode failed status = %d", (int)status);
