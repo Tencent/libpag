@@ -554,12 +554,37 @@ PAGX_TEST(PAGXExporterTest, ToDataReusesOneEntryForSharedDataUriImage) {
   EXPECT_EQ(CountOccurrences(entries["document.pagx"], "image=\"images/img_1.png\""), 2u);
 }
 
+PAGX_TEST(PAGXExporterTest, ToDataKeepsUndecodableDataUriExternal) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  // An anonymous image is inlined at every reference instead of switching to the `@id` form, so
+  // both patterns go through AddImage for the same payload.
+  auto* image = AddImage(doc.get(), "", "data:image/png;base64,@@@@");
+  AddPatternLayer(doc.get(), image);
+  AddPatternLayer(doc.get(), image);
+
+  std::string error;
+  std::vector<std::string> warnings;
+  auto zip = pagx::PAGXExporter::ToData(*doc, {}, &error, &warnings);
+  ASSERT_NE(zip, nullptr);
+  EXPECT_TRUE(error.empty());
+  std::unordered_map<std::string, std::string> entries;
+  ASSERT_TRUE(ReadZip(zip, &entries));
+  ASSERT_EQ(entries.size(), 1u);
+  EXPECT_EQ(CountOccurrences(entries["document.pagx"], "data:image/png;base64,@@@@"), 2u);
+  ASSERT_EQ(warnings.size(), 1u);
+  EXPECT_TRUE(HasWarning(warnings, "undecodable data URI"));
+}
+
 PAGX_TEST(PAGXExporterTest, ToDataKeepsAbsoluteReferenceSuffixReserved) {
   auto doc = pagx::PAGXDocument::Make(100, 100);
   AddImage(doc.get(), "img_local", "/Users/test/images/photo.png");
   AddImage(doc.get(), "photo", "", MakeImageData());
   AddImage(doc.get(), "img_windows", "C:\\Users\\test\\images\\win_photo.png");
   AddImage(doc.get(), "win_photo", "", MakeImageData());
+  // A document stored at the root of a drive resolves an "images/x.png" source to
+  // "C:\images\x.png", where the images/ segment sits directly behind the drive prefix.
+  AddImage(doc.get(), "img_drive_root", "C:\\images\\drive_photo.png");
+  AddImage(doc.get(), "drive_photo", "", MakeImageData());
 
   std::string error;
   auto zip = pagx::PAGXExporter::ToData(*doc, {}, &error);
@@ -570,6 +595,8 @@ PAGX_TEST(PAGXExporterTest, ToDataKeepsAbsoluteReferenceSuffixReserved) {
   EXPECT_NE(entries.find("images/photo_2.png"), entries.end());
   EXPECT_EQ(entries.find("images/win_photo.png"), entries.end());
   EXPECT_NE(entries.find("images/win_photo_2.png"), entries.end());
+  EXPECT_EQ(entries.find("images/drive_photo.png"), entries.end());
+  EXPECT_NE(entries.find("images/drive_photo_2.png"), entries.end());
 }
 
 PAGX_TEST(PAGXExporterTest, ToDataUsesSniffedFormatExtensions) {

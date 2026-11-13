@@ -43,8 +43,12 @@ class PAGXArchiveWriter {
   PAGXArchiveWriter(const PAGXArchiveWriter&) = delete;
   PAGXArchiveWriter& operator=(const PAGXArchiveWriter&) = delete;
 
+  // Returns the path the document should reference for this image: the packed entry path when the
+  // payload is absorbed into the archive, or the original source when it stays external.
   std::string AddImage(const Image* image);
 
+  // Assembles the document and every collected entry into a ZIP archive and returns its bytes, or
+  // returns nullptr with errorMsg set when the archive cannot be written.
   std::shared_ptr<Data> Finish(std::string_view documentXML, std::string* errorMsg);
 
   // Replaces warnings with one line per image the archive could not absorb, so a caller can log or

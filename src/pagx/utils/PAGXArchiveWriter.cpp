@@ -31,7 +31,10 @@ namespace pagx {
 
 namespace {
 
-constexpr size_t IMAGES_PREFIX_LENGTH = 7;  // strlen(PAGXExporter::IMAGES_DIRECTORY)
+// Directory prefix that every packed image entry lives under. It is an archive-layout detail, so
+// it stays internal instead of becoming part of the public exporter contract.
+constexpr const char* IMAGES_DIRECTORY = "images/";
+constexpr size_t IMAGES_PREFIX_LENGTH = 7;  // strlen(IMAGES_DIRECTORY)
 
 // Most filesystems cap a single file name at 255 bytes. Truncating the stem keeps room for the
 // extension and for the "_<n>" suffix that resolves name collisions.
@@ -196,6 +199,10 @@ std::string PAGXArchiveWriter::AddImage(const Image* image) {
       return addEntry(image, decoded);
     }
     recordExternalReference(image->filePath, "undecodable data URI");
+    // Cache the kept reference as well: one Image can be referenced by many ImagePattern / Glyph
+    // nodes, and without this entry every reference would retry the Base64 decode of a payload
+    // that cannot succeed.
+    _entryPaths[image] = image->filePath;
     return image->filePath;
   }
   recordExternalReference(image->filePath, ExternalReferenceReason(image->filePath));
@@ -278,7 +285,7 @@ std::string PAGXArchiveWriter::allocatePath(const std::string& baseName,
   if (stem.size() > MAX_ENTRY_STEM_LENGTH) {
     stem.resize(MAX_ENTRY_STEM_LENGTH);
   }
-  std::string prefix = std::string(PAGXExporter::IMAGES_DIRECTORY) + stem;
+  std::string prefix = IMAGES_DIRECTORY + stem;
   std::string path = prefix + "." + extension;
   for (size_t suffix = 2; _usedPaths.count(ToLowerAscii(path)) > 0; suffix++) {
     path = prefix + "_" + std::to_string(suffix) + "." + extension;
