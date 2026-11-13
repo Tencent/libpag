@@ -23,6 +23,7 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include "pagx/PAGDisplayOptions.h"
 #include "pagx/types/Color.h"
 
 namespace tgfx {
@@ -131,6 +132,13 @@ struct VideoExportOptions {
    * `ceil(documentSize * scale)`.
    */
   bool padToEvenSize = false;
+
+  /**
+   * Rendering mode used for every frame. Defaults to Partial to preserve the existing display-list
+   * behavior. Hosts exporting animations can select Direct to bypass partial-frame caching and
+   * match a full-frame readback pipeline.
+   */
+  PAGRenderMode renderMode = PAGRenderMode::Partial;
 };
 
 /** Result of attempting to start an asynchronous frame. */
@@ -267,6 +275,11 @@ class VideoExporter {
   VideoExporter& operator=(const VideoExporter&) = delete;
   VideoExporter(VideoExporter&&) = delete;
   VideoExporter& operator=(VideoExporter&&) = delete;
+
+  /**
+   * Returns the rendering mode applied to the scene's display options.
+   */
+  PAGRenderMode renderMode() const;
 
   /**
    * Returns the output width in pixels, which is `ceil(documentWidth * scale)` plus optional padding.

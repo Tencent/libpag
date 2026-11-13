@@ -79,9 +79,13 @@ int StartAsyncVideoExportTest() {
   pagx::VideoExportOptions options = {};
   options.frameRate = 1;
   options.duration = 2.0f;
+  options.renderMode = pagx::PAGRenderMode::Direct;
   exporter = pagx::VideoExporter::Make(document, options);
   if (exporter == nullptr || exporter->frameCount() != 2) {
     return Fail("failed to create the two-frame exporter");
+  }
+  if (exporter->renderMode() != pagx::PAGRenderMode::Direct) {
+    return Fail("the async video exporter did not apply Direct rendering");
   }
   auto started = exporter->startNextFrame();
   if (started.status != pagx::VideoExportStartStatus::FrameStarted || started.frame == nullptr ||
