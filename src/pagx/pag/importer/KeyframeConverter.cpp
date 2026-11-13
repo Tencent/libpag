@@ -879,6 +879,127 @@ void MigrateLayerVisibility(pag::Layer* legacyLayer, PAGXDocument* document,
 // and blend mode are static in practice (the importer warns when they animate, mirroring the
 // effect skeleton); reverse rides a Hold bool channel. The offset point flattens into the two
 // offsetX/offsetY channels the style node exposes.
+// Migrates one animated float property of a range selector (start/end/offset/amount/eases) into
+// the channel with the given PAGX field name.
+static void MigrateSelectorFloatChannel(pag::Property<float>* legacy, const std::string& name,
+                                        float frameRate, PAGXDocument* document,
+                                        AnimationObject* object) {
+  if (legacy == nullptr || !legacy->animatable()) {
+    return;
+  }
+  auto* channel = document->makeNode<TypedChannel<float>>();
+  channel->name = name;
+  ConvertFloatChannel(legacy, frameRate, channel);
+  if (!channel->keyframes.empty()) {
+    object->channels.push_back(channel);
+  }
+}
+
+// Channels for one legacy range selector's animated properties (spec 6.5.3 RangeSelector).
+void MigrateRangeSelectorAnimation(pag::TextRangeSelector* legacy, float frameRate,
+                                   PAGXDocument* document, AnimationObject* object) {
+  MigrateSelectorFloatChannel(legacy->start, "start", frameRate, document, object);
+  MigrateSelectorFloatChannel(legacy->end, "end", frameRate, document, object);
+  MigrateSelectorFloatChannel(legacy->offset, "offset", frameRate, document, object);
+  // The legacy "amount" scales the factor after the shape curve; PAGX names it "weight".
+  MigrateSelectorFloatChannel(legacy->amount, "weight", frameRate, document, object);
+  // The legacy easeLow controls the ramp INTO the peak and easeHigh the ramp OUT of it, which
+  // the PAGX triangle names easeIn / easeOut respectively.
+  MigrateSelectorFloatChannel(legacy->easeLow, "easeIn", frameRate, document, object);
+  MigrateSelectorFloatChannel(legacy->easeHigh, "easeOut", frameRate, document, object);
+}
+
+// Samples one animated legacy animator color property (per-frame evaluated by the legacy
+// property system) into a PAGX color channel with 0-1 normalized components. The legacy color
+// property carries RGB only; the alpha stays 1 (the animator opacity channel drives it).
+static void MigrateAnimatorColorChannel(pag::Property<pag::Color>* legacy, const std::string& name,
+                                        float frameRate, PAGXDocument* document,
+                                        AnimationObject* object) {
+  (void)frameRate;
+  auto* animatable = dynamic_cast<pag::AnimatableProperty<pag::Color>*>(legacy);
+  if (animatable == nullptr || animatable->keyframes.empty()) {
+    return;
+  }
+  auto first = animatable->keyframes.front()->startTime;
+  auto last = animatable->keyframes.back()->endTime;
+  auto* channel = document->makeNode<TypedChannel<Color>>();
+  channel->name = name;
+  for (auto frame = first; frame < last; frame++) {
+    auto color = legacy->getValueAt(frame);
+    Keyframe<Color> keyframe = {};
+    keyframe.time = frame;
+    keyframe.value = {color.red / 255.0f, color.green / 255.0f, color.blue / 255.0f, 1.0f,
+                      ColorSpace::SRGB};
+    keyframe.interpolation = KeyframeInterpolationType::Linear;
+    channel->keyframes.push_back(keyframe);
+  }
+  object->channels.push_back(channel);
+}
+
+// Channels for one legacy text animator's animated properties (spec 6.5.3 TextModifier).
+void MigrateTextModifierAnimation(pag::TextAnimator* animator, float frameRate,
+                                  PAGXDocument* document, AnimationObject* object) {
+  auto* typo = animator->typographyProperties;
+  if (typo != nullptr) {
+    if (typo->trackingAmount != nullptr && typo->trackingAmount->animatable()) {
+      // The animated amount splits onto the before/after channels by the STATIC tracking type
+      // share (an animated tracking type is warned as approximated by the importer).
+      float beforeShare = 0.5f;
+      float afterShare = 0.5f;
+      if (typo->trackingType != nullptr) {
+        auto trackingType = typo->trackingType->getValueAt(pag::Frame{0});
+        if (trackingType == pag::TextAnimatorTrackingType::Before) {
+          beforeShare = 1.0f;
+          afterShare = 0.0f;
+        } else if (trackingType == pag::TextAnimatorTrackingType::After) {
+          beforeShare = 0.0f;
+          afterShare = 1.0f;
+        }
+      }
+      auto migrateTrackingChannel = [&](const std::string& name, float share) {
+        if (share == 0.0f) {
+          return;
+        }
+        auto* channel = document->makeNode<TypedChannel<float>>();
+        channel->name = name;
+        ConvertFloatChannel(typo->trackingAmount, frameRate, channel);
+        if (!channel->keyframes.empty()) {
+          for (auto& keyframe : channel->keyframes) {
+            keyframe.value *= share;
+          }
+          object->channels.push_back(channel);
+        }
+      };
+      migrateTrackingChannel("trackingBefore", beforeShare);
+      migrateTrackingChannel("trackingAfter", afterShare);
+    }
+    if (typo->position != nullptr && typo->position->animatable()) {
+      ConvertPointChannel(typo->position, "position", true, frameRate, document, object);
+    }
+    if (typo->scale != nullptr && typo->scale->animatable()) {
+      ConvertPointChannel(typo->scale, "scale", false, frameRate, document, object);
+    }
+    if (typo->rotation != nullptr && typo->rotation->animatable()) {
+      auto* channel = document->makeNode<TypedChannel<float>>();
+      channel->name = "rotation";
+      ConvertFloatChannel(typo->rotation, frameRate, channel);
+      object->channels.push_back(channel);
+    }
+    if (typo->opacity != nullptr && typo->opacity->animatable()) {
+      auto* channel = document->makeNode<TypedChannel<float>>();
+      channel->name = "alpha";
+      ConvertOpacityChannel(typo->opacity, frameRate, channel);
+      object->channels.push_back(channel);
+    }
+  }
+  auto* colorProps = animator->colorProperties;
+  if (colorProps != nullptr) {
+    MigrateAnimatorColorChannel(colorProps->fillColor, "fillColor", frameRate, document, object);
+    MigrateAnimatorColorChannel(colorProps->strokeColor, "strokeColor", frameRate, document,
+                                object);
+  }
+}
+
 void MigrateGradientOverlayStyleAnimation(pag::GradientOverlayStyle* style, float frameRate,
                                           PAGXDocument* document, AnimationObject* object) {
   if (style == nullptr || object == nullptr) {

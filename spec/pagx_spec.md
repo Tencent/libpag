@@ -1823,7 +1823,7 @@ Text Element           Shape Modifier          Subsequent Modifiers
 Applies transforms and style overrides to glyphs within selected ranges. TextModifier may contain multiple RangeSelector child elements.
 
 ```xml
-<TextModifier anchor="0,0" position="0,0" rotation="0" scale="1,1" skew="0" skewAxis="0" alpha="1" fillColor="#FF0000" strokeColor="#000000" strokeWidth="1">
+<TextModifier anchor="0,0" position="0,0" rotation="0" scale="1,1" skew="0" skewAxis="0" alpha="1" trackingBefore="0" trackingAfter="0" trackingJustify="0" fillColor="#FF0000" strokeColor="#000000" strokeWidth="1">
   <RangeSelector start="0" end="0.5" shape="rampUp"/>
   <RangeSelector start="0.5" end="1" shape="rampDown"/>
 </TextModifier>
@@ -1838,6 +1838,9 @@ Applies transforms and style overrides to glyphs within selected ranges. TextMod
 | `skew` | float | 0 | Skew amount in degrees along the skewAxis direction |
 | `skewAxis` | float | 0 | Skew axis angle in degrees; defines the direction along which skewing is applied |
 | `alpha` | float | 1 | Opacity |
+| `trackingBefore` | float | 0 | Tracking space in pixels inserted before each selected character, scaled by its selection factor and accumulated across the line; the first character of a line receives none |
+| `trackingAfter` | float | 0 | Tracking space in pixels inserted after each selected character with the same line rules; the last character of a line receives none |
+| `trackingJustify` | float | 0 | Line justification factor for the tracking growth: each line starts shifted by `-totalTracking × factor` (0 start, -0.5 center, -1 end) |
 | `fillColor` | Color | - | Fill color override |
 | `strokeColor` | Color | - | Stroke color override |
 | `strokeWidth` | float | - | Stroke width override |

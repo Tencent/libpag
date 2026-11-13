@@ -2580,6 +2580,11 @@ class LayerBuilderContext {
     modifier->setSkewAxis(node->skewAxis);
     modifier->setAlpha(node->alpha);
 
+    // Convert tracking properties
+    modifier->setTrackingBefore(node->trackingBefore);
+    modifier->setTrackingAfter(node->trackingAfter);
+    modifier->setTrackingJustify(node->trackingJustify);
+
     // Convert paint properties
     if (node->fillColor.has_value()) {
       modifier->setFillColor(ToTGFX(node->fillColor.value()));
@@ -2604,6 +2609,21 @@ class LayerBuilderContext {
                                 WriteMixedFloat<tgfx::TextModifier, &tgfx::TextModifier::skewAxis,
                                                 &tgfx::TextModifier::setSkewAxis>,
                                 ReadScalar<tgfx::TextModifier, &tgfx::TextModifier::skewAxis>);
+    _result.binding.setAccessor(
+        node, "trackingBefore",
+        WriteMixedFloat<tgfx::TextModifier, &tgfx::TextModifier::trackingBefore,
+                        &tgfx::TextModifier::setTrackingBefore>,
+        ReadScalar<tgfx::TextModifier, &tgfx::TextModifier::trackingBefore>);
+    _result.binding.setAccessor(
+        node, "trackingAfter",
+        WriteMixedFloat<tgfx::TextModifier, &tgfx::TextModifier::trackingAfter,
+                        &tgfx::TextModifier::setTrackingAfter>,
+        ReadScalar<tgfx::TextModifier, &tgfx::TextModifier::trackingAfter>);
+    _result.binding.setAccessor(
+        node, "trackingJustify",
+        WriteMixedFloat<tgfx::TextModifier, &tgfx::TextModifier::trackingJustify,
+                        &tgfx::TextModifier::setTrackingJustify>,
+        ReadScalar<tgfx::TextModifier, &tgfx::TextModifier::trackingJustify>);
     _result.binding.setAccessor(node, "alpha",
                                 WriteMixedFloat<tgfx::TextModifier, &tgfx::TextModifier::alpha,
                                                 &tgfx::TextModifier::setAlpha>,

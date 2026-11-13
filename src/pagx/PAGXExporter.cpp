@@ -1044,6 +1044,12 @@ static void WriteVectorElement(XMLBuilder& xml, const Element* node, const Optio
       xml.addAttribute("skew", modifier->skew, Default<TextModifier>().skew);
       xml.addAttribute("skewAxis", modifier->skewAxis, Default<TextModifier>().skewAxis);
       xml.addAttribute("alpha", modifier->alpha, Default<TextModifier>().alpha);
+      xml.addAttribute("trackingBefore", modifier->trackingBefore,
+                       Default<TextModifier>().trackingBefore);
+      xml.addAttribute("trackingAfter", modifier->trackingAfter,
+                       Default<TextModifier>().trackingAfter);
+      xml.addAttribute("trackingJustify", modifier->trackingJustify,
+                       Default<TextModifier>().trackingJustify);
       if (modifier->fillColor.has_value()) {
         xml.addAttribute("fillColor", ColorToHexString(modifier->fillColor.value()));
       }

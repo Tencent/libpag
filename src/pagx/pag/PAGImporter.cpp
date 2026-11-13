@@ -1840,7 +1840,7 @@ Element* ReadTextModifierTag(pag::DecodeStream* tagStream, DecodeContext* contex
     if (header.code == TagCode::End) break;
     auto tagBytes = tagStream->readBytes(header.length);
     if (header.code == TagCode::TextModifierAttributes) {
-      PAGAttributeBlockReader reader(&tagBytes, 13);
+      PAGAttributeBlockReader reader(&tagBytes, 16);
       bool hasAnchorX = reader.flag(0);
       bool hasAnchorY = reader.flag(1);
       bool hasPosX = reader.flag(2);
@@ -1854,6 +1854,9 @@ Element* ReadTextModifierTag(pag::DecodeStream* tagStream, DecodeContext* contex
       bool hasFillColor = reader.flag(10);
       bool hasStrokeColor = reader.flag(11);
       bool hasStrokeWidth = reader.flag(12);
+      bool hasTrackingBefore = reader.flag(13);
+      bool hasTrackingAfter = reader.flag(14);
+      bool hasTrackingJustify = reader.flag(15);
       tagBytes.alignWithBytes();
       if (hasAnchorX) modifier->anchor.x = tagBytes.readFloat();
       if (hasAnchorY) modifier->anchor.y = tagBytes.readFloat();
@@ -1870,6 +1873,9 @@ Element* ReadTextModifierTag(pag::DecodeStream* tagStream, DecodeContext* contex
       if (hasFillColor) modifier->fillColor = ReadPAGColor(&tagBytes);
       if (hasStrokeColor) modifier->strokeColor = ReadPAGColor(&tagBytes);
       if (hasStrokeWidth) modifier->strokeWidth = tagBytes.readFloat();
+      if (hasTrackingBefore) modifier->trackingBefore = tagBytes.readFloat();
+      if (hasTrackingAfter) modifier->trackingAfter = tagBytes.readFloat();
+      if (hasTrackingJustify) modifier->trackingJustify = tagBytes.readFloat();
     } else if (header.code == TagCode::RangeSelector) {
       auto* selector = ReadRangeSelectorTag(&tagBytes, context);
       if (selector != nullptr) {

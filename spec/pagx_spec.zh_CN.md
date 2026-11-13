@@ -1821,7 +1821,7 @@ Fill 和 Stroke 的 `placement` 属性控制相对于子图层的绘制顺序：
 对选定范围内的字形应用变换和样式覆盖。TextModifier 可包含多个 RangeSelector 子元素，用于定义不同的选择范围和影响因子。
 
 ```xml
-<TextModifier anchor="0,0" position="0,0" rotation="0" scale="1,1" skew="0" skewAxis="0" alpha="1" fillColor="#FF0000" strokeColor="#000000" strokeWidth="1">
+<TextModifier anchor="0,0" position="0,0" rotation="0" scale="1,1" skew="0" skewAxis="0" alpha="1" trackingBefore="0" trackingAfter="0" trackingJustify="0" fillColor="#FF0000" strokeColor="#000000" strokeWidth="1">
   <RangeSelector start="0" end="0.5" shape="rampUp"/>
   <RangeSelector start="0.5" end="1" shape="rampDown"/>
 </TextModifier>
@@ -1836,6 +1836,9 @@ Fill 和 Stroke 的 `placement` 属性控制相对于子图层的绘制顺序：
 | `skew` | float | 0 | 倾斜角度（度），沿 skewAxis 方向应用 |
 | `skewAxis` | float | 0 | 倾斜轴角度（度），定义倾斜的作用方向 |
 | `alpha` | float | 1 | 透明度 |
+| `trackingBefore` | float | 0 | 插入在每个选中字符之前的字间距（像素），按该字符的选择因子缩放并在行内累计；行首字符不加 |
+| `trackingAfter` | float | 0 | 插入在每个选中字符之后的字间距（像素），行规则同 trackingBefore；行尾字符不加 |
+| `trackingJustify` | float | 0 | 字间距引起的行增长的行对齐补偿系数：每行起始偏移 `-总字距 × 系数`（0 起始、-0.5 居中、-1 结尾） |
 | `fillColor` | Color | - | 填充颜色覆盖 |
 | `strokeColor` | Color | - | 描边颜色覆盖 |
 | `strokeWidth` | float | - | 描边宽度覆盖 |

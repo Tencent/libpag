@@ -233,7 +233,8 @@ void CompareSample(const std::string& path, SampleResult* result) {
         for (auto& ch : safeName) {
           if (ch == '/') ch = '_';
         }
-        auto writeRaw = [&safeName, dumpDir](const char* suffix, const std::vector<uint8_t>& pixels) {
+        auto writeRaw = [&safeName, dumpDir](const char* suffix,
+                                             const std::vector<uint8_t>& pixels) {
           std::string outPath = std::string(dumpDir) + "/" + safeName + suffix;
           FILE* f = fopen(outPath.c_str(), "wb");
           if (f != nullptr) {

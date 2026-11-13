@@ -29,8 +29,8 @@
 #include <iostream>
 #include <string>
 #include "cli/CliUtils.h"
-#include "pag/pag.h"
 #include "cli/XPathQuery.h"
+#include "pag/pag.h"
 #include "pagx/FontConfig.h"
 #include "pagx/PAGAnimation.h"
 #include "pagx/PAGDisplayOptions.h"
@@ -102,8 +102,7 @@ static void PrintRenderUsage() {
       << "  --fallback <path|name>    Add a fallback font file or system font name (can be\n"
          "                            specified multiple times)\n"
       << "  --legacy                  Render a legacy PAG file through the PAGPlayer pipeline\n"
-         "                            (incompatible with --crop, --id, --xpath, --background,\n"
-         "                            --font and --fallback)\n";
+         "                            (incompatible with --crop, --id, --xpath and --background)\n";
 }
 
 static bool ParseHexColor(const std::string& hex, float* red, float* green, float* blue,
@@ -240,10 +239,9 @@ static int ParseRenderOptions(int argc, char* argv[], RenderOptions* options) {
     return 1;
   }
   if (options->legacy && (options->hasCrop || !options->id.empty() || !options->xpath.empty() ||
-                           options->hasBackground || !options->fontFiles.empty() ||
-                           !options->fallbacks.empty())) {
-    std::cerr << "pagx render: --legacy cannot be combined with --crop, --id, --xpath, "
-                 "--background, --font or --fallback\n";
+                          options->hasBackground)) {
+    std::cerr << "pagx render: --legacy cannot be combined with --crop, --id, --xpath or "
+                 "--background\n";
     return 1;
   }
   if (options->hasTime && (!options->id.empty() || !options->xpath.empty())) {
@@ -370,6 +368,32 @@ static tgfx::Bitmap RenderAnimatedFrame(const std::shared_ptr<PAGXDocument>& doc
 // the offscreen surface (PAGPlayer's default matrix scales it), --time maps to the playback
 // progress, and --scale drives the surface size.
 static tgfx::Bitmap RenderLegacyFrame(const RenderOptions& options) {
+  // The legacy pipeline resolves text through pag::PAGFont registrations only (no system
+  // substitution), so --font/--fallback must register into the legacy FontManager as well or
+  // text layers of unregistered families render no glyphs at all.
+  for (const auto& fontFile : options.fontFiles) {
+    auto typeface = tgfx::Typeface::MakeFromPath(fontFile);
+    if (typeface == nullptr) {
+      std::cerr << "pagx render: failed to load font '" << fontFile << "'\n";
+      return {};
+    }
+    pag::PAGFont::RegisterFont(fontFile, 0);
+  }
+  std::vector<std::string> fallbackPaths = {};
+  std::vector<std::string> fallbackNames = {};
+  for (const auto& fallback : options.fallbacks) {
+    if (tgfx::Typeface::MakeFromPath(fallback) != nullptr) {
+      fallbackPaths.push_back(fallback);
+    } else {
+      fallbackNames.push_back(fallback);
+    }
+  }
+  if (!fallbackPaths.empty()) {
+    pag::PAGFont::SetFallbackFontPaths(fallbackPaths, std::vector<int>(fallbackPaths.size(), 0));
+  }
+  if (!fallbackNames.empty()) {
+    pag::PAGFont::SetFallbackFontNames(fallbackNames);
+  }
   auto pagFile = pag::PAGFile::Load(options.inputFile);
   if (pagFile == nullptr) {
     std::cerr << "pagx render: failed to load legacy PAG '" << options.inputFile << "'\n";
@@ -402,7 +426,7 @@ static tgfx::Bitmap RenderLegacyFrame(const RenderOptions& options) {
   }
   tgfx::Pixmap pixmap(bitmap);
   if (!surface->readPixels(pag::ColorType::RGBA_8888, pag::AlphaType::Premultiplied,
-                            pixmap.writablePixels(), pixmap.rowBytes())) {
+                           pixmap.writablePixels(), pixmap.rowBytes())) {
     std::cerr << "pagx render: failed to read pixels from surface\n";
     return {};
   }

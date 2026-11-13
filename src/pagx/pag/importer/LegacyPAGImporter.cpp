@@ -52,6 +52,7 @@
 #include "pagx/nodes/Polystar.h"
 #include "pagx/nodes/RadialBlurFilter.h"
 #include "pagx/nodes/RadialGradient.h"
+#include "pagx/nodes/RangeSelector.h"
 #include "pagx/nodes/Rectangle.h"
 #include "pagx/nodes/Repeater.h"
 #include "pagx/nodes/RoundCorner.h"
@@ -60,6 +61,7 @@
 #include "pagx/nodes/StrokeLayerStyle.h"
 #include "pagx/nodes/Text.h"
 #include "pagx/nodes/TextBox.h"
+#include "pagx/nodes/TextModifier.h"
 #include "pagx/nodes/TrimPath.h"
 #include "pagx/nodes/ViewModel.h"
 #include "pagx/nodes/ViewModelProperty.h"
@@ -68,6 +70,10 @@
 
 namespace pagx {
 // Keyframe migration (P3-5): implemented in KeyframeConverter.cpp.
+void MigrateTextModifierAnimation(pag::TextAnimator* animator, float frameRate,
+                                  PAGXDocument* document, AnimationObject* object);
+void MigrateRangeSelectorAnimation(pag::TextRangeSelector* legacy, float frameRate,
+                                   PAGXDocument* document, AnimationObject* object);
 void MigrateTransform2DAnimation(pag::Transform2D* transform, float frameRate,
                                  PAGXDocument* document, AnimationObject* object);
 void MigrateLayerVisibility(pag::Layer* legacyLayer, PAGXDocument* document,
@@ -232,6 +238,183 @@ Color ConvertColor(const pag::Color& color) {
 // Maps the legacy paragraph justification onto the box's inline alignment. A NaN-width point
 // box reproduces the legacy centered/right drawX offsets; the FullJustify last-line variants
 // beyond Left have no PAGX equivalent and approximate as Justify (whose last line is Start).
+SelectorUnit ConvertSelectorUnit(pag::TextRangeSelectorUnits units) {
+  return units == pag::TextRangeSelectorUnits::Index ? SelectorUnit::Index
+                                                     : SelectorUnit::Percentage;
+}
+
+SelectorShape ConvertSelectorShape(pag::TextRangeSelectorShape shape) {
+  switch (shape) {
+    case pag::TextRangeSelectorShape::RampUp:
+      return SelectorShape::RampUp;
+    case pag::TextRangeSelectorShape::RampDown:
+      return SelectorShape::RampDown;
+    case pag::TextRangeSelectorShape::Triangle:
+      return SelectorShape::Triangle;
+    case pag::TextRangeSelectorShape::Round:
+      return SelectorShape::Round;
+    case pag::TextRangeSelectorShape::Smooth:
+      return SelectorShape::Smooth;
+    case pag::TextRangeSelectorShape::Square:
+    default:
+      return SelectorShape::Square;
+  }
+}
+
+SelectorMode ConvertSelectorMode(pag::TextSelectorMode mode) {
+  switch (mode) {
+    case pag::TextSelectorMode::Subtract:
+      return SelectorMode::Subtract;
+    case pag::TextSelectorMode::Intersect:
+      return SelectorMode::Intersect;
+    case pag::TextSelectorMode::Min:
+      return SelectorMode::Min;
+    case pag::TextSelectorMode::Max:
+      return SelectorMode::Max;
+    case pag::TextSelectorMode::Difference:
+      return SelectorMode::Difference;
+    case pag::TextSelectorMode::Add:
+    case pag::TextSelectorMode::None:
+    default:
+      return SelectorMode::Add;
+  }
+}
+
+// Legacy text animators (AE per-character animation) migrate as TextModifier elements (spec
+// 6.5.3): one modifier per animator, its RangeSelectors as child selector nodes. The modifier
+// sits after the Text element and before the painters, so tgfx applies it to the accumulated
+// glyphs before the fill/stroke painters capture them. Unsupported capabilities (tracking,
+// wiggly selectors, non-character basedOn) warn and drop; the legacy renderer itself ignores
+// smoothness, so it is not migrated either.
+static void MigrateTextAnimators(ConvertState* state, pag::TextLayer* legacyText,
+                                 TextBox* textBox) {
+  auto startFrame = legacyText->startTime;
+  auto frameRate = state->currentFrameRate;
+  auto baseId = LegacyLayerTargetId(legacyText) + "-animator-";
+  auto textDocument = legacyText->getTextDocument();
+  // The tracking widens each line; the justification keeps the line's fixed edge where the
+  // legacy CalculateOffsetByJustification puts it (right = -length, center = -length/2, left = 0).
+  float justifyFactor = 0.0f;
+  if (textDocument != nullptr) {
+    switch (textDocument->justification) {
+      case pag::ParagraphJustification::RightJustify:
+        justifyFactor = -1.0f;
+        break;
+      case pag::ParagraphJustification::LeftJustify:
+        justifyFactor = 0.0f;
+        break;
+      default:
+        justifyFactor = -0.5f;
+        break;
+    }
+  }
+  for (size_t animatorIndex = 0; animatorIndex < legacyText->animators.size(); animatorIndex++) {
+    auto* animator = legacyText->animators[animatorIndex];
+    auto* modifier =
+        state->document->makeNode<TextModifier>(baseId + std::to_string(animatorIndex));
+    auto* typo = animator->typographyProperties;
+    if (typo != nullptr) {
+      if (typo->trackingAmount != nullptr) {
+        // The legacy tracking type splits the amount around the glyph: BeforeAndAfter halves it
+        // onto both sides, Before / After put all of it on one side.
+        auto trackingAmount = PropertyValueAtStart(typo->trackingAmount, startFrame, nullptr);
+        auto trackingType = pag::TextAnimatorTrackingType::BeforeAndAfter;
+        if (typo->trackingType != nullptr) {
+          if (typo->trackingType->animatable()) {
+            state->warn(PAGExportWarning::UnsupportedColorSource,
+                        "animated animator trackingType approximated as static");
+          }
+          trackingType = PropertyValueAtStart(typo->trackingType, startFrame, nullptr);
+        }
+        switch (trackingType) {
+          case pag::TextAnimatorTrackingType::Before:
+            modifier->trackingBefore = trackingAmount;
+            modifier->trackingAfter = 0.0f;
+            break;
+          case pag::TextAnimatorTrackingType::After:
+            modifier->trackingBefore = 0.0f;
+            modifier->trackingAfter = trackingAmount;
+            break;
+          default:
+            modifier->trackingBefore = trackingAmount * 0.5f;
+            modifier->trackingAfter = trackingAmount * 0.5f;
+            break;
+        }
+        modifier->trackingJustify = justifyFactor;
+      }
+      if (typo->position != nullptr) {
+        auto position = PropertyValueAtStart(typo->position, startFrame, nullptr);
+        modifier->position = {position.x, position.y};
+      }
+      if (typo->scale != nullptr) {
+        auto scale = PropertyValueAtStart(typo->scale, startFrame, nullptr);
+        modifier->scale = {scale.x, scale.y};
+      }
+      if (typo->rotation != nullptr) {
+        modifier->rotation = PropertyValueAtStart(typo->rotation, startFrame, nullptr);
+      }
+      if (typo->opacity != nullptr) {
+        modifier->alpha = PropertyValueAtStart(typo->opacity, startFrame, nullptr) / 255.0f;
+      }
+    }
+    auto* colorProps = animator->colorProperties;
+    if (colorProps != nullptr) {
+      if (colorProps->fillColor != nullptr) {
+        modifier->fillColor =
+            ConvertColor(PropertyValueAtStart(colorProps->fillColor, startFrame, nullptr));
+      }
+      if (colorProps->strokeColor != nullptr) {
+        modifier->strokeColor =
+            ConvertColor(PropertyValueAtStart(colorProps->strokeColor, startFrame, nullptr));
+      }
+    }
+    for (size_t selectorIndex = 0; selectorIndex < animator->selectors.size(); selectorIndex++) {
+      auto* selector = animator->selectors[selectorIndex];
+      if (selector->type() != pag::TextSelectorType::Range) {
+        state->warn(PAGExportWarning::UnsupportedColorSource, "wiggly text selector not migrated");
+        continue;
+      }
+      auto* legacySelector = static_cast<pag::TextRangeSelector*>(selector);
+      if (legacySelector->basedOn != pag::TextSelectorBasedOn::Characters) {
+        state->warn(PAGExportWarning::UnsupportedColorSource, "text selector basedOn not migrated");
+      }
+      auto* range = state->document->makeNode<RangeSelector>(
+          baseId + std::to_string(animatorIndex) + "-selector-" + std::to_string(selectorIndex));
+      range->start = PropertyValueAtStart(legacySelector->start, startFrame, nullptr);
+      range->end = PropertyValueAtStart(legacySelector->end, startFrame, nullptr);
+      range->offset = PropertyValueAtStart(legacySelector->offset, startFrame, nullptr);
+      range->unit = ConvertSelectorUnit(legacySelector->units);
+      range->shape = ConvertSelectorShape(legacySelector->shape);
+      range->mode =
+          ConvertSelectorMode(PropertyValueAtStart(legacySelector->mode, startFrame, nullptr));
+      range->weight = PropertyValueAtStart(legacySelector->amount, startFrame, nullptr);
+      range->easeIn = PropertyValueAtStart(legacySelector->easeLow, startFrame, nullptr);
+      range->easeOut = PropertyValueAtStart(legacySelector->easeHigh, startFrame, nullptr);
+      range->randomOrder = legacySelector->randomizeOrder;
+      range->randomSeed =
+          static_cast<int>(PropertyValueAtStart(legacySelector->randomSeed, startFrame, nullptr));
+      modifier->selectors.push_back(range);
+      if (state->currentAnimation != nullptr) {
+        auto* object = state->document->makeNode<AnimationObject>();
+        object->target = range->id;
+        MigrateRangeSelectorAnimation(legacySelector, frameRate, state->document, object);
+        if (!object->channels.empty()) {
+          state->currentAnimation->objects.push_back(object);
+        }
+      }
+    }
+    textBox->elements.push_back(modifier);
+    if (state->currentAnimation != nullptr) {
+      auto* object = state->document->makeNode<AnimationObject>();
+      object->target = modifier->id;
+      MigrateTextModifierAnimation(animator, frameRate, state->document, object);
+      if (!object->channels.empty()) {
+        state->currentAnimation->objects.push_back(object);
+      }
+    }
+  }
+}
+
 TextAlign ConvertJustification(pag::ParagraphJustification justification) {
   switch (justification) {
     case pag::ParagraphJustification::CenterJustify:
@@ -1574,6 +1757,7 @@ Layer* ConvertLayer(ConvertState* state, pag::Layer* legacyLayer, float parentFr
           }
         }
         textBox->elements.push_back(text);
+        MigrateTextAnimators(state, legacyText, textBox);
         // The legacy derives line spacing from the document leading (auto = 1.2 x fontSize); the
         // PAGX auto mode uses font metrics instead, so the spacing is always mapped explicitly.
         textBox->lineHeight = textDocument->leading == 0 ? roundf(textDocument->fontSize * 1.2f)

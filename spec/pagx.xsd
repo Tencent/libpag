@@ -708,6 +708,9 @@
     <xs:attribute name="skew" type="xs:decimal" default="0"/>
     <xs:attribute name="skewAxis" type="xs:decimal" default="0"/>
     <xs:attribute name="alpha" type="xs:decimal" default="1"/>
+    <xs:attribute name="trackingBefore" type="xs:decimal" default="0"/>
+    <xs:attribute name="trackingAfter" type="xs:decimal" default="0"/>
+    <xs:attribute name="trackingJustify" type="xs:decimal" default="0"/>
     <xs:attribute name="fillColor" type="ColorType"/>
     <xs:attribute name="strokeColor" type="ColorType"/>
     <xs:attribute name="strokeWidth" type="xs:decimal"/>

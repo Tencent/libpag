@@ -70,6 +70,27 @@ class TextModifier : public Element {
   float alpha = 1.0f;
 
   /**
+   * The tracking space in pixels inserted before each selected character, scaled by the
+   * character's selection factor and accumulated across the line (the first character of a line
+   * receives none). The default value is 0.
+   */
+  float trackingBefore = 0.0f;
+
+  /**
+   * The tracking space in pixels inserted after each selected character, with the same line
+   * accumulation rules as trackingBefore (the last character of a line receives none). The
+   * default value is 0.
+   */
+  float trackingAfter = 0.0f;
+
+  /**
+   * The line justification factor compensating the tracking-induced line growth: each line
+   * starts shifted by -totalTracking * factor. 0 keeps the line start, -0.5 keeps the line
+   * centered, -1 keeps the line end. The default value is 0.
+   */
+  float trackingJustify = 0.0f;
+
+  /**
    * The fill color override for selected characters.
    */
   std::optional<Color> fillColor = std::nullopt;

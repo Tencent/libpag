@@ -1593,6 +1593,9 @@ void WriteTextModifierTag(pag::EncodeStream* stream, TextModifier* modifier, Enc
     auto hasFillColor = modifier->fillColor.has_value();
     auto hasStrokeColor = modifier->strokeColor.has_value();
     auto hasStrokeWidth = modifier->strokeWidth.has_value();
+    auto hasTrackingBefore = modifier->trackingBefore != 0.0f;
+    auto hasTrackingAfter = modifier->trackingAfter != 0.0f;
+    auto hasTrackingJustify = modifier->trackingJustify != 0.0f;
     writer.writeFlag(hasAnchorX);
     writer.writeFlag(hasAnchorY);
     writer.writeFlag(hasPosX);
@@ -1606,6 +1609,9 @@ void WriteTextModifierTag(pag::EncodeStream* stream, TextModifier* modifier, Enc
     writer.writeFlag(hasFillColor);
     writer.writeFlag(hasStrokeColor);
     writer.writeFlag(hasStrokeWidth);
+    writer.writeFlag(hasTrackingBefore);
+    writer.writeFlag(hasTrackingAfter);
+    writer.writeFlag(hasTrackingJustify);
     auto* v = writer.valueStream();
     if (hasAnchorX) v->writeFloat(modifier->anchor.x);
     if (hasAnchorY) v->writeFloat(modifier->anchor.y);
@@ -1622,6 +1628,9 @@ void WriteTextModifierTag(pag::EncodeStream* stream, TextModifier* modifier, Enc
     if (hasFillColor) WritePAGColor(v, modifier->fillColor.value());
     if (hasStrokeColor) WritePAGColor(v, modifier->strokeColor.value());
     if (hasStrokeWidth) v->writeFloat(modifier->strokeWidth.value());
+    if (hasTrackingBefore) v->writeFloat(modifier->trackingBefore);
+    if (hasTrackingAfter) v->writeFloat(modifier->trackingAfter);
+    if (hasTrackingJustify) v->writeFloat(modifier->trackingJustify);
     auto block = writer.release();
     WritePAGTagHeader(&content, TagCode::TextModifierAttributes,
                       static_cast<uint32_t>(block->length()));

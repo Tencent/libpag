@@ -1297,6 +1297,12 @@ static TextModifier* ParseTextModifier(const DOMNode* node, PAGXDocument* doc) {
   modifier->skew = GetFloatAttribute(node, "skew", Default<TextModifier>().skew, doc);
   modifier->skewAxis = GetFloatAttribute(node, "skewAxis", Default<TextModifier>().skewAxis, doc);
   modifier->alpha = GetFloatAttribute(node, "alpha", Default<TextModifier>().alpha, doc);
+  modifier->trackingBefore =
+      GetFloatAttribute(node, "trackingBefore", Default<TextModifier>().trackingBefore, doc);
+  modifier->trackingAfter =
+      GetFloatAttribute(node, "trackingAfter", Default<TextModifier>().trackingAfter, doc);
+  modifier->trackingJustify =
+      GetFloatAttribute(node, "trackingJustify", Default<TextModifier>().trackingJustify, doc);
   auto fillColorAttr = GetAttribute(node, "fillColor");
   if (!fillColorAttr.empty()) {
     modifier->fillColor = GetColorAttribute(node, "fillColor", doc);
