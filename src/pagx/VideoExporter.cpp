@@ -370,9 +370,15 @@ std::shared_ptr<VideoExporter> VideoExporter::MakeInternal(std::shared_ptr<PAGXD
   if (!ResolveSampling(options, plan, &frameRate, &frameCount, errorMsg)) {
     return nullptr;
   }
-  int width = 0;
-  int height = 0;
-  if (!ComputeVideoOutputDimensions(document->width, document->height, options.scale,
+  int width = options.outputWidth;
+  int height = options.outputHeight;
+  const bool hasExplicitSize = width > 0 && height > 0;
+  if ((width == 0) != (height == 0) || width < 0 || height < 0) {
+    SetError(errorMsg, "explicit output dimensions must both be positive or both be zero");
+    return nullptr;
+  }
+  if (!hasExplicitSize &&
+      !ComputeVideoOutputDimensions(document->width, document->height, options.scale,
                                     options.padToEvenSize, &width, &height)) {
     SetError(errorMsg, "the output dimensions must be finite, positive, and fit in an int");
     return nullptr;
