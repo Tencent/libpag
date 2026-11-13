@@ -18,6 +18,7 @@
 
 #include "Transform3DScene.h"
 #include <cmath>
+#include "base/utils/Log.h"
 #include "base/utils/MatrixUtil.h"
 #include "rendering/caches/RenderCache.h"
 #include "rendering/filters/Transform3DSceneFilter.h"
@@ -86,6 +87,8 @@ class Transform3DScene : public Graphic {
   }
 
   bool hitTest(RenderCache* cache, float x, float y) override {
+    // 像素级命中需要实际投影后的像素，故在 1x1 surface 上渲染该点回读。
+    // 非像素(几何)命中由 PAGComposition::GetChildLayerAtPoint 走 ProjectedMatrix 反投影承担。
     auto surface = tgfx::Surface::Make(cache->getContext(), 1, 1);
     if (surface == nullptr) {
       return false;
@@ -123,6 +126,8 @@ class Transform3DScene : public Graphic {
     targetHeight = std::min(targetHeight, limit);
     auto source = MakeSource(background, cache, targetWidth, targetHeight, scale);
     if (source == nullptr) {
+      LOGE("Transform3DScene::draw() failed to allocate background source %dx%d", targetWidth,
+           targetHeight);
       return;
     }
     std::vector<std::shared_ptr<tgfx::Image>> images;
@@ -134,6 +139,8 @@ class Transform3DScene : public Graphic {
     for (const auto& layer : layers) {
       auto image = MakeSource(layer.graphic, cache, targetWidth, targetHeight, scale);
       if (image == nullptr) {
+        LOGE("Transform3DScene::draw() failed to allocate layer image %dx%d", targetWidth,
+             targetHeight);
         return;
       }
       images.push_back(std::move(image));
@@ -146,6 +153,7 @@ class Transform3DScene : public Graphic {
                                                            targetWidth, targetHeight);
     auto image = source->makeWithFilter(tgfx::ImageFilter::Runtime(filter));
     if (image == nullptr) {
+      LOGE("Transform3DScene::draw() failed to build filtered image for %zu layers", layers.size());
       return;
     }
     canvas->save();

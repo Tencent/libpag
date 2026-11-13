@@ -81,4 +81,12 @@ bool Has3DTransform(const Layer* layer) {
   return false;
 }
 
+bool NeedsClipSpaceYFlip() {
+#ifdef TGFX_USE_WEBGPU
+  return true;
+#else
+  return false;
+#endif
+}
+
 }  // namespace pag

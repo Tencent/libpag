@@ -16,6 +16,8 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include <mutex>
+#include <unordered_map>
 #include "base/utils/MatrixUtil.h"
 #include "base/utils/TimeUtil.h"
 #include "pag/file.h"
@@ -32,6 +34,30 @@
 #include "rendering/utils/ScopedLock.h"
 
 namespace pag {
+namespace {
+struct Cached3DGraphic {
+  std::shared_ptr<Graphic> graphic = nullptr;
+  uint32_t contentVersion = 0;
+};
+
+static std::mutex& Cached3DGraphicMutex() {
+  static std::mutex mutex;
+  return mutex;
+}
+
+static std::unordered_map<const PAGComposition*, Cached3DGraphic>& Cached3DGraphicTable() {
+  static std::unordered_map<const PAGComposition*, Cached3DGraphic> table;
+  return table;
+}
+}  // namespace
+
+std::shared_ptr<Graphic> GetCached3DGraphic(const PAGComposition* composition) {
+  std::lock_guard<std::mutex> autoLock(Cached3DGraphicMutex());
+  auto& table = Cached3DGraphicTable();
+  auto item = table.find(composition);
+  return item != table.end() ? item->second.graphic : nullptr;
+}
+
 std::shared_ptr<PAGComposition> PAGComposition::Make(int width, int height) {
   auto pagComposition = std::shared_ptr<PAGComposition>(new PAGComposition(width, height));
   pagComposition->weakThis = pagComposition;
@@ -63,6 +89,10 @@ PAGComposition::PAGComposition(std::shared_ptr<File> file, PreComposeLayer* laye
 }
 
 PAGComposition::~PAGComposition() {
+  {
+    std::lock_guard<std::mutex> autoLock(Cached3DGraphicMutex());
+    Cached3DGraphicTable().erase(this);
+  }
   removeAllLayers();
   if (emptyComposition) {
     delete emptyComposition;  // created by PAGComposition(width, height).
@@ -399,7 +429,8 @@ bool PAGComposition::gotoTime(int64_t layerTime) {
     }
   }
   if (changed) {
-    cached3DGraphic = nullptr;
+    std::lock_guard<std::mutex> autoLock(Cached3DGraphicMutex());
+    Cached3DGraphicTable().erase(this);
   }
   return changed;
 }
@@ -425,19 +456,41 @@ void PAGComposition::draw(Recorder* recorder) {
   if (hasClip()) {
     recorder->saveClip(0, 0, static_cast<float>(_width), static_cast<float>(_height));
   }
-  if (cached3DGraphic != nullptr && cached3DContentVersion == contentVersion) {
-    recorder->drawGraphic(cached3DGraphic);
-    if (hasClip()) {
-      recorder->restore();
-    }
-    return;
-  }
-  cached3DGraphic = nullptr;
   std::shared_ptr<Transform3DContext> context;
   for (const auto& child : layers) {
     if (child->layerVisible && child->frameVisible() && Has3DTransform(child->layer)) {
       context = child->createTransform3DContext();
       break;
+    }
+  }
+  if (context == nullptr) {
+    // 无 3D 子层时保留原直录路径，避免对纯 2D 文件引入逐层 Recorder 与合批退化。
+    for (auto& childLayer : layers) {
+      if (!childLayer->layerVisible) {
+        continue;
+      }
+      auto filter = childLayer->cacheFilters()
+                        ? nullptr
+                        : FilterModifier::Make(childLayer->layer, childLayer->contentFrame +
+                                                                      childLayer->layer->startTime);
+      DrawChildLayer(recorder, childLayer.get(), filter);
+    }
+    if (hasClip()) {
+      recorder->restore();
+    }
+    return;
+  }
+  {
+    std::lock_guard<std::mutex> autoLock(Cached3DGraphicMutex());
+    auto& table = Cached3DGraphicTable();
+    auto item = table.find(this);
+    if (item != table.end() && item->second.graphic != nullptr &&
+        item->second.contentVersion == contentVersion) {
+      recorder->drawGraphic(item->second.graphic);
+      if (hasClip()) {
+        recorder->restore();
+      }
+      return;
     }
   }
   Transform3DSceneBuilder scene(_width, _height);
@@ -459,9 +512,9 @@ void PAGComposition::draw(Recorder* recorder) {
                    ToTGFX(childLayer->layerMatrix));
   }
   auto graphic = scene.makeGraphic();
-  if (context != nullptr) {
-    cached3DGraphic = graphic;
-    cached3DContentVersion = contentVersion;
+  {
+    std::lock_guard<std::mutex> autoLock(Cached3DGraphicMutex());
+    Cached3DGraphicTable()[this] = {graphic, contentVersion};
   }
   recorder->drawGraphic(std::move(graphic));
   if (hasClip()) {

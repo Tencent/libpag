@@ -204,13 +204,18 @@ static_assert(offsetof(VertexUniforms, matrixData) == 0);
 
 }  // namespace
 
+bool Transform3DFilter::IsActiveCamera(const Layer* layer, Frame frame) {
+  return layer->type() == LayerType::Camera && layer->isActive && frame >= layer->startTime &&
+         frame < layer->startTime + layer->duration;
+}
+
 std::shared_ptr<Transform3DContext> Transform3DFilter::MakeContext(VectorComposition* composition,
                                                                    Frame frame) {
   CameraLayer* camera = nullptr;
-  for (auto layer : composition->layers) {
-    if (layer->type() == LayerType::Camera && layer->isActive && frame >= layer->startTime &&
-        frame < layer->startTime + layer->duration) {
-      camera = static_cast<CameraLayer*>(layer);
+  // 多相机时取渲染顺序最靠后的顶层活动相机，与 PAGLayer 的运行期选取保持一致。
+  for (auto item = composition->layers.rbegin(); item != composition->layers.rend(); ++item) {
+    if (IsActiveCamera(*item, frame)) {
+      camera = static_cast<CameraLayer*>(*item);
       break;
     }
   }
@@ -399,9 +404,9 @@ bool Transform3DFilter::onDraw(tgfx::CommandEncoder* encoder,
   croppedMatrix.postScale(width / targetWidth, height / targetHeight, 1);
   croppedMatrix.postTranslate((width + 2 * offset.x) / targetWidth - 1,
                               (height + 2 * offset.y) / targetHeight - 1, 0);
-#ifdef TGFX_USE_WEBGPU
-  croppedMatrix.postScale(1.0f, -1.0f, 1.0f);
-#endif
+  if (NeedsClipSpaceYFlip()) {
+    croppedMatrix.postScale(1.0f, -1.0f, 1.0f);
+  }
   Transform3DFilter cropped(cache, outputTexture->width(), outputTexture->height(), croppedMatrix);
   VertexUniforms uniforms = {};
   croppedMatrix.getColumnMajor(uniforms.matrixData.data());
