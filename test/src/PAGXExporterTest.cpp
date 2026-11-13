@@ -110,6 +110,15 @@ std::string BytesOf(const std::shared_ptr<pagx::Data>& data) {
   return std::string(reinterpret_cast<const char*>(data->bytes()), data->size());
 }
 
+bool HasWarning(const std::vector<std::string>& warnings, const std::string& needle) {
+  for (const auto& warning : warnings) {
+    if (warning.find(needle) != std::string::npos) {
+      return true;
+    }
+  }
+  return false;
+}
+
 uint16_t ReadLE16(const std::string& bytes, size_t offset) {
   return static_cast<uint16_t>(static_cast<uint8_t>(bytes[offset])) |
          static_cast<uint16_t>(static_cast<uint8_t>(bytes[offset + 1]) << 8);
@@ -452,8 +461,12 @@ PAGX_TEST(PAGXExporterTest, ToDataReportsExternalReferences) {
   AddImage(doc.get(), "img_local", "/Users/test/images/photo.png");
 
   std::string error;
-  auto zip = pagx::PAGXExporter::ToData(*doc, {}, &error);
+  std::vector<std::string> warnings;
+  auto zip = pagx::PAGXExporter::ToData(*doc, {}, &error, &warnings);
   ASSERT_NE(zip, nullptr);
+  // A produced archive is a success even when it is not self-contained, so the failure output
+  // stays empty and the problems are reported separately.
+  EXPECT_TRUE(error.empty());
   std::unordered_map<std::string, std::string> entries;
   ASSERT_TRUE(ReadZip(zip, &entries));
   ASSERT_EQ(entries.size(), 1u);
@@ -462,11 +475,11 @@ PAGX_TEST(PAGXExporterTest, ToDataReportsExternalReferences) {
   EXPECT_NE(xml.find("source=\"hash:0123456789abcdef\""), std::string::npos);
   EXPECT_NE(xml.find("source=\"https://example.com/photo.png\""), std::string::npos);
   EXPECT_NE(xml.find("source=\"/Users/test/images/photo.png\""), std::string::npos);
-  EXPECT_NE(error.find("not self-contained"), std::string::npos);
-  EXPECT_NE(error.find("3 image reference(s)"), std::string::npos);
-  EXPECT_NE(error.find("host-supplied hash reference"), std::string::npos);
-  EXPECT_NE(error.find("remote URL"), std::string::npos);
-  EXPECT_NE(error.find("local file path"), std::string::npos);
+  ASSERT_EQ(warnings.size(), 3u);
+  EXPECT_TRUE(HasWarning(warnings, "hash:0123456789abcdef"));
+  EXPECT_TRUE(HasWarning(warnings, "host-supplied hash reference"));
+  EXPECT_TRUE(HasWarning(warnings, "remote URL"));
+  EXPECT_TRUE(HasWarning(warnings, "local file path"));
 }
 
 PAGX_TEST(PAGXExporterTest, ToDataPacksBase64DataUriFilePath) {
@@ -579,8 +592,10 @@ PAGX_TEST(PAGXExporterTest, ToDataUsesSniffedFormatExtensions) {
   EXPECT_NE(xml.find("source=\"data:application/octet-stream;base64,"), std::string::npos);
 
   std::string error;
-  auto zip = pagx::PAGXExporter::ToData(*doc, {}, &error);
+  std::vector<std::string> warnings;
+  auto zip = pagx::PAGXExporter::ToData(*doc, {}, &error, &warnings);
   ASSERT_NE(zip, nullptr);
+  EXPECT_TRUE(error.empty());
   std::unordered_map<std::string, std::string> entries;
   ASSERT_TRUE(ReadZip(zip, &entries));
   ASSERT_NE(entries.find("images/img_png.png"), entries.end());
@@ -593,9 +608,11 @@ PAGX_TEST(PAGXExporterTest, ToDataUsesSniffedFormatExtensions) {
   EXPECT_EQ(entries["images/img_jpeg.jpeg"],
             BytesOf(MakeBytesData(kJpegBytes, sizeof(kJpegBytes))));
   EXPECT_EQ(entries["images/img_gif.gif"], BytesOf(MakeBytesData(kGifBytes, sizeof(kGifBytes))));
-  EXPECT_NE(error.find("image/avif"), std::string::npos);
-  EXPECT_NE(error.find("image/svg+xml"), std::string::npos);
-  EXPECT_NE(error.find("unrecognized format"), std::string::npos);
+  ASSERT_EQ(warnings.size(), 3u);
+  EXPECT_TRUE(HasWarning(warnings, "images/img_avif.avif"));
+  EXPECT_TRUE(HasWarning(warnings, "image/avif"));
+  EXPECT_TRUE(HasWarning(warnings, "image/svg+xml"));
+  EXPECT_TRUE(HasWarning(warnings, "unrecognized format"));
 }
 
 PAGX_TEST(PAGXExporterTest, ToDataSkipsEmojiUsedOnlyBySkippedGlyphs) {

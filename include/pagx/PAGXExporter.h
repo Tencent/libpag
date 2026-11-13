@@ -20,6 +20,7 @@
 
 #include <memory>
 #include <string>
+#include <vector>
 #include "pagx/PAGXDocument.h"
 #include "pagx/types/Data.h"
 
@@ -75,18 +76,20 @@ class PAGXExporter {
    * PAGXDocument::loadFileData() or PAGXDocument::loadFileDataMap() first. The document itself
    * is not modified.
    *
-   * When an archive is produced but is not self-contained, *errorMsg describes which references
-   * were left external, along with any packed format `<Image>` cannot render; the ZIP is still
-   * returned.
+   * An archive that is produced without absorbing every image is still returned. The references
+   * left external, along with any packed format `<Image>` cannot render, are reported through
+   * `warnings` instead of failing the export.
    *
    * @param document the document to export
    * @param options export options
-   * @param errorMsg optional output for the failure reason when nullptr is returned, or for the
-   *                 self-containment warning when a non-null archive is returned
+   * @param errorMsg optional output for the failure reason; only set when nullptr is returned
+   * @param warnings optional output replaced on return by one entry per non-fatal problem, and
+   *                 left empty when the archive is fully self-contained
    * @return the ZIP bytes, or nullptr on failure
    */
   static std::shared_ptr<Data> ToData(const PAGXDocument& document, const Options& options = {},
-                                      std::string* errorMsg = nullptr);
+                                      std::string* errorMsg = nullptr,
+                                      std::vector<std::string>* warnings = nullptr);
 };
 
 }  // namespace pagx

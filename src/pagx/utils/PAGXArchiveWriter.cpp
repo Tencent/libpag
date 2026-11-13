@@ -32,7 +32,6 @@ namespace pagx {
 namespace {
 
 constexpr size_t IMAGES_PREFIX_LENGTH = 7;  // strlen(PAGXExporter::IMAGES_DIRECTORY)
-constexpr size_t MAX_REPORTED_REFERENCES = 16;
 
 // Most filesystems cap a single file name at 255 bytes. Truncating the stem keeps room for the
 // extension and for the "_<n>" suffix that resolves name collisions.
@@ -156,22 +155,6 @@ std::string NormalizeRelativePath(const std::string& path) {
   return JoinPathSegments(path.substr(index));
 }
 
-std::string JoinDetails(const std::vector<std::string>& details) {
-  size_t count =
-      details.size() < MAX_REPORTED_REFERENCES ? details.size() : MAX_REPORTED_REFERENCES;
-  std::string joined;
-  for (size_t i = 0; i < count; i++) {
-    if (!joined.empty()) {
-      joined += ", ";
-    }
-    joined += details[i];
-  }
-  if (details.size() > count) {
-    joined += ", and " + std::to_string(details.size() - count) + " more";
-  }
-  return joined;
-}
-
 }  // namespace
 
 PAGXArchiveWriter::PAGXArchiveWriter(const PAGXDocument& document) {
@@ -236,28 +219,24 @@ std::string PAGXArchiveWriter::addEntry(const Image* image, const std::shared_pt
   return path;
 }
 
-std::string PAGXArchiveWriter::DescribeUnresolvedReferences() const {
-  std::string description;
-  if (!_unresolvedDetails.empty()) {
-    description = "archive is not self-contained; " + std::to_string(_unresolvedDetails.size()) +
-                  " image reference(s) kept external: " + JoinDetails(_unresolvedDetails);
+void PAGXArchiveWriter::CollectWarnings(std::vector<std::string>* warnings) const {
+  warnings->clear();
+  for (const auto& detail : _unresolvedDetails) {
+    warnings->push_back("image reference \"" + detail.first + "\" kept external as " +
+                        detail.second);
   }
-  if (!_unsupportedFormats.empty()) {
-    if (!description.empty()) {
-      description += "; ";
-    }
-    description +=
-        std::to_string(_unsupportedFormats.size()) +
-        " packed image(s) use a format <Image> cannot render: " + JoinDetails(_unsupportedFormats);
+  for (const auto& detail : _unsupportedFormats) {
+    auto format = detail.second.empty() ? std::string("an unrecognized format") : detail.second;
+    warnings->push_back("packed image \"" + detail.first + "\" uses " + format +
+                        ", which <Image> cannot render");
   }
-  return description;
 }
 
 void PAGXArchiveWriter::recordExternalReference(const std::string& reference, const char* reason) {
   if (reference.empty() || !_reportedReferences.insert("external:" + reference).second) {
     return;
   }
-  _unresolvedDetails.push_back(reference + " (" + reason + ")");
+  _unresolvedDetails.emplace_back(reference, reason);
 }
 
 void PAGXArchiveWriter::recordUnsupportedFormat(const std::string& entryPath, const char* mime) {
@@ -266,7 +245,7 @@ void PAGXArchiveWriter::recordUnsupportedFormat(const std::string& entryPath, co
   if (!_reportedReferences.insert("format:" + detail).second) {
     return;
   }
-  _unsupportedFormats.push_back(detail);
+  _unsupportedFormats.emplace_back(entryPath, mime != nullptr ? mime : "");
 }
 
 std::shared_ptr<Data> PAGXArchiveWriter::Finish(std::string_view documentXML,

@@ -265,7 +265,7 @@ XML 与 `PAGXExporter::ToXML()` 的输出完全一致，因此归档不引入任
 - 扩展名跟随嗅探出的实际格式（`png`、`jpeg`、`webp`、`gif`、`avif`、`heic`、`svg`）；
   无法识别的字节使用 `bin`，不会标成它并不是的格式。
 - 归档不保证自包含：本地文件路径、`hash:` 引用和远程 URL 会原样保留在 XML 中，
-  `PAGXExporter::ToData()` 通过 `errorMsg` 警告报告这些引用。
+  `PAGXExporter::ToData()` 通过 `warnings` 逐条报告这些引用；`errorMsg` 只表示导出失败。
 
 ---
 

@@ -267,8 +267,8 @@ returns, so an archive introduces no new document semantics.
   `heic`, `svg`); bytes whose format cannot be identified use `bin` rather than claiming a
   format they are not.
 - An archive is not guaranteed to be self-contained: a local file path, a `hash:` reference or a
-  remote URL is kept verbatim in the XML. `PAGXExporter::ToData()` reports such references through
-  its `errorMsg` warning.
+  remote URL is kept verbatim in the XML. `PAGXExporter::ToData()` reports such references one by
+  one through `warnings`, while `errorMsg` only reports a failed export.
 
 ---
 

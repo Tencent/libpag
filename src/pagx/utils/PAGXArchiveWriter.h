@@ -47,9 +47,10 @@ class PAGXArchiveWriter {
 
   std::shared_ptr<Data> Finish(std::string_view documentXML, std::string* errorMsg);
 
-  // Describes every image the archive could not absorb, or returns an empty string when the
-  // archive is self-contained. Callers surface it as a warning after Finish() succeeds.
-  std::string DescribeUnresolvedReferences() const;
+  // Replaces warnings with one line per image the archive could not absorb, so a caller can log or
+  // inspect them without parsing a single concatenated message. Leaves it empty when the archive
+  // is self-contained.
+  void CollectWarnings(std::vector<std::string>* warnings) const;
 
  private:
   std::string addEntry(const Image* image, const std::shared_ptr<Data>& data);
@@ -61,8 +62,8 @@ class PAGXArchiveWriter {
   std::unordered_map<const Image*, std::string> _entryPaths = {};
   std::unordered_set<std::string> _usedPaths = {};
   std::vector<std::pair<std::string, std::shared_ptr<Data>>> _entries = {};
-  std::vector<std::string> _unresolvedDetails = {};
-  std::vector<std::string> _unsupportedFormats = {};
+  std::vector<std::pair<std::string, std::string>> _unresolvedDetails = {};
+  std::vector<std::pair<std::string, std::string>> _unsupportedFormats = {};
   std::unordered_set<std::string> _reportedReferences = {};
   size_t _nextImageIndex = 1;
 };

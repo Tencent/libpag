@@ -1932,14 +1932,22 @@ std::string PAGXExporter::ToXML(const PAGXDocument& doc, const Options& options)
 }
 
 std::shared_ptr<Data> PAGXExporter::ToData(const PAGXDocument& doc, const Options& options,
-                                           std::string* errorMsg) {
+                                           std::string* errorMsg,
+                                           std::vector<std::string>* warnings) {
+  // Both outputs are replaced on every call: a caller that reuses the same buffers must not read
+  // a failure left over from a previous export as the result of this one.
+  if (errorMsg != nullptr) {
+    errorMsg->clear();
+  }
+  if (warnings != nullptr) {
+    warnings->clear();
+  }
   PAGXArchiveWriter archive(doc);
   PAGXSerializer serializer(options, &archive);
   auto xml = serializer.serialize(doc);
   auto data = archive.Finish(xml, errorMsg);
-  if (data != nullptr && errorMsg != nullptr) {
-    auto warning = archive.DescribeUnresolvedReferences();
-    *errorMsg = warning.empty() ? std::string() : "PAGXExporter: " + warning;
+  if (data != nullptr && warnings != nullptr) {
+    archive.CollectWarnings(warnings);
   }
   return data;
 }
