@@ -16,6 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include <algorithm>
 #include <optional>
 #include "pagx/PAGAnimation.h"
 #include "pagx/PAGScene.h"
@@ -26,6 +27,7 @@
 #include "pagx/nodes/AnimationTimeline.h"
 #include "pagx/nodes/Channel.h"
 #include "pagx/nodes/Composition.h"
+#include "pagx/nodes/Ellipse.h"
 #include "pagx/nodes/Fill.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/ImagePattern.h"
@@ -932,6 +934,45 @@ static std::shared_ptr<pagx::PAGXDocument> MakeTargetViewDocument() {
   return doc;
 }
 
+// Returns the public handle registered for an authored layer node, or nullptr when the node has no
+// runtime layer in this scene.
+static std::shared_ptr<pagx::PAGLayer> LayerHandleFor(pagx::PAGScene* scene,
+                                                      const pagx::Layer* node) {
+  auto composition = scene != nullptr ? scene->rootComposition() : nullptr;
+  auto* binding = composition != nullptr ? composition->binding.get() : nullptr;
+  if (binding == nullptr || node == nullptr) {
+    return nullptr;
+  }
+  auto runtimeLayer = binding->get<tgfx::Layer>(node);
+  if (runtimeLayer == nullptr) {
+    return nullptr;
+  }
+  auto it = scene->layerRegistry.find(runtimeLayer.get());
+  return it != scene->layerRegistry.end() ? it->second->shared_from_this() : nullptr;
+}
+
+// Adds a layer whose only content is a 10x10 opaque rect centered at root (25,25), so the layer
+// covers the same point as MakeTargetViewDocument() does.
+static pagx::Layer* AddCenteredRectLayer(pagx::PAGXDocument* doc, const std::string& id) {
+  auto* layer = doc->makeNode<pagx::Layer>(id);
+  layer->width = 100;
+  layer->height = 100;
+  auto* rect = doc->makeNode<pagx::Rectangle>();
+  rect->size = {10, 10};
+  rect->position = {25, 25};
+  auto* fill = doc->makeNode<pagx::Fill>();
+  auto* solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {1.0f, 1.0f, 1.0f, 1.0f};
+  fill->color = solid;
+  layer->contents = {rect, fill};
+  return layer;
+}
+
+static bool ContainsLayer(const std::vector<std::shared_ptr<pagx::PAGLayer>>& layers,
+                          const std::shared_ptr<pagx::PAGLayer>& layer) {
+  return std::find(layers.begin(), layers.end(), layer) != layers.end();
+}
+
 /**
  * Test case: drawing a target-layer view repeatedly to the same surface must produce identical
  * frames. A PAGSurface keeps one Canvas for its lifetime, so the view transform applied by
@@ -975,14 +1016,16 @@ PAGX_TEST(PAGXRuntimeTest, TargetViewClearedBoundsWithoutNotifyFailsDraw) {
 }
 
 /**
- * Test case: surface-space queries must apply the same output-window shift as draw(). The red
- * square is centered at root (25,25) and covers (20,20)-(30,30); with an output window starting at
- * (20,20) it appears at (0,0)-(10,10) on the surface.
+ * Test case: surface-space queries must apply the same output-window shift as draw(), and hit
+ * testing must follow the same transform. The red square is centered at root (25,25) and covers
+ * (20,20)-(30,30); with an output window starting at (20,20) it appears at (0,0)-(10,10) on the
+ * surface.
  */
-PAGX_TEST(PAGXRuntimeTest, TargetViewQueriesApplyOutputWindowOrigin) {
+PAGX_TEST(PAGXRuntimeTest, TargetViewHitTestOriginAndDisplayTransform) {
   auto doc = MakeTargetViewDocument();
   auto scene = pagx::PAGScene::Make(doc);
   ASSERT_TRUE(scene != nullptr);
+  EXPECT_EQ(scene->getOutputViewStatus(), pagx::OutputViewStatus::Valid);
   auto* targetNode = doc->findNode<pagx::Layer>("target");
   ASSERT_NE(targetNode, nullptr);
   auto* binding = scene->rootComposition()->binding.get();
@@ -1001,6 +1044,9 @@ PAGX_TEST(PAGXRuntimeTest, TargetViewQueriesApplyOutputWindowOrigin) {
   EXPECT_FLOAT_EQ(bounds.height, 10);
   EXPECT_TRUE(target->hitTestPoint(5, 5));
   EXPECT_FALSE(target->hitTestPoint(15, 15));
+  auto identityHits = scene->getLayersUnderPoint(5, 5);
+  ASSERT_EQ(identityHits.size(), 1u);
+  EXPECT_EQ(identityHits[0], target);
   // Local (20,20) maps to surface (0,0), so the root-to-surface matrix translates by -20.
   auto matrix = target->getGlobalMatrix();
   EXPECT_FLOAT_EQ(matrix.tx, -20);
@@ -1017,6 +1063,332 @@ PAGX_TEST(PAGXRuntimeTest, TargetViewQueriesApplyOutputWindowOrigin) {
   EXPECT_FLOAT_EQ(zoomed.height, 20);
   EXPECT_TRUE(target->hitTestPoint(10, 5));
   EXPECT_FALSE(target->hitTestPoint(0, 0));
+  auto zoomedHits = scene->getLayersUnderPoint(10, 5);
+  ASSERT_EQ(zoomedHits.size(), 1u);
+  EXPECT_EQ(zoomedHits[0], target);
+  EXPECT_TRUE(scene->getLayersUnderPoint(0, 0).empty());
+}
+
+PAGX_TEST(PAGXRuntimeTest, TargetViewHitTestRestrictsSubtree) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto* outer = doc->makeNode<pagx::Layer>("outer");
+  outer->width = 100;
+  outer->height = 100;
+  doc->layers.push_back(outer);
+  auto* target = doc->makeNode<pagx::Layer>("target");
+  target->width = 100;
+  target->height = 100;
+  outer->children.push_back(target);
+  outer->children.push_back(AddCenteredRectLayer(doc.get(), "sibling"));
+  target->children.push_back(AddCenteredRectLayer(doc.get(), "bottom"));
+  target->children.push_back(AddCenteredRectLayer(doc.get(), "top"));
+  doc->targetLayerId = "target";
+  doc->outputBounds = pagx::Rect::MakeXYWH(20, 20, 20, 20);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_NE(scene, nullptr);
+  auto top = LayerHandleFor(scene.get(), doc->findNode<pagx::Layer>("top"));
+  auto bottom = LayerHandleFor(scene.get(), doc->findNode<pagx::Layer>("bottom"));
+  auto targetHandle = LayerHandleFor(scene.get(), target);
+  auto sibling = LayerHandleFor(scene.get(), doc->findNode<pagx::Layer>("sibling"));
+  auto outerHandle = LayerHandleFor(scene.get(), outer);
+  auto root = scene->rootComposition();
+  ASSERT_NE(top, nullptr);
+  ASSERT_NE(bottom, nullptr);
+  ASSERT_NE(targetHandle, nullptr);
+  ASSERT_NE(sibling, nullptr);
+  ASSERT_NE(outerHandle, nullptr);
+  ASSERT_NE(root, nullptr);
+
+  auto hits = scene->getLayersUnderPoint(5, 5);
+  ASSERT_EQ(hits.size(), 3u);
+  EXPECT_EQ(hits[0], top);
+  EXPECT_EQ(hits[1], bottom);
+  EXPECT_EQ(hits[2], targetHandle);
+  EXPECT_FALSE(ContainsLayer(hits, sibling));
+  EXPECT_FALSE(ContainsLayer(hits, outerHandle));
+
+  EXPECT_TRUE(top->hitTestPoint(5, 5));
+  EXPECT_TRUE(targetHandle->hitTestPoint(5, 5));
+  // Layers the target view does not render are unreachable through either API.
+  EXPECT_FALSE(sibling->hitTestPoint(5, 5));
+  EXPECT_FALSE(outerHandle->hitTestPoint(5, 5));
+  EXPECT_FALSE(root->hitTestPoint(5, 5));
+}
+
+PAGX_TEST(PAGXRuntimeTest, TargetViewHitTestClipsOutputBounds) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto* target = doc->makeNode<pagx::Layer>("target");
+  target->width = 100;
+  target->height = 100;
+  auto* rect = doc->makeNode<pagx::Rectangle>();
+  // The geometry covers the whole canvas, so only the output window can reject a point.
+  rect->size = {200, 200};
+  rect->position = {50, 50};
+  auto* fill = doc->makeNode<pagx::Fill>();
+  auto* solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {1.0f, 0.0f, 0.0f, 1.0f};
+  fill->color = solid;
+  target->contents = {rect, fill};
+  doc->layers.push_back(target);
+  doc->targetLayerId = "target";
+  doc->outputBounds = pagx::Rect::MakeXYWH(20, 20, 20, 20);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_NE(scene, nullptr);
+  auto targetHandle = LayerHandleFor(scene.get(), target);
+  ASSERT_NE(targetHandle, nullptr);
+
+  EXPECT_TRUE(targetHandle->hitTestPoint(0, 0));
+  EXPECT_TRUE(targetHandle->hitTestPoint(19.5f, 19.5f));
+  ASSERT_EQ(scene->getLayersUnderPoint(0, 0).size(), 1u);
+  // The window bounds are top-left inclusive and bottom-right exclusive.
+  EXPECT_FALSE(targetHandle->hitTestPoint(-0.5f, 5));
+  EXPECT_FALSE(targetHandle->hitTestPoint(5, -0.5f));
+  EXPECT_FALSE(targetHandle->hitTestPoint(20, 5));
+  EXPECT_FALSE(targetHandle->hitTestPoint(5, 20));
+  EXPECT_TRUE(scene->getLayersUnderPoint(-0.5f, 5).empty());
+  EXPECT_TRUE(scene->getLayersUnderPoint(20, 5).empty());
+
+  auto* options = scene->getDisplayOptions();
+  options->setZoomScale(2);
+  options->setContentOffset(10, 6);
+  EXPECT_TRUE(targetHandle->hitTestPoint(20, 16));
+  EXPECT_FALSE(targetHandle->hitTestPoint(9.5f, 16));
+  EXPECT_FALSE(targetHandle->hitTestPoint(50, 16));
+  EXPECT_FALSE(targetHandle->hitTestPoint(20, 5.5f));
+  EXPECT_FALSE(targetHandle->hitTestPoint(20, 46));
+  ASSERT_EQ(scene->getLayersUnderPoint(20, 16).size(), 1u);
+  EXPECT_TRUE(scene->getLayersUnderPoint(50, 16).empty());
+}
+
+PAGX_TEST(PAGXRuntimeTest, TargetViewHitTestRejectsInvalidView) {
+  auto doc = MakeTargetViewDocument();
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_NE(scene, nullptr);
+  auto target = LayerHandleFor(scene.get(), doc->findNode<pagx::Layer>("target"));
+  ASSERT_NE(target, nullptr);
+
+  // An incomplete declaration makes draw() and both hit test entry points reject the scene.
+  doc->targetLayerId.clear();
+  doc->notifyChange({doc.get()}, true);
+  EXPECT_EQ(scene->getOutputViewStatus(), pagx::OutputViewStatus::Invalid);
+  EXPECT_TRUE(scene->getLayersUnderPoint(5, 5).empty());
+  target = LayerHandleFor(scene.get(), doc->findNode<pagx::Layer>("target"));
+  ASSERT_NE(target, nullptr);
+  EXPECT_FALSE(target->hitTestPoint(5, 5));
+
+  doc->targetLayerId = "target";
+  doc->notifyChange({doc.get()}, true);
+  EXPECT_EQ(scene->getOutputViewStatus(), pagx::OutputViewStatus::Valid);
+  target = LayerHandleFor(scene.get(), doc->findNode<pagx::Layer>("target"));
+  ASSERT_NE(target, nullptr);
+  EXPECT_TRUE(target->hitTestPoint(5, 5));
+
+  // Clearing the public bounds field without notifyChange() leaves the cached state Valid.
+  doc->outputBounds = std::nullopt;
+  EXPECT_TRUE(scene->getLayersUnderPoint(5, 5).empty());
+  EXPECT_FALSE(target->hitTestPoint(5, 5));
+
+  doc->outputBounds = pagx::Rect::MakeXYWH(20, 20, 20, 20);
+  doc->notifyChange({doc.get()}, true);
+  target = LayerHandleFor(scene.get(), doc->findNode<pagx::Layer>("target"));
+  ASSERT_NE(target, nullptr);
+  scene->getDisplayOptions()->setZoomScale(0);
+  EXPECT_TRUE(scene->getLayersUnderPoint(5, 5).empty());
+  EXPECT_FALSE(target->hitTestPoint(5, 5));
+}
+
+PAGX_TEST(PAGXRuntimeTest, TargetViewHitTestAppliesLayerConstraints) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto* target = doc->makeNode<pagx::Layer>("target");
+  target->width = 100;
+  target->height = 100;
+  doc->layers.push_back(target);
+  auto* inner = AddCenteredRectLayer(doc.get(), "inner");
+  target->children.push_back(inner);
+  doc->targetLayerId = "target";
+  doc->outputBounds = pagx::Rect::MakeXYWH(20, 20, 20, 20);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_NE(scene, nullptr);
+  auto targetHandle = LayerHandleFor(scene.get(), target);
+  auto innerHandle = LayerHandleFor(scene.get(), inner);
+  ASSERT_NE(targetHandle, nullptr);
+  ASSERT_NE(innerHandle, nullptr);
+  EXPECT_TRUE(innerHandle->hitTestPoint(5, 5));
+
+  inner->visible = false;
+  doc->notifyChange({doc.get()}, true);
+  innerHandle = LayerHandleFor(scene.get(), inner);
+  ASSERT_NE(innerHandle, nullptr);
+  EXPECT_TRUE(scene->getLayersUnderPoint(5, 5).empty());
+  EXPECT_FALSE(innerHandle->hitTestPoint(5, 5));
+  inner->visible = true;
+
+  target->visible = false;
+  doc->notifyChange({doc.get()}, true);
+  targetHandle = LayerHandleFor(scene.get(), target);
+  ASSERT_NE(targetHandle, nullptr);
+  EXPECT_TRUE(scene->getLayersUnderPoint(5, 5).empty());
+  EXPECT_FALSE(targetHandle->hitTestPoint(5, 5));
+  target->visible = true;
+  doc->notifyChange({doc.get()}, true);
+
+  auto* mask = AddCenteredRectLayer(doc.get(), "mask");
+  mask->visible = false;
+  mask->x = 40;
+  mask->y = 40;
+  doc->layers.push_back(mask);
+  inner->mask = mask;
+  inner->maskType = pagx::MaskType::Alpha;
+  doc->notifyChange({doc.get()}, true);
+  innerHandle = LayerHandleFor(scene.get(), inner);
+  ASSERT_NE(innerHandle, nullptr);
+  EXPECT_TRUE(scene->getLayersUnderPoint(5, 5).empty());
+  EXPECT_FALSE(innerHandle->hitTestPoint(5, 5));
+  mask->x = 0;
+  mask->y = 0;
+  doc->notifyChange({doc.get()}, true);
+
+  inner->scrollRect = pagx::Rect::MakeXYWH(30, 30, 10, 10);
+  inner->hasScrollRect = true;
+  doc->notifyChange({doc.get()}, true);
+  innerHandle = LayerHandleFor(scene.get(), inner);
+  ASSERT_NE(innerHandle, nullptr);
+  EXPECT_TRUE(scene->getLayersUnderPoint(5, 5).empty());
+  EXPECT_FALSE(innerHandle->hitTestPoint(5, 5));
+  inner->scrollRect = pagx::Rect::MakeXYWH(0, 0, 30, 30);
+
+  doc->notifyChange({doc.get()}, true);
+  innerHandle = LayerHandleFor(scene.get(), inner);
+  ASSERT_NE(innerHandle, nullptr);
+  ASSERT_EQ(scene->getLayersUnderPoint(5, 5).size(), 2u);
+  EXPECT_TRUE(innerHandle->hitTestPoint(5, 5));
+}
+
+PAGX_TEST(PAGXRuntimeTest, TargetViewHitTestIgnoresOuterConstraints) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto* outer = doc->makeNode<pagx::Layer>("outer");
+  outer->width = 100;
+  outer->height = 100;
+  doc->layers.push_back(outer);
+  auto* target = AddCenteredRectLayer(doc.get(), "target");
+  outer->children.push_back(target);
+  doc->targetLayerId = "target";
+  doc->outputBounds = pagx::Rect::MakeXYWH(20, 20, 20, 20);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_NE(scene, nullptr);
+  auto targetHandle = LayerHandleFor(scene.get(), target);
+  ASSERT_NE(targetHandle, nullptr);
+
+  // An ancestor that the target view does not render must not reject a hit inside the target.
+  outer->visible = false;
+  doc->notifyChange({outer}, false);
+  targetHandle = LayerHandleFor(scene.get(), target);
+  ASSERT_NE(targetHandle, nullptr);
+  EXPECT_TRUE(targetHandle->hitTestPoint(5, 5));
+  ASSERT_EQ(scene->getLayersUnderPoint(5, 5).size(), 1u);
+
+  // scrollRect also translates the subtree, so the content moves to (15,15)-(25,25) and root
+  // (20,20), the top-left corner of the output window, still lands on it. A scroll check applied
+  // to the ancestor would reject (20,20) because its scrolled local point is (15,15).
+  outer->visible = true;
+  outer->scrollRect = pagx::Rect::MakeXYWH(5, 5, 10, 10);
+  outer->hasScrollRect = true;
+  doc->notifyChange({doc.get()}, true);
+  targetHandle = LayerHandleFor(scene.get(), target);
+  ASSERT_NE(targetHandle, nullptr);
+  EXPECT_TRUE(targetHandle->hitTestPoint(0, 0));
+  ASSERT_EQ(scene->getLayersUnderPoint(0, 0).size(), 1u);
+
+  // An ancestor still contributes its transform: shifting the target by (10,10) moves the hit.
+  outer->scrollRect = {};
+  outer->hasScrollRect = false;
+  outer->x = 10;
+  outer->y = 10;
+  doc->notifyChange({outer}, false);
+  targetHandle = LayerHandleFor(scene.get(), target);
+  ASSERT_NE(targetHandle, nullptr);
+  EXPECT_TRUE(targetHandle->hitTestPoint(15, 15));
+  EXPECT_FALSE(targetHandle->hitTestPoint(5, 5));
+  ASSERT_EQ(scene->getLayersUnderPoint(15, 15).size(), 1u);
+  EXPECT_TRUE(scene->getLayersUnderPoint(5, 5).empty());
+}
+
+PAGX_TEST(PAGXRuntimeTest, TargetViewHitTestAllowsMaskTarget) {
+  auto doc = MakeTargetViewDocument();
+  auto* target = doc->findNode<pagx::Layer>("target");
+  ASSERT_NE(target, nullptr);
+  auto* masked = doc->makeNode<pagx::Layer>("masked");
+  masked->width = 100;
+  masked->height = 100;
+  masked->mask = target;
+  masked->maskType = pagx::MaskType::Alpha;
+  doc->layers.push_back(masked);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_NE(scene, nullptr);
+  auto targetHandle = LayerHandleFor(scene.get(), target);
+  auto maskedHandle = LayerHandleFor(scene.get(), masked);
+  ASSERT_NE(targetHandle, nullptr);
+  ASSERT_NE(maskedHandle, nullptr);
+
+  EXPECT_TRUE(targetHandle->hitTestPoint(5, 5));
+  ASSERT_EQ(scene->getLayersUnderPoint(5, 5).size(), 1u);
+  // Querying must not reparent the target or detach it from its mask owner.
+  EXPECT_EQ(masked->mask, target);
+  EXPECT_FALSE(maskedHandle->hitTestPoint(5, 5));
+}
+
+PAGX_TEST(PAGXRuntimeTest, TargetViewHitTestPreservesQueryState) {
+  auto doc = MakeTargetViewDocument();
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_NE(scene, nullptr);
+  auto targetHandle = LayerHandleFor(scene.get(), doc->findNode<pagx::Layer>("target"));
+  ASSERT_NE(targetHandle, nullptr);
+
+  auto before = scene->getLayersUnderPoint(5, 5);
+  ASSERT_EQ(before.size(), 1u);
+  auto surface = pagx::PAGSurface::MakeOffscreen(20, 20);
+  ASSERT_NE(surface, nullptr);
+  ASSERT_TRUE(scene->draw(surface));
+  EXPECT_FALSE(scene->hasContentChanged());
+
+  auto after = scene->getLayersUnderPoint(5, 5);
+  ASSERT_EQ(after.size(), before.size());
+  EXPECT_EQ(after[0], before[0]);
+  EXPECT_TRUE(targetHandle->hitTestPoint(5, 5));
+  EXPECT_FALSE(scene->hasContentChanged());
+}
+
+PAGX_TEST(PAGXRuntimeTest, TargetViewHitTestShapePrecision) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto* target = doc->makeNode<pagx::Layer>("target");
+  target->width = 100;
+  target->height = 100;
+  auto* ellipse = doc->makeNode<pagx::Ellipse>();
+  ellipse->size = {20, 20};
+  ellipse->position = {25, 25};
+  auto* fill = doc->makeNode<pagx::Fill>();
+  auto* solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {1.0f, 0.0f, 0.0f, 1.0f};
+  fill->color = solid;
+  target->contents = {ellipse, fill};
+  doc->layers.push_back(target);
+  doc->targetLayerId = "target";
+  doc->outputBounds = pagx::Rect::MakeXYWH(0, 0, 50, 50);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_NE(scene, nullptr);
+  auto targetHandle = LayerHandleFor(scene.get(), target);
+  ASSERT_NE(targetHandle, nullptr);
+
+  // (16,16) lies inside the 20x20 ellipse bounds but outside the circle itself.
+  EXPECT_TRUE(targetHandle->hitTestPoint(16, 16, false));
+  EXPECT_FALSE(targetHandle->hitTestPoint(16, 16, true));
+  ASSERT_EQ(scene->getLayersUnderPoint(16, 16).size(), 1u);
 }
 
 /**

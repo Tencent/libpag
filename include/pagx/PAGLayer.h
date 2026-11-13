@@ -88,7 +88,10 @@ class PAGLayer : public std::enable_shared_from_this<PAGLayer> {
 
   /**
    * Returns whether this layer overlaps the given surface point. pixelHitTest selects the actual
-   * shape (true) or the bounding box (false).
+   * shape (true) or the bounding box (false). Does not require a prior draw().
+   * When the document declares a default static output view, only layers in the target layer's
+   * subtree can be hit, and the surface point must map inside the declared output window. A layer
+   * outside the subtree, or a scene whose declaration cannot be honored, returns false.
    * @param surfaceX the x coordinate in surface (device) space.
    * @param surfaceY the y coordinate in surface (device) space.
    * @param pixelHitTest whether to test against the actual shape (true) or the bounding box (false).

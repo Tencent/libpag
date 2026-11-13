@@ -743,24 +743,108 @@ void PAGScene::onImageResourcesChanged(const std::vector<Image*>& changedImages)
   RefreshViewModelImages(_rootComposition.get(), changed);
 }
 
-std::vector<std::shared_ptr<PAGLayer>> PAGScene::getLayersUnderPoint(float surfaceX,
-                                                                     float surfaceY) {
-  // Target-view scenes render only a cropped window, so surface coordinates no longer map to the
-  // document root through the display-list transform. Hit testing is not supported in this mode,
-  // including when an edit left the declaration invalid and draw() renders nothing at all.
-  if (outputViewStatus != OutputViewStatus::None) {
-    return {};
+// Walks the runtime path from layer up to hitRoot and applies the per-layer hit constraints TGFX
+// would apply while traversing the whole tree: hidden layers, scroll rects and masks. hitRoot
+// itself is checked and then stops the walk, so ancestors above the query root still contribute
+// coordinates but never reject a hit the rendered subtree would accept.
+static bool CanHitLayerPath(tgfx::Layer* layer, const tgfx::Layer* hitRoot, const Point& rootPoint,
+                            bool pixelHitTest) {
+  auto globalPoint = tgfx::Point::Make(rootPoint.x, rootPoint.y);
+  for (auto* current = layer; current != nullptr; current = current->parent()) {
+    if (!current->visible()) {
+      return false;
+    }
+    auto scrollRect = current->scrollRect();
+    if (!scrollRect.isEmpty()) {
+      auto localPoint = current->globalToLocal(globalPoint);
+      if (!scrollRect.contains(localPoint.x, localPoint.y)) {
+        return false;
+      }
+    }
+    auto mask = current->mask();
+    if (mask != nullptr && !mask->hitTestPoint(globalPoint.x, globalPoint.y, pixelHitTest)) {
+      return false;
+    }
+    if (current == hitRoot) {
+      return true;
+    }
+  }
+  return false;
+}
+
+bool PAGScene::prepareHitTest(float surfaceX, float surfaceY, Point* rootPoint,
+                              std::shared_ptr<tgfx::Layer>* hitRoot) const {
+  if (rootPoint == nullptr || hitRoot == nullptr || displayList == nullptr ||
+      _rootComposition == nullptr || _rootComposition->runtimeLayer == nullptr ||
+      outputViewStatus == OutputViewStatus::Invalid) {
+    return false;
+  }
+  std::optional<Rect> bounds = std::nullopt;
+  if (outputViewStatus == OutputViewStatus::Valid) {
+    // getOutputBounds() re-checks the cached state and the authored field, so a host that cleared
+    // outputBounds without notifyChange() is rejected here as well.
+    bounds = getOutputBounds();
+    if (!bounds.has_value() || displayList->zoomScale() <= 0.0f) {
+      return false;
+    }
   }
   float rootX = 0;
   float rootY = 0;
   if (!surfaceToRoot(surfaceX, surfaceY, &rootX, &rootY)) {
+    return false;
+  }
+  *rootPoint = {rootX, rootY};
+  if (outputViewStatus == OutputViewStatus::None) {
+    *hitRoot = _rootComposition->runtimeLayer;
+    return true;
+  }
+  if (!ToTGFX(*bounds).contains(rootX, rootY)) {
+    return false;
+  }
+  // Always resolve the target from the live binding: a cached runtime pointer would go stale when
+  // an edit rebuilds the tree.
+  *hitRoot = _rootComposition->binding != nullptr
+                 ? _rootComposition->binding->get<tgfx::Layer>(outputTargetNode)
+                 : nullptr;
+  return *hitRoot != nullptr;
+}
+
+bool PAGScene::hitTestLayer(const PAGLayer* layer, float surfaceX, float surfaceY,
+                            bool pixelHitTest) const {
+  if (layer == nullptr || layer->runtimeLayer == nullptr || layer->rootScene.lock().get() != this) {
+    return false;
+  }
+  Point rootPoint = {};
+  std::shared_ptr<tgfx::Layer> hitRoot = nullptr;
+  if (!prepareHitTest(surfaceX, surfaceY, &rootPoint, &hitRoot)) {
+    return false;
+  }
+  if (outputViewStatus == OutputViewStatus::Valid) {
+    if (!hitRoot->contains(layer->runtimeLayer)) {
+      return false;
+    }
+    if (!CanHitLayerPath(layer->runtimeLayer.get(), hitRoot.get(), rootPoint, pixelHitTest)) {
+      return false;
+    }
+  }
+  return layer->runtimeLayer->hitTestPoint(rootPoint.x, rootPoint.y, pixelHitTest);
+}
+
+std::vector<std::shared_ptr<PAGLayer>> PAGScene::getLayersUnderPoint(float surfaceX,
+                                                                     float surfaceY) {
+  Point rootPoint = {};
+  std::shared_ptr<tgfx::Layer> hitRoot = nullptr;
+  if (!prepareHitTest(surfaceX, surfaceY, &rootPoint, &hitRoot)) {
     return {};
   }
-  if (_rootComposition == nullptr || _rootComposition->runtimeLayer == nullptr) {
+  // TGFX skips visibility, scroll rect and mask checks for the layer the query starts from, so the
+  // target itself needs the same constraints applied before its subtree is searched.
+  if (outputViewStatus == OutputViewStatus::Valid &&
+      !CanHitLayerPath(hitRoot.get(), hitRoot.get(), rootPoint, false)) {
     return {};
   }
   std::vector<std::shared_ptr<PAGLayer>> result = {};
-  auto hitLayers = _rootComposition->runtimeLayer->getLayersUnderPoint(rootX, rootY);
+  auto hitLayers = hitRoot->getLayersUnderPoint(rootPoint.x, rootPoint.y);
   for (const auto& hitLayer : hitLayers) {
     auto it = layerRegistry.find(hitLayer.get());
     if (it != layerRegistry.end()) {

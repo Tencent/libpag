@@ -44,6 +44,7 @@ namespace pagx {
 
 class Animation;
 class Node;
+class PAGLayer;
 class PAGSurface;
 class PAGViewModel;
 class PAGXDocument;
@@ -215,8 +216,9 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
    * under the point, the last is the bottom-most. Returns an empty array if nothing is hit. Hit
    * testing does not require a prior draw(). Accepts surface coordinates (with zoom and content
    * offset applied) instead of the composition's local coordinates.
-   * Hit testing is not supported for documents with a default target view; this method returns an
-   * empty array for such scenes.
+   * When the document declares a default static output view, only the target layer and its
+   * descendants are searched, and the point must map inside the declared output window. A
+   * declaration that cannot be honored returns an empty array.
    * @param surfaceX the x coordinate in surface (device) space.
    * @param surfaceY the y coordinate in surface (device) space.
    */
@@ -291,6 +293,18 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
   // (0, 0) when the scene renders the whole canvas. Query helpers apply the same shift so bounds,
   // matrices and hit testing stay in the surface space the caller actually sees.
   Point outputViewOrigin() const;
+
+  // Resolves the runtime search root and the root-space point for a hit test. Returns false when
+  // the scene cannot answer: an invalid output view, a point outside the declared output window, a
+  // zero zoom scale, or a missing runtime tree. A valid output view searches only the target layer,
+  // so hits outside the rendered subtree are never reached.
+  bool prepareHitTest(float surfaceX, float surfaceY, Point* rootPoint,
+                      std::shared_ptr<tgfx::Layer>* hitRoot) const;
+
+  // Hit tests one layer handle against a surface point. Honors the output view window and target
+  // subtree when the document declares one.
+  bool hitTestLayer(const PAGLayer* layer, float surfaceX, float surfaceY,
+                    bool pixelHitTest) const;
 
   std::shared_ptr<PAGXDocument> document = nullptr;
   std::shared_ptr<PAGComposition> _rootComposition = nullptr;
