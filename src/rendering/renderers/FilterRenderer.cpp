@@ -406,8 +406,10 @@ void FilterRenderer::DrawWithFilter(Canvas* parentCanvas, const FilterModifier* 
       return;
     }
     auto gpu = cache->getContext()->gpu();
+    // 单层三维滤镜仅持有少量全幅纹理(输入/输出/深度)，按保守数量纳入显存预算。
     contentScale = Clamp3DScale(
-        gpu, std::max(contentBounds.width(), static_cast<float>(context->width)),
+        gpu, cache->getContext()->cacheLimit(), 4,
+        std::max(contentBounds.width(), static_cast<float>(context->width)),
         std::max(contentBounds.height(), static_cast<float>(context->height)), contentScale);
     if (!Has3DSupport(gpu) || contentScale <= 0) {
       return;

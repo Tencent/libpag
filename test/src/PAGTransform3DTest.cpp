@@ -1132,21 +1132,27 @@ PAG_TEST(PAGTransform3DTest, GPUCapabilityFallback) {
   EXPECT_EQ(gpu.textureCount, 0);
 }
 
-/** 验证整数极限尺寸和高倍缩放始终在纹理上限以内。 */
+/** 验证整数极限尺寸、高倍缩放在纹理上限内，并受显存预算降采样约束。 */
 PAG_TEST(PAGTransform3DTest, GPUScaleLimits) {
   Test3DGPU gpu;
-  EXPECT_FLOAT_EQ(Clamp3DScale(&gpu, 100, 100, 1), 1);
+  EXPECT_FLOAT_EQ(Clamp3DScale(&gpu, 0, 0, 100, 100, 1), 1);
   for (float width : {100.0f, static_cast<float>(INT_MAX), std::numeric_limits<float>::max()}) {
-    auto scale = Clamp3DScale(&gpu, width, 100, std::numeric_limits<float>::max());
+    auto scale = Clamp3DScale(&gpu, 0, 0, width, 100, std::numeric_limits<float>::max());
     ASSERT_GT(scale, 0);
     EXPECT_LE(std::ceil(static_cast<double>(width) * scale), 1024);
     EXPECT_LE(std::ceil(100.0 * scale), 1024);
   }
-  EXPECT_EQ(Clamp3DScale(&gpu, 100, 100, 0), 0);
-  EXPECT_EQ(Clamp3DScale(&gpu, -1, 100, 1), 0);
-  EXPECT_EQ(Clamp3DScale(&gpu, std::numeric_limits<float>::infinity(), 100, 1), 0);
-  EXPECT_EQ(Clamp3DScale(&gpu, 100, 100, std::numeric_limits<float>::quiet_NaN()), 0);
-  EXPECT_EQ(Clamp3DScale(nullptr, 100, 100, 1), 0);
+  EXPECT_EQ(Clamp3DScale(&gpu, 0, 0, 100, 100, 0), 0);
+  EXPECT_EQ(Clamp3DScale(&gpu, 0, 0, -1, 100, 1), 0);
+  EXPECT_EQ(Clamp3DScale(&gpu, 0, 0, std::numeric_limits<float>::infinity(), 100, 1), 0);
+  EXPECT_EQ(Clamp3DScale(&gpu, 0, 0, 100, 100, std::numeric_limits<float>::quiet_NaN()), 0);
+  EXPECT_EQ(Clamp3DScale(nullptr, 0, 0, 100, 100, 1), 0);
+  // 显存预算：10 张每像素 4 字节的 100x100 全幅纹理在 scale=1 需 400000 字节，
+  // 预算 100000 应按面积比降采样到 0.5；预算或纹理数为 0 时不约束。
+  EXPECT_FLOAT_EQ(Clamp3DScale(&gpu, 100000, 10, 100, 100, 1), 0.5f);
+  EXPECT_FLOAT_EQ(Clamp3DScale(&gpu, 0, 10, 100, 100, 1), 1);
+  EXPECT_FLOAT_EQ(Clamp3DScale(&gpu, 100000, 0, 100, 100, 1), 1);
+  EXPECT_LE(Clamp3DScale(&gpu, 400000, 10, 100, 100, 1), 1);
 }
 
 /** 验证持续使用的深度纹理不会被空闲回收，尺寸变化和分配失败可恢复。 */
