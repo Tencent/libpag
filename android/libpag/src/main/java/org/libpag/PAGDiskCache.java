@@ -34,8 +34,8 @@ public class PAGDiskCache {
     /**
      * Sets the disk cache directory. This should be called before any disk cache operations.
      * If the directory does not exist, it will be created automatically.
-     * Note: Changing the cache directory after cache operations have started may cause
-     * existing cached files to become inaccessible.
+     * Directory changes are ignored while sequence files are open, including files awaiting
+     * asynchronous closure. Release all decoders before switching to a different directory.
      * @param dir The absolute path of the cache directory. Pass null or empty string to use the
      * platform default cache directory.
      */

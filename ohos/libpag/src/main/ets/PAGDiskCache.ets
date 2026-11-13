@@ -24,6 +24,19 @@ import { PAGInit } from './PAGInit';
  */
 export class PAGDiskCache {
   /**
+   * Sets the disk cache directory. This should be called before any disk cache operations.
+   * If the directory does not exist, it will be created automatically.
+   * Directory changes are ignored while sequence files are open, including files awaiting
+   * asynchronous closure. Release all decoders before switching to a different directory.
+   * @param dir The absolute path of the cache directory. Pass an empty string to use the
+   * default cache directory.
+   */
+  static SetCacheDir(dir: string): void {
+    PAGInit.Init();
+    JPAGDiskCache.SetCacheDir(dir);
+  }
+
+  /**
    * Returns the size limit of the disk cache in bytes. The default value is 1 GB.
    */
   static MaxDiskSize(): number {

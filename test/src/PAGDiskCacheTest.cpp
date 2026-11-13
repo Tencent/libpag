@@ -19,7 +19,9 @@
 #include <algorithm>
 #include <atomic>
 #include <chrono>
+#include <cstdlib>
 #include <filesystem>
+#include <fstream>
 #include <thread>
 #include <vector>
 #include "pag/pag.h"
@@ -29,6 +31,7 @@
 #include "rendering/utils/BitmapBuffer.h"
 #include "rendering/utils/Directory.h"
 #include "tgfx/core/Clock.h"
+#include "utils/ScopedDiskCacheDirectory.h"
 #include "utils/TestUtils.h"
 
 #ifdef TGFX_USE_OPENGL
@@ -98,23 +101,6 @@ static void ClearDiskCacheAndWait() {
   worker->waitAll();
 }
 
-class ScopedDiskCacheCleanup {
- public:
-  const size_t originalMaxDiskSize;
-
-  ScopedDiskCacheCleanup() : originalMaxDiskSize(PAGDiskCache::MaxDiskSize()) {
-  }
-
-  ScopedDiskCacheCleanup(const ScopedDiskCacheCleanup&) = delete;
-  ScopedDiskCacheCleanup& operator=(const ScopedDiskCacheCleanup&) = delete;
-
-  ~ScopedDiskCacheCleanup() {
-    DiskIOWorker::GetInstance()->waitAll();
-    PAGDiskCache::SetMaxDiskSize(originalMaxDiskSize);
-    ClearDiskCacheAndWait();
-  }
-};
-
 static void ResetDiskCacheFixture(const std::string& cacheDir, size_t maxDiskSize,
                                   const std::string& fixturePath = {}) {
   ASSERT_FALSE(cacheDir.empty());
@@ -137,7 +123,7 @@ static void ResetDiskCacheFixture(const std::string& cacheDir, size_t maxDiskSiz
     // Reload the fixture into the already-live singleton, not just its on-disk files.
     diskCache->fileIDCount = DiskCache::InitialFileID;
     diskCache->maxDiskSize = maxDiskSize;
-    ASSERT_TRUE(diskCache->readConfig());
+    ASSERT_TRUE(diskCache->reloadConfig());
   }
   DiskIOWorker::GetInstance()->waitAll();
 }
@@ -302,8 +288,9 @@ static void CheckSequenceFileReuseAndRelease(SequenceFileState& state,
  * 用例描述: 测试 SequenceFile 的磁盘缓存功能。
  */
 PAG_PIXEL_TEST(PAGDiskCacheTest, SequenceFile) {
-  auto cacheDir = Platform::Current()->getCacheDir();
-  ScopedDiskCacheCleanup cleanup;
+  ScopedDiskCacheDirectory cleanup;
+  ASSERT_FALSE(cleanup.directory.empty());
+  auto cacheDir = cleanup.directory;
   ASSERT_NO_FATAL_FAILURE(ResetDiskCacheFixture(cacheDir, cleanup.originalMaxDiskSize,
                                                 ProjectPath::Absolute("resources/disk/libpag")));
   SequenceFileState state;
@@ -471,8 +458,9 @@ static void CheckDecoderFileLifetimes(DecoderCacheState& state, const std::strin
 }  // namespace
 
 PAG_PIXEL_TEST(PAGDiskCacheTest, PAGDecoder) {
-  auto cacheDir = Platform::Current()->getCacheDir();
-  ScopedDiskCacheCleanup cleanup;
+  ScopedDiskCacheDirectory cleanup;
+  ASSERT_FALSE(cleanup.directory.empty());
+  auto cacheDir = cleanup.directory;
   ASSERT_NO_FATAL_FAILURE(ResetDiskCacheFixture(cacheDir, cleanup.originalMaxDiskSize));
   DecoderCacheState state;
   ASSERT_NO_FATAL_FAILURE(CheckDecoderFrameCache(state));
@@ -502,6 +490,8 @@ static void ReadFirstFrame(PAGDecoder* decoder, bool* success) {
 // scenario does not apply; skip the case on non-GL backends.
 #ifdef TGFX_USE_OPENGL
 PAG_TEST(PAGDiskCacheTest, PAGDecoderContextDestroyed) {
+  ScopedDiskCacheDirectory cleanup;
+  ASSERT_FALSE(cleanup.directory.empty());
   pag::PAGDiskCache::RemoveAll();
   auto pagFile = LoadPAGFile("resources/apitest/data_bmp.pag");
   ASSERT_TRUE(pagFile != nullptr);
@@ -606,6 +596,8 @@ PAG_PIXEL_TEST(PAGDiskCacheTest, PAGDecoder_StaticTimeRanges) {
 }
 
 PAG_TEST(PAGDiskCacheTest, FileCache) {
+  ScopedDiskCacheDirectory cleanup;
+  ASSERT_FALSE(cleanup.directory.empty());
   pag::PAGDiskCache::RemoveAll();
   auto data = ReadFile("resources/apitest/polygon.pag");
   ASSERT_TRUE(data != nullptr);
@@ -685,6 +677,8 @@ PAG_TEST(PAGDiskCacheTest, DiskIOWorker) {
  * against regressions of #3684 without pinning down the exact race window.
  */
 PAG_TEST(PAGDiskCacheTest, PAGDecoderTeardownRace) {
+  ScopedDiskCacheDirectory cleanup;
+  ASSERT_FALSE(cleanup.directory.empty());
   pag::PAGDiskCache::RemoveAll();
   std::vector<std::shared_ptr<PAGFile>> pagFiles;
   for (int i = 0; i < 4; i++) {
@@ -748,6 +742,8 @@ PAG_TEST(PAGDiskCacheTest, SequenceRetryDelayGraduatesAndCaps) {
 }
 
 PAG_TEST(PAGDiskCacheTest, PAGDecoderFailedRenderCooldown) {
+  ScopedDiskCacheDirectory cleanup;
+  ASSERT_FALSE(cleanup.directory.empty());
   pag::PAGDiskCache::RemoveAll();
   auto pagFile = LoadPAGFile("resources/apitest/data_bmp.pag");
   ASSERT_TRUE(pagFile != nullptr);

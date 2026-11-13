@@ -23,6 +23,16 @@
 namespace pag {
 class NativePlatform : public Platform {
  public:
+  /**
+   * Registers the default cache directory during initialization without changing a custom directory.
+   */
+  static void SetDefaultCacheDir(const std::string& dir);
+
+  /**
+   * Returns the default cache directory registered during initialization.
+   */
+  std::string getCacheDir() const override;
+
   std::vector<const VideoDecoderFactory*> getVideoDecoderFactories() const override;
 
   bool registerFallbackFonts() const override;
@@ -30,13 +40,6 @@ class NativePlatform : public Platform {
   void traceImage(const tgfx::ImageInfo& info, const void* pixels,
                   const std::string& tag) const override;
 
-  std::string getCacheDir() const override;
-
   std::shared_ptr<DisplayLink> createDisplayLink(std::function<void()> callback) const override;
-
-  void setCacheDir(const std::string& cacheDir);
-
- private:
-  std::string _cacheDir;
 };
 }  // namespace pag

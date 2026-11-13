@@ -17,10 +17,15 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "NativePlatform.h"
+#include <mutex>
 #include "platform/ohos/NativeDisplayLink.h"
 #include "platform/ohos/OHOSSoftwareDecoderWrapper.h"
+#include "rendering/caches/DiskCache.h"
 
 namespace pag {
+static std::mutex DefaultCacheDirLocker = {};
+static std::string DefaultCacheDir = {};
+
 class HardwareDecoderFactory : public VideoDecoderFactory {
  public:
   bool isHardwareBacked() const override {
@@ -54,6 +59,22 @@ const Platform* Platform::Current() {
   return &platform;
 }
 
+void NativePlatform::SetDefaultCacheDir(const std::string& dir) {
+  if (dir.empty()) {
+    return;
+  }
+  {
+    std::lock_guard<std::mutex> autoLock(DefaultCacheDirLocker);
+    DefaultCacheDir = dir;
+  }
+  DiskCache::SetDefaultCacheDir(dir);
+}
+
+std::string NativePlatform::getCacheDir() const {
+  std::lock_guard<std::mutex> autoLock(DefaultCacheDirLocker);
+  return DefaultCacheDir;
+}
+
 std::vector<const VideoDecoderFactory*> NativePlatform::getVideoDecoderFactories() const {
   return {&hardwareDecoderFactory, &softwareDecoderFactory,
           VideoDecoderFactory::ExternalDecoderFactory(),
@@ -73,20 +94,12 @@ void NativePlatform::traceImage(const tgfx::ImageInfo& info, const void* pixels,
   }
 }
 
-std::string NativePlatform::getCacheDir() const {
-  return _cacheDir;
-}
-
 std::shared_ptr<DisplayLink> NativePlatform::createDisplayLink(
     std::function<void()> callback) const {
   if (!callback) {
     return nullptr;
   }
   return std::make_shared<NativeDisplayLink>(callback);
-}
-
-void NativePlatform::setCacheDir(const std::string& cacheDir) {
-  _cacheDir = cacheDir;
 }
 
 }  // namespace pag

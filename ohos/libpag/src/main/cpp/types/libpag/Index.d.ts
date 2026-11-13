@@ -456,6 +456,11 @@ export declare class JPAGDiskCache {
 
   static SetCacheDir(path: string): void;
 
+  /**
+   * Registers the platform default cache directory for internal initialization only.
+   */
+  static SetDefaultCacheDirInternal(path: string): void;
+
   static ReadFile(key: string): ArrayBuffer;
 
   static WriteFile(key: string, data: ArrayBuffer): boolean;

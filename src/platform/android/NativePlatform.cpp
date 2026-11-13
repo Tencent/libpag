@@ -89,7 +89,13 @@ void NativePlatform::traceImage(const tgfx::ImageInfo& info, const void* pixels,
 }
 
 std::string NativePlatform::getCacheDir() const {
-  return JPAGDiskCache::GetCacheDir();
+  auto cacheDir = JPAGDiskCache::GetCacheDir();
+  if (cacheDir.empty()) {
+    return cacheDir;
+  }
+  // The application cache directory is shared with other SDKs, which may create their own files
+  // and folders there. Keep the SDK cache in a dedicated sub-directory.
+  return cacheDir + "/libpag";
 }
 
 std::shared_ptr<DisplayLink> NativePlatform::createDisplayLink(

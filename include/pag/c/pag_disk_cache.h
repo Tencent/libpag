@@ -24,6 +24,8 @@ PAG_C_PLUS_PLUS_BEGIN_GUARD
 
 /**
  * Sets the disk cache directory. This should be called before any disk cache operations.
+ * Directory changes are ignored while sequence files are open, including files awaiting
+ * asynchronous closure. Release all decoders before switching to a different directory.
  * @param dir The absolute path of the cache directory. Pass NULL or empty string to use the
  * platform default cache directory.
  */

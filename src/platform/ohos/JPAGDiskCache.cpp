@@ -18,8 +18,9 @@
 
 #include "JPAGDiskCache.h"
 #include <cstdint>
-#include "NativePlatform.h"
+#include <string>
 #include "platform/ohos/JsHelper.h"
+#include "platform/ohos/NativePlatform.h"
 #include "rendering/caches/DiskCache.h"
 
 namespace pag {
@@ -44,19 +45,40 @@ static napi_value RemoveAll(napi_env, napi_callback_info) {
   return nullptr;
 }
 
-static napi_value SetCacheDir(napi_env env, napi_callback_info info) {
+static bool ReadCacheDirArgument(napi_env env, napi_callback_info info, std::string* cacheDir) {
   size_t argc = 1;
   napi_value args[1] = {nullptr};
-  napi_get_cb_info(env, info, &argc, args, nullptr, nullptr);
-  char cacheDir[1024] = {0};
-  size_t length = 0;
-  napi_get_value_string_utf8(env, args[0], cacheDir, 1024, &length);
-  if (length <= 0) {
-    return nullptr;
+  if (napi_get_cb_info(env, info, &argc, args, nullptr, nullptr) != napi_ok || argc != 1) {
+    return false;
   }
-  auto nativePlatform = const_cast<NativePlatform*>(
-      reinterpret_cast<const NativePlatform*>(NativePlatform::Current()));
-  nativePlatform->setCacheDir(cacheDir);
+  size_t length = 0;
+  if (napi_get_value_string_utf8(env, args[0], nullptr, 0, &length) != napi_ok) {
+    return false;
+  }
+  cacheDir->resize(length + 1);
+  size_t bytesRead = 0;
+  if (napi_get_value_string_utf8(env, args[0], cacheDir->data(), cacheDir->size(), &bytesRead) !=
+          napi_ok ||
+      bytesRead != length) {
+    return false;
+  }
+  cacheDir->resize(length);
+  return cacheDir->find('\0') == std::string::npos;
+}
+
+static napi_value SetCacheDir(napi_env env, napi_callback_info info) {
+  std::string cacheDir;
+  if (ReadCacheDirArgument(env, info, &cacheDir)) {
+    PAGDiskCache::SetCacheDir(cacheDir);
+  }
+  return nullptr;
+}
+
+static napi_value SetDefaultCacheDirInternal(napi_env env, napi_callback_info info) {
+  std::string cacheDir;
+  if (ReadCacheDirArgument(env, info, &cacheDir) && !cacheDir.empty()) {
+    NativePlatform::SetDefaultCacheDir(cacheDir);
+  }
   return nullptr;
 }
 
@@ -103,12 +125,14 @@ napi_value JPAGDiskCache::Constructor(napi_env, napi_callback_info) {
 }
 
 bool JPAGDiskCache::Init(napi_env env, napi_value exports) {
-  napi_property_descriptor classProp[] = {PAG_STATIC_METHOD_ENTRY(MaxDiskSize, MaxDiskSize),
-                                          PAG_STATIC_METHOD_ENTRY(SetMaxDiskSize, SetMaxDiskSize),
-                                          PAG_STATIC_METHOD_ENTRY(RemoveAll, RemoveAll),
-                                          PAG_STATIC_METHOD_ENTRY(SetCacheDir, SetCacheDir),
-                                          PAG_STATIC_METHOD_ENTRY(ReadFile, ReadFile),
-                                          PAG_STATIC_METHOD_ENTRY(WriteFile, WriteFile)};
+  napi_property_descriptor classProp[] = {
+      PAG_STATIC_METHOD_ENTRY(MaxDiskSize, MaxDiskSize),
+      PAG_STATIC_METHOD_ENTRY(SetMaxDiskSize, SetMaxDiskSize),
+      PAG_STATIC_METHOD_ENTRY(RemoveAll, RemoveAll),
+      PAG_STATIC_METHOD_ENTRY(SetCacheDir, SetCacheDir),
+      PAG_STATIC_METHOD_ENTRY(SetDefaultCacheDirInternal, SetDefaultCacheDirInternal),
+      PAG_STATIC_METHOD_ENTRY(ReadFile, ReadFile),
+      PAG_STATIC_METHOD_ENTRY(WriteFile, WriteFile)};
   auto status = DefineClass(env, exports, ClassName(), sizeof(classProp) / sizeof(classProp[0]),
                             classProp, Constructor, "");
   return status == napi_ok;
