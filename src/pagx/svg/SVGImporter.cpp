@@ -22,7 +22,10 @@
 #include <cstdlib>
 #include <cstring>
 #include <sstream>
+#include "pagx/DocumentAccess.h"
 #include "pagx/PAGXDocument.h"
+#include "pagx/nodes/AnimationObject.h"
+#include "pagx/nodes/Channel.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/SolidColor.h"
 #include "pagx/svg/SVGBlendMode.h"
@@ -113,6 +116,14 @@ std::shared_ptr<PAGXDocument> SVGParserContext::parseFile(const std::string& fil
 
   return parseDOM(dom);
 }
+
+// Mask/clip reference layers are converted with visible=false so mergeAdjacentLayers keeps them
+// separate. Restore visible afterwards: consumers that read the mask node's visible flag (e.g.
+// CoCraft) need true to enable masking; the mask reference itself is what keeps the layer from
+// being rendered as regular content (the renderer sets tgfx maskOwner via setMask, mirroring
+// LayerBuilder::resolvePendingMasks' own setVisible(true)).
+static void RestoreMaskLayerVisibility(Layer* layer);
+
 std::shared_ptr<PAGXDocument> SVGParserContext::parseDOM(const std::shared_ptr<XMLDOM>& dom) {
   auto root = dom->getRootNode();
   if (!root || root->name != "svg") {
@@ -191,6 +202,11 @@ std::shared_ptr<PAGXDocument> SVGParserContext::parseDOM(const std::shared_ptr<X
   // This determines which ColorSources should be extracted to resources.
   countColorSourceReferences(root);
 
+  // Collect SMIL animation elements grouped by their parent graphics element. Must run before
+  // convertToLayer so the converter knows which elements have animations and can assign ids /
+  // create Groups accordingly.
+  collectSMILAnimations(root);
+
   // Compute content transform matrix for viewBox mapping.
   // This handles viewBox origin offset, uniform scaling, and centering in one matrix.
   float viewBoxX = (viewBox.size() >= 4) ? viewBox[0] : 0;
@@ -238,6 +254,12 @@ std::shared_ptr<PAGXDocument> SVGParserContext::parseDOM(const std::shared_ptr<X
   // Merge adjacent layers with the same geometry (optimize Fill + Stroke into one Layer).
   mergeAdjacentLayers(convertedLayers);
 
+  // Mask reference layers were kept invisible for the merge pass above; restore visible for
+  // downstream consumers once merging is done.
+  for (auto* layer : convertedLayers) {
+    RestoreMaskLayerVisibility(layer);
+  }
+
   // Apply content transform if needed. The viewBox -> target mapping must affect both the
   // converted layer's own contents AND any child layers (e.g. nested <g>) it owns. When there
   // is exactly one converted layer, pre-multiply the transform onto that layer's matrix so the
@@ -247,6 +269,9 @@ std::shared_ptr<PAGXDocument> SVGParserContext::parseDOM(const std::shared_ptr<X
     if (convertedLayers.size() == 1) {
       auto* singleLayer = convertedLayers[0];
       singleLayer->matrix = contentMatrix * singleLayer->matrix;
+      _contentMatrix = contentMatrix;
+      _contentMatrixBakedIntoLayer = true;
+      _contentMatrixLayer = singleLayer;
       _document->layers.push_back(singleLayer);
     } else {
       auto rootLayer = _document->makeNode<Layer>();
@@ -260,6 +285,22 @@ std::shared_ptr<PAGXDocument> SVGParserContext::parseDOM(const std::shared_ptr<X
     for (auto& layer : convertedLayers) {
       _document->layers.push_back(layer);
     }
+  }
+
+  // Build the SMIL Animation node (if any) and attach an AnimationTimeline to a root layer.
+  // When the document has multiple top-level layers, wrap them in a new root layer to host the
+  // timeline; single-layer documents reuse that layer directly.
+  if (!_smilAnimations.empty()) {
+    Layer* animationRootLayer = nullptr;
+    if (_document->layers.size() == 1) {
+      animationRootLayer = _document->layers[0];
+    } else if (_document->layers.size() > 1) {
+      animationRootLayer = _document->makeNode<Layer>();
+      animationRootLayer->children = std::move(_document->layers);
+      _document->layers.clear();
+      _document->layers.push_back(animationRootLayer);
+    }
+    buildAnimation(animationRootLayer);
   }
 
   return _document;
@@ -278,6 +319,28 @@ void SVGParserContext::parseDefs(const std::shared_ptr<DOMNode>& defsNode) {
     child = child->getNextSibling();
   }
 }
+static void EnsureOpaqueClipMaskFill(const std::shared_ptr<PAGXDocument>& document, Layer* layer);
+
+// Splits "angle cx cy" style transform parameters into numbers.
+static std::vector<float> ParseTransformParams(const std::string& value) {
+  std::vector<float> params = {};
+  std::string token = {};
+  for (char ch : value) {
+    if (ch == ',' || ch == ' ' || ch == '\t' || ch == '\r' || ch == '\n') {
+      if (!token.empty()) {
+        params.push_back(strtof(token.c_str(), nullptr));
+        token.clear();
+      }
+      continue;
+    }
+    token.push_back(ch);
+  }
+  if (!token.empty()) {
+    params.push_back(strtof(token.c_str(), nullptr));
+  }
+  return params;
+}
+
 Layer* SVGParserContext::convertToLayer(const std::shared_ptr<DOMNode>& element,
                                         const InheritedStyle& parentStyle, int depth) {
   if (depth >= MAX_SVG_RECURSION_DEPTH) {
@@ -287,7 +350,8 @@ Layer* SVGParserContext::convertToLayer(const std::shared_ptr<DOMNode>& element,
 
   if (tag == "defs" || tag == "linearGradient" || tag == "radialGradient" || tag == "pattern" ||
       tag == "mask" || tag == "clipPath" || tag == "filter" || tag == "marker" || tag == "style" ||
-      tag == "title" || tag == "desc" || tag == "metadata") {
+      tag == "title" || tag == "desc" || tag == "metadata" || tag == "animate" ||
+      tag == "animateTransform" || tag == "animateMotion" || tag == "set" || tag == "mpath") {
     return nullptr;
   }
 
@@ -374,6 +438,7 @@ Layer* SVGParserContext::convertToLayer(const std::shared_ptr<DOMNode>& element,
         // Convert clipPath element to a mask layer.
         auto clipLayer = convertMaskElement(clipElement, inheritedStyle);
         if (clipLayer) {
+          EnsureOpaqueClipMaskFill(_document, clipLayer);
           if (layer->mask != nullptr) {
             // Both mask and clip-path are present. Wrap the current layer in a parent layer
             // so that the mask stays on the inner layer and clip-path goes on the outer layer.
@@ -442,6 +507,57 @@ Layer* SVGParserContext::convertToLayer(const std::shared_ptr<DOMNode>& element,
         layer->mask == nullptr && layer->filters.empty() && layer->styles.empty()) {
       return nullptr;
     }
+
+    // A rotate animation about a point ("angle cx cy") becomes a matrix with the pivot baked into
+    // tx/ty. Consumers that decompose the matrix see a translation track, so hoist the pivot onto
+    // a parent layer and let the animated layer rotate about its own origin instead.
+    if (layer->matrix.isIdentity() && layer->contents.empty() && !layer->children.empty()) {
+      auto smilIt = _smilAnimations.find(element.get());
+      if (smilIt != _smilAnimations.end()) {
+        float pivotX = 0.0f;
+        float pivotY = 0.0f;
+        bool hasPivot = false;
+        for (const auto& transformElement : smilIt->second.animateTransforms) {
+          if (getAttribute(transformElement, "type") != "rotate") {
+            continue;
+          }
+          auto valuesAttribute = getAttribute(transformElement, "values");
+          std::string first = valuesAttribute.empty()
+                                  ? getAttribute(transformElement, "from")
+                                  : valuesAttribute.substr(0, valuesAttribute.find(';'));
+          auto params = ParseTransformParams(first);
+          if (params.size() >= 3) {
+            pivotX = params[1];
+            pivotY = params[2];
+            hasPivot = true;
+          }
+          break;
+        }
+        if (hasPivot && (pivotX != 0.0f || pivotY != 0.0f)) {
+          // Registration normally happens after the content branch; the early return below skips
+          // it, so the animated layer must be registered here.
+          registerAnimatedElement(element, layer);
+          // The compensation has to sit on a wrapper instead of the child's own matrix: a child
+          // with a replace transform animation overwrites its matrix channel, which would drop the
+          // T(-pivot) and shift the child to the pivot's origin.
+          std::vector<Layer*> compensatedChildren = {};
+          compensatedChildren.reserve(layer->children.size());
+          for (auto* childLayer : layer->children) {
+            auto* compensation = _document->makeNode<Layer>();
+            compensation->matrix = Matrix::Translate(-pivotX, -pivotY);
+            compensation->children.push_back(childLayer);
+            compensatedChildren.push_back(compensation);
+          }
+          layer->children = std::move(compensatedChildren);
+          auto* pivotLayer = _document->makeNode<Layer>();
+          pivotLayer->matrix = Matrix::Translate(pivotX, pivotY);
+          pivotLayer->children.push_back(layer);
+          layer->matrix = Matrix::Identity();
+          _pivotNormalizedLayers[layer] = {pivotX, pivotY};
+          return pivotLayer;
+        }
+      }
+    }
   } else if (tag == "use") {
     // A <use> may reference a container (<symbol>/<g>/<svg>) or a leaf (<image>/shape). Container
     // references must be instantiated as child layers: convertElement (used by the leaf path below)
@@ -462,6 +578,12 @@ Layer* SVGParserContext::convertToLayer(const std::shared_ptr<DOMNode>& element,
     }
     if (!handledAsContainer) {
       convertChildren(element, layer->contents, inheritedStyle, shadowOnlyType);
+      // A <use> referencing a shape converts that shape's content into this layer, so the
+      // referenced element's SMIL animations belong to this instance as well. Registering them on
+      // the <use> element itself would find nothing: the animations live on the referenced node.
+      if (refIt != _elementsById.end() && refIt->second != element) {
+        registerAnimatedElement(refIt->second, layer);
+      }
     }
   } else {
     // Shape element: convert to vector contents.
@@ -486,6 +608,11 @@ Layer* SVGParserContext::convertToLayer(const std::shared_ptr<DOMNode>& element,
       layer->contents.push_back(rotationGroup);
     }
   }
+
+  // Register the element with SMIL animations: assign an id, create a Group to host transform
+  // channels when animateTransform/animateMotion targets a shape, and record the mapping for
+  // buildAnimation to consume. Done after contents are populated so the Group can wrap them.
+  registerAnimatedElement(element, layer);
 
   // Expand SVG marker references into additional child layers.
   std::string markerStart = getAttribute(element, "marker-start");
@@ -809,7 +936,26 @@ void SVGParserContext::convertChildren(const std::shared_ptr<DOMNode>& element,
       // The InnerShadowFilter draws shadow inside the layer's alpha boundary,
       // using only the shape geometry as the clipping region.
     } else {
-      addFillStroke(element, contents, inheritedStyle);
+      // For <use> elements, the fill/stroke on the referenced element should be inherited by the
+      // use instance. Since addFillStroke reads fill/stroke from `element` (the use element), we
+      // overlay the referenced element's fill/stroke onto an extended inherited style so the
+      // "use inherits referenced fill="none"" case is handled correctly.
+      InheritedStyle effectiveStyle = inheritedStyle;
+      if (tag == "use") {
+        std::string refId = resolveUrl(getHrefAttribute(element));
+        auto it = _defs.find(refId);
+        if (it != _defs.end()) {
+          std::string refFill = getAttribute(it->second, "fill");
+          if (!refFill.empty()) {
+            effectiveStyle.fill = refFill;
+          }
+          std::string refStroke = getAttribute(it->second, "stroke");
+          if (!refStroke.empty()) {
+            effectiveStyle.stroke = refStroke;
+          }
+        }
+      }
+      addFillStroke(element, contents, effectiveStyle);
     }
   }
 }
@@ -942,6 +1088,62 @@ Element* SVGParserContext::convertPath(const std::shared_ptr<DOMNode>& element) 
   }
   return path;
 }
+// SVG default whitespace handling: newlines and tabs become spaces, consecutive spaces collapse
+// to one, and leading/trailing spaces are trimmed.
+static std::string NormalizeTextWhitespace(const std::string& text) {
+  std::string collapsed = text;
+  for (auto& ch : collapsed) {
+    if (ch == '\n' || ch == '\r' || ch == '\t') {
+      ch = ' ';
+    }
+  }
+  std::string normalized;
+  normalized.reserve(collapsed.size());
+  bool previousWasSpace = true;
+  for (char ch : collapsed) {
+    if (ch == ' ') {
+      if (!previousWasSpace) {
+        normalized += ch;
+      }
+      previousWasSpace = true;
+    } else {
+      normalized += ch;
+      previousWasSpace = false;
+    }
+  }
+  if (!normalized.empty() && normalized.back() == ' ') {
+    normalized.pop_back();
+  }
+  return normalized;
+}
+
+// SVG font-family may list fallbacks ("A, B"); PAGX stores a single family, so keep the first.
+static std::string FirstFontFamily(const std::string& value) {
+  std::string first = value.substr(0, value.find(','));
+  size_t start = first.find_first_not_of(" \t\r\n");
+  size_t end = first.find_last_not_of(" \t\r\n");
+  if (start == std::string::npos) {
+    return {};
+  }
+  first = first.substr(start, end - start + 1);
+  if (first.size() >= 2 && (first.front() == '\'' || first.front() == '"') &&
+      first.back() == first.front()) {
+    first = first.substr(1, first.size() - 2);
+  }
+  return first;
+}
+
+// A Text run owns exactly one solid paint. Gradients, patterns and "none" need the element-level
+// path (addFillStroke), so runs using them stay merged with the line.
+static bool IsSolidTextPaint(const std::string& paint) {
+  return !paint.empty() && paint != "none" && paint.rfind("url(", 0) != 0;
+}
+
+// A paint string that references a gradient / pattern definition.
+static bool IsUrlPaint(const std::string& paint) {
+  return paint.rfind("url(", 0) == 0;
+}
+
 Group* SVGParserContext::convertText(const std::shared_ptr<DOMNode>& element,
                                      const InheritedStyle& inheritedStyle) {
   auto group = _document->makeNode<Group>();
@@ -968,93 +1170,50 @@ Group* SVGParserContext::convertText(const std::shared_ptr<DOMNode>& element,
     anchor = inheritedStyle.textAnchor;
   }
 
-  // Get text content from child text nodes and tspan elements.
-  std::string textContent;
-  std::shared_ptr<DOMNode> textPathElement = nullptr;
-  auto child = element->getFirstChild();
-  while (child) {
-    if (child->type == DOMNodeType::Text) {
-      textContent += child->name;
-    } else if (child->name == "tspan") {
-      // Handle tspan element: parse dx/dy offsets for positioning.
-      x += parseLengthEm(getAttribute(child, "dx"), _viewBoxWidth, currentFontSize);
-      y += parseLengthEm(getAttribute(child, "dy"), _viewBoxHeight, currentFontSize);
-      // Extract text content from tspan children.
-      auto tspanChild = child->getFirstChild();
-      while (tspanChild) {
-        if (tspanChild->type == DOMNodeType::Text) {
-          textContent += tspanChild->name;
-        }
-        tspanChild = tspanChild->getNextSibling();
-      }
-    } else if (child->name == "textPath") {
-      // <textPath> places the run along a referenced path. Funnel its (possibly tspan-wrapped)
-      // text into the same content buffer the Text node consumes; the path geometry and offset
-      // descriptors are converted separately into a TextPath modifier sibling below.
-      textPathElement = child;
-      auto pathChild = child->getFirstChild();
-      while (pathChild) {
-        if (pathChild->type == DOMNodeType::Text) {
-          textContent += pathChild->name;
-        } else if (pathChild->name == "tspan") {
-          auto tspanChild = pathChild->getFirstChild();
-          while (tspanChild) {
-            if (tspanChild->type == DOMNodeType::Text) {
-              textContent += tspanChild->name;
-            }
-            tspanChild = tspanChild->getNextSibling();
-          }
-        }
-        pathChild = pathChild->getNextSibling();
+  // Illustrator-style exports position glyphs with explicit x/y on every <tspan> and encode line
+  // breaks as a jump to a new baseline y. Walk children with a pen position and split the content
+  // into lines whenever the baseline moves by more than half the font size, so each line keeps
+  // its own explicit origin. Concatenating everything into a single run instead would lay
+  // following lines out horizontally and overflow the text bounds.
+  TextWalkState state;
+  state.currentX = x;
+  state.currentY = y;
+  state.fontSize = currentFontSize;
+  collectTextRuns(element, &state, inheritedStyle);
+
+  // Collect the emitted runs: one per detected line, or a single combined run when a
+  // <textPath> child turns the text into path-following text.
+  std::vector<TextLine> emittedRuns;
+  if (state.textPathElement) {
+    auto normalized = NormalizeTextWhitespace(state.textContent);
+    if (!normalized.empty()) {
+      emittedRuns.push_back(TextLine{x, y, normalized});
+    }
+  } else {
+    for (const auto& line : state.lines) {
+      auto normalized = NormalizeTextWhitespace(line.text);
+      if (!normalized.empty()) {
+        emittedRuns.push_back(
+            TextLine{line.startX, line.baseline, normalized, line.fill, line.fillOpacity});
       }
     }
-    child = child->getNextSibling();
   }
 
-  // SVG whitespace normalization: replace newlines and tabs with spaces,
-  // collapse consecutive spaces, and trim leading/trailing spaces.
-  for (auto& ch : textContent) {
-    if (ch == '\n' || ch == '\r' || ch == '\t') {
-      ch = ' ';
-    }
-  }
-  std::string normalized;
-  normalized.reserve(textContent.size());
-  bool previousWasSpace = true;
-  for (char ch : textContent) {
-    if (ch == ' ') {
-      if (!previousWasSpace) {
-        normalized += ch;
-      }
-      previousWasSpace = true;
-    } else {
-      normalized += ch;
-      previousWasSpace = false;
-    }
-  }
-  if (!normalized.empty() && normalized.back() == ' ') {
-    normalized.pop_back();
-  }
-  textContent = std::move(normalized);
-
-  if (!textContent.empty()) {
-    auto text = _document->makeNode<Text>();
-    text->position = {x, y};
-    text->text = textContent;
-
+  bool uniformFill = true;
+  bool allRunsNone = false;
+  std::string groupFill = {};
+  // Gradient / pattern reference declared by the runs (a tspan may be the only place a paint is
+  // written), resolved into the group-level Fill instead of being dropped.
+  std::string groupPaintRef = {};
+  // Alpha of the group-level Fill, taken from the first run when every run agrees.
+  float groupFillOpacity = 1.0f;
+  if (!emittedRuns.empty()) {
     // Font family: element attribute > inherited style.
     std::string fontFamily = getAttribute(element, "font-family");
     if (fontFamily.empty()) {
       fontFamily = inheritedStyle.fontFamily;
     }
-    if (!fontFamily.empty()) {
-      text->fontFamily = fontFamily;
-    }
-
-    // Font size already resolved above.
-    text->fontSize = currentFontSize;
-    // SVG <text> y attribute specifies the alphabetic baseline position.
-    text->baseline = TextBaseline::Alphabetic;
+    fontFamily = FirstFontFamily(fontFamily);
 
     // Font weight: element attribute > inherited style.
     // SVG font-weight maps to fontStyle in PAGX (e.g., "Bold", "Light", "Black").
@@ -1071,41 +1230,239 @@ Group* SVGParserContext::convertText(const std::shared_ptr<DOMNode>& element,
     // weights are rounded to the nearest 100 and mapped to OpenType keywords (Thin,
     // Light, Medium, SemiBold, Bold, ExtraBold, Black) so that 900 does not collapse
     // to 700.
-    text->fontStyle = ResolveFontStyleName(fontWeight, fontStyleAttr);
+    auto fontStyleName = ResolveFontStyleName(fontWeight, fontStyleAttr);
 
     // Letter spacing: element attribute > inherited style.
     std::string letterSpacing = getAttribute(element, "letter-spacing");
     if (letterSpacing.empty()) {
       letterSpacing = inheritedStyle.letterSpacing;
     }
-    if (!letterSpacing.empty()) {
-      text->letterSpacing = parseLength(letterSpacing, _viewBoxWidth);
+    float letterSpacingValue =
+        letterSpacing.empty() ? 0.0f : parseLength(letterSpacing, _viewBoxWidth);
+
+    // Map SVG text-anchor to PAGX TextAnchor. SVG values: start (default), middle, end.
+    auto textAnchorValue = TextAnchor::Start;
+    if (anchor == "middle") {
+      textAnchorValue = TextAnchor::Center;
+    } else if (anchor == "end") {
+      textAnchorValue = TextAnchor::End;
     }
 
-    group->elements.push_back(text);
+    // Element-level fill; SVG defaults to black when nothing is specified.
+    std::string elementFill = getAttribute(element, "fill");
+    if (elementFill.empty()) {
+      elementFill = inheritedStyle.fill;
+    }
+    if (elementFill.empty()) {
+      elementFill = "#000000";
+    }
+    // A Text node carries a single paint, so runs with different fills need their own Fill.
+    std::string firstFill = {};
+    float firstFillOpacity = 1.0f;
+    allRunsNone = !emittedRuns.empty();
+    bool hasNoneRun = false;
+    for (const auto& run : emittedRuns) {
+      auto fill = run.fill.empty() ? elementFill : run.fill;
+      if (fill == "none") {
+        hasNoneRun = true;
+        continue;
+      }
+      allRunsNone = false;
+      if (firstFill.empty()) {
+        firstFill = fill;
+        firstFillOpacity = run.fillOpacity;
+      } else if (fill != firstFill || run.fillOpacity != firstFillOpacity) {
+        uniformFill = false;
+        break;
+      }
+    }
 
-    // Map SVG text-anchor to PAGX TextAnchor on the Text node directly.
-    // SVG text-anchor: start (default), middle, end.
-    if (anchor == "middle") {
-      text->textAnchor = TextAnchor::Center;
-    } else if (anchor == "end") {
-      text->textAnchor = TextAnchor::End;
+    // A group-level Fill paints every preceding shape, so a run asking for "none" cannot share it:
+    // with any painted run present the runs have to be emitted one by one, each carrying its own
+    // paint. "All none" is handled by allRunsNone below.
+    if (hasNoneRun && !allRunsNone) {
+      uniformFill = false;
+    }
+
+    // Reference geometry for gradient / pattern paints: objectBoundingBox units resolve against
+    // the text element's bounds, the same box the element-level fill would use.
+    const Rect textBounds = getShapeBounds(element);
+
+    for (const auto& run : emittedRuns) {
+      auto text = _document->makeNode<Text>();
+      text->position = {run.startX, run.baseline};
+      text->text = run.text;
+      if (!fontFamily.empty()) {
+        text->fontFamily = fontFamily;
+      }
+      text->fontSize = currentFontSize;
+      // SVG <text> y attribute specifies the alphabetic baseline position.
+      text->baseline = TextBaseline::Alphabetic;
+      text->fontStyle = fontStyleName;
+      if (!letterSpacing.empty()) {
+        text->letterSpacing = letterSpacingValue;
+      }
+      text->textAnchor = textAnchorValue;
+      auto fill = run.fill.empty() ? elementFill : run.fill;
+      if (!uniformFill && fill != "none") {
+        auto runGroup = _document->makeNode<Group>();
+        runGroup->elements.push_back(text);
+        auto fillNode = _document->makeNode<Fill>();
+        if (IsUrlPaint(fill)) {
+          // A run may be the only place its paint is declared (a tspan gradient over an unfilled
+          // <text>). Resolve the reference here; parseColor would read it as black.
+          fillNode->color = getColorSourceForRef(resolveUrl(fill), textBounds);
+        } else {
+          auto solidColor = _document->makeNode<SolidColor>();
+          solidColor->color = parseColor(fill);
+          fillNode->color = solidColor;
+        }
+        fillNode->alpha = run.fillOpacity;
+        runGroup->elements.push_back(fillNode);
+        group->elements.push_back(runGroup);
+      } else {
+        group->elements.push_back(text);
+      }
     }
 
     // A <textPath> child turns this run into path-following text. Emit the TextPath modifier
     // right after the Text so the resulting [Text, TextPath, Fill] ordering matches what the
     // PAGX renderer and HTML exporter expect for path text.
-    if (textPathElement) {
-      auto textPath = convertTextPath(textPathElement, element);
+    if (state.textPathElement) {
+      auto textPath = convertTextPath(state.textPathElement, element);
       if (textPath) {
         group->elements.push_back(textPath);
       }
     }
+
+    // Runs may be the only place a paint is declared (a tspan fill with no <text> fill). When
+    // every run agrees, use that paint for the group instead of the element default.
+    if (uniformFill && !firstFill.empty()) {
+      std::string elementFill = getAttribute(element, "fill");
+      if (elementFill.empty()) {
+        elementFill = inheritedStyle.fill;
+      }
+      if (elementFill.empty()) {
+        elementFill = "#000000";
+      }
+      // The run's paint wins whenever it says something the element-level paint cannot: a
+      // different colour, or the same colour with a different opacity (the element-level
+      // addFillStroke would otherwise swallow the tspan's fill-opacity).
+      float elementFillOpacity = 1.0f;
+      std::string elementOpacityAttr = getAttribute(element, "fill-opacity");
+      if (elementOpacityAttr.empty()) {
+        elementOpacityAttr = inheritedStyle.fillOpacity;
+      }
+      if (!elementOpacityAttr.empty()) {
+        elementFillOpacity = std::strtof(elementOpacityAttr.c_str(), nullptr);
+      }
+      bool paintDiffers = elementFill != firstFill || firstFillOpacity != elementFillOpacity;
+      if (paintDiffers && IsSolidTextPaint(firstFill)) {
+        groupFill = firstFill;
+        groupFillOpacity = firstFillOpacity;
+      } else if (paintDiffers && IsUrlPaint(firstFill)) {
+        groupPaintRef = resolveUrl(firstFill);
+        groupFillOpacity = firstFillOpacity;
+      }
+    }
   }
 
-  addFillStroke(element, group->elements, inheritedStyle);
+  if (!groupFill.empty()) {
+    auto fillNode = _document->makeNode<Fill>();
+    auto solidColor = _document->makeNode<SolidColor>();
+    solidColor->color = parseColor(groupFill);
+    fillNode->color = solidColor;
+    fillNode->alpha = groupFillOpacity;
+    group->elements.push_back(fillNode);
+  } else if (!groupPaintRef.empty()) {
+    // A tspan-only gradient: resolve the reference at the text bounds so the run's paint survives.
+    if (auto* colorSource = getColorSourceForRef(groupPaintRef, getShapeBounds(element))) {
+      auto fillNode = _document->makeNode<Fill>();
+      fillNode->color = colorSource;
+      fillNode->alpha = groupFillOpacity;
+      group->elements.push_back(fillNode);
+    }
+  }
+  // Every run asking for "none" must stay unpainted; the element default would otherwise fill them.
+  bool includeFill = uniformFill && groupFill.empty() && groupPaintRef.empty() && !allRunsNone;
+  addFillStroke(element, group->elements, inheritedStyle, includeFill);
   return group;
 }
+
+void SVGParserContext::collectTextRuns(const std::shared_ptr<DOMNode>& element,
+                                       TextWalkState* state, const InheritedStyle& parentStyle) {
+  // Only an explicit x on THIS element anchors the text that follows: a tspan without x continues
+  // the previous run's advance, which the importer cannot measure, so a fill split there would
+  // start the new run at a stale pen position and overlap the previous one.
+  const bool anchored = !getAttribute(element, "x").empty();
+  auto child = element->getFirstChild();
+  while (child) {
+    if (child->type == DOMNodeType::Text) {
+      InheritedStyle childStyle = computeInheritedStyle(child, parentStyle);
+      // An unresolved fill means the SVG default applies, which is still a concrete paint and
+      // must be comparable with an explicit fill on a later run.
+      auto fill = childStyle.fill.empty() ? std::string("#000000") : childStyle.fill;
+      // Bare text flows at the current pen position: it joins the line of the previous run,
+      // or opens the first line at the <text> element origin.
+      bool opensLine = state->currentLineIndex < 0 ||
+                       fabs(state->currentY - state->lines[state->currentLineIndex].baseline) >
+                           state->fontSize * 0.5f;
+      // A fill change inside one visual line also opens a run, so each Text keeps one paint.
+      // fill-opacity lives on the element that owns the run (the <text> or <tspan>), not on the
+      // text node being visited.
+      std::string fillOpacityAttr = getAttribute(element, "fill-opacity");
+      if (fillOpacityAttr.empty()) {
+        fillOpacityAttr = parentStyle.fillOpacity;
+      }
+      float fillOpacity = 1.0f;
+      if (!fillOpacityAttr.empty()) {
+        fillOpacity = std::strtof(fillOpacityAttr.c_str(), nullptr);
+      }
+      auto* currentLine = opensLine ? nullptr : &state->lines[state->currentLineIndex];
+      bool fillChanged = currentLine != nullptr && currentLine->fill != fill && anchored &&
+                         IsSolidTextPaint(fill) && IsSolidTextPaint(currentLine->fill);
+      bool opacityChanged = currentLine != nullptr && currentLine->fillOpacity != fillOpacity &&
+                            anchored && IsSolidTextPaint(fill);
+      if (opensLine || fillChanged || opacityChanged) {
+        state->lines.push_back(TextLine{state->currentX, state->currentY, "", fill, fillOpacity});
+        state->currentLineIndex = static_cast<int>(state->lines.size()) - 1;
+        currentLine = &state->lines.back();
+      }
+      currentLine->text += child->name;
+      state->textContent += child->name;
+    } else if (child->name == "tspan") {
+      // A tspan's explicit x/y replace the pen position (absolute in the <text> element's
+      // coordinate space); dx/dy shift it. Nested tspans continue the walk: Illustrator wraps
+      // whole lines in an outer tspan while the inner ones carry the actual positions.
+      InheritedStyle childStyle = computeInheritedStyle(child, parentStyle);
+      auto xAttribute = getAttribute(child, "x");
+      auto yAttribute = getAttribute(child, "y");
+      if (!xAttribute.empty()) {
+        state->currentX = parseLength(xAttribute, _viewBoxWidth);
+      } else {
+        state->currentX += parseLengthEm(getAttribute(child, "dx"), _viewBoxWidth, state->fontSize);
+      }
+      if (!yAttribute.empty()) {
+        state->currentY = parseLength(yAttribute, _viewBoxHeight);
+      } else {
+        state->currentY +=
+            parseLengthEm(getAttribute(child, "dy"), _viewBoxHeight, state->fontSize);
+      }
+      collectTextRuns(child, state, childStyle);
+    } else if (child->name == "textPath") {
+      // <textPath> places the run along a referenced path; SVG ignores x/y on its inner
+      // tspans, so no line splitting applies. Reuse the recursive walk to collect every
+      // descendant text node into the combined content buffer; line entries it may produce
+      // are discarded because the textPath emission path in convertText reads textContent
+      // only. The path geometry and offset descriptors are converted separately into a
+      // TextPath modifier sibling below.
+      state->textPathElement = child;
+      collectTextRuns(child, state, computeInheritedStyle(child, parentStyle));
+    }
+    child = child->getNextSibling();
+  }
+}
+
 TextPath* SVGParserContext::convertTextPath(const std::shared_ptr<DOMNode>& textPathElement,
                                             const std::shared_ptr<DOMNode>& textElement) {
   std::string refId = resolveUrl(getHrefAttribute(textPathElement));
@@ -1284,6 +1641,11 @@ Layer* SVGParserContext::convertUseContainer(const std::shared_ptr<DOMNode>& use
 
   auto group = _document->makeNode<Layer>();
   group->matrix = contentMatrix;
+  // The instance positioning and the referenced element's own transform animation must stay on
+  // separate layers: a replace animation on the container writes the whole matrix channel, which
+  // would otherwise erase the use's x/y and the symbol viewport mapping.
+  auto content = _document->makeNode<Layer>();
+  group->children.push_back(content);
 
   InheritedStyle refStyle = computeInheritedStyle(refElement, inheritedStyle);
   _useStack.insert(refId);
@@ -1291,15 +1653,75 @@ Layer* SVGParserContext::convertUseContainer(const std::shared_ptr<DOMNode>& use
   while (child) {
     auto childLayer = convertToLayer(child, refStyle, depth + 1);
     if (childLayer) {
-      group->children.push_back(childLayer);
+      content->children.push_back(childLayer);
     }
     child = child->getNextSibling();
   }
   _useStack.erase(refId);
 
-  if (group->children.empty()) {
+  if (content->children.empty()) {
     return nullptr;
   }
+
+  // A referenced <g>/<symbol>/<svg> may carry its own mask or clip-path.
+  // Expanding a <use> copies only the referenced subtree children, so the referenced
+  // element's own mask attributes are applied here; otherwise the mask is silently dropped.
+  std::string refMaskAttr = getAttribute(refElement, "mask");
+  if (!refMaskAttr.empty() && refMaskAttr != "none") {
+    auto maskIt = _defs.find(resolveUrl(refMaskAttr));
+    if (maskIt != _defs.end()) {
+      auto* maskLayer = convertMaskElement(maskIt->second, refStyle);
+      if (maskLayer) {
+        // One mask definition expands into one instance per <use> reference; ids must stay
+        // unique across instances, otherwise mask="@..." can resolve to the wrong one.
+        maskLayer->id = maskLayer->id + "_" + std::to_string(++_maskInstanceSeq);
+        maskLayer->name = maskLayer->id;
+        // The mask geometry is authored in the referenced element's space, so it has to carry the
+        // instance mapping too; otherwise the clip stays at the defs origin while the content moves.
+        maskLayer->matrix = contentMatrix * maskLayer->matrix;
+        group->mask = maskLayer;
+        group->maskType = (getAttribute(maskIt->second, "mask-type") == "alpha")
+                              ? MaskType::Alpha
+                              : MaskType::Luminance;
+        _maskLayers.push_back(maskLayer);
+      }
+    }
+  }
+
+  std::string refClipAttr = getAttribute(refElement, "clip-path");
+  if (!refClipAttr.empty() && refClipAttr != "none") {
+    auto clipIt = _defs.find(resolveUrl(refClipAttr));
+    if (clipIt != _defs.end()) {
+      auto* clipLayer = convertMaskElement(clipIt->second, refStyle);
+      if (clipLayer) {
+        EnsureOpaqueClipMaskFill(_document, clipLayer);
+        clipLayer->matrix = contentMatrix * clipLayer->matrix;
+        if (group->mask != nullptr) {
+          // Both mask and clip-path are present: clip-path goes on the outer layer and the
+          // mask stays on the inner one.
+          auto* wrapper = _document->makeNode<Layer>();
+          wrapper->mask = clipLayer;
+          wrapper->maskType = MaskType::Alpha;
+          wrapper->matrix = group->matrix;
+          wrapper->alpha = group->alpha;
+          group->matrix = Matrix::Identity();
+          group->alpha = 1.0f;
+          wrapper->children.push_back(group);
+          _maskLayers.push_back(clipLayer);
+          group = wrapper;
+        } else {
+          group->mask = clipLayer;
+          group->maskType = MaskType::Alpha;
+          _maskLayers.push_back(clipLayer);
+        }
+      }
+    }
+  }
+
+  // The referenced container may carry its own animate / animateTransform children; the copy above
+  // only converts the subtree, so register the container itself against the instantiated group.
+  registerAnimatedElement(refElement, content);
+
   return group;
 }
 // Builds a Rectangle + ImagePattern fill group rendering an image at the given box. Shared by the
@@ -1543,6 +1965,50 @@ ImagePattern* SVGParserContext::convertPattern(const std::shared_ptr<DOMNode>& e
 
   return pattern;
 }
+static bool IsPaintNode(NodeType type) {
+  return type == NodeType::Fill || type == NodeType::Stroke;
+}
+
+// A clipPath only contributes geometry; SVG ignores the paint declared inside it. PAGX masks are
+// alpha based, so a clip shape with "fill: none" would render nothing and hide the whole masked
+// layer. Give every geometry set an opaque fill before it becomes a mask.
+static void EnsureOpaqueClipFill(const std::shared_ptr<PAGXDocument>& document,
+                                 std::vector<Element*>& elements) {
+  bool hasPaint = false;
+  bool hasGeometry = false;
+  for (auto* element : elements) {
+    if (element == nullptr) {
+      continue;
+    }
+    if (IsPaintNode(element->nodeType())) {
+      hasPaint = true;
+    } else if (element->nodeType() == NodeType::Group) {
+      auto* group = static_cast<Group*>(element);
+      EnsureOpaqueClipFill(document, group->elements);
+    } else {
+      hasGeometry = true;
+    }
+  }
+  if (!hasGeometry || hasPaint) {
+    return;
+  }
+  auto* fill = document->makeNode<Fill>();
+  auto* color = document->makeNode<SolidColor>();
+  color->color = {1, 1, 1, 1, ColorSpace::SRGB};
+  fill->color = color;
+  elements.push_back(fill);
+}
+
+static void EnsureOpaqueClipMaskFill(const std::shared_ptr<PAGXDocument>& document, Layer* layer) {
+  if (layer == nullptr) {
+    return;
+  }
+  for (auto* child : layer->children) {
+    EnsureOpaqueClipMaskFill(document, child);
+  }
+  EnsureOpaqueClipFill(document, layer->contents);
+}
+
 Layer* SVGParserContext::convertMaskElement(const std::shared_ptr<DOMNode>& maskElement,
                                             const InheritedStyle& parentStyle) {
   auto maskLayer = _document->makeNode<Layer>();
@@ -1580,6 +2046,9 @@ void SVGParserContext::parseMaskChildren(const std::shared_ptr<DOMNode>& parent,
         subLayer->matrix = combinedMatrix;
         convertChildren(child, subLayer->contents, inheritedStyle);
         maskLayer->children.push_back(subLayer);
+        // Mask content can carry SMIL animations; registering the host layer is required for
+        // those animations to bind.
+        registerAnimatedElement(child, subLayer);
       } else {
         // Each SVG shape carries its own paint, so wrap it in a Group to isolate the fill/stroke.
         // Otherwise multiple shapes sharing the mask layer's flat contents list would let a later
@@ -1588,7 +2057,19 @@ void SVGParserContext::parseMaskChildren(const std::shared_ptr<DOMNode>& parent,
         auto group = _document->makeNode<Group>();
         convertChildren(child, group->elements, inheritedStyle);
         if (!group->elements.empty()) {
-          maskLayer->contents.push_back(group);
+          // Every mask shape goes through a child layer, animated or not. The runtime draws the
+          // layer's own contents before its children, so mixing the two paths for one mask reverses
+          // the SVG paint order (a later black rect would cover an earlier white circle).
+          auto subLayer = _document->makeNode<Layer>();
+          if (_smilAnimations.count(child.get()) > 0) {
+            // Path/Stroke are put directly into the layer: an intermediate Group prevents stroke
+            // channels from resolving their host element.
+            convertChildren(child, subLayer->contents, inheritedStyle);
+            registerAnimatedElement(child, subLayer);
+          } else {
+            subLayer->contents.push_back(group);
+          }
+          maskLayer->children.push_back(subLayer);
         }
       }
     } else if (child->name == "g") {
@@ -1629,6 +2110,27 @@ bool SVGParserContext::convertFilterElement(const std::shared_ptr<DOMNode>& filt
   // we should set shadowOnly=true.
   bool shadowOnly = !hasMerge;
 
+  // A blur merged back with the sharp source is a glow composite (feMerge of the blurred result and
+  // SourceGraphic). PAGX has no duplication primitive for that pattern; blurring the layer itself
+  // would soften the artwork instead of adding a halo, so keep the graphic sharp.
+  bool blurMergesWithSource = false;
+  for (const auto& primitive : primitives) {
+    if (primitive->name != "feMerge") {
+      continue;
+    }
+    auto mergeChild = primitive->getFirstChild();
+    while (mergeChild) {
+      if (mergeChild->name == "feMergeNode" && getAttribute(mergeChild, "in") == "SourceGraphic") {
+        blurMergesWithSource = true;
+        break;
+      }
+      mergeChild = mergeChild->getNextSibling();
+    }
+    if (blurMergesWithSource) {
+      break;
+    }
+  }
+
   // Detect Figma-style drop shadow pattern and extract shadow parameters.
   // Pattern: feColorMatrix(in=SourceAlpha) → feOffset → feGaussianBlur → feComposite → feColorMatrix
   // This pattern may repeat multiple times for multiple shadows.
@@ -1652,8 +2154,9 @@ bool SVGParserContext::convertFilterElement(const std::shared_ptr<DOMNode>& filt
         auto [blurX, blurY] = parseFilterBlur(primitives[i + 2]);
         auto shadowColor = parseFilterColorMatrix(primitives[i + 4]);
 
-        filters.push_back(
-            createDropShadow(offsetX, offsetY, blurX, blurY, shadowColor, shadowOnly));
+        auto* filter = createDropShadow(offsetX, offsetY, blurX, blurY, shadowColor, shadowOnly);
+        registerFilterAnimationTarget(filter, primitives[i + 2], primitives[i + 1]);
+        filters.push_back(filter);
 
         // Skip the consumed primitives (5 elements) plus the feBlend that follows.
         i += 5;
@@ -1673,8 +2176,9 @@ bool SVGParserContext::convertFilterElement(const std::shared_ptr<DOMNode>& filt
         auto [blurX, blurY] = parseFilterBlur(primitives[i + 2]);
         auto shadowColor = parseFilterColorMatrix(primitives[i + 3]);
 
-        filters.push_back(
-            createDropShadow(offsetX, offsetY, blurX, blurY, shadowColor, shadowOnly));
+        auto* filter = createDropShadow(offsetX, offsetY, blurX, blurY, shadowColor, shadowOnly);
+        registerFilterAnimationTarget(filter, primitives[i + 2], primitives[i + 1]);
+        filters.push_back(filter);
 
         // Skip the consumed primitives (4 elements) plus the feBlend that follows.
         i += 4;
@@ -1692,7 +2196,9 @@ bool SVGParserContext::convertFilterElement(const std::shared_ptr<DOMNode>& filt
         auto [offsetX, offsetY] = parseFilterOffset(primitives[i + 1]);
         auto shadowColor = parseFilterColorMatrix(primitives[i + 2]);
 
-        filters.push_back(createDropShadow(offsetX, offsetY, 0, 0, shadowColor, shadowOnly));
+        auto* filter = createDropShadow(offsetX, offsetY, 0, 0, shadowColor, shadowOnly);
+        registerFilterAnimationTarget(filter, nullptr, primitives[i + 1]);
+        filters.push_back(filter);
 
         // Skip the consumed primitives (3 elements) plus any feBlend that follows.
         i += 3;
@@ -1739,6 +2245,7 @@ bool SVGParserContext::convertFilterElement(const std::shared_ptr<DOMNode>& filt
           innerShadow->blurY = blurY;
           innerShadow->color = shadowColor;
           innerShadow->shadowOnly = shadowOnly;
+          registerFilterAnimationTarget(innerShadow, node, primitives[i + 1]);
           filters.push_back(innerShadow);
 
           // Skip consumed primitives: feGaussianBlur, feOffset, feComposite, [feColorMatrix]
@@ -1760,8 +2267,9 @@ bool SVGParserContext::convertFilterElement(const std::shared_ptr<DOMNode>& filt
           shadowColor = parseFilterColorMatrix(primitives[colorMatrixIdx]);
         }
 
-        filters.push_back(
-            createDropShadow(offsetX, offsetY, blurX, blurY, shadowColor, shadowOnly));
+        auto* filter = createDropShadow(offsetX, offsetY, blurX, blurY, shadowColor, shadowOnly);
+        registerFilterAnimationTarget(filter, node, primitives[i + 1]);
+        filters.push_back(filter);
 
         // Skip consumed primitives.
         i += 2;
@@ -1788,8 +2296,9 @@ bool SVGParserContext::convertFilterElement(const std::shared_ptr<DOMNode>& filt
           shadowColor = parseFilterColorMatrix(primitives[colorMatrixIdx]);
         }
 
-        filters.push_back(
-            createDropShadow(offsetX, offsetY, blurX, blurY, shadowColor, shadowOnly));
+        auto* filter = createDropShadow(offsetX, offsetY, blurX, blurY, shadowColor, shadowOnly);
+        registerFilterAnimationTarget(filter, primitives[i + 1], node);
+        filters.push_back(filter);
 
         // Skip consumed primitives.
         i += 2;
@@ -1818,11 +2327,12 @@ bool SVGParserContext::convertFilterElement(const std::shared_ptr<DOMNode>& filt
         }
       }
 
-      if (isSourceGraphic) {
+      if (isSourceGraphic && !blurMergesWithSource) {
         auto [devX, devY] = parseFilterBlur(node);
         auto blurFilter = _document->makeNode<BlurFilter>();
         blurFilter->blurX = devX;
         blurFilter->blurY = devY;
+        registerFilterAnimationTarget(blurFilter, node, nullptr);
         filters.push_back(blurFilter);
       }
     }
@@ -1853,7 +2363,7 @@ bool SVGParserContext::convertFilterElement(const std::shared_ptr<DOMNode>& filt
 }
 void SVGParserContext::addFillStroke(const std::shared_ptr<DOMNode>& element,
                                      std::vector<Element*>& contents,
-                                     const InheritedStyle& inheritedStyle) {
+                                     const InheritedStyle& inheritedStyle, bool includeFill) {
   // Lazily compute shape bounds only when needed (for gradient/pattern references).
   bool boundsComputed = false;
   Rect shapeBounds = {};
@@ -1887,7 +2397,7 @@ void SVGParserContext::addFillStroke(const std::shared_ptr<DOMNode>& element,
   // Only add fill if we have an effective fill value that is not "none".
   // If fill is empty and no inherited value, SVG default is black fill.
   // But if inherited value is "none", we skip fill entirely.
-  if (fill != "none") {
+  if (includeFill && fill != "none") {
     if (fill.empty()) {
       // No fill specified anywhere - use SVG default black.
       auto fillNode = _document->makeNode<Fill>();
@@ -2075,7 +2585,23 @@ void SVGParserContext::addFillStroke(const std::shared_ptr<DOMNode>& element,
     // matching SVG. Pixel tests on the renderer show that tgfx's dashOffset
     // shifts the phase along the reverse path direction, so a negative value
     // is required to advance the start point clockwise.
-    if (!strokeNode->dashes.empty() && (element->name == "circle" || element->name == "ellipse")) {
+    //
+    // Skip this correction when stroke-dashoffset is animated: the animation's
+    // keyframe values come from the SVG author's coordinate space (un-corrected),
+    // and applying the phase shift only to the static base value would cause a
+    // visual jump when the animation starts.
+    bool dashOffsetAnimated = false;
+    auto smilIt = _smilAnimations.find(element.get());
+    if (smilIt != _smilAnimations.end()) {
+      for (const auto& animEl : smilIt->second.animates) {
+        if (getAttribute(animEl, "attributeName") == "stroke-dashoffset") {
+          dashOffsetAnimated = true;
+          break;
+        }
+      }
+    }
+    if (!dashOffsetAnimated && !strokeNode->dashes.empty() &&
+        (element->name == "circle" || element->name == "ellipse")) {
       float rx = 0.0f;
       float ry = 0.0f;
       if (element->name == "circle") {
@@ -2097,6 +2623,59 @@ void SVGParserContext::addFillStroke(const std::shared_ptr<DOMNode>& element,
     contents.push_back(strokeNode);
   }
 }
+// Text box estimation for objectBoundingBox paints: no font metrics are available at import time,
+// so a glyph contributes about one em when it is full-width (CJK) and 0.6 em otherwise. Only the
+// gradient reference geometry depends on this — the text layout itself still uses the real font.
+constexpr float kFullWidthAdvanceEm = 1.0f;
+constexpr float kProportionalAdvanceEm = 0.6f;
+
+// Decodes one UTF-8 sequence and returns its advance in em. Counting code points instead of bytes
+// keeps a CJK string from being sized three times too wide.
+static float Utf8AdvanceEm(const std::string& text, size_t* index) {
+  const auto lead = static_cast<unsigned char>(text[*index]);
+  uint32_t code = lead;
+  size_t length = 1;
+  if ((lead & 0xE0) == 0xC0) {
+    length = 2;
+    code = lead & 0x1Fu;
+  } else if ((lead & 0xF0) == 0xE0) {
+    length = 3;
+    code = lead & 0x0Fu;
+  } else if ((lead & 0xF8) == 0xF0) {
+    length = 4;
+    code = lead & 0x07u;
+  }
+  if (*index + length > text.size()) {
+    length = 1;
+  }
+  for (size_t i = 1; i < length; ++i) {
+    code = (code << 6) | (static_cast<unsigned char>(text[(*index) + i]) & 0x3Fu);
+  }
+  *index += length;
+  // CJK Unified Ideographs, Hiragana / Katakana, Hangul and full-width forms start at U+2E80.
+  return code >= 0x2E80u ? kFullWidthAdvanceEm : kProportionalAdvanceEm;
+}
+
+static float CollectTextAdvanceEm(const std::shared_ptr<DOMNode>& node) {
+  if (node == nullptr) {
+    return 0.0f;
+  }
+  float advance = 0.0f;
+  auto child = node->getFirstChild();
+  while (child) {
+    if (child->type == DOMNodeType::Text) {
+      const auto& text = child->name;
+      for (size_t index = 0; index < text.size();) {
+        advance += Utf8AdvanceEm(text, &index);
+      }
+    } else {
+      advance += CollectTextAdvanceEm(child);
+    }
+    child = child->getNextSibling();
+  }
+  return advance;
+}
+
 Rect SVGParserContext::getShapeBounds(const std::shared_ptr<DOMNode>& element) {
   const auto& tag = element->name;
 
@@ -2167,6 +2746,27 @@ Rect SVGParserContext::getShapeBounds(const std::shared_ptr<DOMNode>& element) {
       float y = parseLength(getAttribute(element, "y"), _viewBoxHeight);
       return Rect::MakeXYWH(refBounds.x + x, refBounds.y + y, refBounds.width, refBounds.height);
     }
+  }
+
+  // Text has no geometry branch of its own: without an estimate the box stays empty and an
+  // objectBoundingBox gradient or pattern collapses onto a single point.
+  if (tag == "text") {
+    float x = parseLength(getAttribute(element, "x"), _viewBoxWidth);
+    const float y = parseLength(getAttribute(element, "y"), _viewBoxHeight);
+    std::string fontSizeStr = getAttribute(element, "font-size");
+    const float fontSize =
+        fontSizeStr.empty() ? DEFAULT_FONT_SIZE : parseLength(fontSizeStr, _viewBoxHeight);
+    const float width = CollectTextAdvanceEm(element) * fontSize;
+    // The anchor decides which side of `x` the glyphs run to; without this a centred or end-anchored
+    // run would shift an objectBoundingBox paint by up to a full width.
+    const auto anchor = getAttribute(element, "text-anchor");
+    if (anchor == "middle") {
+      x -= width * 0.5f;
+    } else if (anchor == "end") {
+      x -= width;
+    }
+    // The baseline sits at `y`: the box reaches one line above it and a descender below.
+    return Rect::MakeXYWH(x, y - fontSize, width, fontSize * 1.2f);
   }
 
   return Rect::MakeXYWH(0, 0, 0, 0);
@@ -2265,6 +2865,20 @@ InheritedStyle SVGParserContext::computeInheritedStyle(const std::shared_ptr<DOM
 
   return style;
 }
+
+static void RestoreMaskLayerVisibility(Layer* layer) {
+  if (layer == nullptr) {
+    return;
+  }
+  if (layer->mask != nullptr) {
+    layer->mask->visible = true;
+    RestoreMaskLayerVisibility(layer->mask);
+  }
+  for (auto* child : layer->children) {
+    RestoreMaskLayerVisibility(child);
+  }
+}
+
 // Parse CSS Color Level 4 color() function: color(display-p3 r g b) or color(display-p3 r g b / a).
 // Returns a Color with alpha=-1 on parse failure.
 static Color ParseCSSColorFunction(const std::string& value) {
@@ -2695,15 +3309,20 @@ PathData SVGParserContext::parsePoints(const std::string& value, bool closed) {
 
   return path;
 }
+static std::string TrimWhitespace(const std::string& value) {
+  size_t first = 0;
+  while (first < value.size() && std::isspace(static_cast<unsigned char>(value[first])) != 0) {
+    ++first;
+  }
+  size_t last = value.size();
+  while (last > first && std::isspace(static_cast<unsigned char>(value[last - 1])) != 0) {
+    --last;
+  }
+  return value.substr(first, last - first);
+}
+
 std::string SVGParserContext::resolveUrl(const std::string& url) {
-  auto trim = [](const std::string& value) {
-    size_t first = 0;
-    while (first < value.size() && std::isspace(static_cast<unsigned char>(value[first]))) first++;
-    size_t last = value.size();
-    while (last > first && std::isspace(static_cast<unsigned char>(value[last - 1]))) last--;
-    return value.substr(first, last - first);
-  };
-  std::string value = trim(url);
+  std::string value = TrimWhitespace(url);
   if (value.empty()) {
     return "";
   }
@@ -2714,10 +3333,10 @@ std::string SVGParserContext::resolveUrl(const std::string& url) {
   if (value.compare(0, 4, "url(") == 0) {
     size_t end = value.rfind(')');
     if (end != std::string::npos && end >= 4) {
-      std::string inner = trim(value.substr(4, end - 4));
+      std::string inner = TrimWhitespace(value.substr(4, end - 4));
       if (inner.size() >= 2 && ((inner.front() == '"' && inner.back() == '"') ||
                                 (inner.front() == '\'' && inner.back() == '\''))) {
-        inner = trim(inner.substr(1, inner.size() - 2));
+        inner = TrimWhitespace(inner.substr(1, inner.size() - 2));
       }
       if (!inner.empty() && inner.front() == '#') {
         return inner.substr(1);
@@ -2769,14 +3388,65 @@ DropShadowFilter* SVGParserContext::createDropShadow(float offsetX, float offset
   return dropShadow;
 }
 
+void SVGParserContext::registerFilterAnimationTarget(
+    LayerFilter* filterNode, const std::shared_ptr<DOMNode>& blurElement,
+    const std::shared_ptr<DOMNode>& offsetElement) {
+  if (filterNode == nullptr) {
+    return;
+  }
+  // Only register the filter when at least one contributing fe* primitive carries SMIL
+  // animations. Filters without animations must stay unregistered: an id + nodeMap entry with
+  // no AnimationObject referencing it trips the verifier's unreferenced-resource check (and
+  // would needlessly bloat exported SVG with the id attribute).
+  if (!hasSmilAnimation(blurElement) && !hasSmilAnimation(offsetElement)) {
+    return;
+  }
+  // Assign an id and register so AnimationObject.target can resolve the filter node at runtime
+  // and in tests. Without this, findNode(filterId) would return nullptr.
+  if (filterNode->id.empty()) {
+    filterNode->id = generateUniqueId("anim_filter");
+  }
+  detail::DocumentAccess::RegisterNode(*_document, filterNode, filterNode->id);
+  // Record each fe* primitive → filter mapping so registerAnimatedElement can route <animate>
+  // children of feGaussianBlur/feOffset to this filter node. A single DropShadowFilter is built
+  // from multiple fe* primitives, so multiple DOM keys map to the same filter.
+  // fe* elements are not graphics elements (convertToLayer never visits them), so we also
+  // populate _animatedNodeMap here — registerAnimatedElement would otherwise never be called
+  // for fe* and buildAnimation would skip their <animate> children.
+  registerFeAnimationTarget(blurElement, filterNode);
+  registerFeAnimationTarget(offsetElement, filterNode);
+}
+
+bool SVGParserContext::hasSmilAnimation(const std::shared_ptr<DOMNode>& element) const {
+  return element != nullptr && _smilAnimations.find(element.get()) != _smilAnimations.end();
+}
+
+void SVGParserContext::registerFeAnimationTarget(const std::shared_ptr<DOMNode>& feElement,
+                                                 LayerFilter* filterNode) {
+  if (feElement == nullptr || filterNode == nullptr) {
+    return;
+  }
+  _feToFilterMap[feElement.get()] = filterNode;
+  // Only register AnimatedNodeInfo when the fe* actually has SMIL animation children;
+  // otherwise buildAnimation would still pick it up and emit an empty AnimationObject.
+  if (!hasSmilAnimation(feElement)) {
+    return;
+  }
+  AnimatedNodeInfo info = {};
+  info.targetFilter = filterNode;
+  info.targetId = filterNode->id;
+  info.domElement = feElement;
+  _animatedNodeMap[feElement.get()].push_back(std::move(info));
+}
+
 // Parse a CSS style string into a property map. Later properties override earlier ones.
 // Handles parenthesized values (e.g., color(display-p3 ...)) by tracking parenthesis depth.
 static void ParseStyleString(const std::string& styleStr,
                              std::unordered_map<std::string, std::string>& out) {
   size_t pos = 0;
   while (pos < styleStr.size()) {
-    // Skip the separator of an empty declaration too: rule bodies collected from a <style> element
-    // may join with a semicolon that follows one the previous body already ended with.
+    // Consecutive separators produce empty declarations; consume them together so the next
+    // property name does not keep a leading ";".
     while (pos < styleStr.size() &&
            (std::isspace(static_cast<unsigned char>(styleStr[pos])) || styleStr[pos] == ';')) {
       ++pos;
@@ -2992,6 +3662,18 @@ void SVGParserContext::mergeAdjacentLayers(std::vector<Layer*>& layers) {
     return;
   }
 
+  // Merging replaces both layers with a new node that only copies the id, so any animation bound to
+  // the original target would resolve against a node that is no longer in the tree. Keep such
+  // layers intact.
+  std::unordered_set<const Layer*> animatedTargets = {};
+  for (const auto& entry : _animatedNodeMap) {
+    for (const auto& info : entry.second) {
+      if (info.targetLayer != nullptr) {
+        animatedTargets.insert(info.targetLayer);
+      }
+    }
+  }
+
   std::vector<Layer*> merged;
   size_t i = 0;
 
@@ -3005,7 +3687,8 @@ void SVGParserContext::mergeAdjacentLayers(std::vector<Layer*>& layers) {
         const Element* geomB = nullptr;
         const Element* painterB = nullptr;
 
-        if (isSimpleShapeLayer(layers[i + 1], geomB, painterB) && isSameGeometry(geomA, geomB)) {
+        if (isSimpleShapeLayer(layers[i + 1], geomB, painterB) && isSameGeometry(geomA, geomB) &&
+            animatedTargets.count(layers[i]) == 0 && animatedTargets.count(layers[i + 1]) == 0) {
           // Merge: one has Fill, the other has Stroke.
           bool aHasFill = (painterA->nodeType() == NodeType::Fill);
           bool bHasFill = (painterB->nodeType() == NodeType::Fill);
@@ -3196,6 +3879,194 @@ ColorSource* SVGParserContext::getColorSourceForRef(const std::string& refId,
     colorSource->id.clear();
   }
   return colorSource;
+}
+
+void SVGParserContext::collectSMILAnimations(const std::shared_ptr<DOMNode>& node) {
+  if (!node) {
+    return;
+  }
+
+  // Non-graphics subtrees cannot host SMIL animations on their children, so skip them entirely.
+  // <defs>, <filter> and <mask> are NOT skipped: filter primitives carry <animate> elements that
+  // drive blur/offset channels (see registerAnimatedElement's fe* branch and
+  // SMILAnimationParser::resolveAnimateTarget's filter mapping), and mask content can animate too.
+  // Definitions that never host animations (gradients, patterns, markers, clipPath) are skipped by
+  // their own entries below.
+  const auto& name = node->name;
+  if (name == "style" || name == "title" || name == "desc" || name == "metadata" ||
+      name == "clipPath" || name == "marker" || name == "linearGradient" ||
+      name == "radialGradient" || name == "pattern") {
+    return;
+  }
+
+  // Collect SMIL animation children of this element. SMIL elements target their parent graphics
+  // element, so we group them by the parent node pointer. mpath is a child of animateMotion and
+  // is handled when the animateMotion is parsed, not here.
+  // For fe* filter primitives (feGaussianBlur/feOffset/...), only <animate>/<set> are meaningful
+  // (driving the filter's blur/offset channels); <animateTransform>/<animateMotion> have no
+  // PAGX channel to drive on a filter node, so they are not collected to avoid dead entries.
+  bool isFilterPrimitive = !name.empty() && name.compare(0, 2, "fe") == 0;
+  SMILAnimationGroup group = {};
+  bool hasAnimation = false;
+  auto child = node->getFirstChild();
+  while (child) {
+    const auto& childName = child->name;
+    if (childName == "animate") {
+      group.animates.push_back(child);
+      hasAnimation = true;
+    } else if (!isFilterPrimitive && childName == "animateTransform") {
+      group.animateTransforms.push_back(child);
+      hasAnimation = true;
+    } else if (!isFilterPrimitive && childName == "animateMotion") {
+      group.animateMotions.push_back(child);
+      hasAnimation = true;
+    } else if (childName == "set") {
+      group.sets.push_back(child);
+      hasAnimation = true;
+    }
+    child = child->getNextSibling();
+  }
+  if (hasAnimation) {
+    _smilAnimations[node.get()] = std::move(group);
+  }
+
+  // Recurse into children.
+  child = node->getFirstChild();
+  while (child) {
+    collectSMILAnimations(child);
+    child = child->getNextSibling();
+  }
+}
+
+std::string SVGParserContext::registerAnimatedElement(const std::shared_ptr<DOMNode>& element,
+                                                      Layer* layer) {
+  if (!element || !layer) {
+    return {};
+  }
+  auto it = _smilAnimations.find(element.get());
+  if (it == _smilAnimations.end()) {
+    return {};
+  }
+
+  // Ensure the Layer has an id so AnimationObject.target can reference it. SVG elements with an
+  // explicit id attribute set layer->id directly during convertToLayer, but that path does not
+  // register the id in the document's nodeMap. Register here so findNode(target) succeeds at
+  // runtime and in tests.
+  if (layer->id.empty()) {
+    layer->id = generateUniqueId("anim_layer");
+  }
+  detail::DocumentAccess::RegisterNode(*_document, layer, layer->id);
+
+  AnimatedNodeInfo info = {};
+  info.targetLayer = layer;
+  info.targetId = layer->id;
+  info.domElement = element;
+  // animateTransform/animateMotion bake their keyframes into Matrix values on the Layer's
+  // runtime "matrix" channel (see SMILAnimationParser::parseAnimateTransform), so no Group host
+  // node is needed — the Layer itself carries the transform animation.
+
+  _animatedNodeMap[element.get()].push_back(std::move(info));
+  return layer->id;
+}
+
+// A matrix channel replaces the target layer's static matrix at runtime. Consumers that render the
+// document without evaluating the timeline (design canvases, static exports) only see the shipped
+// matrix, so a layer positioned solely by the animation would collapse to the parent origin.
+// Mirror the first keyframe onto layers that carry no authored transform of their own.
+static void BakeFirstMatrixKeyframe(const Animation* animation, PAGXDocument* document) {
+  if (animation == nullptr || document == nullptr) {
+    return;
+  }
+  for (auto* object : animation->objects) {
+    if (object == nullptr || object->target.empty()) {
+      continue;
+    }
+    auto* node = document->findNode(object->target);
+    if (node == nullptr || node->nodeType() != NodeType::Layer) {
+      continue;
+    }
+    auto* layer = static_cast<Layer*>(node);
+    if (!layer->matrix.isIdentity() || layer->layout != LayoutMode::None) {
+      continue;
+    }
+    for (auto* channel : object->channels) {
+      if (channel == nullptr || channel->name != "matrix" ||
+          channel->valueType() != ChannelValueType::Matrix) {
+        continue;
+      }
+      auto* matrixChannel = static_cast<TypedChannel<Matrix>*>(channel);
+      if (matrixChannel->keyframes.empty() || matrixChannel->keyframes.front().time != 0) {
+        continue;
+      }
+      layer->matrix = matrixChannel->keyframes.front().value;
+      break;
+    }
+  }
+}
+
+// With the pivot hoisted onto a parent layer, the animated layer only needs the rotation part of
+// each keyframe. Rewrite M as T(-p) * M * T(p) so the composed transform stays identical while the
+// translation components collapse to zero for pure rotations.
+static void NormalizePivotKeyframes(
+    const Animation* animation, PAGXDocument* document,
+    const std::unordered_map<const Layer*, std::pair<float, float>>& pivots) {
+  if (animation == nullptr || document == nullptr || pivots.empty()) {
+    return;
+  }
+  for (auto* object : animation->objects) {
+    if (object == nullptr || object->target.empty()) {
+      continue;
+    }
+    auto* node = document->findNode(object->target);
+    if (node == nullptr || node->nodeType() != NodeType::Layer) {
+      continue;
+    }
+    auto* layer = static_cast<Layer*>(node);
+    auto pivotIt = pivots.find(layer);
+    if (pivotIt == pivots.end()) {
+      continue;
+    }
+    const float pivotX = pivotIt->second.first;
+    const float pivotY = pivotIt->second.second;
+    for (auto* channel : object->channels) {
+      if (channel == nullptr || channel->name != "matrix" ||
+          channel->valueType() != ChannelValueType::Matrix) {
+        continue;
+      }
+      auto* matrixChannel = static_cast<TypedChannel<Matrix>*>(channel);
+      for (auto& keyframe : matrixChannel->keyframes) {
+        const Matrix& value = keyframe.value;
+        keyframe.value.tx = value.tx + (value.a * pivotX + value.c * pivotY) - pivotX;
+        keyframe.value.ty = value.ty + (value.b * pivotX + value.d * pivotY) - pivotY;
+      }
+    }
+  }
+}
+
+// SMIL time values are converted with the animation frame rate PAGX stores in Animation::frameRate;
+// keeping one constant here means keyframe indices and the serialized metadata always agree.
+constexpr float kAnimationFrameRate = 60.0f;
+
+void SVGParserContext::buildAnimation(Layer* rootLayer) {
+  if (_animatedNodeMap.empty() || !rootLayer) {
+    return;
+  }
+  auto* animation = SMILAnimationParser::buildAnimation(*this, _document.get(), _smilAnimations,
+                                                        _animatedNodeMap, kAnimationFrameRate);
+  if (animation == nullptr) {
+    return;
+  }
+  animation->id = generateUniqueId("smil_anim");
+  detail::DocumentAccess::RegisterNode(*_document, animation, animation->id);
+  _document->animations.push_back(animation);
+  NormalizePivotKeyframes(animation, _document.get(), _pivotNormalizedLayers);
+  BakeFirstMatrixKeyframe(animation, _document.get());
+
+  // Attach an AnimationTimeline to the root layer so the runtime activates this animation.
+  auto timeline = std::make_unique<AnimationTimeline>();
+  timeline->animationId = animation->id;
+  timeline->playing = true;
+  rootLayer->timelines.push_back(std::move(timeline));
 }
 
 }  // namespace pagx

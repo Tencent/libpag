@@ -19,6 +19,7 @@
 #pragma once
 
 #include <string>
+#include <unordered_set>
 #include <vector>
 #include "pagx/nodes/Element.h"
 #include "pagx/nodes/Fill.h"
@@ -30,6 +31,8 @@
 #include "pagx/utils/LayerTransformUtils.h"
 
 namespace pagx {
+
+class PAGXDocument;
 
 struct FillStrokeInfo {
   const Fill* fill = nullptr;
@@ -81,6 +84,15 @@ Matrix BuildLayerMatrix(const Layer* layer);
 Matrix BuildGroupMatrix(const Group* group);
 
 FillRule DetectMaskFillRule(const Layer* maskLayer);
+
+/**
+ * Collects every layer referenced through Layer::mask anywhere in `document`, recursing into mask
+ * subtrees and both child relations. Such a layer is a clip shape, not content: importers keep its
+ * visible flag true for downstream consumers, so exporters cannot rely on the visibility check to
+ * skip it.
+ */
+void CollectMaskReferenceLayers(const PAGXDocument& document,
+                                std::unordered_set<const Layer*>* layers);
 
 /**
  * Decomposes the X and Y scale factors of a 2D affine matrix.  The X scale is the
