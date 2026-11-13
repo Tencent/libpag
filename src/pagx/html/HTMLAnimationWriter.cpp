@@ -70,23 +70,6 @@ namespace {
 using pag::FloatNearlyZero;
 using pag::RadiansToDegrees;
 
-// PAGX fakes bold by stroking the Regular outline with a width of
-// `fontSize * FauxBoldScale(fontSize)` and unioning the result with the original path
-// (PathUserTypeface::generatePath). CSS `-webkit-text-stroke-width` is also the total width of a
-// band centred on the outline, so the PAGX width transfers one to one and no measurement is needed.
-float FauxBoldStrokeWidth(float fontSize) {
-  // Mirrors tgfx's FauxBoldScale: 1/24 up to 9px, 1/32 from 36px, linear in between.
-  if (fontSize <= 9.0f) {
-    return fontSize / 24.0f;
-  }
-  if (fontSize >= 36.0f) {
-    return fontSize / 32.0f;
-  }
-  auto t = (fontSize - 9.0f) / 27.0f;
-  auto scale = (1.0f / 24.0f) + ((1.0f / 32.0f) - (1.0f / 24.0f)) * t;
-  return fontSize * scale;
-}
-
 // tgfx fakes italic by shearing the chosen face with Matrix::postSkew(ITALIC_SKEW = -0.2, 0) about
 // the baseline, so the CSS equivalent is a skew of atan(0.2) pivoting on that same baseline.
 float FauxItalicSkewDegrees() {

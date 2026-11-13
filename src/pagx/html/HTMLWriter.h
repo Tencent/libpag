@@ -618,6 +618,10 @@ struct RichTextSpan {
 // Line height that puts browser-rendered text on the same rows as PAGX's own layout: the single
 // line box is shrunk onto PAGX's baseline row, a multi-line block keeps PAGX's line advance.
 // Returns 0 when the family cannot be resolved (the caller then keeps the default line box).
+// Width PAGX strokes a glyph with when it fakes bold (`-webkit-text-stroke-width` is the same total
+// width, so it transfers one to one).
+float FauxBoldStrokeWidth(float fontSize);
+
 float TextLineHeightForCSS(const std::string& fontFamily, const std::string& fontStyle,
                            float fontSize, bool singleLine);
 
