@@ -18,6 +18,7 @@
 
 #include "pagx/utils/ImageMime.h"
 #include <cstring>
+#include "pagx/utils/Base64.h"
 
 namespace pagx {
 
@@ -132,6 +133,40 @@ bool IsSupportedImageMime(const char* mime) {
     }
   }
   return false;
+}
+
+const char* ImageMimeToExtension(const char* mime) {
+  if (mime == nullptr) {
+    return "bin";
+  }
+  if (strcmp(mime, "image/png") == 0) {
+    return "png";
+  }
+  if (strcmp(mime, "image/jpeg") == 0) {
+    return "jpeg";
+  }
+  if (strcmp(mime, "image/webp") == 0) {
+    return "webp";
+  }
+  if (strcmp(mime, "image/gif") == 0) {
+    return "gif";
+  }
+  if (strcmp(mime, "image/avif") == 0) {
+    return "avif";
+  }
+  if (strcmp(mime, "image/heic") == 0) {
+    return "heic";
+  }
+  if (strcmp(mime, "image/svg+xml") == 0) {
+    return "svg";
+  }
+  return "bin";
+}
+
+std::string ImageDataUri(const uint8_t* bytes, size_t size) {
+  const char* mime = DetectImageMime(bytes, size);
+  return std::string("data:") + (mime != nullptr ? mime : "application/octet-stream") + ";base64," +
+         Base64Encode(bytes, size);
 }
 
 }  // namespace pagx

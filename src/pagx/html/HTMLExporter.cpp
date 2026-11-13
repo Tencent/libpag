@@ -27,7 +27,7 @@
 #include "pagx/html/HTMLStyleExtractor.h"
 #include "pagx/html/HTMLWriter.h"
 #if defined(PAG_BUILD_HTML) || defined(PAG_BUILD_PPT)
-#include "pagx/html/HTMLZipWriter.h"
+#include "pagx/utils/MemZipWriter.h"
 #endif
 #include "pagx/nodes/Font.h"
 #include "pagx/utils/StringParser.h"
@@ -411,7 +411,7 @@ bool HTMLExporter::ToFile(PAGXDocument& document, const std::string& filePath,
 std::shared_ptr<Data> HTMLExporter::ToData(PAGXDocument& document, const Options& options,
                                            std::string* errorMsg) {
 #if defined(PAG_BUILD_HTML) || defined(PAG_BUILD_PPT)
-  HTMLZipWriter zipWriter;
+  MemZipWriter zipWriter;
   HTMLWriterContext ctx;
   ctx.docWidth = document.width;
   ctx.docHeight = document.height;
