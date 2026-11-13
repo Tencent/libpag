@@ -16,6 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include <optional>
 #include "pagx/PAGAnimation.h"
 #include "pagx/PAGScene.h"
 #include "pagx/PAGSurface.h"
@@ -957,6 +958,20 @@ PAGX_TEST(PAGXRuntimeTest, RepeatedTargetViewDrawKeepsCanvasState) {
   ASSERT_TRUE(ReadSurfacePixels(surface, &secondFrame));
   EXPECT_EQ(secondFrame, firstFrame);
   EXPECT_FALSE(scene->hasContentChanged());
+}
+
+PAGX_TEST(PAGXRuntimeTest, TargetViewClearedBoundsWithoutNotifyFailsDraw) {
+  auto doc = MakeTargetViewDocument();
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+  auto surface = pagx::PAGSurface::MakeOffscreen(20, 20);
+  ASSERT_TRUE(surface != nullptr);
+  ASSERT_TRUE(scene->draw(surface));
+
+  // outputBounds is public: clearing it without notifyChange() leaves the cached state Valid, so
+  // draw() has to reject the frame instead of dereferencing the now-empty optional.
+  doc->outputBounds = std::nullopt;
+  EXPECT_FALSE(scene->draw(surface));
 }
 
 /**

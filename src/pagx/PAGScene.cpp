@@ -592,7 +592,15 @@ bool PAGScene::renderTo(const std::shared_ptr<PAGSurface>& surface, tgfx::Contex
       canvas->drawColor(background);
     }
     const auto& contentOffset = displayList->contentOffset();
-    const auto& bounds = *document->outputBounds;
+    // Read the window through the same accessor hosts use: outputBounds is public and editable, so
+    // a host that clears it without notifyChange() leaves the cached state Valid while the field
+    // is already empty.
+    auto outputBounds = getOutputBounds();
+    if (!outputBounds.has_value()) {
+      outputViewDirty = false;
+      return false;
+    }
+    const auto& bounds = *outputBounds;
     canvas->translate(contentOffset.x, contentOffset.y);
     canvas->scale(zoomScale, zoomScale);
     canvas->translate(-bounds.x, -bounds.y);
