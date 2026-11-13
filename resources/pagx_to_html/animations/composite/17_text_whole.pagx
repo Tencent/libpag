@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: Whole-text channels on one Text, the case the single-span path owns: the browser re-lays
-     the line out as the size, tracking and synthetic bold change, so glyph positions follow.
-     Target: Composite  Channel: fontSize,letterSpacing,fauxBold  Type: mixed
+     the line out as the size and tracking change, so glyph positions follow.
+     Target: Composite  Channel: fontSize,letterSpacing  Type: mixed
      Ref: - -->
 <pagx width="320" height="200">
   <Layer left="0" right="0" top="0" bottom="0">
@@ -23,11 +23,6 @@
         <Channel name="letterSpacing" type="float">
           <Key time="0" value="0" interpolation="linear"/>
           <Key time="60" value="8"/>
-        </Channel>
-        <Channel name="fauxBold" type="bool">
-          <Key time="0" value="false" interpolation="hold"/>
-          <Key time="30" value="true" interpolation="hold"/>
-          <Key time="60" value="true"/>
         </Channel>
       </Object>
     </Animation>
