@@ -20,6 +20,8 @@
 #include <filesystem>
 #include <string>
 
+class QWindow;
+
 namespace exporter {
 
 namespace Messages {
@@ -39,6 +41,14 @@ std::string GetConfigPath();
 std::string GetTempFolderPath();
 
 bool IsAEWindowActive();
+
+/**
+ * Makes the given plugin window owned by the main window of After Effects, so that the plugin
+ * window is always displayed above the host window and follows its z-order when the user
+ * switches back to After Effects from another application. Only implemented on Windows, where
+ * the plugin windows are otherwise independent top-level windows of the host process.
+ */
+void AttachWindowToAEMainWindow(QWindow* window);
 
 std::string GetDownloadsPath();
 
