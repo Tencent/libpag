@@ -62,7 +62,9 @@
 #include "pagx/nodes/Text.h"
 #include "pagx/nodes/TextBox.h"
 #include "pagx/nodes/TextModifier.h"
+#include "pagx/nodes/TextPath.h"
 #include "pagx/nodes/TrimPath.h"
+#include "tgfx/core/PathMeasure.h"
 #include "pagx/nodes/ViewModel.h"
 #include "pagx/nodes/ViewModelProperty.h"
 #include "pagx/pag/SequenceCodec.h"
@@ -413,6 +415,113 @@ static void MigrateTextAnimators(ConvertState* state, pag::TextLayer* legacyText
       }
     }
   }
+}
+
+// Legacy path text (a TextLayer with pathOption) migrates as a TextPath element after the Text
+// (and any TextModifier): tgfx places the accumulated glyphs along the curve, matching the legacy
+// TextPathRender. The legacy justification positions the whole run relative to the path
+// (left = start, right = end, center = middle); tgfx has no justification, so the offset folds
+// into firstMargin (the legacy formulas are all position + constant, so the fold is exact):
+//   left:               firstMargin
+//   right:              pathLength - layoutWidth + lastMargin
+//   center (and full):  (pathLength - layoutWidth) / 2 + firstMargin + lastMargin
+static void MigrateTextPathOptions(ConvertState* state, pag::TextLayer* legacyText, TextBox* textBox) {
+  auto* options = legacyText->pathOption;
+  if (options == nullptr || options->path == nullptr || options->path->maskPath == nullptr) {
+    return;
+  }
+  auto startFrame = legacyText->startTime;
+  auto* textPath = state->document->makeNode<TextPath>(LegacyLayerTargetId(legacyText) + "-textpath");
+  auto handle = PropertyValueAtStart(options->path->maskPath, startFrame, nullptr);
+  if (handle != nullptr) {
+    textPath->path = ConvertPathData(state, *handle);
+  }
+  auto reversed = PropertyValueAtStart(options->reversedPath, startFrame, nullptr);
+  auto firstMargin = PropertyValueAtStart(options->firstMargin, startFrame, nullptr);
+  auto lastMargin = PropertyValueAtStart(options->lastMargin, startFrame, nullptr);
+  textPath->reversed = reversed;
+  textPath->perpendicular =
+      PropertyValueAtStart(options->perpendicularToPath, startFrame, nullptr);
+  auto forceAlignment = PropertyValueAtStart(options->forceAlignment, startFrame, nullptr);
+  textPath->forceAlignment = forceAlignment;
+  // Fold the justification into firstMargin (only the non-forceAlignment mode uses it; the
+  // forceAlignment branch of the legacy MapToPathPosition ignores justification).
+  if (!forceAlignment) {
+    auto textDocument = legacyText->getTextDocument();
+    float layoutWidth = 0.0f;
+    if (textDocument != nullptr && textDocument->boxText) {
+      layoutWidth = textDocument->boxTextSize.x;
+    }
+    auto justification = textDocument != nullptr ? textDocument->justification
+                                                  : pag::ParagraphJustification::LeftJustify;
+    float pathLength = 0.0f;
+    if (handle != nullptr) {
+      tgfx::Path path = {};
+      size_t pointIndex = 0;
+      const auto& points = handle->points;
+      for (auto verb : handle->verbs) {
+        switch (verb) {
+          case pag::PathDataVerb::MoveTo:
+            if (pointIndex < points.size()) {
+              path.moveTo(points[pointIndex].x, points[pointIndex].y);
+              pointIndex++;
+            }
+            break;
+          case pag::PathDataVerb::LineTo:
+            if (pointIndex < points.size()) {
+              path.lineTo(points[pointIndex].x, points[pointIndex].y);
+              pointIndex++;
+            }
+            break;
+          case pag::PathDataVerb::CurveTo:
+            if (pointIndex + 2 < points.size() + 1 && pointIndex + 2 <= points.size()) {
+              path.cubicTo(points[pointIndex].x, points[pointIndex].y, points[pointIndex + 1].x,
+                           points[pointIndex + 1].y, points[pointIndex + 2].x,
+                           points[pointIndex + 2].y);
+              pointIndex += 3;
+            }
+            break;
+          case pag::PathDataVerb::Close:
+            path.close();
+            break;
+        }
+      }
+      auto measure = tgfx::PathMeasure::MakeFrom(path);
+      if (measure != nullptr) {
+        pathLength = measure->getLength();
+      }
+    }
+    switch (justification) {
+      case pag::ParagraphJustification::RightJustify:
+        textPath->firstMargin = pathLength - layoutWidth + lastMargin;
+        break;
+      case pag::ParagraphJustification::CenterJustify:
+      case pag::ParagraphJustification::FullJustifyLastLineLeft:
+      case pag::ParagraphJustification::FullJustifyLastLineRight:
+      case pag::ParagraphJustification::FullJustifyLastLineCenter:
+      case pag::ParagraphJustification::FullJustifyLastLineFull:
+        textPath->firstMargin = (pathLength - layoutWidth) / 2 + firstMargin + lastMargin;
+        break;
+      case pag::ParagraphJustification::LeftJustify:
+      default:
+        textPath->firstMargin = firstMargin;
+        break;
+    }
+  } else {
+    textPath->firstMargin = firstMargin;
+    textPath->lastMargin = lastMargin;
+  }
+  // Animated path options have no PAGX channels yet (margins are layout-only, booleans are
+  // static); warn instead of silently dropping.
+  if ((options->firstMargin != nullptr && options->firstMargin->animatable()) ||
+      (options->lastMargin != nullptr && options->lastMargin->animatable()) ||
+      (options->reversedPath != nullptr && options->reversedPath->animatable()) ||
+      (options->perpendicularToPath != nullptr && options->perpendicularToPath->animatable()) ||
+      (options->forceAlignment != nullptr && options->forceAlignment->animatable())) {
+    state->warn(PAGExportWarning::UnsupportedColorSource,
+                "animated text path options not migrated");
+  }
+  textBox->elements.push_back(textPath);
 }
 
 TextAlign ConvertJustification(pag::ParagraphJustification justification) {
@@ -1758,6 +1867,7 @@ Layer* ConvertLayer(ConvertState* state, pag::Layer* legacyLayer, float parentFr
         }
         textBox->elements.push_back(text);
         MigrateTextAnimators(state, legacyText, textBox);
+        MigrateTextPathOptions(state, legacyText, textBox);
         // The legacy derives line spacing from the document leading (auto = 1.2 x fontSize); the
         // PAGX auto mode uses font metrics instead, so the spacing is always mapped explicitly.
         textBox->lineHeight = textDocument->leading == 0 ? roundf(textDocument->fontSize * 1.2f)
