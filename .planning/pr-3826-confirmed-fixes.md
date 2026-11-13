@@ -2,11 +2,11 @@
 
 初始来源：[PAGX PR 3826 已确认修复方案](https://chatgpt.com/space/page_10f412c402d08191aed705349af2aac1)。后续确认的方案以本仓库文档为执行和追加入口。
 
-本文档用于在另一个会话中实施 [PR 3826](https://github.com/Tencent/libpag/pull/3826) 已确认的修复。当前记录命中测试一致性、目标绘制失败传播、复用已有栅格化挂接工具、稳定复用输出视图状态、纯渲染变更的声明校验快路径、输出窗口数值校验复用、统一导出拒绝检查与 CLI 诊断七项。先扩展已有工具，再接入输出视图；失败传播与稳定状态需要合并实施，校验快路径沿用同一 runtime 恢复时序。用户已授权：后续评论经核查能够按 CR 意见处理的，直接记录方案，无需逐条确认；需要偏离 CR 建议或存在未决取舍时，再与用户讨论。
+本文档用于在另一个会话中实施 [PR 3826](https://github.com/Tencent/libpag/pull/3826) 已确认的修复，当前收录十二项，详情见状态表。先扩展已有工具，再接入输出视图；失败传播与稳定状态需要合并实施，校验快路径沿用同一 runtime 恢复时序。用户已授权：后续评论经核查能够按 CR 意见处理的，直接记录方案，无需逐条确认；需要偏离 CR 建议或存在未决取舍时，再与用户讨论。当前剩余五条评论已一并核查并按该授权收录，代码仍由后续执行会话实施。
 
 ## 当前执行状态
 
-核对日期：2026 年 11 月 13 日。工作目录：`/Users/codywwang/Desktop/PAGX/libpag`。分支：`feature/codywwang_glass`。本次更新前的核对基点为 `6c4159067`。执行前重新检查实际工作区与提交，保留其他会话产生的改动。
+核对日期：2026 年 11 月 13 日。工作目录：`/Users/codywwang/Desktop/PAGX/libpag`。分支：`feature/codywwang_glass`。本次更新前的核对基点为 `f9d232318`。执行前重新检查实际工作区与提交，保留其他会话产生的改动。
 
 | 项目 | 状态 | 执行动作 |
 | --- | --- | --- |
@@ -17,6 +17,11 @@
 | 纯渲染变更的声明校验快路径 | 方案已确认，尚未实施 | 只跳过能够证明不影响声明语义的重校验 |
 | 输出窗口数值校验复用 | 方案已确认，尚未实施 | 提取现有规则，导入与程序化校验共用 |
 | 统一导出拒绝检查与 CLI 诊断 | 方案已确认，尚未实施 | 共用声明检查和拒绝原因，复用现有错误接口 |
+| 桌面与微信 host 同步适配输出窗口 | 方案已确认，尚未实施 | 覆盖加载、编辑重建、坐标映射和平台验收 |
+| 输出视图测试拆分与回读工具复用 | 方案已确认，尚未实施 | 迁移六项通用用例，扩展已有快照 helper |
+| playground 静态帧刷新与 draw 拆分 | 方案已确认，尚未实施 | 复用 scene dirty 并保留失败后的待呈现状态 |
+| 优化器独立解析并保留声明目标 | 方案已确认，尚未实施 | 提取引用解析，保留动态或非法 bounds 文档中的唯一 target |
+| 输出窗口 API 文档与有效缩放说明 | nullopt 措辞已修正，剩余方案已确认 | 补返回值与实际量化缩放说明，不修改绘制规则 |
 
 ## 命中测试一致性
 
@@ -371,9 +376,150 @@ PPT 保留磁盘 ZIP 与内存 ZIP 两条既有写入路径，不为了共享检
 - 在全新、唯一输出路径下验证拒绝不会创建目标文件；普通无声明文档仍能正常导出。SVG CLI 的已有 warnings 能被输出。
 - 新用例沿用各现有测试套件，以 `TargetView` 命名；复用 `PAGXHtmlTest.RootDocument`、`PAGXHTMLDataTest.ToData_BasicArchive`、`PAGXSVGTest.SVGExport_ToFile` 和 `PAGXPPTTest.RectangleSolidFill` 回归正常路径，不用渲染截图基线测试代替拒绝与诊断断言。
 
+## 桌面与微信 host 同步适配输出窗口
+
+对应 [P2 仓库内其他 host 未迁移 getOutputBounds](https://github.com/Tencent/libpag/pull/3826#discussion_r4535366098)。采用 CR 中同步修改两个 host 的方案，覆盖加载、编辑重建和坐标消费者，而不是仅增加迁移说明。复用 scene 的输出状态、窗口和既有显示变换，不改变 TGFX 或公共画布尺寸 API。
+
+### 桌面 Qt viewer
+
+涉及 `viewer/src/rendering/pagx/PAGXViewModel.h/.cpp` 与 `PAGXRenderer.cpp`：
+
+1. `loadFile()` 和 `applyXmlChanges()` 创建新 scene 后均读取 `getOutputBounds()`；Valid 使用窗口宽高，None 保持原有整页尺寸路径。尺寸更新必须与 scene 一起在既有 renderMutex 保护下提交，继续发送原有宽高、contentSize、preferredSize 和播放状态通知。
+2. 内部逻辑内容尺寸及 `RenderState.contentWidth/contentHeight` 使用 float/qreal，供 fit、居中和 preferredSize 计算。公共 int 宽高接口保持签名，Valid 的展示尺寸按 ceil 安全取整，检查有限值和可表示范围；不能将 fractional bounds 直接截断为零，也不能把整数展示尺寸反用于渲染。None 沿用当前整页尺寸的行为。
+3. `PAGXRenderer::applyDisplayTransform()` 继续组合原有 fit 与用户 zoom/pan，只使用正确的逻辑内容尺寸；输出 origin 已由 scene 处理，renderer 不额外平移。需要当帧精确裁剪或反算时，读取设置后的实际 zoom/contentOffset，不全面改写普通文档的缩放逻辑。
+4. Invalid 沿用 `PAGScene::Make()` 返回 nullptr 的现有错误路径：首次加载失败清理旧内容；XML Apply 失败返回错误并保留当前有效 scene 和原编辑基线，不把无效 XML 提交为新内容，也不退化成整页渲染。
+
+### 微信 host
+
+涉及 `pagx/wechat/src/PAGXView.h/.cpp`，相应坐标说明在现有头文件和 `pagx/wechat/ts/types.ts` 中同步：
+
+1. `parsePAGX()` 后、`buildLayers()` 前，渐进加载器已经读取 contentWidth/contentHeight 和基础 fit 来选择首屏图片质量。该阶段复用内部 `ResolveOutputView()` 判断声明：Valid 采用 bounds 的浮点宽高，None 采用原画布，Invalid 保持不可渲染状态并报告诊断，不先创建完整 scene，也不回退为整页。build 成功后再以 `scene->getOutputBounds()` 校准尺寸；parse/build/reset 清理上一文档的窗口状态和快照。
+2. 输出窗口的 root origin 单独保存，不能覆盖既有 CoCraft/custom bounds-origin 或 `setBoundsOrigin()` 的基准。`getContentTransform()` 在 Valid 时返回原基准 origin 加输出窗口 origin，使已有公式 `(cocraftPoint - boundsOrigin) * fitScale + centerOffset` 仍成立；`getNodePosition()` 的原始 page-offset 返回值不变。
+3. `computeViewportInRootCoords()` 继续使用实际 display zoom/offset，Valid 的反算改为 `left = bounds.x - offset.x / zoom`、`top = bounds.y - offset.y / zoom`；None 的额外 origin 为零。保留现有 viewport 扩张、资源保护与预算逻辑。
+4. `getImageBounds()` 将 root bounds 映射为基础 canvas 坐标时，在原 fitMatrix 中补窗口的负 origin，例如 scale 后 `preTranslate(-bounds.x, -bounds.y)`；保留不包含 user pan/zoom 的现有 JS 契约。不能据 target 子树过滤所有外部资源，Glass/BackgroundBlur 仍可能采样 target 外背景。
+5. `applyMergedTransform()` 和 `captureFitSnapshot()` 使用新的逻辑尺寸，仍只设置 zoom 和显示 offset，不能再手动减窗口 origin。复用已有快照生命周期和恢复显示变换的流程。
+6. `ContentTransform` 是每次文件加载/画布尺寸对应的静态基础 fit，保持这一公开语义，不将 fitScale 改成随当前 userZoom 变化的 actualZoom/userZoom。当帧内部 viewport、裁剪等几何使用实际 getters；基础 fit 继续供原 JS 坐标与渐进质量选择使用。
+7. Valid 输出视图本身走 scene 的直接绘制路径；None 保留原有 Tiled、图片渐进升级、快照和预算配置，不为本 PR 重建缓存框架。
+
+### 验收与平台构建
+
+- 大画布中的小窗口、正负 origin、fractional 宽高（含小于 1 的合法尺寸）、嵌套 target：两端内容尺寸和 fit 不再采用整页大小，origin 只应用一次。
+- Qt 首次加载及 XML Apply 修改窗口尺寸、清除输出声明均正确更新；无效 Apply 保留有效预览并返回错误，加载失败不展示前一文档。
+- 微信 parse 后即可取得基础尺寸与 fit，build 后一致；评论 pin、image bounds、viewport 资源优先级在有 origin 时对齐，保留自定义 origin/override 行为。pan/zoom/resize、snapshot 手势和渐进图片升级后仍对齐。
+- None 文档沿用原行为，Invalid 不被当作 None；量化 zoom 下核查实际窗口边缘，但不改变 CLI 请求 scale 的取整规则。
+- 桌面按 `viewer/README.zh_CN.md` 配置本地 Qt 6 后构建 `PAGViewer`，覆盖加载与 XML Apply 的交互验收。微信在 `pagx/wechat` 执行 `npm run build`，需要既有 Emscripten/brotli 环境，并使用微信开发者工具或真机检查坐标、快照与资源升级。
+- 核心 GTest 不覆盖两个 host 的真实构建与交互；平台工具缺失时明确报告未验证项，不能以核心测试通过替代。
+
+## 输出视图测试拆分与回读工具复用
+
+对应 [P2 Glass 测试混入输出视图通用用例且回读重复](https://github.com/Tencent/libpag/pull/3826#discussion_r4535367392)。当前 `PAGXGlassRenderTest.cpp` 为 1082 行。按职责新建输出视图测试文件，复用已有 TestUtils 的快照入口，不另立回读框架。
+
+### 测试归属
+
+新建 `test/src/PAGXOutputViewTest.cpp`，套件改为 `PAGXOutputViewTest`，迁移以下六项并保持测试名：
+
+- `TargetViewAppliesTargetMask`
+- `TargetViewClipsToOutputBounds`
+- `TargetViewSurvivesXmlReload`
+- `TargetViewSamplesBackdropForBackgroundBlur`
+- `TargetViewAppliesTargetAlphaOnce`
+- `TargetViewHiddenTargetStaysTransparent`
+
+真正验证 Glass 背景采样的 `TargetViewSamplesBackdropAndKeepsOutputBounds` 保留在 `PAGXGlassRenderTest`；原先九个 Glass 本体用例不动。新文件使用无 Glass 的简单 target fixture，供 XML、alpha、visible 用例使用，保持原目标填充 alpha=0.8 等断言语义，不复制整套 Glass fixture。`MakeBlurTargetDocument()` 随 BackgroundBlur 用例迁移，其现有 lambda 改为显式函数。
+
+### 扩展已有工具
+
+1. 在已有 `test/src/utils/TestUtils.h/.cpp` 的 `MakeSnapshot(std::shared_ptr<pag::PAGSurface>)` 旁增加 `tgfx::Surface` 和 `pagx::PAGSurface` 重载，按各自接口调用 readPixels。新增重载对 null、bitmap 分配失败、回读失败返回空 bitmap；保持原重载的正常行为。
+2. Glass 的 `RenderViaDisplayList()`、`RenderViaOrphanDirectDraw()` 使用 TGFX 重载；输出视图和超大 surface 的裁剪测试使用 PAGX 重载。Pixmap 必须在 helper 返回前析构，避免调用者 getColor 再锁同一 bitmap 时仍持有旧锁。
+3. 将现有 `RenderTargetView()` 提取到已有 `PAGXTestUtils.h` 的声明及新增同目录 `.cpp` 中，两套件共用。保留创建 scene、读取 bounds、创建 surface 的逻辑，draw 失败立即返回空 bitmap，最后调用共享 MakeSnapshot。头文件仅增加声明与必要前置声明，完整渲染依赖放到 `.cpp`。
+4. 将现有 `CountDifferentPixels()` 及其依赖的 `CountDifferentPixelsInRect()` 移入 TestUtils，供 Glass 和 XML 往返比较复用。保持原 8 级通道差阈值及不可比较时返回 -1 的语义；比较前明确断言结果非负，避免错误码被容差条件接受。Glass 专用 `MaxChannelDifferenceInRect()` 留在原文件。
+5. 清理迁移后不再需要的 include 和局部 helper。新增文件版权年份使用 2026，保持既有 PAGX_TEST，不改成持有设备锁的 PAG_TEST；直接 TGFX 渲染继续使用局部 DeviceLockScope，支持现有 OpenGL、Metal 与 SwiftShader 后端。
+
+### 验证要求
+
+根 CMake 使用未带 CONFIGURE_DEPENDS 的 `GLOB_RECURSE test/src/*.*`；新增 `.cpp` 后重新运行 configure，无需手写源文件清单。用 `--gtest_list_tests` 确认六项已迁到新套件、Glass 专属 target 用例仍在，再运行 `PAGXGlassRenderTest.*:PAGXOutputViewTest.*` 两个完整套件。
+
+当前这两组源用例没有 Baseline::Compare，保持原数值/像素断言即可，不引入或接受新截图基线。后续执行文档中的通用输出视图验收用例优先放入新套件；scene 生命周期和命中 API 的 Runtime 用例继续留在原有套件，不顺带搬迁无关测试。
+
+## playground 静态帧刷新与 draw 拆分
+
+对应 [P2 输出分支绕过 hasContentChanged 导致 loadFileData 后不刷新](https://github.com/Tencent/libpag/pull/3826#discussion_r4535368856)。按 CR 提取静态绘制、复用 scene dirty 状态并删除冗余 canvas 保护，保留正确的动画和延迟 recording 流程。
+
+涉及 `playground/pagx-viewer/src/cpp/PAGXView.h/.cpp` 与已有 `script/test-output-view.js`：
+
+1. 提取私有 `drawStaticFrame()`，承接 scene 为空或存在输出视图时的静态直接呈现路径，让 `draw()` 保留窗口检查和调度，控制在 CR 建议的 80 行内。普通动画/Tiled 路径的 advance、双缓冲提交、性能观测和 tile refinement 行为保持。
+2. 静态 helper 先同步画布尺寸。没有 scene 时，只有 presentImmediately 要求清屏才绘制；有输出 scene 时，门控采用 `presentImmediately || scene->hasContentChanged()`。`loadFileData()` 已经通过 document 通知 scene，不靠仅给该资源入口补 present 标志来绕过 dirty 契约。
+3. **通过门控后，在取得 context/首次 Record 前设置 presentImmediately=true**，只有绘制、snapshot 和最终提交均成功才清为 false，并清理旧 lastRecording。context、Record、snapshot 或最终 flush 失败时保留 true，保证重试。仅“不清标志”不够：若本帧由 scene dirty 触发、原标志为 false，Record 成功消费 dirty 后仍可能在后续合成失败，必须由显式待呈现状态覆盖这一段。
+4. 所有成功 lock 的路径均对应 unlock，只有完整成功才消费 host 待呈现状态；与已确认的引擎准备失败保留 dirty 方案一起回归，不让 host 失败处理抵消引擎错误传播。
+5. 删除 `drawOutputView()` 中围绕 `pagx::Record()` 的 outputCanvas save/restore；scene 的 renderTo 已用 AutoCanvasRestore 保护该 canvas。保留最终显示 canvas 上为 resetMatrix、clip、matte 和 drawImage 使用的另一组 save/restore。
+6. 继续使用已有 viewport 大小的 outputSurface、显示选项 getters 和 surface 生命周期，不引入新缓存框架，不改变背景采样和最终合成职责。
+
+### 验收与 WASM 构建
+
+扩展已有 `script/test-output-view.js`：首次绘制后替换 target 引用的外部图片，不调用 zoom/resize/build，下一 draw 应改变像素；连续两次资源替换均刷新，成功后多次 idle draw 没有额外 GPU 提交。继续覆盖普通文档、动画 seek、matte、清屏、resize、正负 origin 和重复绘制矩阵不累积。补失败后的下一有效帧可恢复，特别覆盖 Record 已成功、后续合成失败的待呈现重试。
+
+在 `playground/pagx-viewer` 中依次执行：
+
+```bash
+npm run build:debug
+npm run test:output-view
+npm run build:debug:st
+npm run test:output-view -- --st
+```
+
+浏览器脚本复用 tools/html-snapshot 的 Playwright 与 Chromium，构建需要 Emscripten。缺少对应环境时报告实际未运行项，不能用核心 C++ 测试替代 WASM host 验证。
+
+## 优化器独立解析并保留声明目标
+
+对应 [P3 动态文档中的声明 target 可能被优化掉](https://github.com/Tencent/libpag/pull/3826#discussion_r4535373201)。`PreserveOutputTarget()` 目前只有在完整 `ResolveOutputView()` 返回 Valid 时才加入 keep-set。按 CR 将“引用指向哪个 Layer”与“整个输出视图是否受运行时支持”分离；继续复用既有引用校验与优化器保留集合。
+
+### 提取既有引用解析
+
+在内部 `src/pagx/utils/OutputView.h/.cpp` 提取现有查找逻辑，接口可采用：
+
+```cpp
+const Layer* ResolveOutputTargetLayer(const PAGXDocument* document, std::string* error);
+```
+
+该函数仅检查 parsed `targetLayerId` 的 ID 语法、`findNode()`、`document->nodes` 中 ID 唯一性、节点类型为 Layer，以及现有 `SearchLayers(document->layers)` 的唯一可达条件。不依赖 outputBounds、动画、状态机、数据绑定或历史 errors，不修改声明、节点或 `document->errors`。错误时返回 nullptr，并通过可空 error 输出现有引用诊断；null document 或没有可解析 ID 时安全返回 nullptr。
+
+`ResolveOutputView()` 继续负责属性配对、原始非法属性、bounds 和动态内容支持，在原有引用检查位置调用共享函数。保留当前诊断优先级，包括原来较早的 ID 语法检查；共享函数独立调用时也要复用该轻量语法检查。不能将动态扫描提前或推后而改变现有错误归因，也不能为优化器放宽运行时的 None/Valid/Invalid 契约。
+
+### 优化器接入与边界
+
+- `src/pagx/PAGXOptimizer.cpp` 的 `PreserveOutputTarget()` 改用纯引用解析，只要取得唯一目标 Layer，就加入已有 keep-set。保留初次 `RecomputeMaskRefs()` 后和矩形 mask 转 scrollRect 后重建集合时的两个调用点。
+- 既有 keep-set 已作用于 prune、downgrade、merge 和 single-child collapse，继续使用这些保护，不新建平行机制，也不冻结整个文档或全部祖先。祖先仍按原有等价条件优化。
+- parsed target ID 能唯一定位时，即使 bounds 缺失、非法或文档包含动态内容，也保留该 Layer；完整输出视图状态仍按原规则为 Invalid。
+- ID 重复、非 Layer、目标不存在、重复路径或循环时，不从 registry 的最后注册项猜测目标。查找仍限于当前文档的 layers/children，不沿 mask 引用进入另一棵树，不查找 Composition 资源或 externalDoc 内部节点；当前文档中的外部文档宿主 Layer 可作为目标。
+- 不重新解析私有 raw target 属性修复非法引用，保留原有非法声明回写。共享搜索继续使用 visited/onPath 防护；本项不扩展整个优化器对循环输入的支持。
+
+### 验收用例
+
+- 扩展已有 `PAGXOptimizerTest.PruneEmptyKeepsOutputTarget`，覆盖动画、数据绑定、状态机及外部动态文档。空 target 和 shell target 优化后仍以原 ID、Layer 类型和可达关系存在。
+- 复用 `OnlyRuleOptions()`/`OptimizeWithOptions()`，分别覆盖 prune、downgrade、merge、collapse 以及 mask 引用集合重建路径；不另建优化测试框架。
+- 优化前后及导出再导入后，明确断言 target 仍唯一可达、类型为 Layer，导出 XML 中仍存在该目标；动态支持、缺失或非法 bounds 的原有错误保持。当前 resolver 的动态检查早于引用检查，单独断言动态诊断无法证明目标未被删除，不能以此代替结构和回写断言。
+- 直接测试共享引用函数的嵌套 Layer、非 Layer、重复 ID、Composition 内部、重复路径和循环边界。循环输入只验证具备防护的引用函数，不调用尚无全局循环防护的完整 Optimize。
+- 回归 `PAGXImporterValidationTest.OutputView*` 与运行时输出视图状态用例，确认完整校验语义未放宽。新增优化器测试名称包含 TargetView，并保留既有保留目标测试的执行。
+
+## 输出窗口 API 文档与有效缩放说明
+
+对应 [P3 optional 措辞与 getOutputBounds 缩放说明](https://github.com/Tencent/libpag/pull/3826#discussion_r4535374587)。`include/pagx/PAGXDocument.h` 的 outputBounds 缺省说明已改为 std::nullopt，保留该修正。补齐 `include/pagx/PAGScene.h` 的返回值文档，并修正把调用者请求 scale 直接等同于绘制缩放的说明。
+
+### 文档修改范围
+
+1. 给 `getOutputBounds()` 添加明确的 `@return`：Valid 时返回文档 root 坐标中的输出窗口；None 或 Invalid 时返回 std::nullopt，用 `getOutputViewStatus()` 区分。`width()`/`height()` 始终是原始文档画布尺寸，不改成输出窗口尺寸。
+2. 说明窗口 origin 的平移由 scene 执行一次，host 只使用窗口宽高进行 fit 和尺寸计算，不能再将负 origin 写进显示偏移。
+3. 自然输出像素尺寸的说明使用大于零的实际有效缩放：先设置 zoom/precision，再读取 `getDisplayOptions()->getZoomScale()`；零 content offset 时，窗口所需尺寸为 `ceil(bounds.width * effectiveScale)`、`ceil(bounds.height * effectiveScale)`。任意 viewport、居中或平移场景还要使用实际 `getContentOffset()`，不能把该尺寸公式当作所有 viewport 的完整覆盖范围；实际缩放不大于零时不能按此创建可绘制输出。
+4. 在 `include/pagx/PAGDisplayOptions.h` 的 zoom getter/setter 与 precision 说明中，明确请求值按当前 precision 量化，getter 返回实际绘制值；precision 不只影响 cache key，也可能改变有效缩放。保留既有量化规则和默认值，不修改 TGFX。
+5. 同步 `PAGScene::draw()` 中“按窗口尺寸映射 1:1”的措辞，明确还需考虑显示缩放与偏移。清理 getOutputBounds 中“与其他导出器使用相同 scale”的笼统承诺：CLI 静态导出直接使用请求 scale，scene 使用 DisplayList 的量化值，不为统一文档而修改正确的导出取整行为。
+
+有效输出视图的几何关系为：`surfacePoint = effectiveOffset + effectiveScale * (rootPoint - bounds.origin)`。裁剪已由 `renderTo()` 实现；ceil 多出的边缘属于未被内容覆盖的区域，是否透明还取决于背景色。文档应描述当前已生效的裁剪行为。
+
+此项不新增公开尺寸 API、不改变状态、绘制或 CLI 行为。复用 `PAGXRuntimeTest.OutputViewDisplayChangesInvalidateRenderedContent`、`RepeatedTargetViewDrawKeepsCanvasState` 和输出裁剪用例核对文档契约。文档修改本身不新增镜像实现的测试；host 适配涉及的尺寸和坐标验收见对应章节。
+
 ## 执行和验证
 
-先读取仓库 `AGENTS.md` 与 `.codebuddy/rules/`、`.claude/rules/` 中的适用规则。代码与注释使用英语，避免 lambda，保持 C++17 和现有风格。只实施本文档确认的项目，保留其他会话的改动。先提取扩展已有 RasterLayerParent 并通过既有栅格化回归，再将输出视图失败传播与稳定状态作为一组接入；共享 bounds 规则可独立提取并验证，随后实现纯渲染校验快路径。导出拒绝检查与 CLI 诊断可独立实施，复用已存在的错误接口。保留原有 runtime 恢复时序，不为本 PR 反向改写正确的导出实现。
+先读取仓库 `AGENTS.md` 与 `.codebuddy/rules/`、`.claude/rules/` 中的适用规则。代码与注释使用英语，避免 lambda，保持 C++17 和现有风格。只实施本文档确认的项目，保留其他会话的改动。测试拆分可先独立完成，供后续通用用例使用。提取扩展已有 RasterLayerParent 并通过既有栅格化回归，再将输出视图失败传播与稳定状态作为一组接入；共享 bounds 与目标引用解析可独立提取并验证，纯渲染校验快路径继续围绕完整 ResolveOutputView 管理快照。导出诊断、优化器保留、host 适配和 API 文档可按对应章节分别实施；playground 刷新同时验证引擎失败传播与 host 待呈现状态。保留原有 runtime 恢复时序，不为本 PR 反向改写正确的导出实现。
 
 在工作目录中先执行格式化、全模块构建和定向测试：
 
@@ -382,7 +528,7 @@ PPT 保留磁盘 ZIP 与内存 ZIP 两条既有写入路径，不为了共享检
 cmake -G Ninja -DPAG_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Debug -B cmake-build-debug
 cmake --build cmake-build-debug --target PAGFullTest_OpenGL
 ./cmake-build-debug/PAGFullTest_OpenGL \
-  --gtest_filter='PAGXRuntimeTest.*TargetView*:PAGXRuntimeTest.*OutputView*:PAGXImporterValidationTest.OutputView*:PAGXTest.HitTest*:PAGXGlassRenderTest.TargetView*:PAGXCliTest.Render_TargetView*:PAGXCliTest.Export_*:PAGXHtmlTest.*TargetView*:PAGXHTMLDataTest.*TargetView*:PAGXSVGTest.*TargetView*:PAGXPPTTest.*TargetView*:PAGXHtmlTest.RootDocument:PAGXHTMLDataTest.ToData_BasicArchive:PAGXSVGTest.SVGExport_ToFile:PAGXPPTTest.RectangleSolidFill:PAGXUtilsTest.RasterLayer*:PAGXUtilsTest.SVGExportPreservesDepthWithoutPerspective:PAGXSVGTest.*Bake*:PAGXPPTTest.*Backdrop*:PAGXPPTTest.*ScrollRect*'
+  --gtest_filter='PAGXRuntimeTest.*TargetView*:PAGXRuntimeTest.*OutputView*:PAGXImporterValidationTest.OutputView*:PAGXTest.HitTest*:PAGXGlassRenderTest.*:PAGXOutputViewTest.*:PAGXOptimizerTest.*:PAGXCliTest.Render_TargetView*:PAGXCliTest.Export_*:PAGXHtmlTest.*TargetView*:PAGXHTMLDataTest.*TargetView*:PAGXSVGTest.*TargetView*:PAGXPPTTest.*TargetView*:PAGXHtmlTest.RootDocument:PAGXHTMLDataTest.ToData_BasicArchive:PAGXSVGTest.SVGExport_ToFile:PAGXPPTTest.RectangleSolidFill:PAGXUtilsTest.RasterLayer*:PAGXUtilsTest.SVGExportPreservesDepthWithoutPerspective:PAGXSVGTest.*Bake*:PAGXPPTTest.*Backdrop*:PAGXPPTTest.*ScrollRect*'
 ```
 
 在基线缓存已同步的环境中执行完整 SwiftShader 回归：
@@ -405,8 +551,8 @@ cmake --build cmake-build-hit-test-swiftshader --target PAGFullTest_OpenGL
 
 ## 交付
 
-按仓库规则仅提交本次修改，不自动推送。共享工具可先提交为 `Reuse raster layer parenting for output views.`；稳定状态与失败传播建议提交信息为 `Reuse target view rendering state and report setup failures.`；共享 bounds 校验可单独提交为 `Share output bounds validation across import and runtime.`；校验快路径可单独提交为 `Avoid output view revalidation for proven render only changes.`；导出拒绝与诊断可单独提交为 `Share output view export checks and report rejection reasons.`。最终报告列出修改文件、实际测试结果、未解决的环境或基线问题和 commit ID。本文档后续只追加已确认的方案，或依用户授权经核查能够直接按 CR 意见处理的方案；需要偏离 CR 建议或存在未决取舍时先讨论。
+按仓库规则仅提交本次修改，不自动推送。共享工具可先提交为 `Reuse raster layer parenting for output views.`；稳定状态与失败传播建议提交信息为 `Reuse target view rendering state and report setup failures.`；共享 bounds 校验可单独提交为 `Share output bounds validation across import and runtime.`；校验快路径可单独提交为 `Avoid output view revalidation for proven render only changes.`；导出拒绝与诊断可单独提交为 `Share output view export checks and report rejection reasons.`。测试拆分、host 适配、playground 刷新、优化器保留及 API 文档也按可独立回归的范围提交。最终报告列出修改文件、实际测试结果、未解决的环境或基线问题和 commit ID，明确区分核心、Qt、微信与 WASM 的验证结果。本文档后续只追加已确认的方案，或依用户授权经核查能够直接按 CR 意见处理的方案；需要偏离 CR 建议或存在未决取舍时先讨论。
 
 ```codex-prompt
-请在 /Users/codywwang/Desktop/PAGX/libpag 按本文档已确认的方案执行。先检查当前分支、提交和工作区；命中测试修复已有本地提交 ba4a8a179，复核并回归，避免重复实现。以已有 RasterLayerParent 为基础提取并扩展共享工具，删除 OutputTargetParent；保留已有 Raster 的坐标、无 parent 支持和两种背景输出策略。OutputTargetState 只委托共享工具管理 scene 的跨帧生命周期；CLI 和 Raster 调用保持单次恢复。接通准备失败传播，提取现有 bounds 数值校验供导入和运行时共用，保留严格解析及浮点行为。再加入可证明语义不变的渲染叶子校验快路径；未知变更与 Invalid 全检，重绘通知、runtime 刷新和 wrapper reset 不得被跳过。统一导出输出视图的声明拒绝检查和文案，保留 HTML 独立入口保护，将 PPT 同链检查收拢到 BuildSlides，并复用已有错误接口补齐 CLI 诊断和 SVG warnings。只修改 libpag，不反向改写正确的既有导出实现。验证 scene、Record、CLI、HTML/SVG/PPT、导入、命中、缓存和生命周期行为。遵守仓库规则，保留其他会话改动，仅提交本次修改，不推送。不要扩展到本文档尚未收录的 PR 评论。完成后报告变更、测试、阻塞和 commit ID。
+请在 /Users/codywwang/Desktop/PAGX/libpag 按本文档十二项方案执行。先检查当前分支、提交和工作区；命中测试修复已有本地提交 ba4a8a179，复核并回归，避免重复实现。以已有 RasterLayerParent 为基础提取并扩展共享工具，删除 OutputTargetParent；保留已有 Raster 的坐标、无 parent 支持和两种背景输出策略。OutputTargetState 只委托共享工具管理 scene 的跨帧生命周期；CLI 和 Raster 调用保持单次恢复。接通准备失败传播，提取现有 bounds 数值校验供导入和运行时共用，保留严格解析及浮点行为。再加入可证明语义不变的渲染叶子校验快路径；未知变更与 Invalid 全检，重绘通知、runtime 刷新和 wrapper reset 不得被跳过。统一导出输出视图的声明拒绝检查和文案，保留 HTML 独立入口保护，将 PPT 同链检查收拢到 BuildSlides，并复用已有错误接口补齐 CLI 诊断和 SVG warnings。按文档迁移六项通用测试到 PAGXOutputViewTest，扩展既有 MakeSnapshot 等工具，保留真正的 Glass 集成测试。同步 Qt 的加载与 XML Apply、微信的 parse/build 和 origin 坐标消费者；保留 JS 静态基础 fit 与自定义 origin 契约。playground 拆静态帧，接入 hasContentChanged，并在 Record 后合成失败时保留待呈现状态。提取纯目标引用解析供优化器使用，不能放宽完整运行时支持校验。修正 getOutputBounds 返回值、origin 和有效量化缩放文档。只修改 libpag，不反向改写正确的既有导出实现。验证 scene、Record、CLI、HTML/SVG/PPT、导入、优化器、命中、缓存和生命周期，以及 Qt、微信和 WASM host 的实际构建与交互；环境缺失时明确报告未验证项。遵守仓库规则，保留其他会话改动，仅提交本次修改，不推送，不自动接受基线。不要扩展到本文档尚未收录的 PR 评论。完成后报告变更、测试、阻塞和 commit ID。
 ```
