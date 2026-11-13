@@ -775,6 +775,16 @@ float TextLineHeightForCSS(const std::string& fontFamily, const std::string& fon
   return singleLine ? alignment.singleLineHeight : alignment.lineHeight;
 }
 
+// PAGX fakes bold by stroking the Regular outline with a width of `fontSize * FauxBoldScale`, and
+// `-webkit-text-stroke-width` is also the total width of a band centred on the outline, so the PAGX
+// width transfers one to one. `font-weight: bold` would swap the face instead and change the
+// advance (measured: a fauxBold line came out 5px wider than the reference).
+float FauxBoldStrokeWidth(float fontSize) {
+  // Measured against the renderer: a 64px glyph matches at 4.5px (0.070em). The tgfx constant
+  // (1/32em from 36px up) is about half that, which left every fauxBold line visibly thin.
+  return fontSize * 0.07f;
+}
+
 void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
                            const Stroke* stroke, const TextBox* tb, float alpha) {
   if (!text->glyphRuns.empty()) {
@@ -1059,7 +1069,11 @@ void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
     }
   }
   if (text->fauxBold) {
-    style += ";font-weight:bold";
+    // PAGX bolds by stroking the outline; `font-weight: bold` swaps the face, which changes the
+    // advance and makes the line wider than the reference.
+    style +=
+        ";-webkit-text-stroke:" + CssFloatToString(FauxBoldStrokeWidth(text->renderFontSize())) +
+        "px currentColor";
   }
   if (fill && fill->color) {
     auto ct = fill->color->nodeType();
@@ -1767,7 +1781,9 @@ void HTMLWriter::writeTextModifier(HTMLBuilder& out, const std::vector<GeoInfo>&
             }
           }
           if (text->fauxBold) {
-            charStyle += ";font-weight:bold";
+            charStyle += ";-webkit-text-stroke:" +
+                         CssFloatToString(FauxBoldStrokeWidth(text->renderFontSize())) +
+                         "px currentColor";
           }
           // A TextModifier channel animates every glyph it reaches; on the span path each glyph is
           // its own element, so it needs an id and a record just like an SVG <text> would.
