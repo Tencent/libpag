@@ -111,8 +111,9 @@ if ((process.argv[2] === '--help' || process.argv[2] === '-h') && process.argv.l
   process.exit(result.status || 0);
 }
 
+const args = process.argv.slice(2);
 try {
-  execFileSync(binPath, process.argv.slice(2), { stdio: "inherit" });
+  execFileSync(binPath, args, { stdio: "inherit" });
 } catch (e) {
   process.exit(e.status != null ? e.status : 1);
 }

@@ -58,6 +58,8 @@ endif ()
 
 # Build pagx static library
 file(GLOB PAGX_CORE_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/../../src/pagx/*.cpp)
+# VideoExporter is native-only and is not part of the WeChat wasm build.
+list(FILTER PAGX_CORE_SOURCES EXCLUDE REGEX "/VideoExporter\\.cpp$")
 file(GLOB_RECURSE PAGX_ANIMATION_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/../../src/pagx/animation/*.cpp)
 file(GLOB_RECURSE PAGX_NODES_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/../../src/pagx/nodes/*.cpp)
 file(GLOB_RECURSE PAGX_RUNTIME_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/../../src/pagx/runtime/*.cpp)

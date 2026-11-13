@@ -20,19 +20,29 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cerrno>
 #include <cmath>
 #include <cstdio>
+#include <cstdlib>
 #include <memory>
+#include <ostream>
 #include <string>
 #include <vector>
 #include "pagx/FontConfig.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/SystemFonts.h"
+#include "pagx/VideoExporter.h"
 #include "pagx/nodes/Layer.h"
 #include "pagx/utils/VerifyUtils.h"
 #include "tgfx/core/Typeface.h"
 
 namespace pagx::cli {
+
+/** Returns an error stream prefixed with "<command>: error: " for one diagnostic message. */
+std::ostream& CommandError(const std::string& command);
+
+/** Parses an integer or numerator/denominator frame rate within VideoExporter's supported limits. */
+bool ParseVideoFrameRate(const char* text, VideoFrameRate* frameRate);
 
 inline size_t FindLastPathSeparator(const std::string& path) {
   auto slash = path.rfind('/');
@@ -67,6 +77,69 @@ inline std::shared_ptr<tgfx::Typeface> ResolveFallbackTypeface(const std::string
   auto family = commaPos != std::string::npos ? specifier.substr(0, commaPos) : specifier;
   auto style = commaPos != std::string::npos ? specifier.substr(commaPos + 1) : std::string();
   return SystemFonts::ResolveTypeface(family, style);
+}
+
+/**
+ * Parses an integer option within the inclusive range, rejecting overflow and trailing characters.
+ * Returns false without modifying value when the input is invalid.
+ */
+inline bool ParseIntOption(const char* text, long minValue, long maxValue, long* value) {
+  char* endPtr = nullptr;
+  errno = 0;
+  auto parsed = strtol(text, &endPtr, 10);
+  if (errno != 0 || endPtr == text || *endPtr != '\0' || parsed < minValue || parsed > maxValue) {
+    return false;
+  }
+  *value = parsed;
+  return true;
+}
+
+/**
+ * Parses a finite floating-point option with an inclusive or exclusive lower bound. Returns false
+ * without modifying value when the input is invalid or overflows.
+ */
+inline bool ParseFloatOption(const char* text, float minValue, bool includeMin, float* value) {
+  char* endPtr = nullptr;
+  errno = 0;
+  auto parsed = strtof(text, &endPtr);
+  if (errno != 0 || endPtr == text || *endPtr != '\0' || !std::isfinite(parsed) ||
+      (includeMin ? parsed < minValue : parsed <= minValue)) {
+    return false;
+  }
+  *value = parsed;
+  return true;
+}
+
+/**
+ * Parses a "#RRGGBB" or "#RRGGBBAA" color into normalized float components. The leading '#' is
+ * optional. Returns false when the string is not a valid color, leaving the outputs untouched.
+ */
+inline bool ParseHexColor(const std::string& hex, float* red, float* green, float* blue,
+                          float* alpha) {
+  std::string color = hex;
+  if (!color.empty() && color[0] == '#') {
+    color = color.substr(1);
+  }
+  if (color.size() != 6 && color.size() != 8) {
+    return false;
+  }
+  char* endPtr = nullptr;
+  unsigned long value = strtoul(color.c_str(), &endPtr, 16);
+  if (endPtr != color.c_str() + color.size()) {
+    return false;
+  }
+  if (color.size() == 8) {
+    *red = static_cast<float>((value >> 24) & 0xFF) / 255.0f;
+    *green = static_cast<float>((value >> 16) & 0xFF) / 255.0f;
+    *blue = static_cast<float>((value >> 8) & 0xFF) / 255.0f;
+    *alpha = static_cast<float>(value & 0xFF) / 255.0f;
+  } else {
+    *red = static_cast<float>((value >> 16) & 0xFF) / 255.0f;
+    *green = static_cast<float>((value >> 8) & 0xFF) / 255.0f;
+    *blue = static_cast<float>(value & 0xFF) / 255.0f;
+    *alpha = 1.0f;
+  }
+  return true;
 }
 
 /**
@@ -197,6 +270,17 @@ inline std::string EscapeJson(const std::string& input) {
   }
   return result;
 }
+
+#ifdef _WIN32
+/** Converts a UTF-8 string to UTF-16; returns an empty string when the input is not valid UTF-8. */
+std::wstring UTF8ToWide(const std::string& value);
+
+/**
+ * Quotes one argv item using the CommandLineToArgvW / Microsoft C runtime rules. CreateProcessW
+ * receives the command line directly, so cmd.exe metacharacters never get a chance to execute.
+ */
+std::wstring QuoteWindowsArg(const std::wstring& value);
+#endif
 
 /**
  * Loads a PAGX document from a file. Prints load errors and warnings to stderr using the given

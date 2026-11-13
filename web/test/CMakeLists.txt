@@ -77,6 +77,9 @@ list(FILTER TEST_SOURCES EXCLUDE REGEX "PAGDiskCacheTest\\.cpp$")           # pt
 # RenderCache::prepareLayers(), so the counts permanently differ from the native semantics.
 list(FILTER TEST_SOURCES EXCLUDE REGEX "AsyncDecodeTest\\.cpp$")            # web full-timeline prefetch
 list(FILTER TEST_SOURCES EXCLUDE REGEX "PAGXCliTest\\.cpp$")                # CLI sources excluded
+list(FILTER TEST_SOURCES EXCLUDE REGEX "PAGXVideoCliTest\\.cpp$")           # native process tests
+list(FILTER TEST_SOURCES EXCLUDE REGEX "PAGXVideoExporterTest\\.cpp$")      # native-only exporter
+list(FILTER TEST_SOURCES EXCLUDE REGEX "CliTestUtils\\.cpp$")               # native CLI helper
 # The legacy HTML-importer suite uses dynamic_cast. RTTI cannot be enabled to accommodate it:
 # tgfx's emscripten bindings are compiled no-rtti with synthetic typeinfo, so an RTTI libpag in
 # the same embind registry splits type identities and breaks all JS-to-C++ calls at runtime.
@@ -102,6 +105,9 @@ list(APPEND TEST_SOURCES ${WEB_TEST_SOURCES})
 # pagx::cli entry points; main.cpp is replaced by WebTestRunner.cpp).
 file(GLOB CLI_SOURCES CONFIGURE_DEPENDS ${ROOT}/src/cli/*.cpp)
 list(FILTER CLI_SOURCES EXCLUDE REGEX "main\\.cpp$")
+list(FILTER CLI_SOURCES EXCLUDE REGEX "CommandExport\\.cpp$")
+list(FILTER CLI_SOURCES EXCLUDE REGEX "VideoEncoder\\.cpp$")
+list(FILTER CLI_SOURCES EXCLUDE REGEX "VideoFrameSource\\.cpp$")
 list(APPEND TEST_SOURCES ${CLI_SOURCES})
 
 # The vendor's prebuilt gtest static library is compiled with -fno-rtti and therefore lacks

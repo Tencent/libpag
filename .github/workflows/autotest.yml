@@ -31,7 +31,7 @@ jobs:
 
       - uses: tecolicom/actions-use-homebrew-tools@v1
         with:
-          tools: ninja yasm gcovr
+          tools: ninja yasm gcovr ffmpeg
 
       - name: Run depsync
         run: |
@@ -54,6 +54,24 @@ jobs:
           cd test
           npm ci
         shell: bash
+
+      - name: Install pagx test dependencies
+        working-directory: cli/npm
+        env:
+          PAGX_SKIP_FFMPEG_DOWNLOAD: '1'
+        run: npm install --include=dev
+
+      - name: Generate the pinned ffmpeg manifest
+        working-directory: cli/npm
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npm run generate:ffmpeg-manifest
+
+      - name: Test ffmpeg downloader
+        working-directory: cli/npm
+        env:
+          PAGX_FFMPEG_REAL_DOWNLOAD: '1'
+        run: npm run test:ffmpeg
 
       - name: Test PPT Evaluator
         run: |
@@ -129,7 +147,7 @@ jobs:
 
       - uses: tecolicom/actions-use-homebrew-tools@v1
         with:
-          tools: ninja yasm
+          tools: ninja yasm ffmpeg
 
       - name: Run depsync
         run: |
@@ -173,3 +191,39 @@ jobs:
           name: mac_metal_result
           path: result
           include-hidden-files: true
+
+  pagx_ffmpeg_downloader:
+    name: pagx ffmpeg downloader (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - windows-latest
+    steps:
+      - name: Check Out Repo
+        uses: actions/checkout@v4
+
+      - name: Set Up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install pagx test dependencies
+        working-directory: cli/npm
+        env:
+          PAGX_SKIP_FFMPEG_DOWNLOAD: '1'
+        run: npm install --include=dev
+
+      - name: Generate the pinned ffmpeg manifest
+        working-directory: cli/npm
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npm run generate:ffmpeg-manifest
+
+      - name: Test ffmpeg downloader
+        working-directory: cli/npm
+        env:
+          PAGX_FFMPEG_REAL_DOWNLOAD: '1'
+        run: npm run test:ffmpeg

@@ -24,6 +24,7 @@ npm install -g @libpag/pagx
 | `pagx bounds` | Query the precise rendered bounds of layers |
 | `pagx font` | Query a font file, a system font by name, or list system font families |
 | `pagx embed` | Embed font glyphs and images into a PAGX file for self-contained output |
+| `pagx export` | Export PAGX to SVG, PPTX, HTML, or MP4 |
 
 ## Usage Examples
 
@@ -110,6 +111,41 @@ Render a PAGX file to an image.
 | `--font <path>` | Register a font file (repeatable) |
 | `--fallback <path\|name>` | Add a fallback font file or system font name (repeatable) |
 
+### `pagx export --format mp4 --input <file.pagx> --output <file.mp4>`
+
+Export an animated PAGX file to H.264 MP4 through an external ffmpeg process. During `npm install`,
+the package's `postinstall` hook downloads the matching pinned build from `libpag/ffmpeg-builder`,
+verifies its size and SHA-256 against the manifest generated at package time and bundled in this
+package, and caches it. The manifest pins the default release for every supported platform; automatic downloads of other
+releases are not supported. A postinstall download failure reports a warning
+without blocking installation of the other commands. Runtime commands prefer `--ffmpeg` and an
+existing `FFMPEG_BIN`, then the downloaded cache, then `PATH`; they never wait for a network
+download. If MP4 export finds none of these, it exits with instructions to retry the standalone
+ffmpeg download without reinstalling the package.
+
+```bash
+pagx export --input motion.pagx --output motion.mp4
+
+# Use an existing executable without downloading:
+pagx export --input motion.pagx --output motion.mp4 --ffmpeg /absolute/path/to/ffmpeg
+```
+
+To predownload the executable and print its cached path:
+
+```bash
+npm run download:ffmpeg --prefix "$(npm root -g)/@libpag/pagx"
+```
+
+The cache location defaults to the platform user cache. `PAGX_FFMPEG_CACHE_DIR` overrides it.
+`PAGX_FFMPEG_BASE_URL` can point to a mirror directory containing the pinned release assets;
+mirrored archives must exactly match the bundled manifest. Automatic downloads require HTTPS
+outside loopback, and redirects cannot downgrade HTTPS to HTTP. To use another ffmpeg build, select
+a local executable through `FFMPEG_BIN` or `--ffmpeg` instead of downloading it through PAGX. Set
+`PAGX_SKIP_FFMPEG_DOWNLOAD=1` before installation to skip the optional postinstall download.
+Downloads include the upstream license files. The downloader does not read `HTTP_PROXY` or
+`HTTPS_PROXY`. If direct access fails, point `PAGX_FFMPEG_BASE_URL` to a mirror, retry the download
+script, or use an existing ffmpeg through `FFMPEG_BIN`/`--ffmpeg`.
+
 ### `pagx optimize [options] <file.pagx>`
 
 Validate, optimize, and format a PAGX file in one step. Aborts if the input fails validation.
@@ -183,8 +219,8 @@ Embed font glyphs and images into a PAGX file for self-contained output.
 ## Supported Platforms
 
 - macOS (Apple Silicon and Intel)
-- Linux (x64)
-- Windows (x64)
+- Linux (x64 and ARM64)
+- Windows (x64 and ARM64)
 
 ## License
 

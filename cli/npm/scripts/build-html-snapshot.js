@@ -78,9 +78,12 @@ function main() {
     die(`source tool not found at ${TOOL_DIR}`);
   }
 
-  // 1. Install + build the source tool so dist/ is up to date.
+  // 1. Install + build the source tool so dist/ is up to date. This tool currently has no
+  // committed lockfile, so npm ci cannot be used for a fresh local checkout.
   if (!fs.existsSync(path.join(TOOL_DIR, 'node_modules'))) {
-    run(NPM, ['ci'], TOOL_DIR);
+    const hasLockFile = fs.existsSync(path.join(TOOL_DIR, 'package-lock.json')) ||
+                        fs.existsSync(path.join(TOOL_DIR, 'npm-shrinkwrap.json'));
+    run(NPM, [hasLockFile ? 'ci' : 'install'], TOOL_DIR);
   }
   run(NPM, ['run', 'build'], TOOL_DIR);
 

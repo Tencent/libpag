@@ -17,6 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "cli/CliUtils.h"
+#ifdef _WIN32
+#include <windows.h>
+#endif
 #include <cstdio>
 #include <filesystem>
 #include <fstream>
@@ -27,11 +30,93 @@
 
 namespace pagx::cli {
 
+namespace {
+
+bool ParseInt64(const std::string& text, int64_t* value) {
+  if (text.empty()) {
+    return false;
+  }
+  char* endPtr = nullptr;
+  errno = 0;
+  auto parsed = std::strtoll(text.c_str(), &endPtr, 10);
+  if (errno != 0 || endPtr == text.c_str() || *endPtr != '\0') {
+    return false;
+  }
+  *value = parsed;
+  return true;
+}
+
+}  // namespace
+
+std::ostream& CommandError(const std::string& command) {
+  return std::cerr << command << ": error: ";
+}
+
+bool ParseVideoFrameRate(const char* text, VideoFrameRate* frameRate) {
+  if (text == nullptr || frameRate == nullptr) {
+    return false;
+  }
+  std::string input = text;
+  auto slash = input.find('/');
+  std::string numeratorText = slash == std::string::npos ? input : input.substr(0, slash);
+  std::string denominatorText = slash == std::string::npos ? "1" : input.substr(slash + 1);
+  if (slash != std::string::npos && input.find('/', slash + 1) != std::string::npos) {
+    return false;
+  }
+  int64_t numerator = 0;
+  int64_t denominator = 1;
+  if (!ParseInt64(numeratorText, &numerator) || !ParseInt64(denominatorText, &denominator) ||
+      numerator < VideoExporter::MIN_FRAME_RATE || denominator <= 0) {
+    return false;
+  }
+  VideoFrameRate parsed = {numerator, denominator};
+  if (!parsed.isWithin(VideoExporter::MIN_FRAME_RATE, VideoExporter::MAX_FRAME_RATE)) {
+    return false;
+  }
+  *frameRate = parsed;
+  return true;
+}
+
+#ifdef _WIN32
+std::wstring UTF8ToWide(const std::string& value) {
+  if (value.empty()) return {};
+  int size = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, value.data(),
+                                 static_cast<int>(value.size()), nullptr, 0);
+  if (size <= 0) return {};
+  std::wstring wide(static_cast<size_t>(size), L'\0');
+  MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, value.data(), static_cast<int>(value.size()),
+                      wide.data(), size);
+  return wide;
+}
+
+std::wstring QuoteWindowsArg(const std::wstring& value) {
+  std::wstring out = L"\"";
+  size_t backslashes = 0;
+  for (wchar_t ch : value) {
+    if (ch == L'\\') {
+      backslashes++;
+      continue;
+    }
+    if (ch == L'\"') {
+      out.append(backslashes * 2 + 1, L'\\');
+      out.push_back(L'\"');
+    } else {
+      out.append(backslashes, L'\\');
+      out.push_back(ch);
+    }
+    backslashes = 0;
+  }
+  out.append(backslashes * 2, L'\\');
+  out.push_back(L'\"');
+  return out;
+}
+#endif
+
 std::shared_ptr<PAGXDocument> LoadDocument(const std::string& filePath,
                                            const std::string& command) {
   auto document = PAGXImporter::FromFile(filePath);
   if (document == nullptr) {
-    std::cerr << command << ": failed to load '" << filePath << "'\n";
+    CommandError(command) << "failed to load '" << filePath << "'\n";
     return nullptr;
   }
   for (auto& error : document->errors) {
@@ -45,7 +130,7 @@ bool LoadFontConfig(FontConfig* fontConfig, const std::vector<std::string>& font
   for (const auto& fontFile : fontFiles) {
     auto typeface = tgfx::Typeface::MakeFromPath(fontFile);
     if (typeface == nullptr) {
-      std::cerr << command << ": failed to load font '" << fontFile << "'\n";
+      CommandError(command) << "failed to load font '" << fontFile << "'\n";
       return false;
     }
     fontConfig->registerFont(fontFile, 0, typeface->fontFamily(), typeface->fontStyle());

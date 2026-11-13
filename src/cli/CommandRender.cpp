@@ -18,6 +18,7 @@
 
 #include "cli/CommandRender.h"
 #include <libxml/parser.h>
+#include <algorithm>
 #include <cerrno>
 #include <climits>
 #include <cmath>
@@ -25,22 +26,31 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <filesystem>
+#include <iomanip>
 #include <iostream>
+#include <memory>
+#include <sstream>
 #include <string>
+#include <vector>
 #include "cli/CliUtils.h"
+#ifdef PAG_BUILD_VIDEO_EXPORTER
+#include "cli/VideoFrameSource.h"
+#endif
 #include "cli/XPathQuery.h"
 #include "pagx/FontConfig.h"
 #include "pagx/PAGDisplayOptions.h"
 #include "pagx/PAGScene.h"
 #include "pagx/PAGSurface.h"
-#include "pagx/PAGTimeline.h"
 #include "pagx/PAGXDocument.h"
+#include "pagx/VideoExporter.h"
 #include "pagx/nodes/Node.h"
 #include "pagx/types/Color.h"
 #include "renderer/LayerBuilder.h"
 #include "rendering/gpu/Devices.h"
 #include "tgfx/core/Bitmap.h"
 #include "tgfx/core/ImageCodec.h"
+#include "tgfx/core/ImageInfo.h"
 #include "tgfx/core/Pixmap.h"
 #include "tgfx/layers/DisplayList.h"
 
@@ -71,6 +81,17 @@ struct RenderOptions {
   // than the static layer-tree path. Negative means "no time requested" (static render).
   bool hasTime = false;
   float timeSeconds = 0.0f;
+  // When set, the document's animations are sampled into an image sequence written to this
+  // directory. The scene and surface are built once and reused for every frame.
+  std::string framesDir = {};
+  // Sampling frame rate for --frames-dir. Zero uses one consistent integer document rate; mixed or
+  // non-integer document rates must be overridden explicitly.
+  VideoFrameRate frameRate = {};
+  // Sequence length in seconds for --frames-dir. Negative means the longest full playback period,
+  // or one frame for a static document. State machines require an explicit positive duration.
+  float duration = -1.0f;
+  // Whether --output was given explicitly, so --frames-dir can reject the combination.
+  bool hasOutput = false;
 };
 
 static void PrintRenderUsage() {
@@ -84,6 +105,15 @@ static void PrintRenderUsage() {
       << "  --scale <float>           Scale factor (default: 1.0)\n"
       << "  --time <seconds>          Evaluate animations at this playback time and render that "
          "frame\n"
+      << "  --frames-dir <dir>        Render the animations as an image sequence into <dir>, "
+         "reusing\n"
+      << "                            one scene for every frame\n"
+      << "  --fps <n|num/den>         Sampling frame rate for --frames-dir (default: the integer\n"
+      << "                            document's animation frame rate; mixed/non-integer document\n"
+      << "                            rates require an explicit --fps; use 30000/1001 for NTSC)\n"
+      << "  --duration <seconds>      Sequence length for --frames-dir (default: the longest\n"
+      << "                            full playback period; static documents produce one frame;\n"
+      << "                            state machines require an explicit value)\n"
       << "  --crop <x,y,w,h>          Crop region in document coordinates\n"
       << "  --id <id>                 Render only the Layer with the specified id\n"
       << "  --xpath <expr>            Render only the Layer matched by XPath expression\n"
@@ -92,34 +122,6 @@ static void PrintRenderUsage() {
       << "  --font <path>             Register a font file (can be specified multiple times)\n"
       << "  --fallback <path|name>    Add a fallback font file or system font name (can be\n"
          "                            specified multiple times)\n";
-}
-
-static bool ParseHexColor(const std::string& hex, float* red, float* green, float* blue,
-                          float* alpha) {
-  std::string color = hex;
-  if (!color.empty() && color[0] == '#') {
-    color = color.substr(1);
-  }
-  if (color.size() != 6 && color.size() != 8) {
-    return false;
-  }
-  char* endPtr = nullptr;
-  unsigned long value = strtoul(color.c_str(), &endPtr, 16);
-  if (endPtr != color.c_str() + color.size()) {
-    return false;
-  }
-  if (color.size() == 8) {
-    *red = static_cast<float>((value >> 24) & 0xFF) / 255.0f;
-    *green = static_cast<float>((value >> 16) & 0xFF) / 255.0f;
-    *blue = static_cast<float>((value >> 8) & 0xFF) / 255.0f;
-    *alpha = static_cast<float>(value & 0xFF) / 255.0f;
-  } else {
-    *red = static_cast<float>((value >> 16) & 0xFF) / 255.0f;
-    *green = static_cast<float>((value >> 8) & 0xFF) / 255.0f;
-    *blue = static_cast<float>(value & 0xFF) / 255.0f;
-    *alpha = 1.0f;
-  }
-  return true;
 }
 
 static bool ParseCrop(const std::string& cropStr, float* x, float* y, float* w, float* h) {
@@ -155,27 +157,41 @@ static int ParseRenderOptions(int argc, char* argv[], RenderOptions* options) {
     std::string arg = argv[i];
     if ((arg == "-o" || arg == "--output") && i + 1 < argc) {
       options->outputFile = argv[++i];
+      options->hasOutput = true;
+    } else if (arg == "--frames-dir" && i + 1 < argc) {
+      options->framesDir = argv[++i];
+    } else if (arg == "--fps" && i + 1 < argc) {
+      ++i;
+      if (!ParseVideoFrameRate(argv[i], &options->frameRate)) {
+        CommandError("pagx render")
+            << "invalid fps '" << argv[i] << "', must be 1-120 or a ratio such as 30000/1001\n";
+        return 1;
+      }
+    } else if (arg == "--duration" && i + 1 < argc) {
+      ++i;
+      if (!ParseFloatOption(argv[i], 0.0f, false, &options->duration)) {
+        CommandError("pagx render")
+            << "invalid duration '" << argv[i] << "', must be a positive number of seconds\n";
+        return 1;
+      }
     } else if (arg == "--format" && i + 1 < argc) {
       options->format = argv[++i];
       if (options->format != "png" && options->format != "webp" && options->format != "jpg") {
-        std::cerr << "pagx render: unsupported format '" << options->format << "'\n";
+        CommandError("pagx render") << "unsupported format '" << options->format << "'\n";
         return 1;
       }
     } else if (arg == "--scale" && i + 1 < argc) {
-      char* endPtr = nullptr;
-      options->scale = strtof(argv[++i], &endPtr);
-      if (endPtr == argv[i] || *endPtr != '\0' || !std::isfinite(options->scale) ||
-          options->scale <= 0.0f) {
-        std::cerr << "pagx render: invalid scale '" << argv[i] << "'\n";
+      ++i;
+      if (!ParseFloatOption(argv[i], 0.0f, false, &options->scale)) {
+        CommandError("pagx render") << "invalid scale '" << argv[i] << "'\n";
         return 1;
       }
     } else if (arg == "--time" && i + 1 < argc) {
-      char* endPtr = nullptr;
-      options->timeSeconds = strtof(argv[++i], &endPtr);
-      if (endPtr == argv[i] || *endPtr != '\0' || !std::isfinite(options->timeSeconds) ||
-          options->timeSeconds < 0.0f) {
-        std::cerr << "pagx render: invalid time '" << argv[i] << "', must be a non-negative number "
-                  << "of seconds\n";
+      ++i;
+      if (!ParseFloatOption(argv[i], 0.0f, true, &options->timeSeconds)) {
+        CommandError("pagx render")
+            << "invalid time '" << argv[i] << "', must be a non-negative number "
+            << "of seconds\n";
         return 1;
       }
       options->hasTime = true;
@@ -183,23 +199,22 @@ static int ParseRenderOptions(int argc, char* argv[], RenderOptions* options) {
       options->hasCrop = true;
       if (!ParseCrop(argv[++i], &options->cropX, &options->cropY, &options->cropWidth,
                      &options->cropHeight)) {
-        std::cerr << "pagx render: invalid crop format, expected x,y,w,h\n";
+        CommandError("pagx render") << "invalid crop format, expected x,y,w,h\n";
         return 1;
       }
     } else if (arg == "--quality" && i + 1 < argc) {
-      char* endPtr = nullptr;
-      errno = 0;
-      long val = strtol(argv[++i], &endPtr, 10);
-      if (errno != 0 || endPtr == argv[i] || *endPtr != '\0' || val < 0 || val > 100) {
-        std::cerr << "pagx render: invalid quality '" << argv[i] << "', must be 0-100\n";
+      long value = 0;
+      ++i;
+      if (!ParseIntOption(argv[i], 0, 100, &value)) {
+        CommandError("pagx render") << "invalid quality '" << argv[i] << "', must be 0-100\n";
         return 1;
       }
-      options->quality = static_cast<int>(val);
+      options->quality = static_cast<int>(value);
     } else if (arg == "--background" && i + 1 < argc) {
       options->hasBackground = true;
       if (!ParseHexColor(argv[++i], &options->bgRed, &options->bgGreen, &options->bgBlue,
                          &options->bgAlpha)) {
-        std::cerr << "pagx render: invalid color format, expected #RRGGBB or #RRGGBBAA\n";
+        CommandError("pagx render") << "invalid color format, expected #RRGGBB or #RRGGBBAA\n";
         return 1;
       }
     } else if (arg == "--id" && i + 1 < argc) {
@@ -214,7 +229,7 @@ static int ParseRenderOptions(int argc, char* argv[], RenderOptions* options) {
       PrintRenderUsage();
       return -1;
     } else if (arg[0] == '-') {
-      std::cerr << "pagx render: unknown option '" << arg << "'\n";
+      CommandError("pagx render") << "unknown option '" << arg << "'\n";
       return 1;
     } else {
       options->inputFile = arg;
@@ -222,11 +237,11 @@ static int ParseRenderOptions(int argc, char* argv[], RenderOptions* options) {
     i++;
   }
   if (!options->id.empty() && !options->xpath.empty()) {
-    std::cerr << "pagx render: --id and --xpath are mutually exclusive\n";
+    CommandError("pagx render") << "--id and --xpath are mutually exclusive\n";
     return 1;
   }
   if (options->hasTime && (!options->id.empty() || !options->xpath.empty())) {
-    std::cerr << "pagx render: --time cannot be combined with --id / --xpath\n";
+    CommandError("pagx render") << "--time cannot be combined with --id / --xpath\n";
     return 1;
   }
   if (options->hasTime && options->hasCrop) {
@@ -234,11 +249,33 @@ static int ParseRenderOptions(int argc, char* argv[], RenderOptions* options) {
     // frame and writes the full document bounds), so combining these would silently ignore the
     // crop region. Reject the combination so the user notices instead of getting a full-frame
     // output.
-    std::cerr << "pagx render: --time cannot be combined with --crop\n";
+    CommandError("pagx render") << "--time cannot be combined with --crop\n";
+    return 1;
+  }
+  if (!options->framesDir.empty()) {
+    if (options->hasTime) {
+      CommandError("pagx render") << "--frames-dir cannot be combined with --time\n";
+      return 1;
+    }
+    if (!options->id.empty() || !options->xpath.empty()) {
+      CommandError("pagx render") << "--frames-dir cannot be combined with --id / --xpath\n";
+      return 1;
+    }
+    if (options->hasCrop) {
+      CommandError("pagx render") << "--frames-dir cannot be combined with --crop\n";
+      return 1;
+    }
+    if (options->hasOutput) {
+      CommandError("pagx render") << "--frames-dir writes a sequence, it cannot be combined with "
+                                     "--output\n";
+      return 1;
+    }
+  } else if (options->frameRate.numerator != 0 || options->duration > 0.0f) {
+    CommandError("pagx render") << "--fps and --duration require --frames-dir\n";
     return 1;
   }
   if (options->inputFile.empty()) {
-    std::cerr << "pagx render: missing input file\n";
+    CommandError("pagx render") << "missing input file\n";
     return 1;
   }
   if (options->outputFile.empty()) {
@@ -265,9 +302,54 @@ static bool WriteDataToFile(const std::string& filePath, const std::shared_ptr<t
     return false;
   }
   auto written = fwrite(data->data(), 1, data->size(), file);
-  fclose(file);
-  return written == data->size();
+  auto closeResult = fclose(file);
+  return written == data->size() && closeResult == 0;
 }
+
+#ifdef PAG_BUILD_VIDEO_EXPORTER
+struct ImageFrameContext {
+  int width = 0;
+  int height = 0;
+  tgfx::EncodedFormat format = tgfx::EncodedFormat::PNG;
+  int quality = 100;
+  std::string framesDir = {};
+  std::string extension = {};
+  int fileNameWidth = 6;
+  std::vector<std::string> writtenFiles = {};
+};
+
+static bool WriteImageFrame(const VideoFrameView& frame, void* context, std::string* errorMsg) {
+  auto* output = static_cast<ImageFrameContext*>(context);
+  auto frameInfo = tgfx::ImageInfo::Make(output->width, output->height, tgfx::ColorType::RGBA_8888,
+                                         tgfx::AlphaType::Premultiplied, frame.rowBytes);
+  tgfx::Pixmap pixmap(frameInfo, frame.pixels);
+  auto encodedData = tgfx::ImageCodec::Encode(pixmap, output->format, output->quality);
+  if (encodedData == nullptr) {
+    *errorMsg = "failed to encode frame " + std::to_string(frame.index);
+    return false;
+  }
+  std::ostringstream fileName = {};
+  fileName << "f_" << std::setw(output->fileNameWidth) << std::setfill('0') << frame.index << "."
+           << output->extension;
+  auto outputPath = output->framesDir + "/" + fileName.str();
+  auto temporaryPath = outputPath + ".tmp";
+  std::error_code error = {};
+  if (!WriteDataToFile(temporaryPath, encodedData)) {
+    std::filesystem::remove(temporaryPath, error);
+    *errorMsg = "failed to write frame " + std::to_string(frame.index);
+    return false;
+  }
+  std::filesystem::rename(temporaryPath, outputPath, error);
+  if (error) {
+    std::error_code cleanupError = {};
+    std::filesystem::remove(temporaryPath, cleanupError);
+    *errorMsg = "failed to publish frame " + std::to_string(frame.index) + ": " + error.message();
+    return false;
+  }
+  output->writtenFiles.emplace_back(std::move(outputPath));
+  return true;
+}
+#endif
 
 // Renders a single animation frame through the runtime animation path. The document's top-level
 // timelines are all seeked to `options.timeSeconds` and applied before drawing, and the timelines
@@ -278,7 +360,7 @@ static tgfx::Bitmap RenderAnimatedFrame(const std::shared_ptr<PAGXDocument>& doc
                                         const RenderOptions& options) {
   auto scene = PAGScene::Make(document);
   if (scene == nullptr) {
-    std::cerr << "pagx render: failed to build animation scene\n";
+    CommandError("pagx render") << "failed to build animation scene\n";
     return {};
   }
 
@@ -299,14 +381,14 @@ static tgfx::Bitmap RenderAnimatedFrame(const std::shared_ptr<PAGXDocument>& doc
   int outputWidth = static_cast<int>(ceilf(document->width * options.scale));
   int outputHeight = static_cast<int>(ceilf(document->height * options.scale));
   if (outputWidth <= 0 || outputHeight <= 0) {
-    std::cerr << "pagx render: output dimensions are zero\n";
+    CommandError("pagx render") << "output dimensions are zero\n";
     return {};
   }
 
   auto surface = PAGSurface::MakeOffscreen(outputWidth, outputHeight);
   if (surface == nullptr) {
-    std::cerr << "pagx render: failed to create surface (" << outputWidth << "x" << outputHeight
-              << ")\n";
+    CommandError("pagx render") << "failed to create surface (" << outputWidth << "x"
+                                << outputHeight << ")\n";
     return {};
   }
 
@@ -318,18 +400,18 @@ static tgfx::Bitmap RenderAnimatedFrame(const std::shared_ptr<PAGXDocument>& doc
   }
 
   if (!scene->draw(surface)) {
-    std::cerr << "pagx render: failed to draw animation scene\n";
+    CommandError("pagx render") << "failed to draw animation scene\n";
     return {};
   }
 
   tgfx::Bitmap bitmap(outputWidth, outputHeight, false, false);
   if (bitmap.isEmpty()) {
-    std::cerr << "pagx render: failed to allocate bitmap\n";
+    CommandError("pagx render") << "failed to allocate bitmap\n";
     return {};
   }
   tgfx::Pixmap pixmap(bitmap);
   if (!surface->readPixels(pixmap.writablePixels(), pixmap.rowBytes())) {
-    std::cerr << "pagx render: failed to read pixels from surface\n";
+    CommandError("pagx render") << "failed to read pixels from surface\n";
     return {};
   }
   return bitmap;
@@ -341,7 +423,7 @@ static tgfx::Bitmap RenderCore(const RenderOptions& options) {
     return {};
   }
   if (document->hasUnresolvedImports()) {
-    std::cerr << "pagx render: error: unresolved import directive, run 'pagx resolve' first\n";
+    CommandError("pagx render") << "unresolved import directive, run 'pagx resolve' first\n";
     return {};
   }
 
@@ -369,7 +451,7 @@ static tgfx::Bitmap RenderCore(const RenderOptions& options) {
     rootLayer = LayerBuilder::Build(document.get());
   }
   if (rootLayer == nullptr) {
-    std::cerr << "pagx render: failed to build layer tree\n";
+    CommandError("pagx render") << "failed to build layer tree\n";
     return {};
   }
 
@@ -378,30 +460,30 @@ static tgfx::Bitmap RenderCore(const RenderOptions& options) {
     if (!options.id.empty()) {
       auto* node = document->findNode(options.id);
       if (node == nullptr) {
-        std::cerr << "pagx render: no node found with id '" << options.id << "'\n";
+        CommandError("pagx render") << "no node found with id '" << options.id << "'\n";
         return {};
       }
       if (node->nodeType() != NodeType::Layer) {
-        std::cerr << "pagx render: node '" << options.id << "' is not a Layer\n";
+        CommandError("pagx render") << "node '" << options.id << "' is not a Layer\n";
         return {};
       }
       targetPagxLayer = static_cast<const Layer*>(node);
     } else {
       xmlDocPtr xmlDoc = xmlReadFile(options.inputFile.c_str(), nullptr, XML_PARSE_NONET);
       if (xmlDoc == nullptr) {
-        std::cerr << "pagx render: failed to parse XML from '" << options.inputFile << "'\n";
+        CommandError("pagx render") << "failed to parse XML from '" << options.inputFile << "'\n";
         return {};
       }
       targetPagxLayer = EvaluateSingleXPath(xmlDoc, options.xpath, document.get(), "render");
       xmlFreeDoc(xmlDoc);
       if (targetPagxLayer == nullptr) {
-        std::cerr << "pagx render: no matching Layer found\n";
+        CommandError("pagx render") << "no matching Layer found\n";
         return {};
       }
     }
     targetTgfxLayer = buildResult.getLayer(targetPagxLayer);
     if (targetTgfxLayer == nullptr) {
-      std::cerr << "pagx render: target Layer has no rendered layer\n";
+      CommandError("pagx render") << "target Layer has no rendered layer\n";
       return {};
     }
   }
@@ -440,18 +522,18 @@ static tgfx::Bitmap RenderCore(const RenderOptions& options) {
   int outputWidth = static_cast<int>(ceilf(sourceWidth * options.scale));
   int outputHeight = static_cast<int>(ceilf(sourceHeight * options.scale));
   if (outputWidth <= 0 || outputHeight <= 0) {
-    std::cerr << "pagx render: output dimensions are zero\n";
+    CommandError("pagx render") << "output dimensions are zero\n";
     return {};
   }
 
   auto device = pag::Devices::MakeDefault();
   if (device == nullptr) {
-    std::cerr << "pagx render: failed to create the GPU device\n";
+    CommandError("pagx render") << "failed to create the GPU device\n";
     return {};
   }
   auto context = device->lockContext();
   if (context == nullptr) {
-    std::cerr << "pagx render: failed to lock the GPU context\n";
+    CommandError("pagx render") << "failed to lock the GPU context\n";
     return {};
   }
 
@@ -463,8 +545,8 @@ static tgfx::Bitmap RenderCore(const RenderOptions& options) {
   auto surface = tgfx::Surface::Make(context, outputWidth, outputHeight);
   if (surface == nullptr) {
     device->unlock();
-    std::cerr << "pagx render: failed to create surface (" << outputWidth << "x" << outputHeight
-              << ")\n";
+    CommandError("pagx render") << "failed to create surface (" << outputWidth << "x"
+                                << outputHeight << ")\n";
     return {};
   }
 
@@ -485,18 +567,93 @@ static tgfx::Bitmap RenderCore(const RenderOptions& options) {
   tgfx::Bitmap bitmap(outputWidth, outputHeight, false, false);
   if (bitmap.isEmpty()) {
     device->unlock();
-    std::cerr << "pagx render: failed to allocate bitmap\n";
+    CommandError("pagx render") << "failed to allocate bitmap\n";
     return {};
   }
   tgfx::Pixmap pixmap(bitmap);
   bool readSuccess = surface->readPixels(pixmap.info(), pixmap.writablePixels());
   device->unlock();
   if (!readSuccess) {
-    std::cerr << "pagx render: failed to read pixels from surface\n";
+    CommandError("pagx render") << "failed to read pixels from surface\n";
     return {};
   }
   return bitmap;
 }
+
+#ifdef PAG_BUILD_VIDEO_EXPORTER
+// Renders the document's animations as an image sequence into options.framesDir. Frame production
+// is delegated to VideoExporter so that the timeline semantics stay identical to the video path.
+static int RenderFrameSequence(const RenderOptions& options) {
+  auto document =
+      LoadVideoDocument(options.inputFile, options.fontFiles, options.fallbacks, "pagx render");
+  if (document == nullptr) {
+    return 1;
+  }
+
+  VideoExportOptions videoOptions = {};
+  videoOptions.frameRate = options.frameRate;
+  videoOptions.duration = options.duration;
+  videoOptions.scale = options.scale;
+  if (options.hasBackground) {
+    videoOptions.background =
+        Color{options.bgRed, options.bgGreen, options.bgBlue, options.bgAlpha, ColorSpace::SRGB};
+  }
+  std::string errorMsg = {};
+  auto source = VideoFrameSource::Make(document, videoOptions, &errorMsg);
+  if (source == nullptr) {
+    CommandError("pagx render") << errorMsg << "\n";
+    return 1;
+  }
+  const auto& exporter = source->exporter();
+
+  std::error_code createError = {};
+  std::filesystem::create_directories(options.framesDir, createError);
+  if (createError || !std::filesystem::is_directory(options.framesDir)) {
+    CommandError("pagx render") << "failed to create directory '" << options.framesDir << "'\n";
+    return 1;
+  }
+  auto isEmpty = std::filesystem::is_empty(options.framesDir, createError);
+  if (createError) {
+    CommandError("pagx render") << "failed to inspect directory '" << options.framesDir << "'\n";
+    return 1;
+  }
+  if (!isEmpty) {
+    CommandError("pagx render") << "frame directory '" << options.framesDir << "' must be empty\n";
+    return 1;
+  }
+
+  auto width = exporter->width();
+  auto height = exporter->height();
+  auto frameCount = exporter->frameCount();
+  int fileNameWidth = 6;
+  for (auto index = frameCount - 1; index >= 10; index /= 10) {
+    ++fileNameWidth;
+  }
+  ImageFrameContext frameContext = {};
+  frameContext.width = width;
+  frameContext.height = height;
+  frameContext.format = GetEncodedFormat(options.format);
+  frameContext.quality = options.quality;
+  frameContext.framesDir = options.framesDir;
+  frameContext.extension = options.format;
+  frameContext.fileNameWidth = fileNameWidth;
+  if (!RunVideoFrames(*source, "pagx render", "pagx render: error: ", WriteImageFrame,
+                      &frameContext, &errorMsg)) {
+    for (const auto& file : frameContext.writtenFiles) {
+      std::error_code cleanupError = {};
+      std::filesystem::remove(file, cleanupError);
+    }
+    return 1;
+  }
+
+  float durationSeconds =
+      static_cast<float>(static_cast<double>(frameCount) / exporter->frameRate().framesPerSecond());
+  std::cout << "pagx render: wrote " << frameCount << " frames to " << options.framesDir << " ("
+            << width << "x" << height << ", " << exporter->frameRate().toString() << " fps, "
+            << durationSeconds << "s)\n";
+  return 0;
+}
+#endif
 
 tgfx::Bitmap RenderToBitmap(int argc, char* argv[]) {
   RenderOptions options = {};
@@ -513,6 +670,16 @@ int RunRender(int argc, char* argv[]) {
   if (parseResult != 0) {
     return parseResult == -1 ? 0 : parseResult;
   }
+#ifdef PAG_BUILD_VIDEO_EXPORTER
+  if (!options.framesDir.empty()) {
+    return RenderFrameSequence(options);
+  }
+#else
+  if (!options.framesDir.empty()) {
+    CommandError("pagx render") << "--frames-dir requires PAG_BUILD_VIDEO_EXPORTER=ON\n";
+    return 1;
+  }
+#endif
   auto bitmap = RenderCore(options);
   if (bitmap.isEmpty()) {
     return 1;
@@ -521,11 +688,11 @@ int RunRender(int argc, char* argv[]) {
   auto encodedData =
       tgfx::ImageCodec::Encode(pixmap, GetEncodedFormat(options.format), options.quality);
   if (encodedData == nullptr) {
-    std::cerr << "pagx render: failed to encode image\n";
+    CommandError("pagx render") << "failed to encode image\n";
     return 1;
   }
   if (!WriteDataToFile(options.outputFile, encodedData)) {
-    std::cerr << "pagx render: failed to write '" << options.outputFile << "'\n";
+    CommandError("pagx render") << "failed to write '" << options.outputFile << "'\n";
     return 1;
   }
   std::cout << "pagx render: wrote " << options.outputFile << " (" << bitmap.width() << "x"

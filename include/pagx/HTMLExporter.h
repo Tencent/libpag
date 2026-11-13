@@ -38,10 +38,10 @@ enum class HTMLOutputMode {
 /**
  * Export options for HTMLExporter.
  *
- * ABI stability: this struct is part of the public API. New optional fields must be appended at
- * the end with sensible defaults so that callers compiled against an older header continue to
- * link and behave correctly. Reordering, removing, or changing the type of an existing field is
- * a breaking change.
+ * This struct is part of the public API but does not promise binary ABI stability. Callers and
+ * the library must use compatible headers. Adding, reordering, removing, or changing fields
+ * requires recompilation; appending a field alone does not make an old binary safe because the
+ * library may read beyond the smaller object allocated by an older caller.
  */
 struct HTMLExportOptions {
   /**
