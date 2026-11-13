@@ -2,16 +2,17 @@
 
 初始来源：[PAGX PR 3826 已确认修复方案](https://chatgpt.com/space/page_10f412c402d08191aed705349af2aac1)。后续确认的方案以本仓库文档为执行和追加入口。
 
-本文档用于在另一个会话中实施 [PR 3826](https://github.com/Tencent/libpag/pull/3826) 已讨论并确认的修复。当前记录命中测试一致性、目标绘制失败传播、稳定复用输出视图状态、纯渲染变更的声明校验快路径四项。失败传播与稳定状态需要合并实施，校验快路径沿用同一 runtime 恢复时序。后续评论的方案经用户确认后再追加。
+本文档用于在另一个会话中实施 [PR 3826](https://github.com/Tencent/libpag/pull/3826) 已讨论并确认的修复。当前记录命中测试一致性、目标绘制失败传播、复用已有栅格化挂接工具、稳定复用输出视图状态、纯渲染变更的声明校验快路径五项。先扩展已有工具，再接入输出视图；失败传播与稳定状态需要合并实施，校验快路径沿用同一 runtime 恢复时序。后续评论的方案经用户确认后再追加。
 
 ## 当前执行状态
 
-核对日期：2026 年 11 月 13 日。工作目录：`/Users/codywwang/Desktop/PAGX/libpag`。分支：`feature/codywwang_glass`。本次更新前的核对基点为 `2a81eee99`。执行前重新检查实际工作区与提交，保留其他会话产生的改动。
+核对日期：2026 年 11 月 13 日。工作目录：`/Users/codywwang/Desktop/PAGX/libpag`。分支：`feature/codywwang_glass`。本次更新前的核对基点为 `b0ef603cc`。执行前重新检查实际工作区与提交，保留其他会话产生的改动。
 
 | 项目 | 状态 | 执行动作 |
 | --- | --- | --- |
 | 命中测试一致性 | 本地已提交 `ba4a8a179` | 复核实现并回归，不重复实现 |
 | 目标绘制失败传播 | 方案已确认，尚未实施 | 与稳定输出视图状态合并实施 |
+| 复用已有栅格化挂接工具 | 方案已确认，尚未实施 | 扩展 RasterLayerParent，输出视图接入已有实现 |
 | 稳定复用输出视图状态 | 方案已确认，尚未实施 | 仅修改 libpag，不修改 TGFX |
 | 纯渲染变更的声明校验快路径 | 方案已确认，尚未实施 | 只跳过能够证明不影响声明语义的重校验 |
 
@@ -73,9 +74,9 @@ bool DrawOutputTarget(tgfx::Canvas* canvas,
 
 2. `targetLayer == root` 时调用 `root->draw(canvas)`，正常返回 true。
 
-3. 其余情况通过共享的 `OutputTargetState` 准备 wrapper；父层缺失或准备失败返回 false。该状态同时用于 scene 的持续复用和 CLI 的单次绘制。
+3. 其余情况由 `OutputTargetState` 委托扩展后的 `RasterLayerParent` 准备 wrapper；输出视图中非 root 的 target 缺失父层或准备失败时返回 false。保留栅格化工具原有的无 parent 支持，不把输出视图的入口约束强加给已有导出路径。
 
-4. 检查 `replaceChild()` 和 `addChild()` 的结果，只有重挂全部完成后才进入有效态。若修改树后失败，恢复已修改的父子关系和 mask，再返回失败；回滚信息不能因清空 wrapper 而丢失。
+4. 挂接和恢复只在共享的 `RasterLayerParent` 中实现。检查 `replaceChild()` 和 `addChild()` 的结果，只有重挂全部完成后才进入有效态。若修改树后失败，恢复已修改的父子关系和 mask，再返回失败；回滚信息不能因清空 wrapper 而丢失。
 
 5. 正常路径继续复用原有坐标变换、背景采样和 mask 处理。每次绘制都恢复 canvas 状态；树与 mask 的恢复时机由状态生命周期决定：scene 失效、退出输出模式或销毁时恢复，CLI 单次调用结束时恢复。具体生命周期见下一节。
 
@@ -128,13 +129,52 @@ if (!pagx::DrawOutputTarget(canvas, rootLayer, targetTgfxLayer)) {
 
 CLI 保留现有 `PAGXCliTest.Render_TargetView*` 回归，检查正常输出、显式选择、crop 和非法声明处理；检查新的 helper 失败分支确实在回读和编码之前释放锁并返回空结果。
 
+## 复用已有栅格化挂接工具
+
+对应 [P2 OutputTargetParent 与 RasterLayerParent 重复](https://github.com/Tencent/libpag/pull/3826#discussion_r4535361783)。按 CR 建议，以 `src/pagx/utils/RasterUtils.cpp` 中已有的 `RasterLayerParent` 为基础提取并扩展共享内部工具，补充外部 mask ownership 的释放与恢复；两种背景输出策略在注释中说明取舍。
+
+### 复用方向和职责
+
+1. 将已有 `RasterLayerParent` 从匿名命名空间提取至 utils 下的共享内部文件，例如 `RasterLayerParent.h` 与 `.cpp`，保留原有挂接和恢复机制。不让 `RasterUtils` 改为依赖仅为本 PR 新建的输出视图绘制框架。
+2. 在原类上补齐有效态检查、部分准备失败的回滚、显式且幂等的 reset，以及非复制的生命周期管理。原 parent、位置、target、wrapper、已释放的 mask owner 等挂接恢复数据只由这一处维护。
+3. 增加显式释放外部 mask owner 的能力：沿用 `FindMaskOwner` 对 target 子树内 owner 的排除规则，记录被解除的关系，并在 reset 或析构时恢复。已有 Raster 调用默认保留原 mask 处理方式；输出视图按自身语义显式启用释放，避免合并时改变既有导出行为。
+4. 删除 `OutputTargetParent`。`OutputTargetState` 只持有输出视图所需的 root、target 绑定信息并委托共享工具，负责 scene 的准备态复用和失效时机，不再实现另一套换父、mask 查找或恢复逻辑。
+5. `RenderMaskedLayer()` 继续使用原有 `MaskedLayerDrawer` 和共享的 `RasterLayerParent`，采用单次调用的作用域生命周期。scene 则让持有该工具的状态跨帧存在；CLI 通过局部输出状态完成单次调用。
+
+### 保留现有栅格化契约
+
+- 坐标与尺寸继续按既有入口处理。scene、CLI 和普通 PPT 栅格化使用 root；SVG 传入 target 原 parent，保留 `wrapper->getRelativeMatrix(coordinateSpace)`、bounds、pixelScale 与 PNG 放置规则，避免增加二维变换拼接或重复应用父变换。
+- `root == target` 保留现有直接绘制分支。低层 `RasterLayerParent` 保留无 parent target 的支持，并在结束时将其从 wrapper 摘除；scene、CLI 的 root 归属校验由各自入口承担，不反向收紧已有栅格化能力。
+- 已有 alpha、mask、scrollRect、混合和 perspective、preserve3D 的处理仍经过原有父层合成路径。共享重构只增加所需能力与失败检查，不重写正确的绘制实现。
+- 保留 GPU context 锁、像素尺寸上限、PNG 编码和 SVG/PPT 的失败降级规则。PPT 完全裁剪或空 bounds 的“成功但不输出”语义保持。
+
+### 背景输出策略说明
+
+| 入口 | 交付内容和用途 |
+| --- | --- |
+| target view 与 RenderMaskedLayer | 交付 target，原文档祖先和前序兄弟为 Glass、BackgroundBlur 等提供采样上下文 |
+| RenderLayerCompositeWithBackdrop | 将前序背景和 target 一起烘焙，供 PPT 不支持的混合模式等场景使用 |
+
+保留 `BackdropCompositeDrawer` 与 `BackdropSiblingMask` 的 root 绘制和后序兄弟隐藏逻辑，说明它们如何避免后序内容被提前烘焙、再被导出器重复输出。它们不改为 target-only 入口。临时可见性在所有返回路径恢复，原本隐藏的层仍保持隐藏。HTML 未直接使用这些栅格化入口，不扩大修改范围。
+
+### 准备失败与验收
+
+在 `MaskedLayerDrawer` 中接入共享工具的有效态检查，将可检测的准备失败传回 `RenderToPNG()`，返回 nullptr，不能编码成有效的透明 PNG。可将内部 drawer 约定统一为 bool，让 `RenderToPNG()` 在 false 时结束；其他既有 drawer 正常完成时返回 true，保留其绘制步骤。所有失败路径仍保证 GPU unlock 和作用域状态恢复，不把 TGFX 的 void 绘制调用包装为任意 GPU 错误检测。
+
+复用现有回归并补充共享能力测试：
+
+- `PAGXUtilsTest.RasterLayerUsesParentCompositing`、`RasterLayerPreservesMaskScrollRectAndAlpha`，以及 SVG parent-space、3D 和 scrollRect 用例。
+- 共享工具在普通调用与显式 mask 释放两种用法下的正确行为，以及原 parent、位置、mask 和无 parent target 的恢复。
+- root 与 target 相等、prepare 部分失败、单次调用结束与 scene reset 的恢复；失败返回 nullptr，正常透明内容和既有空 bounds 规则保持。
+- PPT 的非 Normal blend、Glass 背景烘焙、祖先链各层后序兄弟排除与可见性恢复。
+
 ## 稳定复用输出视图状态
 
 对应 [P2 每帧绘制改树造成额外分配和失效](https://github.com/Tencent/libpag/pull/3826#discussion_r4535358918)。当前 `FindMaskOwner()` 遍历树，wrapper 换父会递归更新 target 子树的 root 归属，并使祖先的边界和相关状态失效。此项在 libpag 内通过调整生命周期解决，继续使用 TGFX 现有接口和合成路径。
 
 ### 共享状态与所有权
 
-在 `src/pagx/utils/OutputView.h` 和 `.cpp` 中将现有临时父层逻辑收敛为内部 `OutputTargetState`。不新增发布 SDK 接口，不复制一套手工绘制 mask、alpha 或背景效果的实现。接口轮廓为：
+在 `src/pagx/utils/OutputView.h` 和 `.cpp` 中用内部 `OutputTargetState` 管理输出视图生命周期，内部持有扩展后的 `RasterLayerParent`。挂接、mask 释放和恢复复用已有工具；输出状态只负责校验、持有和委托，不新增发布 SDK 接口或第二套底层绘制框架。生命周期入口轮廓为：
 
 ```cpp
 class OutputTargetState {
@@ -146,12 +186,12 @@ class OutputTargetState {
 };
 ```
 
-1. 状态保存 root、target、wrapper、原 parent 和位置，以及外部 mask owner 的可靠引用。恢复过程不能依赖已被旧 runtime 树释放的裸指针。析构调用幂等的 `reset()`，禁止复制导致重复恢复。
-2. `prepare()` 校验所属树后，查找外部 mask owner、插入 identity wrapper，并解除外部 ownership。target 自身的 mask 以及 target 子树内部的 mask 关系保持原有规则。准备失败按已完成的步骤回滚。
-3. 外部 mask ownership 在 scene 准备态期间保持解除，只在 `reset()` 时恢复。此处修改的是 runtime 层关系，PAGXDocument 中的源节点和 mask 声明保持原样。
-4. `draw()` 检查准备态和挂接关系仍有效，再按 wrapper 到 root 的实时相对矩阵绘制；仅做 canvas 的作用域保存和恢复。热路径不调用 `FindMaskOwner()`、`Layer::Make()`、换父或 `setMask()`。
+1. 输出状态持有 root、target 绑定信息与共享挂接工具；wrapper、原 parent 和位置、外部 mask owner 等恢复数据由 `RasterLayerParent` 唯一维护，并保存可靠引用。析构通过幂等的 `reset()` 释放工具，避免依赖已被释放的 runtime 裸指针。
+2. `prepare()` 校验所属树后，使用已有挂接工具准备 identity wrapper，再显式启用外部 mask owner 的释放能力。target 自身的 mask 以及 target 子树内部的关系保持原有规则。准备失败由工具回滚，不在输出状态里复制恢复算法。
+3. 外部 mask ownership 在 scene 准备态期间保持解除，工具随 `reset()` 释放时恢复。此处修改的是 runtime 层关系，PAGXDocument 中的源节点和 mask 声明保持原样。
+4. `draw()` 委托共享工具检查准备态和挂接关系，再沿用 wrapper 到 root 的实时相对矩阵绘制；仅做 canvas 的作用域保存和恢复。热路径不调用 `FindMaskOwner()`、`Layer::Make()`、换父或 `setMask()`。
 5. 保留原树中的祖先和兄弟，继续让 TGFX 采样原有背景。target 的 transform、alpha、visibility、mask、scrollRect 和混合行为仍由同一 wrapper 合成路径应用一次。
-6. CLI 的 `DrawOutputTarget()` 创建局部状态，依次 prepare、draw，在作用域结束时 reset。scene 持有同一类状态，避免形成两套准备与恢复逻辑。
+6. CLI 的 `DrawOutputTarget()` 创建局部输出状态，依次 prepare、draw，在作用域结束时 reset；`RenderMaskedLayer()` 继续使用单次作用域的共享挂接工具。scene 只延长该工具的生命周期，不形成另一套准备与恢复逻辑。
 
 ### Scene 生命周期
 
@@ -251,7 +291,7 @@ Valid target 必须是 Layer，以上白名单节点不可能是 target。上次
 
 ## 执行和验证
 
-先读取仓库 `AGENTS.md` 与 `.codebuddy/rules/`、`.claude/rules/` 中的适用规则。代码与注释使用英语，避免 lambda，保持 C++17 和现有风格。只实施本文档确认的项目，保留其他会话的改动。先将失败传播与稳定状态作为一组实现并验证，再接入纯渲染校验快路径，保留原有 runtime 恢复时序。
+先读取仓库 `AGENTS.md` 与 `.codebuddy/rules/`、`.claude/rules/` 中的适用规则。代码与注释使用英语，避免 lambda，保持 C++17 和现有风格。只实施本文档确认的项目，保留其他会话的改动。先提取扩展已有 RasterLayerParent 并通过既有栅格化回归，再将输出视图失败传播与稳定状态作为一组接入，最后实现纯渲染校验快路径。保留原有 runtime 恢复时序，不为本 PR 反向改写正确的导出实现。
 
 在工作目录中先执行格式化、全模块构建和定向测试：
 
@@ -260,7 +300,7 @@ Valid target 必须是 Layer，以上白名单节点不可能是 target。上次
 cmake -G Ninja -DPAG_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Debug -B cmake-build-debug
 cmake --build cmake-build-debug --target PAGFullTest_OpenGL
 ./cmake-build-debug/PAGFullTest_OpenGL \
-  --gtest_filter='PAGXRuntimeTest.*TargetView*:PAGXRuntimeTest.*OutputView*:PAGXTest.HitTest*:PAGXGlassRenderTest.TargetView*:PAGXCliTest.Render_TargetView*'
+  --gtest_filter='PAGXRuntimeTest.*TargetView*:PAGXRuntimeTest.*OutputView*:PAGXTest.HitTest*:PAGXGlassRenderTest.TargetView*:PAGXCliTest.Render_TargetView*:PAGXUtilsTest.RasterLayer*:PAGXUtilsTest.SVGExportPreservesDepthWithoutPerspective:PAGXSVGTest.*Bake*:PAGXPPTTest.*Backdrop*:PAGXPPTTest.*ScrollRect*'
 ```
 
 在基线缓存已同步的环境中执行完整 SwiftShader 回归：
@@ -283,8 +323,8 @@ cmake --build cmake-build-hit-test-swiftshader --target PAGFullTest_OpenGL
 
 ## 交付
 
-按仓库规则仅提交本次修改，不自动推送。稳定状态与失败传播建议提交信息为 `Reuse target view rendering state and report setup failures.`；校验快路径可单独提交为 `Avoid output view revalidation for proven render only changes.`。最终报告列出修改文件、实际测试结果、未解决的环境或基线问题和 commit ID。本文档后续只追加用户确认后的方案。
+按仓库规则仅提交本次修改，不自动推送。共享工具可先提交为 `Reuse raster layer parenting for output views.`；稳定状态与失败传播建议提交信息为 `Reuse target view rendering state and report setup failures.`；校验快路径可单独提交为 `Avoid output view revalidation for proven render only changes.`。最终报告列出修改文件、实际测试结果、未解决的环境或基线问题和 commit ID。本文档后续只追加用户确认后的方案。
 
 ```codex-prompt
-请在 /Users/codywwang/Desktop/PAGX/libpag 按本文档已确认的方案执行。先检查当前分支、提交和工作区；命中测试修复已有本地提交 ba4a8a179，复核并回归，避免重复实现。将 DrawOutputTarget 失败传播与稳定输出视图状态合并实现：scene 跨帧复用，编辑刷新前恢复，CLI 单次调用后恢复。之后加入可证明语义不变的渲染叶子校验快路径，未知变更与 Invalid 全检；重绘通知、runtime 刷新和 wrapper reset 不得被快路径跳过。只修改 libpag，验证 scene、Record、CLI、命中、缓存和生命周期行为。遵守仓库规则，保留其他会话改动，仅提交本次修改，不推送。不要扩展到尚未讨论确认的 PR 评论。完成后报告变更、测试、阻塞和 commit ID。
+请在 /Users/codywwang/Desktop/PAGX/libpag 按本文档已确认的方案执行。先检查当前分支、提交和工作区；命中测试修复已有本地提交 ba4a8a179，复核并回归，避免重复实现。以已有 RasterLayerParent 为基础提取并扩展共享工具，删除 OutputTargetParent；保留已有 Raster 的坐标、无 parent 支持和两种背景输出策略。OutputTargetState 只委托共享工具管理 scene 的跨帧生命周期；CLI 和 Raster 调用保持单次恢复。接通准备失败传播，再加入可证明语义不变的渲染叶子校验快路径；未知变更与 Invalid 全检，重绘通知、runtime 刷新和 wrapper reset 不得被跳过。只修改 libpag，不反向改写正确的既有导出实现。验证 scene、Record、CLI、SVG/PPT、命中、缓存和生命周期行为。遵守仓库规则，保留其他会话改动，仅提交本次修改，不推送。不要扩展到尚未讨论确认的 PR 评论。完成后报告变更、测试、阻塞和 commit ID。
 ```
