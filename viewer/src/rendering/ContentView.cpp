@@ -19,6 +19,8 @@
 #include "ContentView.h"
 #include <QQuickWindow>
 #include <QSGImageNode>
+#include <algorithm>
+#include <cmath>
 #include "RenderThread.h"
 
 namespace pag {
@@ -69,12 +71,14 @@ void ContentView::prepareForRemoval() {
 
 void ContentView::zoomAt(double factor, double x, double y) {
   auto pixelRatio = window() == nullptr ? 1.0 : window()->devicePixelRatio();
-  getViewModel()->zoomAt(factor, x * pixelRatio, y * pixelRatio);
+  getViewModel()->zoomAt(factor, x * pixelRatio, y * pixelRatio,
+                         QSizeF(std::ceil(width() * pixelRatio), std::ceil(height() * pixelRatio)));
 }
 
 void ContentView::panBy(double deltaX, double deltaY) {
   auto pixelRatio = window() == nullptr ? 1.0 : window()->devicePixelRatio();
-  getViewModel()->panBy(deltaX * pixelRatio, deltaY * pixelRatio);
+  getViewModel()->panBy(deltaX * pixelRatio, deltaY * pixelRatio,
+                        QSizeF(std::ceil(width() * pixelRatio), std::ceil(height() * pixelRatio)));
 }
 
 void ContentView::resetView() {
@@ -83,6 +87,7 @@ void ContentView::resetView() {
 
 void ContentView::sizeChangedDelayHandle() {
   resizeTimer->stop();
+  contentResizing = false;
   if (sizeChanged) {
     return;
   }
@@ -93,11 +98,26 @@ void ContentView::sizeChangedDelayHandle() {
   }
 }
 
+void ContentView::beginContentResize() {
+  // The timer doubles as the end marker of the content resize: it fires once the geometry stopped
+  // changing, and also covers the case where the item already had the preferred size and no
+  // geometry change follows, so the mode can never outlive the fitting of the new content.
+  resizeTimer->start(400);
+  contentResizing = true;
+}
+
 void ContentView::geometryChange(const QRectF& newGeometry, const QRectF& oldGeometry) {
   if (newGeometry == oldGeometry) {
     return;
   }
   QQuickItem::geometryChange(newGeometry, oldGeometry);
+  if (contentResizing) {
+    // The intermediate geometries produced while the window is fitted to newly loaded content are
+    // not worth debouncing: waiting for the timer keeps the previous texture stretched onto every
+    // one of them, which is visible as a wrong aspect ratio right after a file is opened.
+    sizeChanged = true;
+    triggerFlush();
+  }
   resizeTimer->start(400);
 }
 
@@ -129,10 +149,42 @@ QSGNode* ContentView::updateTextureNode(QSGNode* oldNode) {
       }
       node->setTexture(texture);
       node->markDirty(QSGNode::DirtyMaterial);
-      node->setRect(boundingRect());
+      node->setRect(textureRect(texture));
     }
   }
   return node;
+}
+
+QRectF ContentView::textureRect(QSGTexture* texture) const {
+  auto rect = boundingRect();
+  auto textureSize = texture->textureSize();
+  auto viewModel = getViewModel();
+  if (viewModel == nullptr || textureSize.isEmpty() || rect.isEmpty()) {
+    return rect;
+  }
+  auto contentWidth = static_cast<double>(viewModel->getWidth());
+  auto contentHeight = static_cast<double>(viewModel->getHeight());
+  if (contentWidth <= 0 || contentHeight <= 0) {
+    return rect;
+  }
+  auto textureWidth = static_cast<double>(textureSize.width());
+  auto textureHeight = static_cast<double>(textureSize.height());
+  auto pixelRatio = window() == nullptr ? 1.0 : window()->devicePixelRatio();
+  auto targetWidth = std::ceil(rect.width() * pixelRatio);
+  auto targetHeight = std::ceil(rect.height() * pixelRatio);
+  auto textureFit = std::min(textureWidth / contentWidth, textureHeight / contentHeight);
+  auto canvasFit = std::min(targetWidth / contentWidth, targetHeight / contentHeight);
+  if (textureFit <= 0) {
+    return rect;
+  }
+  // Scale the previous canvas around its center so the same content point remains centered.
+  // Do not infer old frame placement from the current mutable user transform.
+  auto ratio = canvasFit / textureFit;
+  auto width = textureWidth * ratio;
+  auto height = textureHeight * ratio;
+  return {rect.x() + (targetWidth - width) / (2 * pixelRatio),
+          rect.y() + (targetHeight - height) / (2 * pixelRatio), width / pixelRatio,
+          height / pixelRatio};
 }
 
 }  // namespace pag

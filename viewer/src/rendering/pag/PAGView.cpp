@@ -83,6 +83,7 @@ void PAGView::onRequestSizeChanged() {
 }
 
 void PAGView::onPreferredSizeChanged() {
+  beginContentResize();
   setSize(viewModel->getPreferredSize());
 }
 

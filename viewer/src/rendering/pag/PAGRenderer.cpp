@@ -26,6 +26,13 @@ PAGRenderer::PAGRenderer(PAGViewModel* viewModel) : viewModel(viewModel) {
 
 void PAGRenderer::setDrawable(GPUDrawable* drawable) {
   this->drawable = drawable;
+  if (drawable != nullptr) {
+    auto width = static_cast<double>(drawable->width());
+    auto height = static_cast<double>(drawable->height());
+    viewModel->adjustForSurfaceResize(width, height, width, height,
+                                      static_cast<double>(viewModel->getWidth()),
+                                      static_cast<double>(viewModel->getHeight()));
+  }
 }
 
 bool PAGRenderer::isReady() const {

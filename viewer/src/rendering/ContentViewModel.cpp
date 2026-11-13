@@ -36,31 +36,58 @@ ContentViewModel::ViewTransform ContentViewModel::getViewTransform() const {
   return viewTransform;
 }
 
-void ContentViewModel::zoomAt(double factor, double anchorX, double anchorY) {
+void ContentViewModel::zoomAt(double factor, double anchorX, double anchorY,
+                              const QSizeF& viewportSize) {
+  auto contentWidth = static_cast<double>(getWidth());
+  auto contentHeight = static_cast<double>(getHeight());
   double newZoomScale = 1.0;
   {
     std::lock_guard<std::mutex> lock(viewTransformMutex);
+    if (surfaceSize.isEmpty() || viewportSize.isEmpty() || contentWidth <= 0 ||
+        contentHeight <= 0) {
+      return;
+    }
+    auto ratio =
+        std::min(viewportSize.width() / contentWidth, viewportSize.height() / contentHeight) /
+        std::min(surfaceSize.width() / contentWidth, surfaceSize.height() / contentHeight);
+    // Invert the centered surface-to-viewport mapping to keep the zoom anchor under the pointer.
+    auto surfaceAnchorX =
+        (anchorX - (viewportSize.width() - ratio * surfaceSize.width()) * 0.5) / ratio;
+    auto surfaceAnchorY =
+        (anchorY - (viewportSize.height() - ratio * surfaceSize.height()) * 0.5) / ratio;
     newZoomScale = std::clamp(viewTransform.zoomScale * factor, MIN_ZOOM, MAX_ZOOM);
     if (newZoomScale == viewTransform.zoomScale) {
       return;
     }
     auto appliedFactor = newZoomScale / viewTransform.zoomScale;
-    viewTransform.offsetX = (viewTransform.offsetX - anchorX) * appliedFactor + anchorX;
-    viewTransform.offsetY = (viewTransform.offsetY - anchorY) * appliedFactor + anchorY;
+    viewTransform.offsetX =
+        (viewTransform.offsetX - surfaceAnchorX) * appliedFactor + surfaceAnchorX;
+    viewTransform.offsetY =
+        (viewTransform.offsetY - surfaceAnchorY) * appliedFactor + surfaceAnchorY;
     viewTransform.zoomScale = newZoomScale;
   }
   notifyViewTransformChanged(newZoomScale);
 }
 
-void ContentViewModel::panBy(double deltaX, double deltaY) {
+void ContentViewModel::panBy(double deltaX, double deltaY, const QSizeF& viewportSize) {
   if (std::abs(deltaX) < TRANSFORM_EPSILON && std::abs(deltaY) < TRANSFORM_EPSILON) {
     return;
   }
+  auto contentWidth = static_cast<double>(getWidth());
+  auto contentHeight = static_cast<double>(getHeight());
   double currentZoomScale = 1.0;
   {
     std::lock_guard<std::mutex> lock(viewTransformMutex);
-    viewTransform.offsetX += deltaX;
-    viewTransform.offsetY += deltaY;
+    if (surfaceSize.isEmpty() || viewportSize.isEmpty() || contentWidth <= 0 ||
+        contentHeight <= 0) {
+      return;
+    }
+    auto ratio =
+        std::min(viewportSize.width() / contentWidth, viewportSize.height() / contentHeight) /
+        std::min(surfaceSize.width() / contentWidth, surfaceSize.height() / contentHeight);
+    // Undo the fit ratio because viewport deltas may target a differently sized render surface.
+    viewTransform.offsetX += deltaX / ratio;
+    viewTransform.offsetY += deltaY / ratio;
     currentZoomScale = viewTransform.zoomScale;
   }
   notifyViewTransformChanged(currentZoomScale);
@@ -77,25 +104,23 @@ void ContentViewModel::resetView() {
 void ContentViewModel::adjustForSurfaceResize(double oldSurfaceWidth, double oldSurfaceHeight,
                                               double newSurfaceWidth, double newSurfaceHeight,
                                               double contentWidth, double contentHeight) {
+  std::lock_guard<std::mutex> lock(viewTransformMutex);
+  surfaceSize = newSurfaceWidth <= 0 || newSurfaceHeight <= 0
+                    ? QSizeF{}
+                    : QSizeF(newSurfaceWidth, newSurfaceHeight);
   if (contentWidth <= 0 || contentHeight <= 0 || oldSurfaceWidth <= 0 || oldSurfaceHeight <= 0 ||
       newSurfaceWidth <= 0 || newSurfaceHeight <= 0) {
     return;
   }
   auto oldContentScale = std::min(oldSurfaceWidth / contentWidth, oldSurfaceHeight / contentHeight);
   auto newContentScale = std::min(newSurfaceWidth / contentWidth, newSurfaceHeight / contentHeight);
-  auto oldContentOffsetX = (oldSurfaceWidth - contentWidth * oldContentScale) * 0.5;
-  auto oldContentOffsetY = (oldSurfaceHeight - contentHeight * oldContentScale) * 0.5;
-  auto newContentOffsetX = (newSurfaceWidth - contentWidth * newContentScale) * 0.5;
-  auto newContentOffsetY = (newSurfaceHeight - contentHeight * newContentScale) * 0.5;
-  {
-    std::lock_guard<std::mutex> lock(viewTransformMutex);
-    if (viewTransform.zoomScale == 1.0 && viewTransform.offsetX == 0.0 &&
-        viewTransform.offsetY == 0.0) {
-      return;
-    }
-    viewTransform.offsetX += (oldContentOffsetX - newContentOffsetX) * viewTransform.zoomScale;
-    viewTransform.offsetY += (oldContentOffsetY - newContentOffsetY) * viewTransform.zoomScale;
-  }
+  auto ratio = newContentScale / oldContentScale;
+  // Scale center-relative pan by the fit ratio to preserve the content at the viewport center.
+  auto zoomOffsetScale = (viewTransform.zoomScale - 1) * 0.5;
+  viewTransform.offsetX = (viewTransform.offsetX + oldSurfaceWidth * zoomOffsetScale) * ratio -
+                          newSurfaceWidth * zoomOffsetScale;
+  viewTransform.offsetY = (viewTransform.offsetY + oldSurfaceHeight * zoomOffsetScale) * ratio -
+                          newSurfaceHeight * zoomOffsetScale;
 }
 
 void ContentViewModel::notifyViewTransformChanged(double newZoomScale) {

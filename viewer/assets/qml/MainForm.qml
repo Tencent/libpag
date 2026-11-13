@@ -12,6 +12,7 @@ SplitView {
     property var contentView: contentViewLoader.item
     property bool hasPAGFile: contentView && contentView.viewModel.filePath !== ""
     property bool hasAnimation: contentView && contentView.viewModel.hasAnimation
+    property bool isSeekable: contentView && contentView.viewModel.isSeekable
 
     property bool isBackgroundOn: false
 

@@ -8,6 +8,7 @@ Item {
 
     required property bool hasPAGFile
     required property bool hasAnimation
+    required property bool isSeekable
     required property bool isUseEnglish
     required property bool windowActive
     required property bool isFullScreen
@@ -102,7 +103,7 @@ Item {
                 title: qsTr("Play")
                 Action {
                     text: qsTr("Pause and go to the first frame")
-                    enabled: root.hasPAGFile && root.hasAnimation
+                    enabled: root.hasPAGFile && root.hasAnimation && root.isSeekable
                     shortcut: StandardKey.MoveToPreviousLine
                     onTriggered: {
                         root.command("first-frame");
@@ -110,7 +111,7 @@ Item {
                 }
                 Action {
                     text: qsTr("Pause and go to the last frame")
-                    enabled: root.hasPAGFile && root.hasAnimation
+                    enabled: root.hasPAGFile && root.hasAnimation && root.isSeekable
                     shortcut: StandardKey.MoveToNextLine
                     onTriggered: {
                         root.command("last-frame");
@@ -118,7 +119,7 @@ Item {
                 }
                 Action {
                     text: qsTr("Previous frame")
-                    enabled: root.hasPAGFile && root.hasAnimation
+                    enabled: root.hasPAGFile && root.hasAnimation && root.isSeekable
                     shortcut: StandardKey.MoveToPreviousChar
                     onTriggered: {
                         root.command("previous-frame");
@@ -126,7 +127,7 @@ Item {
                 }
                 Action {
                     text: qsTr("Next frame ")
-                    enabled: root.hasPAGFile && root.hasAnimation
+                    enabled: root.hasPAGFile && root.hasAnimation && root.isSeekable
                     shortcut: StandardKey.MoveToNextChar
                     onTriggered: {
                         root.command("next-frame");
@@ -348,7 +349,7 @@ Item {
                 title: qsTr("Play")
                 Platform.MenuItem {
                     text: qsTr("Pause and go to the first frame")
-                    enabled: root.hasPAGFile && root.hasAnimation
+                    enabled: root.hasPAGFile && root.hasAnimation && root.isSeekable
                     shortcut: StandardKey.MoveToPreviousLine
                     onTriggered: {
                         root.command("first-frame");
@@ -356,7 +357,7 @@ Item {
                 }
                 Platform.MenuItem {
                     text: qsTr("Pause and go to the last frame")
-                    enabled: root.hasPAGFile && root.hasAnimation
+                    enabled: root.hasPAGFile && root.hasAnimation && root.isSeekable
                     shortcut: StandardKey.MoveToNextLine
                     onTriggered: {
                         root.command("last-frame");
@@ -364,7 +365,7 @@ Item {
                 }
                 Platform.MenuItem {
                     text: qsTr("Previous frame")
-                    enabled: root.hasPAGFile && root.hasAnimation
+                    enabled: root.hasPAGFile && root.hasAnimation && root.isSeekable
                     shortcut: StandardKey.MoveToPreviousChar
                     onTriggered: {
                         root.command("previous-frame");
@@ -372,7 +373,7 @@ Item {
                 }
                 Platform.MenuItem {
                     text: qsTr("Next frame")
-                    enabled: root.hasPAGFile && root.hasAnimation
+                    enabled: root.hasPAGFile && root.hasAnimation && root.isSeekable
                     shortcut: StandardKey.MoveToNextChar
                     onTriggered: {
                         root.command("next-frame");
