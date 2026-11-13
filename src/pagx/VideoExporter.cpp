@@ -30,7 +30,9 @@
 #include "pagx/PAGSurface.h"
 #include "pagx/PAGTimeline.h"
 #include "pagx/PAGXDocument.h"
+#include "pagx/VideoExportFrame.h"
 #include "pagx/nodes/Animation.h"
+#include "pagx/runtime/Drawable.h"
 #include "tgfx/core/Bitmap.h"
 #include "tgfx/core/Pixmap.h"
 
@@ -318,6 +320,23 @@ bool VideoExporter::ResolveSampling(const Options& options, const PlaybackPlan& 
 
 std::shared_ptr<VideoExporter> VideoExporter::Make(std::shared_ptr<PAGXDocument> document,
                                                    const Options& options, std::string* errorMsg) {
+  return MakeInternal(std::move(document), nullptr, options, errorMsg);
+}
+
+std::shared_ptr<VideoExporter> VideoExporter::MakeWithSurface(
+    std::shared_ptr<PAGXDocument> document, std::shared_ptr<PAGSurface> surface,
+    const Options& options, std::string* errorMsg) {
+  if (surface == nullptr) {
+    SetError(errorMsg, "the export surface is null");
+    return nullptr;
+  }
+  return MakeInternal(std::move(document), std::move(surface), options, errorMsg);
+}
+
+std::shared_ptr<VideoExporter> VideoExporter::MakeInternal(std::shared_ptr<PAGXDocument> document,
+                                                           std::shared_ptr<PAGSurface> surface,
+                                                           const Options& options,
+                                                           std::string* errorMsg) {
   if (!ValidateOptions(document, options, errorMsg)) {
     return nullptr;
   }
@@ -335,26 +354,66 @@ std::shared_ptr<VideoExporter> VideoExporter::Make(std::shared_ptr<PAGXDocument>
   if (!ResolveSampling(options, plan, &frameRate, &frameCount, errorMsg)) {
     return nullptr;
   }
-  int width = 0;
-  int height = 0;
-  if (!ComputeOutputDimensions(document->width, document->height, options.scale,
-                               options.padToEvenSize, &width, &height)) {
+  int width = options.outputWidth;
+  int height = options.outputHeight;
+  const bool hasExplicitSize = width > 0 && height > 0;
+  if ((width == 0) != (height == 0) || width < 0 || height < 0) {
+    SetError(errorMsg, "explicit output dimensions must both be positive or both be zero");
+    return nullptr;
+  }
+  if (!hasExplicitSize && !ComputeOutputDimensions(document->width, document->height, options.scale,
+                                                   options.padToEvenSize, &width, &height)) {
     SetError(errorMsg, "the output dimensions must be finite, positive, and fit in an int");
     return nullptr;
   }
-  std::shared_ptr<PAGSurface> surface = {};
   std::shared_ptr<tgfx::Bitmap> bitmap = {};
-  if (!CreateResources(width, height, &surface, &bitmap, errorMsg)) {
-    return nullptr;
+  if (surface == nullptr) {
+    if (!CreateResources(width, height, &surface, &bitmap, errorMsg)) {
+      return nullptr;
+    }
+  } else {
+    if (surface->width() != width || surface->height() != height) {
+      SetError(errorMsg, "the export surface dimensions do not match the expected output of " +
+                             std::to_string(width) + "x" + std::to_string(height));
+      return nullptr;
+    }
+    if (surface->drawable == nullptr) {
+      SetError(errorMsg, "the export surface has no drawable");
+      return nullptr;
+    }
+    auto device = surface->drawable->getDevice();
+    if (device == nullptr) {
+      SetError(errorMsg, "the export surface has no GPU device");
+      return nullptr;
+    }
+    auto* context = device->lockContext();
+    if (context == nullptr) {
+      SetError(errorMsg, "failed to lock the export surface device");
+      return nullptr;
+    }
+    auto tgfxSurface = surface->drawable->getSurface(context);
+    auto validContext = tgfxSurface != nullptr && tgfxSurface->getContext() == context;
+    device->unlock();
+    if (!validContext) {
+      SetError(errorMsg, "the export surface has no valid GPU context");
+      return nullptr;
+    }
+    bitmap = std::make_shared<tgfx::Bitmap>(width, height, false, false);
+    if (bitmap->isEmpty()) {
+      SetError(errorMsg, "failed to allocate the frame bitmap");
+      return nullptr;
+    }
   }
 
   auto* displayOptions = scene->getDisplayOptions();
+  displayOptions->setRenderMode(options.renderMode);
   displayOptions->setZoomScale(options.scale);
   if (options.background.alpha > 0.0f) {
     displayOptions->setBackgroundColor(options.background);
   }
 
   auto exporter = std::shared_ptr<VideoExporter>(new VideoExporter());
+  exporter->state = std::make_shared<VideoExportState>();
   exporter->scene = std::move(scene);
   exporter->surface = std::move(surface);
   exporter->timelines = std::move(plan.timelines);
@@ -366,6 +425,11 @@ std::shared_ptr<VideoExporter> VideoExporter::Make(std::shared_ptr<PAGXDocument>
   exporter->totalFrames = frameCount;
   exporter->reuseStaticFrame = !plan.hasDynamicContent;
   return exporter;
+}
+
+PAGRenderMode VideoExporter::renderMode() const {
+  auto* options = scene != nullptr ? scene->getDisplayOptions() : nullptr;
+  return options != nullptr ? options->getRenderMode() : PAGRenderMode::Partial;
 }
 
 int VideoExporter::width() const {
@@ -385,18 +449,16 @@ int64_t VideoExporter::frameCount() const {
 }
 
 int64_t VideoExporter::currentFrame() const {
-  return nextFrameIndex;
+  return state != nullptr ? state->currentFrame : 0;
 }
 
-bool VideoExporter::nextFrame() {
-  if (scene == nullptr || nextFrameIndex >= totalFrames) {
-    return false;
-  }
-  if (reuseStaticFrame && nextFrameIndex > 0) {
-    nextFrameIndex++;
-    return true;
-  }
-  auto timeUs = static_cast<int64_t>(std::llround(static_cast<double>(nextFrameIndex) * 1000000.0 /
+std::string VideoExporter::error() const {
+  return state != nullptr ? state->error : "";
+}
+
+bool VideoExporter::drawNextFrame(std::string* errorMsg) {
+  auto frameIndex = state->currentFrame;
+  auto timeUs = static_cast<int64_t>(std::llround(static_cast<double>(frameIndex) * 1000000.0 /
                                                   samplingFrameRate.framesPerSecond()));
   auto deltaUs = timeUs - previousFrameTimeUs;
   for (const auto& timeline : timelines) {
@@ -414,13 +476,106 @@ bool VideoExporter::nextFrame() {
   scene->advanceAndApply(deltaUs);
   previousFrameTimeUs = timeUs;
   if (!scene->draw(surface)) {
+    SetError(errorMsg, "failed to draw the export frame");
+    return false;
+  }
+  return true;
+}
+
+bool VideoExporter::nextFrame() {
+  if (state->failed || state->cancelled) {
+    return false;
+  }
+  if (state->mode == VideoExportMode::Async) {
+    state->failed = true;
+    state->error = "mixed_mode";
+    if (pendingFrame != nullptr) {
+      pendingFrame->impl->fail(state->error);
+    }
+    return false;
+  }
+  if (scene == nullptr || state->currentFrame >= totalFrames) {
+    return false;
+  }
+  if (reuseStaticFrame && state->currentFrame > 0) {
+    state->currentFrame++;
+    state->mode = VideoExportMode::Sync;
+    state->error.clear();
+    return true;
+  }
+  std::string renderError = {};
+  if (!drawNextFrame(&renderError)) {
+    state->error = renderError;
     return false;
   }
   if (!surface->readPixels(pixmap->writablePixels(), pixmap->rowBytes())) {
+    state->error = "failed to read the export frame pixels";
     return false;
   }
-  nextFrameIndex++;
+  state->currentFrame++;
+  state->mode = VideoExportMode::Sync;
+  state->error.clear();
   return true;
+}
+
+VideoExportStartResult VideoExporter::startNextFrame() {
+  if (state->failed || state->cancelled) {
+    return {VideoExportStartStatus::Failed, nullptr, state->error};
+  }
+  if (state->mode == VideoExportMode::Sync) {
+    state->failed = true;
+    state->error = "mixed_mode";
+    return {VideoExportStartStatus::Failed, nullptr, state->error};
+  }
+  if (pendingFrame != nullptr) {
+    if (pendingFrame->impl->consumed) {
+      pendingFrame = nullptr;
+    } else {
+      return {VideoExportStartStatus::Busy, nullptr, ""};
+    }
+  }
+  if (state->currentFrame >= totalFrames) {
+    return {VideoExportStartStatus::End, nullptr, ""};
+  }
+  auto frameIndex = state->currentFrame;
+  std::shared_ptr<VideoExportFrameImpl> impl = nullptr;
+  if (reuseStaticFrame && frameIndex > 0) {
+    impl = VideoExportFrameImpl::MakeCPU(state, frameIndex, pixmap);
+  } else {
+    std::string renderError = {};
+    if (!drawNextFrame(&renderError)) {
+      state->failed = true;
+      state->error = renderError;
+      return {VideoExportStartStatus::Failed, nullptr, renderError};
+    }
+    impl = VideoExportFrameImpl::MakeGPU(state, frameIndex, surface,
+                                         reuseStaticFrame ? pixmap : nullptr, &renderError);
+    if (impl == nullptr) {
+      state->failed = true;
+      state->error = renderError;
+      return {VideoExportStartStatus::Failed, nullptr, renderError};
+    }
+  }
+  auto frame = std::shared_ptr<VideoExportFrame>(new VideoExportFrame(std::move(impl)));
+  pendingFrame = frame;
+  state->mode = VideoExportMode::Async;
+  state->error.clear();
+  return {VideoExportStartStatus::FrameStarted, std::move(frame), ""};
+}
+
+void VideoExporter::cancel() {
+  if (state->cancelled) {
+    return;
+  }
+  auto wasFailed = state->failed;
+  state->cancelled = true;
+  if (!wasFailed) {
+    state->error = "cancelled";
+    if (pendingFrame != nullptr && !pendingFrame->impl->consumed) {
+      pendingFrame->impl->fail(state->error);
+    }
+  }
+  pendingFrame = nullptr;
 }
 
 const uint8_t* VideoExporter::pixels() const {

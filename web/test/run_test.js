@@ -10,10 +10,12 @@ const ProjectRoot = path.resolve(__dirname, '../..');
 const TimeoutMS = 30 * 60 * 1000;
 
 function ParseOptions(args) {
-  const options = { backend: 'webgl', mode: 'compare', filter: '', output: '', noSandbox: false };
+  const options = { backend: 'webgl', mode: 'compare', filter: '', output: '', noSandbox: false,
+    asyncVideoExport: false };
   for (let i = 0; i < args.length; i++) {
-    if (args[i] === '--no-sandbox') {
-      options.noSandbox = true;
+    if (args[i] === '--no-sandbox' || args[i] === '--async-video-export') {
+      if (args[i] === '--no-sandbox') options.noSandbox = true;
+      else options.asyncVideoExport = true;
       continue;
     }
     const match = /^--(backend|mode|filter|output)(?:=(.*))?$/.exec(args[i]);
@@ -26,6 +28,9 @@ function ParseOptions(args) {
     throw new Error('Invalid backend or mode');
   }
   if (options.mode === 'update' && options.filter) throw new Error('Filtered baseline updates are forbidden');
+  if (options.asyncVideoExport && (options.backend !== 'webgpu' || options.filter)) {
+    throw new Error('Async video export requires WebGPU and cannot be combined with --filter');
+  }
   return options;
 }
 
@@ -250,7 +255,7 @@ function PrepareOutput(options) {
 function LoadRunConfig(options, directory, cacheDirectory, runInfo) {
   const buildInfo = SnapshotBuild(path.join(__dirname, 'dist', `${options.backend}-${options.mode}`),
     directory, options.backend, options.mode);
-  const config = { buildInfo, filter: options.filter,
+  const config = { buildInfo, filter: options.filter, asyncVideoExport: options.asyncVideoExport,
     baselineVersion: fs.readFileSync(path.join(ProjectRoot, 'test/baseline/version.json'), 'utf8'),
     cache: options.mode === 'compare' ? ReadExpectedCache(cacheDirectory, options.backend) : null };
   if (options.mode === 'update') {
@@ -300,10 +305,12 @@ async function ExecuteSuite(session, output, options, buildInfo, runInfo) {
   ValidateBuildInfo(state.buildInfo, options.backend, options.mode);
   if (state.buildInfo.buildId !== buildInfo.buildId) throw new Error('WASM build identity mismatch');
   ValidateResult(state.result);
-  const report = JSON.parse(fs.readFileSync(path.join(output, 'report.json'), 'utf8'));
-  if (!Number.isSafeInteger(report.disabled) || report.tests - report.disabled !== state.result.tests ||
-      report.failures !== state.result.failed) {
-    throw new Error('GoogleTest report does not match the execution result');
+  if (!options.asyncVideoExport) {
+    const report = JSON.parse(fs.readFileSync(path.join(output, 'report.json'), 'utf8'));
+    if (!Number.isSafeInteger(report.disabled) || report.tests - report.disabled !== state.result.tests ||
+        report.failures !== state.result.failed) {
+      throw new Error('GoogleTest report does not match the execution result');
+    }
   }
   const finalState = await page.evaluate(ReadState);
   runInfo.errors = finalState.errors;

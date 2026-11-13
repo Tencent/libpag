@@ -24,6 +24,7 @@
 #include <numeric>
 #include <string>
 #include <vector>
+#include "pagx/PAGDisplayOptions.h"
 #include "pagx/types/Color.h"
 
 namespace tgfx {
@@ -39,6 +40,7 @@ class PAGScene;
 class PAGSurface;
 class PAGTimeline;
 class PAGXDocument;
+struct VideoExportState;
 
 /** A rational sampling rate in frames per second. Zero numerator with denominator 1 means auto. */
 struct VideoFrameRate {
@@ -138,6 +140,75 @@ struct VideoExportOptions {
    * `ceil(documentSize * scale)`.
    */
   bool padToEvenSize = false;
+
+  /** Rendering mode applied to every frame. Defaults to Partial to preserve display-list caching. */
+  PAGRenderMode renderMode = PAGRenderMode::Partial;
+
+  /**
+   * Optional explicit output dimensions. Both values must be positive to take effect; leaving both
+   * at zero derives dimensions from documentSize * scale and optional padding.
+   */
+  int outputWidth = 0;
+  int outputHeight = 0;
+};
+
+/** Result of attempting to start an asynchronous frame. */
+enum class VideoExportStartStatus {
+  FrameStarted,
+  Busy,
+  End,
+  Failed,
+};
+
+/** Current state of an asynchronous export frame. */
+enum class VideoExportFrameStatus {
+  Pending,
+  Ready,
+  Failed,
+};
+
+class VideoExportFrameImpl;
+
+/**
+ * A single frame started by VideoExporter::startNextFrame(). All operations must run on the thread
+ * that owns the exporter's GPU device.
+ */
+class VideoExportFrame {
+ public:
+  ~VideoExportFrame();
+
+  VideoExportFrame(const VideoExportFrame&) = delete;
+  VideoExportFrame& operator=(const VideoExportFrame&) = delete;
+
+  /** Returns the sequential frame index assigned when the frame started. */
+  int64_t index() const;
+
+  /** Returns the current state without blocking. Consumed frames remain Ready. */
+  VideoExportFrameStatus status();
+
+  /** Returns the failure reason, or an empty string when the frame has not failed. */
+  std::string error() const;
+
+  /**
+   * Copies premultiplied RGBA_8888 pixels to the caller's buffer. The first successful call consumes
+   * the frame and commits its index. Pending, consumed and failed reads return false without
+   * modifying the destination or committing an index.
+   */
+  bool readPixels(void* dstPixels, size_t dstRowBytes);
+
+ private:
+  explicit VideoExportFrame(std::shared_ptr<VideoExportFrameImpl> impl);
+
+  std::shared_ptr<VideoExportFrameImpl> impl = nullptr;
+
+  friend class VideoExporter;
+};
+
+/** The explicit result of VideoExporter::startNextFrame(). */
+struct VideoExportStartResult {
+  VideoExportStartStatus status = VideoExportStartStatus::Failed;
+  std::shared_ptr<VideoExportFrame> frame = nullptr;
+  std::string error = {};
 };
 
 /**
@@ -147,10 +218,10 @@ struct VideoExportOptions {
  * top-level or mounted nested timelines draw and read back only the first frame; later frames reuse
  * the same RGBA buffer.
  *
- * The exporter only renders. Encoding and muxing are the host's responsibility; the current
- * implementation is built only for native hosts and uses an external ffmpeg process. WebAssembly
- * builds exclude this implementation, so a future WebCodecs host would need its own frame-source
- * adapter. No video codec ships inside pagx.
+ * The exporter only renders. Encoding and muxing are the host's responsibility: an external ffmpeg
+ * process on native platforms, WebCodecs on the web. Native hosts can use synchronous or
+ * asynchronous readback; WebGPU hosts can poll asynchronous frames from the browser event loop.
+ * No video codec ships inside pagx.
  *
  * Frames are pulled one at a time so that hosts can interleave other work (a UI thread, an encoder
  * queue) between frames. Rendering the whole sequence in a single call is not supported because a
@@ -197,6 +268,16 @@ class VideoExporter {
                                              const Options& options = {},
                                              std::string* errorMsg = nullptr);
 
+  /**
+   * Creates an exporter that renders into a host-provided surface with exactly the resolved output
+   * dimensions. The surface must remain exclusively used by the exporter and share a compatible
+   * device with the document's GPU resources.
+   */
+  static std::shared_ptr<VideoExporter> MakeWithSurface(std::shared_ptr<PAGXDocument> document,
+                                                        std::shared_ptr<PAGSurface> surface,
+                                                        const Options& options = {},
+                                                        std::string* errorMsg = nullptr);
+
   ~VideoExporter();
 
   VideoExporter(const VideoExporter&) = delete;
@@ -218,14 +299,13 @@ class VideoExporter {
   static bool ComputeOutputDimensions(float documentWidth, float documentHeight, float scale,
                                       bool padToEvenSize, int* width, int* height);
 
-  /**
-   * Returns the output width in pixels, which is `ceil(documentWidth * scale)` plus optional padding.
-   */
+  /** Returns the rendering mode applied to the scene's display options. */
+  PAGRenderMode renderMode() const;
+
+  /** Returns the explicit host width or the document-derived width, including optional padding. */
   int width() const;
 
-  /**
-   * Returns the output height in pixels, including optional even-size padding.
-   */
+  /** Returns the explicit host height or the document-derived height, including optional padding. */
   int height() const;
 
   /**
@@ -253,6 +333,22 @@ class VideoExporter {
   bool nextFrame();
 
   /**
+   * Advances, draws and starts reading the next frame without waiting for GPU readback. The first
+   * successful use of nextFrame() or startNextFrame() fixes the exporter's mode; mixing modes is
+   * a terminal usage error. Only one uncommitted frame may exist at a time.
+   */
+  VideoExportStartResult startNextFrame();
+
+  /**
+   * Cancels the sequence and abandons any pending frame. This is terminal and must run on the
+   * device-owning thread.
+   */
+  void cancel();
+
+  /** Returns the terminal error or the last synchronous read error, if any. */
+  std::string error() const;
+
+  /**
    * Returns the pixels of the most recently rendered frame as RGBA8888, premultiplied. The buffer
    * is owned by the exporter and stays valid only until the next nextFrame() call, so the host
    * must consume it (write to a pipe, wrap in a VideoFrame) before advancing.
@@ -277,6 +373,11 @@ class VideoExporter {
 
   VideoExporter();
 
+  static std::shared_ptr<VideoExporter> MakeInternal(std::shared_ptr<PAGXDocument> document,
+                                                     std::shared_ptr<PAGSurface> surface,
+                                                     const Options& options, std::string* errorMsg);
+  bool drawNextFrame(std::string* errorMsg);
+
   static bool ResolvePlaybackPlan(const std::shared_ptr<PAGScene>& scene,
                                   const std::shared_ptr<PAGXDocument>& document, PlaybackPlan* plan,
                                   std::string* errorMsg);
@@ -288,6 +389,8 @@ class VideoExporter {
                               VideoFrameRate* frameRate, int64_t* frameCount,
                               std::string* errorMsg);
 
+  std::shared_ptr<VideoExportState> state = {};
+  std::shared_ptr<VideoExportFrame> pendingFrame = {};
   std::shared_ptr<PAGScene> scene = {};
   std::shared_ptr<PAGSurface> surface = {};
   std::vector<std::shared_ptr<PAGTimeline>> timelines = {};
@@ -297,7 +400,6 @@ class VideoExporter {
   int outputHeight = 0;
   VideoFrameRate samplingFrameRate = {60, 1};
   int64_t totalFrames = 0;
-  int64_t nextFrameIndex = 0;
   int64_t previousFrameTimeUs = 0;
   bool reuseStaticFrame = false;
 };
