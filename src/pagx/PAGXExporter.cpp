@@ -1911,6 +1911,19 @@ std::string PAGXExporter::ToXML(const PAGXDocument& doc, const Options& options)
   xml.addAttribute("width", doc.width);
   xml.addAttribute("height", doc.height);
   if (doc.viewModel != nullptr) xml.addAttribute("viewModel", "@" + doc.viewModel->id);
+  // Write the target view fields exactly as authored. A pair that failed to parse is written back
+  // from its raw declaration instead of being silently dropped, so the resulting file keeps failing
+  // validation on reload instead of quietly turning into a whole-canvas document.
+  if (!doc.targetLayerId.empty()) {
+    xml.addAttribute("targetLayer", "@" + doc.targetLayerId);
+  } else if (doc.declaredTargetLayer.has_value()) {
+    xml.addRequiredAttribute("targetLayer", *doc.declaredTargetLayer);
+  }
+  if (doc.outputBounds.has_value()) {
+    xml.addAttribute("outputBounds", RectToString(*doc.outputBounds));
+  } else if (doc.declaredOutputBounds.has_value()) {
+    xml.addRequiredAttribute("outputBounds", *doc.declaredOutputBounds);
+  }
   WriteCustomData(xml, &doc);
   xml.closeElementStart();
 

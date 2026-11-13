@@ -365,6 +365,13 @@ static bool LayersHaveImports(const std::vector<Layer*>& layers) {
   return false;
 }
 
+void PAGXDocument::clearOutputView() {
+  targetLayerId.clear();
+  outputBounds = std::nullopt;
+  declaredTargetLayer = std::nullopt;
+  declaredOutputBounds = std::nullopt;
+}
+
 bool PAGXDocument::hasUnresolvedImports() const {
   if (LayersHaveImports(layers)) {
     return true;

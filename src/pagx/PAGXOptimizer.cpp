@@ -43,6 +43,7 @@
 #include "pagx/nodes/Text.h"
 #include "pagx/types/PathVerb.h"
 #include "pagx/utils/LayerTransformUtils.h"
+#include "pagx/utils/OutputView.h"
 #include "pagx/utils/VerifyUtils.h"
 
 namespace pagx {
@@ -163,6 +164,17 @@ int OptimizeLayerList(PAGXDocument* doc, std::vector<Layer*>& layers,
 
 bool HasUnresolvedImport(const Layer* layer) {
   return !layer->importDirective.source.empty() || !layer->importDirective.content.empty();
+}
+
+// Keeps the document's default output target out of the prune/merge keep-set's blind spot: an
+// empty or shell-like target layer is still semantically required, so it must survive every
+// optimization pass that otherwise drops unreferenced layers.
+void PreserveOutputTarget(PAGXDocument* doc, std::unordered_set<const Layer*>& keepSet) {
+  const Layer* target = nullptr;
+  std::string error;
+  if (ResolveOutputView(doc, &target, &error) == OutputViewStatus::Valid && target != nullptr) {
+    keepSet.insert(target);
+  }
 }
 
 // A painter paints every geometry that precedes it in the same element list; every non-painter
@@ -1830,6 +1842,7 @@ int OptimizeLayerList(PAGXDocument* doc, std::vector<Layer*>& layers,
       }
       if (rmChanged) {
         RecomputeMaskRefs(doc, maskRefs);
+        PreserveOutputTarget(doc, maskRefs);
         changed = true;
       }
     }
@@ -1897,6 +1910,7 @@ PAGXOptimizer::Result OptimizeWithOptions(PAGXDocument* doc, const PAGXOptimizer
 
   std::unordered_set<const Layer*> maskRefs;
   RecomputeMaskRefs(doc, maskRefs);
+  PreserveOutputTarget(doc, maskRefs);
 
   std::unordered_set<std::string> animatedTargets;
   CollectAnimatedTargets(doc, animatedTargets);

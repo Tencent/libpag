@@ -19,6 +19,7 @@
 #pragma once
 
 #include <memory>
+#include <optional>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -29,6 +30,7 @@
 #include "pagx/nodes/Layer.h"
 #include "pagx/nodes/Node.h"
 #include "pagx/types/Data.h"
+#include "pagx/types/Rect.h"
 
 namespace pagx {
 
@@ -39,6 +41,28 @@ class PAGScene;
 class ViewModel;
 class Image;
 class ImagePattern;
+
+/**
+ * Status of the default static output view declared by the paired `targetLayer` / `outputBounds`
+ * root attributes. Resolve it with pagx::ResolveOutputView() or PAGScene::getOutputViewStatus().
+ */
+enum class OutputViewStatus {
+  /**
+   * The document does not declare a target view; it renders the whole canvas.
+   */
+  None,
+
+  /**
+   * The document declares a valid target view.
+   */
+  Valid,
+
+  /**
+   * The document declares invalid target view fields. The document is not renderable through the
+   * default static output path.
+   */
+  Invalid,
+};
 
 /**
  * PAGXDocument is the root container for a PAGX document. It owns the resources, layers, and font
@@ -64,6 +88,26 @@ class PAGXDocument : public Node {
    * Canvas height.
    */
   float height = 0;
+
+  /**
+   * The id (without the leading '@') of the Layer that the document renders as its default static
+   * output, or empty when the document renders the whole canvas. Declared by the `targetLayer`
+   * root attribute, which must be paired with `outputBounds`.
+   */
+  std::string targetLayerId = {};
+
+  /**
+   * The output rectangle in document-root coordinates used when `targetLayerId` is set. Declared by
+   * the `outputBounds` root attribute. std::nullopt when the document renders the whole canvas.
+   */
+  std::optional<Rect> outputBounds = std::nullopt;
+
+  /**
+   * Removes the document's default static output view declaration, including authored attribute
+   * text that failed to parse. After this call the document renders the whole canvas again. Call
+   * notifyChange() so live scenes pick up the change.
+   */
+  void clearOutputView();
 
   /**
    * Top-level layers (raw pointers, owned by nodes).
@@ -188,8 +232,7 @@ class PAGXDocument : public Node {
    * individually for each file when embedding multiple images.
    * @param fileDataMap a map from file path to the file content to embed
    */
-  void loadFileDataMap(
-      const std::unordered_map<std::string, std::shared_ptr<Data>>& fileDataMap);
+  void loadFileDataMap(const std::unordered_map<std::string, std::shared_ptr<Data>>& fileDataMap);
 
   /**
    * Returns the document's font configuration. Importers populate fallback fonts here
@@ -312,10 +355,10 @@ class PAGXDocument : public Node {
 
   // Sets runtimeImage on every Image node matching filePath in this document and its resolved
   // external documents, collecting the touched Image nodes per owning document.
-  static void LoadImageInChain(PAGXDocument* document, const std::string& filePath,
-                               const std::shared_ptr<PAGImage>& image,
-                               std::unordered_map<PAGXDocument*, std::vector<Node*>>& docDirtyImages,
-                               std::unordered_set<const PAGXDocument*>& visited);
+  static void LoadImageInChain(
+      PAGXDocument* document, const std::string& filePath, const std::shared_ptr<PAGImage>& image,
+      std::unordered_map<PAGXDocument*, std::vector<Node*>>& docDirtyImages,
+      std::unordered_set<const PAGXDocument*>& visited);
 
   // Recursive layout worker. visited holds the documents on the current ancestor path so an
   // externalDoc cycle built directly through the API (bypassing loadFileData's own chain guard)
@@ -357,6 +400,14 @@ class PAGXDocument : public Node {
   std::unordered_map<std::string, std::vector<const Layer*>> layersByImageFilePath = {};
   bool layersByImageFilePathBuilt = false;
 
+  // Raw text of the `targetLayer`/`outputBounds` root attributes that could not be parsed into
+  // targetLayerId/outputBounds. The exporter replays them verbatim so an invalid declaration keeps
+  // failing on reload instead of degrading into a whole-canvas document. std::nullopt means the
+  // attribute was absent or parsed successfully; an empty string means it was present but empty.
+  std::optional<std::string> declaredTargetLayer = std::nullopt;
+  std::optional<std::string> declaredOutputBounds = std::nullopt;
+
+  friend class OutputViewDeclarationAccess;
   friend class PAGXImporter;
   friend class PAGXExporter;
   friend class TextLayoutContext;

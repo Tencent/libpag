@@ -260,6 +260,17 @@ CLI_TEST(PAGXHtmlTest, BatchConvertAll) {
 // Root document
 // =============================================================================
 
+CLI_TEST(PAGXHtmlTest, TargetViewZipExportRejected) {
+  auto doc = pagx::PAGXImporter::FromXML(
+      "<pagx width=\"100\" height=\"100\" targetLayer=\"@target\" outputBounds=\"0,0,50,50\">"
+      "<Layer id=\"target\"><Rectangle position=\"50,50\" size=\"100,100\"/>"
+      "<Fill color=\"#3366FF\"/></Layer></pagx>");
+  ASSERT_NE(doc, nullptr);
+  std::string error;
+  EXPECT_EQ(pagx::HTMLExporter::ToData(*doc, {}, &error), nullptr);
+  EXPECT_EQ(error, "HTML export does not support documents with targetLayer/outputBounds.");
+}
+
 CLI_TEST(PAGXHtmlTest, RootDocument) {
   auto html = LoadAndConvert(ProjectPath::Absolute("resources/pagx_to_html/root_document.pagx"));
   ASSERT_FALSE(html.empty());

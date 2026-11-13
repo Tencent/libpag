@@ -17,8 +17,12 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include <string>
+#include <vector>
+#include "pagx/PAGScene.h"
 #include "pagx/PAGXDocument.h"
+#include "pagx/PAGXExporter.h"
 #include "pagx/PAGXImporter.h"
+#include "pagx/utils/OutputView.h"
 #include "utils/TestUtils.h"
 
 namespace pag {
@@ -144,6 +148,346 @@ PAGX_TEST(PAGXImporterValidationTest, AnimatingColorMatrixRejected) {
   auto doc = pagx::PAGXImporter::FromXML(xml);
   ASSERT_TRUE(doc != nullptr);
   EXPECT_TRUE(HasError(doc, "Animating a ColorMatrixFilter is not supported"));
+}
+
+/**
+ * Test case: the paired targetLayer/outputBounds root attributes round-trip through import and
+ * export, and the parsed model stores the bare target id plus the document-space window.
+ */
+PAGX_TEST(PAGXImporterValidationTest, OutputViewRoundTrip) {
+  std::string xml =
+      "<pagx width=\"300\" height=\"500\" targetLayer=\"@target\" outputBounds=\"0,280,80,40\">\n"
+      "  <Layer id=\"container\">\n"
+      "    <Layer id=\"preceding\"/>\n"
+      "    <Layer id=\"target\">\n"
+      "      <Rectangle position=\"40,20\" size=\"80,40\"/>\n"
+      "      <Fill color=\"#3366FF\"/>\n"
+      "    </Layer>\n"
+      "    <Layer id=\"later\"/>\n"
+      "  </Layer>\n"
+      "</pagx>\n";
+  auto doc = pagx::PAGXImporter::FromXML(xml);
+  ASSERT_TRUE(doc != nullptr);
+  EXPECT_TRUE(doc->errors.empty());
+  EXPECT_EQ(doc->targetLayerId, "target");
+  ASSERT_TRUE(doc->outputBounds.has_value());
+  EXPECT_EQ(doc->outputBounds->x, 0.0f);
+  EXPECT_EQ(doc->outputBounds->y, 280.0f);
+  EXPECT_EQ(doc->outputBounds->width, 80.0f);
+  EXPECT_EQ(doc->outputBounds->height, 40.0f);
+
+  auto exported = pagx::PAGXExporter::ToXML(*doc);
+  EXPECT_NE(exported.find("targetLayer=\"@target\""), std::string::npos);
+  EXPECT_NE(exported.find("outputBounds=\"0,280,80,40\""), std::string::npos);
+
+  auto reloaded = pagx::PAGXImporter::FromXML(exported);
+  ASSERT_TRUE(reloaded != nullptr);
+  EXPECT_TRUE(reloaded->errors.empty());
+  EXPECT_EQ(reloaded->targetLayerId, "target");
+  ASSERT_TRUE(reloaded->outputBounds.has_value());
+  EXPECT_EQ(reloaded->outputBounds->y, 280.0f);
+}
+
+/**
+ * Test case: tiny positive output dimensions and origins round-trip exactly instead of being
+ * rounded to zero, which would make a valid output view fail validation on reload.
+ */
+PAGX_TEST(PAGXImporterValidationTest, OutputViewTinyBoundsRoundTrip) {
+  auto doc = pagx::PAGXImporter::FromXML(
+      "<pagx width=\"100\" height=\"100\" targetLayer=\"@target\" "
+      "outputBounds=\"-1e-20,2e-20,1e-10,3e-30\"><Layer id=\"target\"/></pagx>");
+  ASSERT_NE(doc, nullptr);
+  EXPECT_TRUE(doc->errors.empty());
+  ASSERT_TRUE(doc->outputBounds.has_value());
+  EXPECT_EQ(doc->outputBounds->x, -1e-20f);
+  EXPECT_EQ(doc->outputBounds->y, 2e-20f);
+  EXPECT_EQ(doc->outputBounds->width, 1e-10f);
+  EXPECT_EQ(doc->outputBounds->height, 3e-30f);
+
+  auto reloaded = pagx::PAGXImporter::FromXML(pagx::PAGXExporter::ToXML(*doc));
+  ASSERT_NE(reloaded, nullptr);
+  EXPECT_TRUE(reloaded->errors.empty());
+  EXPECT_EQ(pagx::ResolveOutputView(reloaded.get(), nullptr, nullptr),
+            pagx::OutputViewStatus::Valid);
+  EXPECT_EQ(reloaded->targetLayerId, "target");
+  ASSERT_TRUE(reloaded->outputBounds.has_value());
+  EXPECT_EQ(reloaded->outputBounds->x, -1e-20f);
+  EXPECT_EQ(reloaded->outputBounds->y, 2e-20f);
+  EXPECT_EQ(reloaded->outputBounds->width, 1e-10f);
+  EXPECT_EQ(reloaded->outputBounds->height, 3e-30f);
+}
+
+/**
+ * Test case: a single target view attribute is rejected instead of guessing a default window.
+ */
+PAGX_TEST(PAGXImporterValidationTest, OutputViewRequiresPairedAttributes) {
+  std::string xml =
+      "<pagx width=\"100\" height=\"100\" targetLayer=\"@target\">\n"
+      "  <Layer id=\"target\"/>\n"
+      "</pagx>\n";
+  auto doc = pagx::PAGXImporter::FromXML(xml);
+  ASSERT_TRUE(doc != nullptr);
+  EXPECT_TRUE(HasError(doc, "must be specified together"));
+  EXPECT_EQ(pagx::ResolveOutputView(doc.get(), nullptr, nullptr), pagx::OutputViewStatus::Invalid);
+
+  std::string boundsOnly =
+      "<pagx width=\"100\" height=\"100\" outputBounds=\"0,0,10,10\">\n"
+      "  <Layer id=\"target\"/>\n"
+      "</pagx>\n";
+  auto boundsDoc = pagx::PAGXImporter::FromXML(boundsOnly);
+  ASSERT_TRUE(boundsDoc != nullptr);
+  EXPECT_TRUE(HasError(boundsDoc, "must be specified together"));
+}
+
+/**
+ * Test case: invalid outputBounds values, including malformed separators and field counts, are
+ * rejected rather than producing a zero-sized or partially parsed window.
+ */
+PAGX_TEST(PAGXImporterValidationTest, OutputViewInvalidBoundsRejected) {
+  const char* bounds[] = {"0,0,0,40",   "0,0,80,-1", "0,0,80,40x",   "a,b,c,d",    "0,0,inf,40",
+                          "0,0,10.5.5", "0,0,10+20", "0 0 10 20",    "0,0,,10,20", ",0,0,10,20",
+                          "0,0,10,20,", "0,0,10",    "0,0,10,20,30", "0,0,10,",    "0,0,1e+,20"};
+  for (const auto* value : bounds) {
+    std::string xml =
+        "<pagx width=\"100\" height=\"100\" targetLayer=\"@target\" "
+        "outputBounds=\"" +
+        std::string(value) + "\">\n  <Layer id=\"target\"/>\n</pagx>\n";
+    auto doc = pagx::PAGXImporter::FromXML(xml);
+    ASSERT_TRUE(doc != nullptr) << value;
+    EXPECT_TRUE(HasError(doc, "Invalid value")) << value;
+    EXPECT_FALSE(doc->outputBounds.has_value()) << value;
+  }
+}
+
+/**
+ * Test case: whitespace around commas and signed scientific notation remain valid bounds.
+ */
+PAGX_TEST(PAGXImporterValidationTest, OutputViewBoundsAcceptWhitespaceAndExponents) {
+  auto doc = pagx::PAGXImporter::FromXML(
+      "<pagx width=\"100\" height=\"100\" targetLayer=\"@target\" "
+      "outputBounds=\" -1e+1 , +2E1 , 3e1 , 4E+1 \"><Layer id=\"target\"/></pagx>");
+  ASSERT_NE(doc, nullptr);
+  EXPECT_TRUE(doc->errors.empty());
+  ASSERT_TRUE(doc->outputBounds.has_value());
+  EXPECT_EQ(doc->outputBounds->x, -10.0f);
+  EXPECT_EQ(doc->outputBounds->y, 20.0f);
+  EXPECT_EQ(doc->outputBounds->width, 30.0f);
+  EXPECT_EQ(doc->outputBounds->height, 40.0f);
+}
+
+/**
+ * Test case: the target must be a unique Layer reachable from the document layer tree. A missing
+ * node, a non-Layer node, a duplicated id, and a Target inside a Composition resource are all
+ * rejected with distinct diagnostics.
+ */
+PAGX_TEST(PAGXImporterValidationTest, OutputViewRejectsInvalidTargets) {
+  std::string missing =
+      "<pagx width=\"100\" height=\"100\" targetLayer=\"@nope\" outputBounds=\"0,0,10,10\">\n"
+      "  <Layer id=\"target\"/>\n"
+      "</pagx>\n";
+  auto missingDoc = pagx::PAGXImporter::FromXML(missing);
+  ASSERT_TRUE(missingDoc != nullptr);
+  EXPECT_TRUE(HasError(missingDoc, "does not match any node"));
+
+  std::string notLayer =
+      "<pagx width=\"100\" height=\"100\" targetLayer=\"@shape\" outputBounds=\"0,0,10,10\">\n"
+      "  <Layer id=\"target\">\n"
+      "    <Rectangle id=\"shape\" position=\"5,5\" size=\"10,10\"/>\n"
+      "  </Layer>\n"
+      "</pagx>\n";
+  auto notLayerDoc = pagx::PAGXImporter::FromXML(notLayer);
+  ASSERT_TRUE(notLayerDoc != nullptr);
+  EXPECT_TRUE(HasError(notLayerDoc, "does not resolve to a Layer"));
+
+  std::string unreachable =
+      "<pagx width=\"100\" height=\"100\" targetLayer=\"@inner\" outputBounds=\"0,0,10,10\">\n"
+      "  <Resources>\n"
+      "    <Composition id=\"comp\">\n"
+      "      <Layer id=\"inner\"/>\n"
+      "    </Composition>\n"
+      "  </Resources>\n"
+      "  <Layer id=\"host\" composition=\"@comp\"/>\n"
+      "</pagx>\n";
+  auto unreachableDoc = pagx::PAGXImporter::FromXML(unreachable);
+  ASSERT_TRUE(unreachableDoc != nullptr);
+  EXPECT_TRUE(HasError(unreachableDoc, "not reachable"));
+
+  std::string duplicate =
+      "<pagx width=\"100\" height=\"100\" targetLayer=\"@target\" outputBounds=\"0,0,10,10\">\n"
+      "  <Layer id=\"target\"/>\n"
+      "  <Layer id=\"target\"/>\n"
+      "</pagx>\n";
+  auto duplicateDoc = pagx::PAGXImporter::FromXML(duplicate);
+  ASSERT_TRUE(duplicateDoc != nullptr);
+  EXPECT_TRUE(HasError(duplicateDoc, "not uniquely reachable"));
+}
+
+/**
+ * Test case: target view documents are static-only this round. Declaring animations or data binds
+ * alongside the target fields is rejected at parse time so consumers never silently ignore motion.
+ */
+PAGX_TEST(PAGXImporterValidationTest, OutputViewRejectsDynamicContent) {
+  std::string xml =
+      "<pagx width=\"100\" height=\"100\" targetLayer=\"@target\" outputBounds=\"0,0,10,10\">\n"
+      "  <Layer id=\"target\"/>\n"
+      "  <Animations>\n"
+      "    <Animation id=\"a\" duration=\"60\" frameRate=\"60\">\n"
+      "      <Object target=\"target\">\n"
+      "        <Channel name=\"alpha\" type=\"float\">\n"
+      "          <Key time=\"0\" value=\"0\"/>\n"
+      "          <Key time=\"60\" value=\"1\"/>\n"
+      "        </Channel>\n"
+      "      </Object>\n"
+      "    </Animation>\n"
+      "  </Animations>\n"
+      "</pagx>\n";
+  auto doc = pagx::PAGXImporter::FromXML(xml);
+  ASSERT_TRUE(doc != nullptr);
+  EXPECT_TRUE(HasError(doc, "animations"));
+}
+
+/**
+ * Test case: the static output contract includes loaded external documents at every depth.
+ * A static two-level composition stays valid, while an animation in its inner document is rejected.
+ */
+PAGX_TEST(PAGXImporterValidationTest, OutputViewValidatesNestedExternalDocuments) {
+  for (bool hasAnimation : {false, true}) {
+    SCOPED_TRACE(hasAnimation);
+    auto doc = pagx::PAGXImporter::FromXML(
+        "<pagx width=\"100\" height=\"100\" targetLayer=\"@target\" outputBounds=\"0,0,100,100\">"
+        "<Layer id=\"target\" composition=\"outer.pagx\"/></pagx>");
+    ASSERT_NE(doc, nullptr);
+    std::string outerXML =
+        "<pagx width=\"100\" height=\"100\"><Layer id=\"innerSlot\" composition=\"inner.pagx\">";
+    if (hasAnimation) {
+      outerXML += "<Timelines><Animation ref=\"@fade\" playing=\"true\"/></Timelines>";
+    }
+    outerXML += "</Layer></pagx>";
+    ASSERT_TRUE(doc->loadFileData("outer.pagx",
+                                  pagx::Data::MakeWithCopy(outerXML.data(), outerXML.size())));
+    std::string innerXML =
+        "<pagx width=\"100\" height=\"100\"><Layer id=\"content\">"
+        "<Rectangle position=\"50,50\" size=\"100,100\"/><Fill color=\"#FF0000\"/></Layer>";
+    if (hasAnimation) {
+      innerXML +=
+          "<Animations><Animation id=\"fade\" duration=\"60\" frameRate=\"60\">"
+          "<Object target=\"content\"><Channel name=\"alpha\" type=\"float\">"
+          "<Key time=\"0\" value=\"0\"/><Key time=\"60\" value=\"1\"/>"
+          "</Channel></Object></Animation></Animations>";
+    }
+    innerXML += "</pagx>";
+    ASSERT_TRUE(doc->loadFileData("inner.pagx",
+                                  pagx::Data::MakeWithCopy(innerXML.data(), innerXML.size())));
+    EXPECT_TRUE(doc->errors.empty());
+    EXPECT_TRUE(doc->animations.empty());
+    EXPECT_TRUE(doc->getExternalFilePaths().empty());
+    auto* target = doc->findNode<pagx::Layer>("target");
+    ASSERT_NE(target, nullptr);
+    ASSERT_NE(target->externalDoc, nullptr);
+    EXPECT_TRUE(target->externalDoc->animations.empty());
+    auto* innerSlot = target->externalDoc->findNode<pagx::Layer>("innerSlot");
+    ASSERT_NE(innerSlot, nullptr);
+    ASSERT_NE(innerSlot->externalDoc, nullptr);
+    EXPECT_EQ(innerSlot->externalDoc->animations.size(), hasAnimation ? 1u : 0u);
+
+    const pagx::Layer* resolved = nullptr;
+    std::string error;
+    auto status = pagx::ResolveOutputView(doc.get(), &resolved, &error);
+    if (hasAnimation) {
+      EXPECT_EQ(status, pagx::OutputViewStatus::Invalid);
+      EXPECT_EQ(resolved, nullptr);
+      EXPECT_EQ(error,
+                "Target view documents with animations, state machines or data binds are not "
+                "supported.");
+      EXPECT_EQ(pagx::PAGScene::Make(doc), nullptr);
+    } else {
+      EXPECT_EQ(status, pagx::OutputViewStatus::Valid);
+      EXPECT_EQ(resolved, target);
+      EXPECT_TRUE(error.empty());
+      EXPECT_NE(pagx::PAGScene::Make(doc), nullptr);
+    }
+  }
+}
+
+/**
+ * Test case: a target view declaration that fails to parse keeps its authored attributes through
+ * export, so reloading the exported file reports the same error instead of silently becoming a
+ * whole-canvas document.
+ */
+PAGX_TEST(PAGXImporterValidationTest, OutputViewInvalidDeclarationSurvivesExport) {
+  struct Case {
+    std::string declaration = {};
+    std::vector<std::string> expectedAttributes = {};
+  };
+  const Case cases[] = {
+      {"targetLayer=\"\"", {"targetLayer=\"\""}},
+      {"outputBounds=\"\"", {"outputBounds=\"\""}},
+      {"targetLayer=\"\" outputBounds=\"\"", {"targetLayer=\"\"", "outputBounds=\"\""}},
+      {"targetLayer=\"\" outputBounds=\"0,0,10,10\"",
+       {"targetLayer=\"\"", "outputBounds=\"0,0,10,10\""}},
+      {"targetLayer=\"@target\" outputBounds=\"\"",
+       {"targetLayer=\"@target\"", "outputBounds=\"\""}},
+      {"targetLayer=\"@target\"", {"targetLayer=\"@target\""}},
+      {"targetLayer=\"target\" outputBounds=\"0,0,10,10\"",
+       {"targetLayer=\"target\"", "outputBounds=\"0,0,10,10\""}},
+      {"targetLayer=\"@target\" outputBounds=\"0,0,0,10\"",
+       {"targetLayer=\"@target\"", "outputBounds=\"0,0,0,10\""}},
+  };
+  for (const auto& testCase : cases) {
+    std::string xml = "<pagx width=\"100\" height=\"100\" " + testCase.declaration +
+                      ">\n  <Layer id=\"target\"/>\n</pagx>\n";
+    auto doc = pagx::PAGXImporter::FromXML(xml);
+    ASSERT_TRUE(doc != nullptr) << testCase.declaration;
+    EXPECT_EQ(pagx::ResolveOutputView(doc.get(), nullptr, nullptr), pagx::OutputViewStatus::Invalid)
+        << testCase.declaration;
+    EXPECT_TRUE(pagx::HasDeclaredOutputView(*doc)) << testCase.declaration;
+    EXPECT_EQ(pagx::PAGScene::Make(doc), nullptr) << testCase.declaration;
+
+    auto exported = pagx::PAGXExporter::ToXML(*doc);
+    for (const auto& expected : testCase.expectedAttributes) {
+      EXPECT_NE(exported.find(expected), std::string::npos) << testCase.declaration;
+    }
+    auto reloaded = pagx::PAGXImporter::FromXML(exported);
+    ASSERT_TRUE(reloaded != nullptr) << testCase.declaration;
+    EXPECT_EQ(pagx::ResolveOutputView(reloaded.get(), nullptr, nullptr),
+              pagx::OutputViewStatus::Invalid)
+        << testCase.declaration;
+    EXPECT_EQ(pagx::PAGScene::Make(reloaded), nullptr) << testCase.declaration;
+  }
+}
+
+/**
+ * Test case: clearing the declaration removes the authored text too, so an imported invalid
+ * declaration does not resurface on export after the caller deletes it.
+ */
+PAGX_TEST(PAGXImporterValidationTest, OutputViewClearRemovesInvalidDeclaration) {
+  auto doc = pagx::PAGXImporter::FromXML(
+      "<pagx width=\"100\" height=\"100\" targetLayer=\"\" outputBounds=\"\">"
+      "<Layer id=\"target\"/></pagx>");
+  ASSERT_NE(doc, nullptr);
+  EXPECT_EQ(pagx::ResolveOutputView(doc.get(), nullptr, nullptr), pagx::OutputViewStatus::Invalid);
+  EXPECT_TRUE(pagx::HasDeclaredOutputView(*doc));
+
+  doc->clearOutputView();
+  EXPECT_EQ(pagx::ResolveOutputView(doc.get(), nullptr, nullptr), pagx::OutputViewStatus::None);
+  EXPECT_FALSE(pagx::HasDeclaredOutputView(*doc));
+  auto exported = pagx::PAGXExporter::ToXML(*doc);
+  EXPECT_EQ(exported.find("targetLayer="), std::string::npos);
+  EXPECT_EQ(exported.find("outputBounds="), std::string::npos);
+}
+
+PAGX_TEST(PAGXImporterValidationTest, AbsentOutputViewStaysAbsentAfterExport) {
+  auto doc = pagx::PAGXImporter::FromXML(
+      "<pagx width=\"100\" height=\"100\"><Layer id=\"target\"/></pagx>");
+  ASSERT_NE(doc, nullptr);
+  auto exported = pagx::PAGXExporter::ToXML(*doc);
+  EXPECT_EQ(exported.find("targetLayer="), std::string::npos);
+  EXPECT_EQ(exported.find("outputBounds="), std::string::npos);
+  auto reloaded = pagx::PAGXImporter::FromXML(exported);
+  ASSERT_NE(reloaded, nullptr);
+  EXPECT_EQ(pagx::ResolveOutputView(reloaded.get(), nullptr, nullptr),
+            pagx::OutputViewStatus::None);
+  EXPECT_NE(pagx::PAGScene::Make(reloaded), nullptr);
 }
 
 }  // namespace pag

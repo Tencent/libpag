@@ -362,6 +362,157 @@ CLI_TEST(PAGXCliTest, Bounds_IdAndXPathMutuallyExclusive) {
   EXPECT_NE(ret, 0);
 }
 
+static std::string WriteTempRenderFile(const std::string& name, const std::string& xml) {
+  auto path = TempDir() + "/" + name;
+  std::ofstream out(path);
+  out << xml;
+  return path;
+}
+
+static tgfx::Bitmap RenderCliFile(std::vector<std::string> args, const std::string& path) {
+  args.push_back(path);
+  std::vector<char*> argv = {};
+  for (auto& arg : args) {
+    argv.push_back(arg.data());
+  }
+  return pagx::cli::RenderToBitmap(static_cast<int>(argv.size()), argv.data());
+}
+
+CLI_TEST(PAGXCliTest, Render_DecimalScalePreservesDimensions) {
+  auto path = WriteTempRenderFile(
+      "render_decimal_scale.pagx",
+      "<pagx width=\"100\" height=\"100\"><Layer>"
+      "<Rectangle position=\"50,50\" size=\"100,100\"/><Fill color=\"#3366FF\"/>"
+      "</Layer></pagx>");
+  auto tenth = RenderCliFile({"render", "--scale", "0.1"}, path);
+  ASSERT_FALSE(tenth.isEmpty());
+  EXPECT_EQ(tenth.width(), 10);
+  EXPECT_EQ(tenth.height(), 10);
+  auto fifth = RenderCliFile({"render", "--scale", "0.2"}, path);
+  ASSERT_FALSE(fifth.isEmpty());
+  EXPECT_EQ(fifth.width(), 20);
+  EXPECT_EQ(fifth.height(), 20);
+}
+
+CLI_TEST(PAGXCliTest, Render_TargetViewUsesDocumentWindow) {
+  auto path = WriteTempRenderFile(
+      "render_target_view.pagx",
+      "<pagx width=\"300\" height=\"500\" targetLayer=\"@target\" outputBounds=\"0,0,300,500\">\n"
+      "  <Layer id=\"container\">\n"
+      "    <Layer id=\"preceding\">\n"
+      "      <Rectangle position=\"150,250\" size=\"300,500\"/>\n"
+      "      <Fill color=\"#FF0000\"/>\n"
+      "    </Layer>\n"
+      "    <Layer id=\"target\">\n"
+      "      <Rectangle position=\"40,300\" size=\"80,40\"/>\n"
+      "      <Fill color=\"#0000FF\"/>\n"
+      "    </Layer>\n"
+      "    <Layer id=\"later\"/>\n"
+      "  </Layer>\n"
+      "</pagx>\n");
+  auto bitmap = RenderCliFile({"render"}, path);
+  ASSERT_FALSE(bitmap.isEmpty());
+  EXPECT_EQ(bitmap.width(), 300);
+  EXPECT_EQ(bitmap.height(), 500);
+  // The preceding full-page rectangle is sampling context only; it must not be delivered.
+  EXPECT_NEAR(bitmap.getColor(200, 100).alpha, 0.0f, 0.01f);
+  auto target = bitmap.getColor(40, 300);
+  EXPECT_GT(target.blue, 0.9f);
+  EXPECT_GT(target.alpha, 0.99f);
+}
+
+CLI_TEST(PAGXCliTest, Render_TargetViewBackgroundFillsPaddingAndBlendsAlpha) {
+  auto path = WriteTempRenderFile(
+      "render_target_view_background.pagx",
+      "<pagx width=\"100\" height=\"100\" targetLayer=\"@target\" outputBounds=\"0,0,100,100\">"
+      "<Layer id=\"target\" alpha=\"0.5\">"
+      "<Rectangle position=\"50,50\" size=\"40,40\"/><Fill color=\"#0000FF\"/>"
+      "</Layer></pagx>");
+  auto bitmap = RenderCliFile({"render", "--background", "#00FF00"}, path);
+  ASSERT_FALSE(bitmap.isEmpty());
+  auto padding = bitmap.getColor(10, 10);
+  EXPECT_NEAR(padding.red, 0.0f, 0.01f);
+  EXPECT_NEAR(padding.green, 1.0f, 0.01f);
+  EXPECT_NEAR(padding.blue, 0.0f, 0.01f);
+  EXPECT_NEAR(padding.alpha, 1.0f, 0.01f);
+  auto target = bitmap.getColor(50, 50);
+  EXPECT_NEAR(target.red, 0.0f, 0.01f);
+  EXPECT_NEAR(target.green, 0.5f, 0.01f);
+  EXPECT_NEAR(target.blue, 0.5f, 0.01f);
+  EXPECT_NEAR(target.alpha, 1.0f, 0.01f);
+}
+
+CLI_TEST(PAGXCliTest, Render_TargetViewCropIsRelativeToTarget) {
+  auto path = WriteTempRenderFile(
+      "render_target_view_crop.pagx",
+      "<pagx width=\"300\" height=\"500\" targetLayer=\"@target\" outputBounds=\"0,0,300,500\">\n"
+      "  <Layer id=\"target\">\n"
+      "    <Rectangle position=\"40,300\" size=\"80,40\"/>\n"
+      "    <Fill color=\"#0000FF\"/>\n"
+      "  </Layer>\n"
+      "</pagx>\n");
+  auto bitmap = RenderCliFile({"render", "--crop", "0,0,40,20"}, path);
+  ASSERT_FALSE(bitmap.isEmpty());
+  EXPECT_EQ(bitmap.width(), 40);
+  EXPECT_EQ(bitmap.height(), 20);
+  EXPECT_GT(bitmap.getColor(20, 10).blue, 0.9f);
+}
+
+CLI_TEST(PAGXCliTest, Render_TargetViewExplicitSelectionWins) {
+  auto path = WriteTempRenderFile(
+      "render_target_view_explicit.pagx",
+      "<pagx width=\"300\" height=\"500\" targetLayer=\"@target\" outputBounds=\"0,0,300,500\">\n"
+      "  <Layer id=\"target\">\n"
+      "    <Rectangle position=\"40,300\" size=\"80,40\"/>\n"
+      "    <Fill color=\"#0000FF\"/>\n"
+      "  </Layer>\n"
+      "  <Layer id=\"other\">\n"
+      "    <Rectangle position=\"50,50\" size=\"100,60\"/>\n"
+      "    <Fill color=\"#00FF00\"/>\n"
+      "  </Layer>\n"
+      "</pagx>\n");
+  auto bitmap = RenderCliFile({"render", "--id", "other"}, path);
+  ASSERT_FALSE(bitmap.isEmpty());
+  EXPECT_EQ(bitmap.width(), 100);
+  EXPECT_EQ(bitmap.height(), 60);
+  EXPECT_GT(bitmap.getColor(50, 30).green, 0.9f);
+}
+
+CLI_TEST(PAGXCliTest, Export_TargetViewRejectedByWriters) {
+  auto path = WriteTempRenderFile(
+      "export_target_view.pagx",
+      "<pagx width=\"100\" height=\"100\" targetLayer=\"@target\" outputBounds=\"0,0,50,50\">\n"
+      "  <Layer id=\"target\">\n"
+      "    <Rectangle position=\"50,50\" size=\"100,100\"/>\n"
+      "    <Fill color=\"#3366FF\"/>\n"
+      "  </Layer>\n"
+      "</pagx>\n");
+  for (const auto* format : {"svg", "html", "pptx"}) {
+    auto output = TempDir() + "/export_target_view." + format;
+    auto ret = CallRun(pagx::cli::RunExport,
+                       {"export", "--format", format, "--input", path, "--output", output});
+    EXPECT_NE(ret, 0) << format;
+  }
+}
+
+CLI_TEST(PAGXCliTest, Render_TargetViewRejectsTimeAndInvalidFields) {
+  auto path = WriteTempRenderFile(
+      "render_target_view_time.pagx",
+      "<pagx width=\"100\" height=\"100\" targetLayer=\"@target\" outputBounds=\"0,0,100,100\">\n"
+      "  <Layer id=\"target\"/>\n"
+      "</pagx>\n");
+  EXPECT_TRUE(RenderCliFile({"render", "--time", "0"}, path).isEmpty());
+
+  auto invalidPath = WriteTempRenderFile(
+      "render_target_view_invalid.pagx",
+      "<pagx width=\"100\" height=\"100\" targetLayer=\"@missing\" outputBounds=\"0,0,10,10\">\n"
+      "  <Layer id=\"target\"/>\n"
+      "</pagx>\n");
+  EXPECT_TRUE(RenderCliFile({"render"}, invalidPath).isEmpty());
+  // An explicit selection must not mask an invalid target view.
+  EXPECT_TRUE(RenderCliFile({"render", "--id", "target"}, invalidPath).isEmpty());
+}
+
 //==============================================================================
 // Render tests — Verify rendered output matches baseline screenshots
 //==============================================================================

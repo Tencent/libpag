@@ -40,7 +40,10 @@ class PAGXView {
 
   void registerFonts(const emscripten::val& fontVal, const emscripten::val& emojiFontVal);
 
-  void loadPAGX(const emscripten::val& pagxData);
+  /**
+   * Loads a PAGX document. Returns false if parsing or scene validation fails.
+   */
+  bool loadPAGX(const emscripten::val& pagxData);
 
   void parsePAGX(const emscripten::val& pagxData);
 
@@ -48,7 +51,11 @@ class PAGXView {
 
   bool loadFileData(const std::string& filePath, const emscripten::val& fileData);
 
-  void buildLayers();
+  /**
+   * Creates a scene from the parsed document. Returns false if no document is loaded or its
+   * default output view is invalid or unsupported.
+   */
+  bool buildLayers();
 
   void updateSize();
 
@@ -71,10 +78,16 @@ class PAGXView {
 
   void draw();
 
+  /**
+   * Returns the output window width when a default output view is present, or the document width.
+   */
   float contentWidth() const {
     return pagxWidth;
   }
 
+  /**
+   * Returns the output window height when a default output view is present, or the document height.
+   */
   float contentHeight() const {
     return pagxHeight;
   }
@@ -95,6 +108,8 @@ class PAGXView {
   void applyDisplayTransform();
   void applySceneDisplayOptions();
   bool ensureWindow();
+  void resetScene();
+  bool drawOutputView(tgfx::Context* context);
   void syncSurfaceSize(int canvasWidth, int canvasHeight);
   void advanceTimelines(double frameStartMs);
   void onZoomEnd();
@@ -105,6 +120,7 @@ class PAGXView {
   std::string canvasID = {};
   std::shared_ptr<tgfx::WebGLWindow> window = nullptr;
   std::shared_ptr<tgfx::Surface> tgfxSurface = nullptr;
+  std::shared_ptr<tgfx::Surface> outputSurface = nullptr;
   std::shared_ptr<PAGSurface> pagSurface = nullptr;
   std::shared_ptr<PAGScene> scene = nullptr;
   std::shared_ptr<PAGTimeline> defaultTimeline = nullptr;
@@ -128,6 +144,9 @@ class PAGXView {
   bool presentImmediately = true;
   float pagxWidth = 0.0f;
   float pagxHeight = 0.0f;
+  // Enabled only after PAGScene validates the paired fields. Documents without them use the full
+  // document for framing and rendering.
+  bool hasOutputView = false;
   float contentScale = 1.0f;
   float contentOffsetX = 0.0f;
   float contentOffsetY = 0.0f;

@@ -664,13 +664,22 @@ std::string FloatToString(float value) {
   // angle that almost lines up with a multiple of pi/2) still round-trip through XML losslessly
   // and changing them would alter rendered output for baseline-sensitive callers.
   if (s.find('e') != std::string::npos || s.find('E') != std::string::npos) {
-    // Use 9 fractional digits: this matches FLT_DECIMAL_DIG, the minimum precision that
-    // guarantees every distinct float value serializes to a distinct decimal string and
-    // round-trips back to the same bit pattern. Fewer digits would collapse near-denormal
-    // values (e.g. 1e-30f) onto 0 after the scientific-notation branch is rewritten. Trailing
-    // zeros are stripped below so typical values stay short.
+    // Use 9 fractional digits, which covers every magnitude down to 1e-9 with enough digits to
+    // round-trip. Trailing zeros are stripped below so typical values stay short.
     snprintf(buf, sizeof(buf), "%.9f", value);
     s = buf;
+    if (s.find_first_not_of("-0.") == std::string::npos) {
+      // Nine fractional digits collapse smaller non-zero magnitudes (e.g. 1e-30f) onto zero, which
+      // would turn a positive dimension into an invalid zero. Re-emit with the fractional-digit
+      // count that keeps FLT_DECIMAL_DIG significant digits instead.
+      snprintf(buf, sizeof(buf), "%.9e", value);
+      std::string scientific(buf);
+      auto exponentPos = scientific.find('e');
+      auto exponent =
+          exponentPos != std::string::npos ? atoi(scientific.c_str() + exponentPos + 1) : 0;
+      snprintf(buf, sizeof(buf), "%.*f", exponent < 0 ? 8 - exponent : 0, value);
+      s = buf;
+    }
     auto dot = s.find('.');
     if (dot != std::string::npos) {
       auto last = s.find_last_not_of('0');

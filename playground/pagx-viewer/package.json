@@ -39,7 +39,8 @@
     "build:debug": "npm run build:wasm:debug && npm run build:js",
     "build:release": "npm run build:wasm && npm run build:js:release",
     "build:debug:st": "npm run build:wasm:st:debug && npm run build:js:st",
-    "build:release:st": "npm run build:wasm:st && npm run build:js:st:release"
+    "build:release:st": "npm run build:wasm:st && npm run build:js:st:release",
+    "test:output-view": "node script/test-output-view.js"
   },
   "devDependencies": {
     "@rollup/plugin-alias": "~5.1.1",

@@ -26,6 +26,8 @@
 #include "pagx/nodes/Channel.h"
 #include "pagx/nodes/Composition.h"
 #include "pagx/nodes/Fill.h"
+#include "pagx/nodes/Image.h"
+#include "pagx/nodes/ImagePattern.h"
 #include "pagx/nodes/Layer.h"
 #include "pagx/nodes/Rectangle.h"
 #include "pagx/nodes/SolidColor.h"
@@ -33,6 +35,10 @@
 #include "pagx/runtime/KeyframeEvaluator.h"
 #include "pagx/runtime/KeyframeEvaluatorImpl.h"
 #include "pagx/tgfx.h"
+#include "renderer/LayerBuilder.h"
+#include "tgfx/core/Bitmap.h"
+#include "tgfx/core/Data.h"
+#include "tgfx/core/Pixmap.h"
 #include "tgfx/gpu/Context.h"
 #include "utils/Baseline.h"
 #include "utils/TestUtils.h"
@@ -76,6 +82,17 @@ PAGX_TEST(PAGXRuntimeTest, PAGSceneLiveSceneRegistration) {
 /**
  * Test case: PAGScene timeline lookup by name and identity sharing.
  */
+PAGX_TEST(PAGXRuntimeTest, PAGSceneRejectsInvalidOutputView) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  doc->targetLayerId = "missing";
+  doc->outputBounds = pagx::Rect::MakeXYWH(0, 0, 10, 10);
+  EXPECT_EQ(pagx::PAGScene::Make(doc), nullptr);
+
+  auto incomplete = pagx::PAGXDocument::Make(100, 100);
+  incomplete->targetLayerId = "missing";
+  EXPECT_EQ(pagx::PAGScene::Make(incomplete), nullptr);
+}
+
 PAGX_TEST(PAGXRuntimeTest, PAGSceneTimelineLookup) {
   auto doc = pagx::PAGXDocument::Make(100, 100);
 
@@ -879,6 +896,323 @@ PAGX_PIXEL_TEST(PAGXRuntimeTest, AnimationVisibleChannelWindow) {
   scene->advanceAndApply(500000);
   ASSERT_TRUE(scene->draw(surface));
   EXPECT_TRUE(Baseline::Compare(surface, "PAGXRuntimeTest/AnimationVisibleChannelWindow_hidden"));
+}
+
+static bool ReadSurfacePixels(const std::shared_ptr<pagx::PAGSurface>& surface,
+                              std::vector<uint8_t>* pixels) {
+  tgfx::Bitmap bitmap(surface->width(), surface->height(), false, false);
+  tgfx::Pixmap pixmap(bitmap);
+  if (pixmap.isEmpty() || !surface->readPixels(pixmap.writablePixels(), pixmap.rowBytes())) {
+    return false;
+  }
+  auto* bytes = static_cast<uint8_t*>(pixmap.writablePixels());
+  pixels->assign(bytes, bytes + pixmap.rowBytes() * pixmap.height());
+  return true;
+}
+
+// Builds a 100x100 document whose default output view is a 20x20 window over a red square, so a
+// target-view render shows red in the top-left corner and nothing elsewhere.
+static std::shared_ptr<pagx::PAGXDocument> MakeTargetViewDocument() {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto* layer = doc->makeNode<pagx::Layer>("target");
+  layer->width = 100;
+  layer->height = 100;
+  auto* rect = doc->makeNode<pagx::Rectangle>();
+  rect->size = {10, 10};
+  rect->position = {25, 25};
+  auto* fill = doc->makeNode<pagx::Fill>();
+  auto* solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {1.0f, 0.0f, 0.0f, 1.0f};
+  fill->color = solid;
+  layer->contents = {rect, fill};
+  doc->layers.push_back(layer);
+  doc->targetLayerId = "target";
+  doc->outputBounds = pagx::Rect::MakeXYWH(20, 20, 20, 20);
+  return doc;
+}
+
+/**
+ * Test case: drawing a target-layer view repeatedly to the same surface must produce identical
+ * frames. A PAGSurface keeps one Canvas for its lifetime, so the view transform applied by
+ * PAGScene::draw() has to be scoped to the draw; otherwise every frame accumulates the translate /
+ * scale and the content eventually leaves the output window.
+ */
+PAGX_TEST(PAGXRuntimeTest, RepeatedTargetViewDrawKeepsCanvasState) {
+  auto doc = MakeTargetViewDocument();
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+  auto surface = pagx::PAGSurface::MakeOffscreen(20, 20);
+  ASSERT_TRUE(surface != nullptr);
+
+  std::vector<uint8_t> firstFrame = {};
+  EXPECT_TRUE(scene->hasContentChanged());
+  ASSERT_TRUE(scene->draw(surface));
+  EXPECT_FALSE(scene->hasContentChanged());
+  ASSERT_TRUE(ReadSurfacePixels(surface, &firstFrame));
+  EXPECT_EQ(firstFrame[3], 255u);
+
+  std::vector<uint8_t> secondFrame = {};
+  ASSERT_TRUE(scene->draw(surface));
+  ASSERT_TRUE(ReadSurfacePixels(surface, &secondFrame));
+  EXPECT_EQ(secondFrame, firstFrame);
+  EXPECT_FALSE(scene->hasContentChanged());
+}
+
+/**
+ * Test case: surface-space queries must apply the same output-window shift as draw(). The red
+ * square is centered at root (25,25) and covers (20,20)-(30,30); with an output window starting at
+ * (20,20) it appears at (0,0)-(10,10) on the surface.
+ */
+PAGX_TEST(PAGXRuntimeTest, TargetViewQueriesApplyOutputWindowOrigin) {
+  auto doc = MakeTargetViewDocument();
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+  auto* targetNode = doc->findNode<pagx::Layer>("target");
+  ASSERT_NE(targetNode, nullptr);
+  auto* binding = scene->rootComposition()->binding.get();
+  ASSERT_NE(binding, nullptr);
+  auto runtimeTarget = binding->get<tgfx::Layer>(targetNode);
+  ASSERT_NE(runtimeTarget, nullptr);
+  auto it = scene->layerRegistry.find(runtimeTarget.get());
+  ASSERT_NE(it, scene->layerRegistry.end());
+  auto target = it->second->shared_from_this();
+  ASSERT_NE(target, nullptr);
+
+  auto bounds = scene->getGlobalBounds(target);
+  EXPECT_FLOAT_EQ(bounds.x, 0);
+  EXPECT_FLOAT_EQ(bounds.y, 0);
+  EXPECT_FLOAT_EQ(bounds.width, 10);
+  EXPECT_FLOAT_EQ(bounds.height, 10);
+  EXPECT_TRUE(target->hitTestPoint(5, 5));
+  EXPECT_FALSE(target->hitTestPoint(15, 15));
+  // Local (20,20) maps to surface (0,0), so the root-to-surface matrix translates by -20.
+  auto matrix = target->getGlobalMatrix();
+  EXPECT_FLOAT_EQ(matrix.tx, -20);
+  EXPECT_FLOAT_EQ(matrix.ty, -20);
+
+  // The output-window shift composes with the display zoom and content offset exactly like draw().
+  auto* options = scene->getDisplayOptions();
+  options->setZoomScale(2);
+  options->setContentOffset(10, 5);
+  auto zoomed = scene->getGlobalBounds(target);
+  EXPECT_FLOAT_EQ(zoomed.x, 10);
+  EXPECT_FLOAT_EQ(zoomed.y, 5);
+  EXPECT_FLOAT_EQ(zoomed.width, 20);
+  EXPECT_FLOAT_EQ(zoomed.height, 20);
+  EXPECT_TRUE(target->hitTestPoint(10, 5));
+  EXPECT_FALSE(target->hitTestPoint(0, 0));
+}
+
+/**
+ * Test case: a target that another layer references as its mask must still be drawn. TGFX skips
+ * child layers owned as masks, which used to drop the whole output when the target was such a mask.
+ */
+PAGX_TEST(PAGXRuntimeTest, TargetViewDrawsTargetReferencedAsMask) {
+  auto doc = MakeTargetViewDocument();
+  auto* target = doc->findNode<pagx::Layer>("target");
+  ASSERT_NE(target, nullptr);
+  auto* masked = doc->makeNode<pagx::Layer>("masked");
+  masked->width = 100;
+  masked->height = 100;
+  masked->mask = target;
+  doc->layers.push_back(masked);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+  auto surface = pagx::PAGSurface::MakeOffscreen(20, 20);
+  ASSERT_TRUE(surface != nullptr);
+  ASSERT_TRUE(scene->draw(surface));
+  std::vector<uint8_t> pixels = {};
+  ASSERT_TRUE(ReadSurfacePixels(surface, &pixels));
+  EXPECT_EQ(pixels[3], 255u);
+  // The mask owner is only released for the draw; the document relationship is restored.
+  EXPECT_EQ(masked->mask, target);
+}
+
+PAGX_TEST(PAGXRuntimeTest, OutputViewEditsInvalidateRenderedContent) {
+  auto doc = MakeTargetViewDocument();
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_NE(scene, nullptr);
+  auto surface = pagx::PAGSurface::MakeOffscreen(20, 20);
+  ASSERT_NE(surface, nullptr);
+  ASSERT_TRUE(scene->draw(surface));
+  EXPECT_FALSE(scene->hasContentChanged());
+
+  auto* target = doc->findNode<pagx::Layer>("target");
+  ASSERT_NE(target, nullptr);
+  target->alpha = 0;
+  doc->notifyChange({target}, false);
+  EXPECT_TRUE(scene->hasContentChanged());
+  ASSERT_TRUE(scene->draw(surface));
+  EXPECT_FALSE(scene->hasContentChanged());
+  std::vector<uint8_t> pixels = {};
+  ASSERT_TRUE(ReadSurfacePixels(surface, &pixels));
+  EXPECT_EQ(pixels[3], 0u);
+
+  doc->outputBounds = pagx::Rect::MakeXYWH(10, 10, 20, 20);
+  doc->notifyChange({doc.get()}, false);
+  EXPECT_TRUE(scene->hasContentChanged());
+  ASSERT_TRUE(scene->draw(surface));
+  EXPECT_FALSE(scene->hasContentChanged());
+}
+
+PAGX_TEST(PAGXRuntimeTest, OutputViewDisplayChangesInvalidateRenderedContent) {
+  auto scene = pagx::PAGScene::Make(MakeTargetViewDocument());
+  ASSERT_NE(scene, nullptr);
+  auto surface = pagx::PAGSurface::MakeOffscreen(20, 20);
+  ASSERT_NE(surface, nullptr);
+  ASSERT_TRUE(scene->draw(surface));
+  auto* options = scene->getDisplayOptions();
+
+  options->setZoomScale(2);
+  EXPECT_TRUE(scene->hasContentChanged());
+  ASSERT_TRUE(scene->draw(surface));
+  EXPECT_FALSE(scene->hasContentChanged());
+  options->setZoomScale(2);
+  EXPECT_FALSE(scene->hasContentChanged());
+
+  options->setContentOffset(5, 10);
+  EXPECT_TRUE(scene->hasContentChanged());
+  ASSERT_TRUE(scene->draw(surface));
+  EXPECT_FALSE(scene->hasContentChanged());
+  options->setContentOffset(5, 10);
+  EXPECT_FALSE(scene->hasContentChanged());
+
+  options->setBackgroundColor({0, 0, 1, 1});
+  EXPECT_TRUE(scene->hasContentChanged());
+  ASSERT_TRUE(scene->draw(surface));
+  EXPECT_FALSE(scene->hasContentChanged());
+  options->setBackgroundColor({0, 0, 1, 1});
+  EXPECT_FALSE(scene->hasContentChanged());
+
+  options->setZoomScale(1.5f);
+  ASSERT_TRUE(scene->draw(surface));
+  EXPECT_FALSE(scene->hasContentChanged());
+  options->setZoomScalePrecision(1);
+  EXPECT_TRUE(scene->hasContentChanged());
+  ASSERT_TRUE(scene->draw(surface));
+  EXPECT_FALSE(scene->hasContentChanged());
+  options->setZoomScalePrecision(1);
+  EXPECT_FALSE(scene->hasContentChanged());
+
+  options->setZoomScale(0);
+  EXPECT_TRUE(scene->hasContentChanged());
+  EXPECT_FALSE(scene->draw(surface));
+  EXPECT_TRUE(scene->hasContentChanged());
+}
+
+PAGX_TEST(PAGXRuntimeTest, OutputViewRecordConsumesContentChanges) {
+  auto doc = MakeTargetViewDocument();
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_NE(scene, nullptr);
+  auto device = Devices::MakeDefault();
+  ASSERT_NE(device, nullptr);
+  DeviceLockScope scope(device);
+  ASSERT_TRUE(static_cast<bool>(scope));
+  auto surface = tgfx::Surface::Make(scope.context(), 20, 20);
+  ASSERT_NE(surface, nullptr);
+  auto wrapped = pagx::MakeFrom(device, surface);
+  ASSERT_NE(wrapped, nullptr);
+
+  EXPECT_TRUE(scene->hasContentChanged());
+  auto recording = pagx::Record(scope.context(), scene, wrapped);
+  ASSERT_NE(recording, nullptr);
+  scope.context()->submit(std::move(recording));
+  EXPECT_FALSE(scene->hasContentChanged());
+  scene->getDisplayOptions()->setContentOffset(5, 5);
+  EXPECT_TRUE(scene->hasContentChanged());
+  recording = pagx::Record(scope.context(), scene, wrapped);
+  ASSERT_NE(recording, nullptr);
+  scope.context()->submit(std::move(recording));
+  EXPECT_FALSE(scene->hasContentChanged());
+}
+
+PAGX_TEST(PAGXRuntimeTest, OutputViewImageReplacementInvalidatesRenderedContent) {
+  auto doc = MakeTargetViewDocument();
+  auto* target = doc->findNode<pagx::Layer>("target");
+  ASSERT_NE(target, nullptr);
+  auto* imageNode = doc->makeNode<pagx::Image>();
+  imageNode->filePath = "target.png";
+  auto* pattern = doc->makeNode<pagx::ImagePattern>();
+  pattern->image = imageNode;
+  // A magnified 1x1 image with linear Decal sampling blends with transparent border texels.
+  // Clamp keeps this solid-color fixture opaque so the assertions isolate resource replacement.
+  pattern->tileModeX = pagx::TileMode::Clamp;
+  pattern->tileModeY = pagx::TileMode::Clamp;
+  auto* fill = static_cast<pagx::Fill*>(target->contents.back());
+  fill->color = pattern;
+  const uint8_t red[] = {255, 0, 0, 255};
+  const uint8_t blue[] = {0, 0, 255, 255};
+  auto info =
+      tgfx::ImageInfo::Make(1, 1, tgfx::ColorType::RGBA_8888, tgfx::AlphaType::Premultiplied);
+  auto redImage =
+      pagx::MakeFrom(tgfx::Image::MakeFrom(info, tgfx::Data::MakeWithCopy(red, sizeof(red))));
+  auto blueImage =
+      pagx::MakeFrom(tgfx::Image::MakeFrom(info, tgfx::Data::MakeWithCopy(blue, sizeof(blue))));
+  ASSERT_NE(redImage, nullptr);
+  ASSERT_NE(blueImage, nullptr);
+  ASSERT_TRUE(doc->loadFileData("target.png", redImage));
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_NE(scene, nullptr);
+  auto surface = pagx::PAGSurface::MakeOffscreen(20, 20);
+  ASSERT_NE(surface, nullptr);
+  ASSERT_TRUE(scene->draw(surface));
+  EXPECT_FALSE(scene->hasContentChanged());
+  std::vector<uint8_t> pixels = {};
+  ASSERT_TRUE(ReadSurfacePixels(surface, &pixels));
+  auto sampleOffset = (5 * surface->width() + 5) * 4;
+  EXPECT_EQ(pixels[sampleOffset], 255u);
+  EXPECT_EQ(pixels[sampleOffset + 2], 0u);
+  EXPECT_EQ(pixels[sampleOffset + 3], 255u);
+
+  ASSERT_TRUE(doc->loadFileData("target.png", blueImage));
+  EXPECT_TRUE(scene->hasContentChanged());
+  ASSERT_TRUE(scene->draw(surface));
+  EXPECT_FALSE(scene->hasContentChanged());
+  ASSERT_TRUE(ReadSurfacePixels(surface, &pixels));
+  EXPECT_EQ(pixels[sampleOffset], 0u);
+  EXPECT_EQ(pixels[sampleOffset + 2], 255u);
+  EXPECT_EQ(pixels[sampleOffset + 3], 255u);
+}
+
+/**
+ * Test case: an edit that breaks the target view declaration after the scene was built must make
+ * draw() fail instead of silently switching to a whole-canvas render, consume the pending content
+ * change, and report the invalid state. Clearing both fields returns the document to the
+ * whole-canvas state so a host can recover without rebuilding the scene.
+ */
+PAGX_TEST(PAGXRuntimeTest, InvalidOutputViewAfterEditRejectsDraw) {
+  auto doc = MakeTargetViewDocument();
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+  auto surface = pagx::PAGSurface::MakeOffscreen(20, 20);
+  ASSERT_TRUE(surface != nullptr);
+  ASSERT_TRUE(scene->draw(surface));
+
+  doc->targetLayerId.clear();
+  doc->notifyChange({doc.get()}, true);
+  EXPECT_EQ(scene->getOutputViewStatus(), pagx::OutputViewStatus::Invalid);
+  EXPECT_FALSE(scene->getOutputViewError().empty());
+  EXPECT_FALSE(scene->getOutputBounds().has_value());
+  EXPECT_TRUE(scene->hasContentChanged());
+  EXPECT_FALSE(scene->draw(surface));
+  EXPECT_FALSE(scene->hasContentChanged());
+
+  doc->outputBounds.reset();
+  doc->notifyChange({doc.get()}, true);
+  EXPECT_EQ(scene->getOutputViewStatus(), pagx::OutputViewStatus::None);
+  EXPECT_FALSE(scene->getOutputBounds().has_value());
+  EXPECT_TRUE(scene->draw(surface));
+  EXPECT_FALSE(scene->hasContentChanged());
+
+  doc->targetLayerId = "target";
+  doc->outputBounds = pagx::Rect::MakeXYWH(20, 20, 20, 20);
+  doc->notifyChange({doc.get()}, true);
+  EXPECT_EQ(scene->getOutputViewStatus(), pagx::OutputViewStatus::Valid);
+  ASSERT_TRUE(scene->getOutputBounds().has_value());
+  EXPECT_TRUE(scene->draw(surface));
+  EXPECT_FALSE(scene->hasContentChanged());
 }
 
 // Helper that builds a scene owning a single Animation with the given loop mode. The animation is
