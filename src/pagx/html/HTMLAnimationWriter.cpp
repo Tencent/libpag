@@ -1236,6 +1236,13 @@ struct BundleChannelSet {
   int propertyGroups = 3;
   // Per-group timing, so each split rule keeps only its own stops and easing.
   std::set<Frame> opacityGroupTimes = {};
+  // A hold channel (fauxBold, visibility) needs `steps(1, end)`, and a stop's timing function covers
+  // every property in its rule - so it has to ride a rule of its own or it freezes the linear
+  // channels beside it (composite/17 froze a growing font that way).
+  std::set<Frame> steppedGroupTimes = {};
+  std::unordered_map<Frame, SegmentEasing> steppedGroupEasings = {};
+  std::set<Frame> steppedGroupMixed = {};
+  bool steppedConflict = false;
   std::set<Frame> transformGroupTimes = {};
   std::unordered_map<Frame, SegmentEasing> opacityGroupEasings = {};
   std::unordered_map<Frame, SegmentEasing> transformGroupEasings = {};
@@ -1741,12 +1748,18 @@ BundleChannelSet CollectBundleChannels(
         // Opacity and visibility are their own property group: they can ride their own animation
         // without colliding with the transform/paint group.
         auto role = LookupChannelRole(objTarget->nodeType(), ch->name);
-        bool opacityGroup =
-            role == TargetChannelRole::Opacity || role == TargetChannelRole::LayerVisibility;
-        ExtractChannelTimesAndEasing(
-            ch, opacityGroup ? result.opacityGroupTimes : result.transformGroupTimes,
-            opacityGroup ? result.opacityGroupEasings : result.transformGroupEasings,
-            opacityGroup ? result.opacityGroupMixed : result.transformGroupMixed);
+        bool stepped =
+            role == TargetChannelRole::TextFauxBold || role == TargetChannelRole::LayerVisibility;
+        bool opacityGroup = !stepped && role == TargetChannelRole::Opacity;
+        if (stepped) {
+          ExtractChannelTimesAndEasing(ch, result.steppedGroupTimes, result.steppedGroupEasings,
+                                       result.steppedGroupMixed);
+        } else {
+          ExtractChannelTimesAndEasing(
+              ch, opacityGroup ? result.opacityGroupTimes : result.transformGroupTimes,
+              opacityGroup ? result.opacityGroupEasings : result.transformGroupEasings,
+              opacityGroup ? result.opacityGroupMixed : result.transformGroupMixed);
+        }
       }
     }
   }
@@ -1757,6 +1770,9 @@ BundleChannelSet CollectBundleChannels(
       break;
     }
   }
+  result.steppedConflict =
+      !result.steppedGroupTimes.empty() &&
+      (!result.opacityGroupTimes.empty() || !result.transformGroupTimes.empty());
   if (result.starPointCountCh != nullptr &&
       result.starPointCountCh->valueType() == ChannelValueType::Float) {
     // Everything else about a polystar is linear in the path's coordinates (position and rotation
@@ -2704,6 +2720,7 @@ std::string EvaluateKeyframeCssDecls(const DomTargetBundle& bundle, const Bundle
   // with disjoint properties, because one stop's timing function covers every property in its rule.
   const bool wantsOpacity = (chSet.propertyGroups & 1) != 0;
   const bool wantsRest = (chSet.propertyGroups & 2) != 0;
+  const bool wantsStepped = (chSet.propertyGroups & 4) != 0;
   if (wantsOpacity && chSet.alphaCh != nullptr) {
     float a = alphaOverride != nullptr ? *alphaOverride : EvalFloatChannel(chSet.alphaCh, t, 1.0f);
     AppendCssDecl(decls, "opacity", CssFloatToString(a));
@@ -2716,14 +2733,11 @@ std::string EvaluateKeyframeCssDecls(const DomTargetBundle& bundle, const Bundle
     auto css = BlendModeToMixBlendMode(mode);
     AppendCssDecl(decls, "mix-blend-mode", css != nullptr ? css : "normal");
   }
-  if (wantsOpacity && chSet.visibleCh != nullptr && bundle.primaryHost != nullptr &&
+  if (wantsStepped && chSet.visibleCh != nullptr && bundle.primaryHost != nullptr &&
       bundle.primaryHost->nodeType() == NodeType::Layer) {
     bool visible =
         EvalBoolChannel(chSet.visibleCh, t, static_cast<const Layer*>(bundle.primaryHost)->visible);
     AppendCssDecl(decls, "visibility", visible ? "visible" : "hidden");
-  }
-  if (!wantsRest) {
-    return decls;
   }
   EmitShadowStyleCssAtFrame(bundle, chSet, t, decls);
   const Text* animatedText =
@@ -2757,7 +2771,7 @@ std::string EvaluateKeyframeCssDecls(const DomTargetBundle& bundle, const Bundle
     AppendCssDecl(decls, "font-weight", bold ? "700" : "400");
     AppendCssDecl(decls, "font-style", italic ? "italic" : "normal");
   }
-  if (animatedText != nullptr && chSet.fauxBoldCh != nullptr) {
+  if (wantsStepped && animatedText != nullptr && chSet.fauxBoldCh != nullptr) {
     auto* text = animatedText;
     bool bold = EvalBoolChannel(chSet.fauxBoldCh, t, text->fauxBold);
     // PAGX emboldens by stroking the outline, so the CSS stroke must use PAGX's stroke width
@@ -2768,6 +2782,10 @@ std::string EvaluateKeyframeCssDecls(const DomTargetBundle& bundle, const Bundle
     float width = bold ? FauxBoldStrokeWidth(size) : 0.0f;
     AppendCssDecl(decls, "-webkit-text-stroke-width", CssFloatToString(width) + "px");
     AppendCssDecl(decls, "-webkit-text-stroke-color", "currentColor");
+  }
+  if (!wantsRest) {
+    // A stepped rule carries only its discrete property; pose and paint belong to the continuous one.
+    return decls;
   }
   EmitTransformCssAtFrame(bundle, chSet, t, decls, needsZeroOrigin);
   EmitGeometryCssAtFrame(bundle, chSet, tagName, t, decls, needsZeroOrigin);
@@ -4495,26 +4513,59 @@ std::string HTMLAnimationSession::emitKeyframesAndWeave(std::string& bodyHtml) {
       // gets its own rule (and its own entry in the element's comma-separated animation list).
       std::vector<BundleChannelSet> ruleSets = {};
       std::vector<BundleTimingInfo> ruleTimings = {};
-      if (!chSet.crossGroupConflict) {
-        ruleSets.push_back(chSet);
+      auto addRule = [&](const BundleChannelSet& set) {
+        if (set.keyTimes.empty()) {
+          return;
+        }
+        ruleSets.push_back(set);
+        ruleTimings.push_back(ComputeBundleTiming(anim, mount.offset, set));
+      };
+      if (!chSet.crossGroupConflict && !chSet.steppedConflict) {
+        BundleChannelSet single = chSet;
+        if (!chSet.steppedGroupTimes.empty()) {
+          single.propertyGroups |= 4;
+        }
+        ruleSets.push_back(single);
         ruleTimings.push_back(timing);
       } else {
-        BundleChannelSet opacitySet = chSet;
-        opacitySet.propertyGroups = 1;
-        opacitySet.keyTimes = chSet.opacityGroupTimes;
-        opacitySet.stopEasings = chSet.opacityGroupEasings;
-        opacitySet.mixedEasingTimes = chSet.opacityGroupMixed;
-        BundleChannelSet restSet = chSet;
-        restSet.propertyGroups = 2;
-        restSet.keyTimes = chSet.transformGroupTimes;
-        restSet.stopEasings = chSet.transformGroupEasings;
-        restSet.mixedEasingTimes = chSet.transformGroupMixed;
-        for (const auto* set : {&opacitySet, &restSet}) {
-          if (set->keyTimes.empty()) {
-            continue;
+        if (chSet.steppedConflict) {
+          BundleChannelSet steppedSet = chSet;
+          steppedSet.propertyGroups = 4;
+          steppedSet.keyTimes = chSet.steppedGroupTimes;
+          steppedSet.stopEasings = chSet.steppedGroupEasings;
+          steppedSet.mixedEasingTimes = chSet.steppedGroupMixed;
+          addRule(steppedSet);
+        }
+        if (chSet.crossGroupConflict) {
+          BundleChannelSet opacitySet = chSet;
+          opacitySet.propertyGroups = 1;
+          opacitySet.keyTimes = chSet.opacityGroupTimes;
+          opacitySet.stopEasings = chSet.opacityGroupEasings;
+          opacitySet.mixedEasingTimes = chSet.opacityGroupMixed;
+          addRule(opacitySet);
+          BundleChannelSet restSet = chSet;
+          restSet.propertyGroups = 2;
+          restSet.keyTimes = chSet.transformGroupTimes;
+          restSet.stopEasings = chSet.transformGroupEasings;
+          restSet.mixedEasingTimes = chSet.transformGroupMixed;
+          addRule(restSet);
+        } else {
+          // Opacity agrees with the rest on the curve, so it stays in the same rule.
+          BundleChannelSet restSet = chSet;
+          restSet.propertyGroups = 3;
+          restSet.keyTimes = chSet.transformGroupTimes;
+          restSet.stopEasings = chSet.transformGroupEasings;
+          restSet.mixedEasingTimes = chSet.transformGroupMixed;
+          for (Frame frame : chSet.opacityGroupTimes) {
+            restSet.keyTimes.insert(frame);
           }
-          ruleSets.push_back(*set);
-          ruleTimings.push_back(ComputeBundleTiming(anim, mount.offset, *set));
+          for (const auto& easing : chSet.opacityGroupEasings) {
+            restSet.stopEasings.insert(easing);
+          }
+          for (Frame frame : chSet.opacityGroupMixed) {
+            restSet.mixedEasingTimes.insert(frame);
+          }
+          addRule(restSet);
         }
       }
       std::unordered_map<std::string, std::string> keyframesNameByTag = {};
