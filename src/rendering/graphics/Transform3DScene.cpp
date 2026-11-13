@@ -30,6 +30,8 @@
 
 namespace pag {
 namespace {
+// 场景滤镜固定持有的 8 张全幅纹理(深度/颜色/编码深度 x2/索引 x2/累积 x2) 加 1 张背景源。
+static constexpr int SCENE_FIXED_TEXTURE_COUNT = 9;
 
 std::shared_ptr<tgfx::Image> MakeSource(const std::shared_ptr<Graphic>& graphic, RenderCache* cache,
                                         int width, int height, float scale) {
@@ -115,8 +117,9 @@ class Transform3DScene : public Graphic {
     }
     auto cache = canvas->getCache();
     auto limit = cache->getContext()->gpu()->limits()->maxTextureDimension2D;
-    auto scale = Clamp3DScale(cache->getContext()->gpu(), width, height,
-                              GetMaxScaleFactor(canvas->getMatrix()));
+    auto scale = Clamp3DScale(cache->getContext()->gpu(), cache->getContext()->cacheLimit(),
+                              static_cast<int>(layers.size()) + SCENE_FIXED_TEXTURE_COUNT, width,
+                              height, GetMaxScaleFactor(canvas->getMatrix()));
     if (scale <= 0) {
       return;
     }
@@ -171,10 +174,10 @@ class Transform3DScene : public Graphic {
 
 class CachedTransform3DScene : public Graphic {
  public:
-  CachedTransform3DScene(std::shared_ptr<Graphic> scene, int width, int height)
+  CachedTransform3DScene(std::shared_ptr<Graphic> scene, int textureCount, int width, int height)
       : scene(std::move(scene)), picture(std::static_pointer_cast<Picture>(
                                      Picture::MakeFrom(UniqueID::Next(), this->scene))),
-        width(width), height(height) {
+        textureCount(textureCount), width(width), height(height) {
   }
 
   GraphicType type() const override {
@@ -196,7 +199,8 @@ class CachedTransform3DScene : public Graphic {
   void draw(Canvas* canvas) const override {
     auto cache = canvas->getCache();
     auto gpu = cache->getContext()->gpu();
-    auto scale = Clamp3DScale(gpu, width, height, GetMaxScaleFactor(canvas->getMatrix()));
+    auto scale = Clamp3DScale(gpu, cache->getContext()->cacheLimit(), textureCount, width, height,
+                              GetMaxScaleFactor(canvas->getMatrix()));
     if (!Has3DSupport(gpu)) {
       scene->draw(canvas);
       return;
@@ -220,6 +224,7 @@ class CachedTransform3DScene : public Graphic {
  private:
   std::shared_ptr<Graphic> scene;
   std::shared_ptr<Picture> picture;
+  int textureCount = 0;
   int width = 0;
   int height = 0;
 };
@@ -248,9 +253,11 @@ void Transform3DSceneBuilder::flushScene() {
   if (layers.empty()) {
     return;
   }
+  auto textureCount = static_cast<int>(layers.size()) + SCENE_FIXED_TEXTURE_COUNT;
   auto scene = std::make_shared<Transform3DScene>(Graphic::MakeCompose(std::move(background)),
                                                   std::move(layers), width, height);
-  background = {std::make_shared<CachedTransform3DScene>(std::move(scene), width, height)};
+  background = {
+      std::make_shared<CachedTransform3DScene>(std::move(scene), textureCount, width, height)};
   layers.clear();
 }
 

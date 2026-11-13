@@ -58,7 +58,8 @@ bool Has3DSupport(const tgfx::GPU* gpu) {
          gpu->isFormatRenderable(tgfx::PixelFormat::RGBA_8888);
 }
 
-float Clamp3DScale(const tgfx::GPU* gpu, float width, float height, float scale) {
+float Clamp3DScale(const tgfx::GPU* gpu, size_t memoryBudget, int textureCount, float width,
+                   float height, float scale) {
   if (gpu == nullptr || !std::isfinite(width) || !std::isfinite(height) || !std::isfinite(scale) ||
       width <= 0 || height <= 0 || scale <= 0) {
     return 0;
@@ -68,7 +69,16 @@ float Clamp3DScale(const tgfx::GPU* gpu, float width, float height, float scale)
     return 0;
   }
   auto maximumScale = std::nextafter(static_cast<float>(limit) / std::max(width, height), 0.0f);
-  return std::min(scale, maximumScale);
+  scale = std::min(scale, maximumScale);
+  if (memoryBudget > 0 && textureCount > 0) {
+    // 按目标分辨率下 textureCount 张每像素 4 字节全幅纹理估算工作集，超预算时按面积比降采样，
+    // 避免 4K 合成乘高倍缩放占用 GB 级显存。
+    double perPixel = static_cast<double>(textureCount) * 4.0;
+    double budgetScale = std::sqrt(static_cast<double>(memoryBudget) /
+                                   (perPixel * static_cast<double>(width) * height));
+    scale = std::min(scale, static_cast<float>(budgetScale));
+  }
+  return scale;
 }
 
 bool Has3DTransform(const Layer* layer) {

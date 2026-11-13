@@ -37,8 +37,13 @@ std::shared_ptr<tgfx::Image> Apply3DEffects(std::shared_ptr<tgfx::Image> input, 
 /** 判断 GPU 是否支持三维投影与逐像素透明合成所需的格式和资源限制。 */
 bool Has3DSupport(const tgfx::GPU* gpu);
 
-/** 将三维内容采样比例限制在 GPU 纹理范围内，无效输入返回零。 */
-float Clamp3DScale(const tgfx::GPU* gpu, float width, float height, float scale);
+/**
+ * 将三维内容采样比例限制在 GPU 纹理范围与显存预算内，无效输入返回零。
+ * memoryBudget 为显存预算字节数（通常取 Context 的缓存上限），textureCount 为目标分辨率下
+ * 需同时持有的每像素 4 字节全幅纹理数；超预算时按面积比降采样而非直接失败。
+ */
+float Clamp3DScale(const tgfx::GPU* gpu, size_t memoryBudget, int textureCount, float width,
+                   float height, float scale);
 
 /** 检查图层自身或父链是否包含三维变换。 */
 bool Has3DTransform(const Layer* layer);
