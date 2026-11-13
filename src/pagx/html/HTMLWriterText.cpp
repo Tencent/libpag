@@ -1628,6 +1628,17 @@ void HTMLWriter::writeTextModifier(HTMLBuilder& out, const std::vector<GeoInfo>&
         out.addAttr("style", containerStyle);
         out.closeTagStart();
         std::string fontSizeStr = CssFloatToString(renderFont) + "px";
+        // PAGX lays the glyphs out itself. Flatten the runs so each span sits at the pen position
+        // PAGX measured: inline-block flow picks its own advances, which drift ~2px per glyph and
+        // added up to 8px over four glyphs on composite/18.
+        std::vector<tgfx::Point> glyphPositions;
+        if (text->glyphData != nullptr) {
+          for (auto& run : text->glyphData->layoutRuns) {
+            for (size_t gi = 0; gi < run.positions.size(); gi++) {
+              glyphPositions.push_back(run.positions[gi]);
+            }
+          }
+        }
         const char* p = text->text.c_str();
         size_t charIdx = 0;
         while (*p) {
@@ -1643,7 +1654,14 @@ void HTMLWriter::writeTextModifier(HTMLBuilder& out, const std::vector<GeoInfo>&
           if (isSpace) {
             charStr = "\u00A0";
           }
-          std::string charStyle = "display:inline-block;font-size:" + fontSizeStr;
+          std::string charStyle = "";
+          if (charIdx < glyphPositions.size()) {
+            charStyle = "position:absolute;left:" + CssFloatToString(glyphPositions[charIdx].x) +
+                        "px;top:0;";
+          } else {
+            charStyle = "display:inline-block;";
+          }
+          charStyle += "font-size:" + fontSizeStr;
           std::string transform;
           if (!FloatNearlyZero(modifier->position.x * f) ||
               !FloatNearlyZero(modifier->position.y * f)) {
