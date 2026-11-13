@@ -24,20 +24,36 @@
 
 namespace pagx {
 
-// The first Text element's baseline mode seeds the box layout: a migrated legacy point text
-// sets Alphabetic so its first line's baseline sits at the box origin, matching the legacy
-// renderer (a standalone Text anchors the same way through its own params).
-static TextBaseline FirstTextBaseline(const std::vector<Text*>& childText) {
+// The first Text element's per-text layout attributes seed the box layout: a migrated legacy
+// point text sets Alphabetic so its first line's baseline sits at the box origin, matching the
+// legacy renderer (a standalone Text anchors the same way through its own params); the migrated
+// baselineShift/firstBaseLine ride along the same way.
+struct FirstTextLayoutAttributes {
+  TextBaseline baseline = TextBaseline::LineBox;
+  float firstBaseLine = NAN;
+  float baselineShift = 0.0f;
+  Color backgroundColor = {};
+  float backgroundAlpha = 0.0f;
+};
+
+static FirstTextLayoutAttributes FirstTextLayout(const std::vector<Text*>& childText) {
+  FirstTextLayoutAttributes attributes = {};
   for (auto* text : childText) {
     if (text != nullptr) {
-      return text->baseline;
+      attributes.baseline = text->baseline;
+      attributes.firstBaseLine = text->firstBaseLine;
+      attributes.baselineShift = text->baselineShift;
+      attributes.backgroundColor = text->backgroundColor;
+      attributes.backgroundAlpha = text->backgroundAlpha;
+      return attributes;
     }
   }
-  return TextBaseline::LineBox;
+  return attributes;
 }
 
 static TextLayoutParams MakeTextLayoutParams(const TextBox* textBox, float boxWidth,
-                                             float boxHeight, TextBaseline baseline) {
+                                             float boxHeight,
+                                             const FirstTextLayoutAttributes& first) {
   TextLayoutParams params = {};
   params.boxWidth = boxWidth;
   params.boxHeight = boxHeight;
@@ -47,7 +63,11 @@ static TextLayoutParams MakeTextLayoutParams(const TextBox* textBox, float boxWi
   params.lineHeight = textBox->lineHeight;
   params.wordWrap = textBox->wordWrap;
   params.overflow = textBox->overflow;
-  params.baseline = baseline;
+  params.baseline = first.baseline;
+  params.firstBaseLine = first.firstBaseLine;
+  params.baselineShift = first.baselineShift;
+  params.backgroundColor = first.backgroundColor;
+  params.backgroundAlpha = first.backgroundAlpha;
   return params;
 }
 
@@ -74,7 +94,7 @@ void TextBox::onMeasure(LayoutContext* context) {
   }
   std::vector<Text*> childText = {};
   TextLayout::CollectTextElements(elements, childText);
-  auto params = MakeTextLayoutParams(this, boxW, boxH, FirstTextBaseline(childText));
+  auto params = MakeTextLayoutParams(this, boxW, boxH, FirstTextLayout(childText));
   auto result = TextLayout::Layout(TextLayout::MakeElements(childText), params, context);
   preferredWidth = std::isnan(width) ? result.bounds.width : width;
   preferredHeight = std::isnan(height) ? result.bounds.height : height;
@@ -124,7 +144,7 @@ void TextBox::setLayoutSize(LayoutContext* context, float targetWidth, float tar
         hasPadding ? std::max(0.0f, layoutHeight - padding.top - padding.bottom) : layoutHeight;
     std::vector<Text*> childText = {};
     TextLayout::CollectTextElements(elements, childText);
-    auto params = MakeTextLayoutParams(this, boxW, boxH, FirstTextBaseline(childText));
+    auto params = MakeTextLayoutParams(this, boxW, boxH, FirstTextLayout(childText));
     auto result = TextLayout::Layout(TextLayout::MakeElements(childText), params, context);
     // Measurement result: keep un-rounded so the TextBox mirrors the exact typeset extent.
     // Rounding is reserved for layout-allocation sites (see LayoutNode::setLayoutSize contract).
@@ -167,8 +187,12 @@ void TextBox::updateLayout(LayoutContext* context) {
   // Text elements: typeset with inset bounds, then offset positions by padding.
   std::vector<Text*> childText = {};
   TextLayout::CollectTextElements(elements, childText);
-  auto params = MakeTextLayoutParams(this, cw, ch, FirstTextBaseline(childText));
+  auto params = MakeTextLayoutParams(this, cw, ch, FirstTextLayout(childText));
   auto result = TextLayout::Layout(TextLayout::MakeElements(childText), params, context);
+  // The background path spans the whole box; the renderer reads it from the first child Text.
+  if (!childText.empty() && childText[0] != nullptr) {
+    childText[0]->glyphData->backgroundPath = result.backgroundPath;
+  }
   for (size_t i = 0; i < childText.size(); i++) {
     auto* text = childText[i];
     text->textBounds = result.getTextBounds(text);

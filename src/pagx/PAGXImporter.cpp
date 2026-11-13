@@ -1116,6 +1116,13 @@ static Text* ParseText(const DOMNode* node, PAGXDocument* doc) {
   text->letterSpacing =
       GetFloatAttribute(node, "letterSpacing", Default<Text>().letterSpacing, doc);
   text->tracking = GetFloatAttribute(node, "tracking", Default<Text>().tracking, doc);
+  text->baselineShift =
+      GetFloatAttribute(node, "baselineShift", Default<Text>().baselineShift, doc);
+  text->firstBaseLine =
+      GetFloatAttribute(node, "firstBaseLine", Default<Text>().firstBaseLine, doc);
+  text->backgroundColor = GetColorAttribute(node, "backgroundColor", doc);
+  text->backgroundAlpha =
+      GetFloatAttribute(node, "backgroundAlpha", Default<Text>().backgroundAlpha, doc);
   text->fauxBold = GetBoolAttribute(node, "fauxBold", Default<Text>().fauxBold, doc);
   text->fauxItalic = GetBoolAttribute(node, "fauxItalic", Default<Text>().fauxItalic, doc);
   text->textAnchor = GET_ENUM(node, "textAnchor", "start", doc, TextAnchor);

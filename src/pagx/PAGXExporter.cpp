@@ -833,6 +833,13 @@ static void WriteVectorElement(XMLBuilder& xml, const Element* node, const Optio
       xml.addAttribute("fontSize", text->fontSize, Default<Text>().fontSize);
       xml.addAttribute("letterSpacing", text->letterSpacing, Default<Text>().letterSpacing);
       xml.addAttribute("tracking", text->tracking, Default<Text>().tracking);
+      xml.addAttribute("baselineShift", text->baselineShift, Default<Text>().baselineShift);
+      xml.addOptionalAttribute("firstBaseLine", text->firstBaseLine);
+      if (text->backgroundAlpha > 0.0f) {
+        xml.addAttribute("backgroundColor", ColorToHexString(text->backgroundColor,
+                                                             text->backgroundColor.alpha < 1.0f));
+        xml.addAttribute("backgroundAlpha", text->backgroundAlpha);
+      }
       xml.addAttribute("fauxBold", text->fauxBold, Default<Text>().fauxBold);
       xml.addAttribute("fauxItalic", text->fauxItalic, Default<Text>().fauxItalic);
       if (text->textAnchor != Default<Text>().textAnchor) {

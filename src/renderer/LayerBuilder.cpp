@@ -2704,8 +2704,49 @@ class LayerBuilderContext {
   // Converts a TextBox. The base (static) build renders it as a plain Group; no shared TextHolder
   // is needed because a static tree is never re-shaped. RuntimeLayerBuilderContext overrides this
   // to build a shared TextHolder + per-child coordinate context and thread it through convertGroup.
+  // The migrated legacy text background: a path of merged per-line rounded rectangles built by
+  // the layout (stored on the first child Text), painted below the glyphs. Styles paint backward
+  // within a group, so the background's own FillStyle only reaches the background shape.
+  std::shared_ptr<tgfx::VectorGroup> wrapTextBoxBackground(
+      const TextBox* node, std::shared_ptr<tgfx::VectorGroup> group) {
+    if (group == nullptr || node->elements.empty()) {
+      return group;
+    }
+    std::vector<Text*> childText = {};
+    TextLayout::CollectTextElements(node->elements, childText);
+    if (childText.empty() || childText[0] == nullptr || childText[0]->glyphData == nullptr ||
+        childText[0]->glyphData->backgroundPath == nullptr ||
+        childText[0]->backgroundAlpha <= 0.0f) {
+      return group;
+    }
+    auto* text = childText[0];
+    auto shape = tgfx::ShapePath::Make();
+    auto solid = tgfx::SolidColor::Make(ToTGFX(text->backgroundColor));
+    auto fill = tgfx::FillStyle::Make(solid);
+    if (shape == nullptr || solid == nullptr || fill == nullptr) {
+      return group;
+    }
+    shape->setPath(*text->glyphData->backgroundPath);
+    fill->setAlpha(text->backgroundAlpha);
+    // Painters capture every geometry accumulated in their own context, and a group's geometries
+    // merge into the parent context after the group applies. Sibling groups keep the background
+    // geometry out of the text painters' capture scope and vice versa; a flat list would let the
+    // text's painters re-paint the background shape.
+    std::vector<std::shared_ptr<tgfx::VectorElement>> backgroundElements = {};
+    backgroundElements.push_back(shape);
+    backgroundElements.push_back(fill);
+    auto backgroundGroup = tgfx::VectorGroup::Make();
+    backgroundGroup->setElements(std::move(backgroundElements));
+    std::vector<std::shared_ptr<tgfx::VectorElement>> outerElements = {};
+    outerElements.push_back(backgroundGroup);
+    outerElements.push_back(group);
+    auto outer = tgfx::VectorGroup::Make();
+    outer->setElements(std::move(outerElements));
+    return outer;
+  }
+
   virtual std::shared_ptr<tgfx::VectorGroup> convertTextBox(const TextBox* node) {
-    return convertGroup(node);
+    return wrapTextBoxBackground(node, convertGroup(node));
   }
 
   std::shared_ptr<tgfx::VectorGroup> convertGroup(const Group* node) {
@@ -5088,6 +5129,7 @@ class RuntimeLayerBuilderContext : public LayerBuilderContext {
     _textBoxContext = &context;
     auto group = convertGroup(node);
     _textBoxContext = previous;
+    group = wrapTextBoxBackground(node, group);
     _result.binding.registerTextHolder(context.holder);
     // Container-level layout channels (spec 6.5) route through a runtime target on the TextBox
     // node so justification / leading / box geometry can be animated or ViewModel-bound.

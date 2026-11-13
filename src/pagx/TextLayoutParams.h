@@ -20,6 +20,7 @@
 
 #include <cmath>
 #include <string>
+#include "pagx/types/Color.h"
 #include "pagx/types/Overflow.h"
 #include "pagx/types/ParagraphAlign.h"
 #include "pagx/types/TextAlign.h"
@@ -64,6 +65,14 @@ struct TextLayoutParams {
   Overflow overflow = Overflow::Visible;
   TextBaseline baseline = TextBaseline::LineBox;
   float textScale = 1.0f;
+  // Box text only: the distance from the box top to the first line's baseline. NaN keeps the
+  // default linebox positioning (the linebox baseline replaces it when authored).
+  float firstBaseLine = NAN;
+  // Shifts every line's baseline up by this many pixels (legacy baselineShift).
+  float baselineShift = 0.0f;
+  // Text background: painted below the glyphs as merged per-line rounded rectangles.
+  Color backgroundColor = {};
+  float backgroundAlpha = 0.0f;
 };
 
 }  // namespace pagx

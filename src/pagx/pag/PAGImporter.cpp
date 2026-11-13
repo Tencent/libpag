@@ -2119,7 +2119,7 @@ Text* ReadTextTag(pag::DecodeStream* tagStream, DecodeContext* context) {
     if (header.code == TagCode::End) break;
     auto tagBytes = tagStream->readBytes(header.length);
     if (header.code == TagCode::TextAttributes) {
-      PAGAttributeBlockReader reader(&tagBytes, 14);
+      PAGAttributeBlockReader reader(&tagBytes, 17);
       bool hasPosX = reader.flag(0);
       bool hasPosY = reader.flag(1);
       bool hasWidth = reader.flag(2);
@@ -2134,6 +2134,9 @@ Text* ReadTextTag(pag::DecodeStream* tagStream, DecodeContext* context) {
       text->fauxItalic = reader.flag(11);
       bool hasAnchor = reader.flag(12);
       bool hasBaseline = reader.flag(13);
+      bool hasBaselineShift = reader.flag(14);
+      bool hasFirstBaseLine = reader.flag(15);
+      bool hasBackground = reader.flag(16);
       tagBytes.alignWithBytes();
       if (hasPosX) text->position.x = tagBytes.readFloat();
       if (hasPosY) text->position.y = tagBytes.readFloat();
@@ -2147,6 +2150,12 @@ Text* ReadTextTag(pag::DecodeStream* tagStream, DecodeContext* context) {
       if (hasTracking) text->tracking = tagBytes.readFloat();
       if (hasAnchor) text->textAnchor = static_cast<TextAnchor>(tagBytes.readUint8());
       if (hasBaseline) text->baseline = static_cast<TextBaseline>(tagBytes.readUint8());
+      if (hasBaselineShift) text->baselineShift = tagBytes.readFloat();
+      if (hasFirstBaseLine) text->firstBaseLine = tagBytes.readFloat();
+      if (hasBackground) {
+        text->backgroundColor = ReadPAGColor(&tagBytes);
+        text->backgroundAlpha = tagBytes.readFloat();
+      }
     } else if (header.code == TagCode::GlyphRun) {
       auto* run = ReadGlyphRunTag(&tagBytes, context);
       if (run != nullptr) {

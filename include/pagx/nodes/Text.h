@@ -23,6 +23,7 @@
 #include "pagx/nodes/LayoutNode.h"
 #include "pagx/nodes/Element.h"
 #include "pagx/nodes/GlyphRun.h"
+#include "pagx/types/Color.h"
 #include "pagx/types/Point.h"
 #include "pagx/types/TextAnchor.h"
 #include "pagx/types/TextBaseline.h"
@@ -78,6 +79,29 @@ class Text : public Element, public LayoutNode {
    * letterSpacing + tracking * fontSize / 1000. Unset when NaN (not authored). The default is 0.
    */
   float tracking = 0.0f;
+
+  /**
+   * The baseline shift in pixels for horizontal text. Positive values move every line's baseline
+   * up, matching the legacy drawY = baseline - baselineShift convention. The default is 0.
+   */
+  float baselineShift = 0.0f;
+
+  /**
+   * The distance in pixels from the box top to the first line's baseline, replacing the default
+   * linebox positioning of the first line. Only consumed for box text (a TextBox with an authored
+   * height). Unset when NaN (not authored). The default is NaN.
+   */
+  float firstBaseLine = NAN;
+
+  /**
+   * The text background color, painted below the glyphs of the text block. The default is black.
+   */
+  Color backgroundColor = {};
+
+  /**
+   * The text background opacity in [0, 1]; 0 draws no background. The default is 0.
+   */
+  float backgroundAlpha = 0.0f;
 
   /**
    * Whether to apply algorithmic bolding. The default value is false.

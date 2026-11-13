@@ -28,6 +28,7 @@
 #include "pagx/types/Rect.h"
 #include "tgfx/core/Font.h"
 #include "tgfx/core/Matrix.h"
+#include "tgfx/core/Path.h"
 #include "tgfx/core/Point.h"
 #include "tgfx/core/RSXform.h"
 #include "tgfx/core/TextBlob.h"
@@ -50,6 +51,9 @@ struct Text::GlyphData {
   std::shared_ptr<tgfx::TextBlob> textBlob = nullptr;
   std::vector<tgfx::Point> anchors = {};
   std::vector<TextLayoutGlyphRun> layoutRuns = {};
+  // The text background geometry (merged per-line rounded rectangles) in layout coordinates,
+  // built when the layout's backgroundAlpha is set. The renderer paints it below the glyphs.
+  std::shared_ptr<tgfx::Path> backgroundPath = nullptr;
 };
 
 class Element;
@@ -149,6 +153,11 @@ class TextLayoutResult {
   std::unordered_map<Text*, std::vector<TextLayoutGlyphRun>> layoutGlyphRuns = {};
   std::unordered_map<Text*, std::vector<TextLayoutLineInfo>> textLines = {};
   friend class TextLayoutContext;
+
+ public:
+  // The text background geometry (merged per-line rounded rectangles) in layout coordinates,
+  // built when the layout's backgroundAlpha is set (horizontal layouts only).
+  std::shared_ptr<tgfx::Path> backgroundPath = nullptr;
 };
 
 /**

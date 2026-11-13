@@ -1542,6 +1542,37 @@ Layer* ConvertLayer(ConvertState* state, pag::Layer* legacyLayer, float parentFr
           // with the box's NaN width, Center/End become the legacy centered/right drawX offsets.
           text->baseline = TextBaseline::Alphabetic;
         }
+        // The legacy baselineShift lifts every line's baseline (drawY = baseline - shift) and the
+        // box-text firstBaseLine anchors the first baseline relative to the layer origin; the
+        // box-local conversion subtracts boxTextPos.y. Both act on the rotated frame's baseline
+        // axis for vertical text (a column-position shift in visual space), which the native
+        // vertical layout places differently - defer those to the vertical-geometry round.
+        auto isVerticalText = textDocument->direction == pag::TextDirection::Vertical;
+        if (textDocument->baselineShift != 0) {
+          if (isVerticalText) {
+            state->warn(PAGExportWarning::UnsupportedColorSource,
+                        "vertical text baselineShift (column offset) not migrated");
+          } else {
+            text->baselineShift = textDocument->baselineShift;
+          }
+        }
+        if (textDocument->boxText && textDocument->firstBaseLine != 0) {
+          if (isVerticalText) {
+            state->warn(PAGExportWarning::UnsupportedColorSource,
+                        "vertical text firstBaseLine (column baseline) not migrated");
+          } else {
+            text->firstBaseLine = textDocument->firstBaseLine - textDocument->boxTextPos.y;
+          }
+        }
+        if (textDocument->backgroundAlpha > 0) {
+          if (isVerticalText) {
+            state->warn(PAGExportWarning::UnsupportedColorSource,
+                        "vertical text background not migrated");
+          } else {
+            text->backgroundColor = ConvertColor(textDocument->backgroundColor);
+            text->backgroundAlpha = textDocument->backgroundAlpha / 255.0f;
+          }
+        }
         textBox->elements.push_back(text);
         // The legacy derives line spacing from the document leading (auto = 1.2 x fontSize); the
         // PAGX auto mode uses font metrics instead, so the spacing is always mapped explicitly.
@@ -1557,12 +1588,40 @@ Layer* ConvertLayer(ConvertState* state, pag::Layer* legacyLayer, float parentFr
           state->warn(PAGExportWarning::UnsupportedColorSource,
                       "justified text last-line alignment approximated as start");
         }
+        // The legacy paints StrokeAndFill text as two passes over the glyph paths: fill first,
+        // then the stroke when strokeOverFill is set (the stroke covers the fill edge), or the
+        // reverse otherwise. The element order encodes the same stacking (M0: earlier painters
+        // render below later ones), and the legacy's CopyLines drops the stroke pass entirely
+        // for a stroke-and-fill text whose width is under 0.1px.
+        Element* fillElement = nullptr;
         if (textDocument->applyFill) {
           auto* fill = state->document->makeNode<Fill>();
           auto* solid = state->document->makeNode<SolidColor>();
           solid->color = ConvertColor(textDocument->fillColor);
           fill->color = solid;
-          textBox->elements.push_back(fill);
+          fillElement = fill;
+        }
+        Element* strokeElement = nullptr;
+        if (textDocument->applyStroke && textDocument->strokeWidth >= 0.1f) {
+          auto* stroke = state->document->makeNode<Stroke>();
+          auto* solid = state->document->makeNode<SolidColor>();
+          solid->color = ConvertColor(textDocument->strokeColor);
+          stroke->color = solid;
+          stroke->width = textDocument->strokeWidth;
+          strokeElement = stroke;
+        }
+        if (textDocument->strokeOverFill || strokeElement == nullptr) {
+          if (fillElement != nullptr) {
+            textBox->elements.push_back(fillElement);
+          }
+          if (strokeElement != nullptr) {
+            textBox->elements.push_back(strokeElement);
+          }
+        } else {
+          textBox->elements.push_back(strokeElement);
+          if (fillElement != nullptr) {
+            textBox->elements.push_back(fillElement);
+          }
         }
         layer->contents.push_back(textBox);
         state->convertedTexts.push_back({legacyText, text, state->currentComposition});

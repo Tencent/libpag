@@ -1258,6 +1258,9 @@ void WriteTextTag(pag::EncodeStream* stream, Text* text, EncodeState* state) {
     writer.writeFlag(text->fauxItalic);
     writer.writeFlag(text->textAnchor != TextAnchor::Start);
     writer.writeFlag(text->baseline != TextBaseline::LineBox);
+    writer.writeFlag(text->baselineShift != 0.0f);
+    writer.writeFlag(!std::isnan(text->firstBaseLine));
+    writer.writeFlag(text->backgroundAlpha > 0.0f);
     auto* v = writer.valueStream();
     if (text->position.x != 0.0f) v->writeFloat(text->position.x);
     if (text->position.y != 0.0f) v->writeFloat(text->position.y);
@@ -1274,6 +1277,16 @@ void WriteTextTag(pag::EncodeStream* stream, Text* text, EncodeState* state) {
     }
     if (text->baseline != TextBaseline::LineBox) {
       v->writeUint8(static_cast<uint8_t>(text->baseline));
+    }
+    if (text->baselineShift != 0.0f) {
+      v->writeFloat(text->baselineShift);
+    }
+    if (!std::isnan(text->firstBaseLine)) {
+      v->writeFloat(text->firstBaseLine);
+    }
+    if (text->backgroundAlpha > 0.0f) {
+      WritePAGColor(v, text->backgroundColor);
+      v->writeFloat(text->backgroundAlpha);
     }
     auto block = writer.release();
     WritePAGTagHeader(&content, TagCode::TextAttributes, static_cast<uint32_t>(block->length()));

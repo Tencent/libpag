@@ -33,6 +33,7 @@
 #include "renderer/TextShaper.h"
 #include "renderer/VerticalTextUtils.h"
 #include "tgfx/core/Font.h"
+#include "tgfx/core/PathEffect.h"
 #include "tgfx/core/TextBlob.h"
 #include "tgfx/core/UTF.h"
 
@@ -978,6 +979,8 @@ class TextLayoutContext {
         yOffset -= (halfLeading + firstLine.maxAscent) * firstLine.roundingRatio;
       }
     }
+    // The legacy baselineShift lifts every line's baseline (drawY = baseline - shift).
+    yOffset -= params.baselineShift;
 
     // Use result.horizontalGlyphs to collect positioned glyphs grouped by source Text element.
 
@@ -1018,6 +1021,7 @@ class TextLayoutContext {
       }
     }
 
+    std::vector<BackgroundLine> backgroundLines = {};
     for (size_t lineIdx = 0; lineIdx < lines.size(); lineIdx++) {
       auto& line = lines[lineIdx];
       float relativeBaseline = 0;
@@ -1036,10 +1040,18 @@ class TextLayoutContext {
         relativeBaseline = prevRelativeBaseline + lines[lineIdx - 1].maxLineHeight;
         baselineY = roundf(relativeBaseline + yOffset);
       } else {
-        // Auto line height or first content line: use half-leading model.
-        float halfLeading = (line.maxLineHeight - line.metricsHeight) / 2;
-        relativeBaseline = (relativeTop + halfLeading + line.maxAscent) * line.roundingRatio;
-        baselineY = roundf(relativeBaseline + yOffset);
+        // Auto line height or first content line: use half-leading model. An authored
+        // firstBaseLine (box text) anchors the first content line's baseline that many pixels
+        // below the box top instead, matching the legacy box-text first-baseline semantics;
+        // subsequent lines keep the equal-spacing model through the fixed-lineHeight branch.
+        if (lineIdx == 0 && !line.glyphs.empty() && !std::isnan(params.firstBaseLine)) {
+          relativeBaseline = params.firstBaseLine;
+          baselineY = roundf(relativeBaseline + yOffset);
+        } else {
+          float halfLeading = (line.maxLineHeight - line.metricsHeight) / 2;
+          relativeBaseline = (relativeTop + halfLeading + line.maxAscent) * line.roundingRatio;
+          baselineY = roundf(relativeBaseline + yOffset);
+        }
       }
       prevRelativeBaseline = relativeBaseline;
       hasPrevBaseline = !line.glyphs.empty();
@@ -1164,7 +1176,98 @@ class TextLayoutContext {
       }
 
       RecordPerTextLineMetadata(line, baselineY, xOffset, line.width, result);
+      if (!line.glyphs.empty()) {
+        auto bgLine = BackgroundLine();
+        bgLine.left = xOffset;
+        bgLine.baseline = baselineY;
+        bgLine.width = line.width;
+        bgLine.fontSize = line.glyphs.front().fontSize;
+        // The legacy background band uses the glyphs' INK bounds (min top / max bottom), not the
+        // font metrics ascent/descent, which are taller than the actual ink for most fonts.
+        for (auto& g : line.glyphs) {
+          if (g.unichar == '\n' || g.unichar == '\t') {
+            continue;
+          }
+          auto ink = g.font.getBounds(g.glyphID);
+          bgLine.ascent = std::max(bgLine.ascent, -ink.top);
+          bgLine.descent = std::max(bgLine.descent, ink.bottom);
+        }
+        backgroundLines.push_back(bgLine);
+      }
     }
+    BuildTextBackgroundPath(backgroundLines, params, &result);
+  }
+
+  // A content line's geometry for the text background: the visual left edge (alignment
+  // offset), the baseline, the line width, the line's ascent/descent, and the source font size.
+  struct BackgroundLine {
+    float left = 0;
+    float baseline = 0;
+    float width = 0;
+    float ascent = 0;
+    float descent = 0;
+    float fontSize = 0;
+  };
+
+  // The legacy text background: one rectangle per line (a uniform ascent/descent band across
+  // all lines), outset by fontSize * 0.4, overlapping outset rectangles merged into a continuous
+  // band, corners rounded by min(whole-path min(w, h) / 3, 25). The renderer paints the path
+  // below the glyphs. The legacy margin also grows to the text stroke width when that is wider;
+  // the layout does not see painters, so that term is dropped (no corpus sample combines a
+  // stroke wider than 40 percent of the font size with a background).
+  static void BuildTextBackgroundPath(const std::vector<BackgroundLine>& lines,
+                                      const TextLayoutParams& params, TextLayoutResult* result) {
+    if (lines.empty() || params.backgroundAlpha <= 0.0f ||
+        params.writingMode != WritingMode::Horizontal) {
+      return;
+    }
+    float maxAscent = 0.0f;
+    float maxDescent = 0.0f;
+    float fontSize = 0.0f;
+    for (auto& line : lines) {
+      maxAscent = std::max(maxAscent, line.ascent);
+      maxDescent = std::max(maxDescent, line.descent);
+      fontSize = std::max(fontSize, line.fontSize);
+    }
+    float margin = fontSize * 0.4f;
+    struct Band {
+      float left = 0;
+      float top = 0;
+      float right = 0;
+      float bottom = 0;
+    };
+    std::vector<Band> bands = {};
+    for (auto& line : lines) {
+      Band band = {};
+      band.left = line.left - margin;
+      band.top = line.baseline - maxAscent - margin;
+      band.right = line.left + line.width + margin;
+      band.bottom = line.baseline + maxDescent + margin;
+      if (!bands.empty()) {
+        auto& last = bands.back();
+        if (band.top <= last.bottom) {
+          last.left = std::min(last.left, band.left);
+          last.right = std::max(last.right, band.right);
+          last.bottom = std::max(last.bottom, band.bottom);
+          continue;
+        }
+      }
+      bands.push_back(band);
+    }
+    auto path = std::make_shared<tgfx::Path>();
+    for (auto& band : bands) {
+      path->addRect(tgfx::Rect::MakeLTRB(roundf(band.left), roundf(band.top), roundf(band.right),
+                                         roundf(band.bottom)));
+    }
+    auto bounds = path->getBounds();
+    float maxRadius = std::min(std::min(bounds.width(), bounds.height()) / 3.0f, 25.0f);
+    if (maxRadius > 0.0f) {
+      auto effect = tgfx::PathEffect::MakeCorner(maxRadius);
+      if (effect) {
+        effect->filterPath(path.get());
+      }
+    }
+    result->backgroundPath = path;
   }
 
   static void RemoveTrailingLetterSpacing(std::vector<VerticalGlyphInfo>& glyphs) {
