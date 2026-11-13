@@ -2,11 +2,11 @@
 
 初始来源：[PAGX PR 3826 已确认修复方案](https://chatgpt.com/space/page_10f412c402d08191aed705349af2aac1)。后续确认的方案以本仓库文档为执行和追加入口。
 
-本文档用于在另一个会话中实施 [PR 3826](https://github.com/Tencent/libpag/pull/3826) 已讨论并确认的修复。当前记录命中测试一致性、目标绘制失败传播、复用已有栅格化挂接工具、稳定复用输出视图状态、纯渲染变更的声明校验快路径五项。先扩展已有工具，再接入输出视图；失败传播与稳定状态需要合并实施，校验快路径沿用同一 runtime 恢复时序。后续评论的方案经用户确认后再追加。
+本文档用于在另一个会话中实施 [PR 3826](https://github.com/Tencent/libpag/pull/3826) 已讨论并确认的修复。当前记录命中测试一致性、目标绘制失败传播、复用已有栅格化挂接工具、稳定复用输出视图状态、纯渲染变更的声明校验快路径、输出窗口数值校验复用六项。先扩展已有工具，再接入输出视图；失败传播与稳定状态需要合并实施，校验快路径沿用同一 runtime 恢复时序。后续评论的方案经用户确认后再追加。
 
 ## 当前执行状态
 
-核对日期：2026 年 11 月 13 日。工作目录：`/Users/codywwang/Desktop/PAGX/libpag`。分支：`feature/codywwang_glass`。本次更新前的核对基点为 `b0ef603cc`。执行前重新检查实际工作区与提交，保留其他会话产生的改动。
+核对日期：2026 年 11 月 13 日。工作目录：`/Users/codywwang/Desktop/PAGX/libpag`。分支：`feature/codywwang_glass`。本次更新前的核对基点为 `399aef760`。执行前重新检查实际工作区与提交，保留其他会话产生的改动。
 
 | 项目 | 状态 | 执行动作 |
 | --- | --- | --- |
@@ -15,6 +15,7 @@
 | 复用已有栅格化挂接工具 | 方案已确认，尚未实施 | 扩展 RasterLayerParent，输出视图接入已有实现 |
 | 稳定复用输出视图状态 | 方案已确认，尚未实施 | 仅修改 libpag，不修改 TGFX |
 | 纯渲染变更的声明校验快路径 | 方案已确认，尚未实施 | 只跳过能够证明不影响声明语义的重校验 |
+| 输出窗口数值校验复用 | 方案已确认，尚未实施 | 提取现有规则，导入与程序化校验共用 |
 
 ## 命中测试一致性
 
@@ -289,9 +290,49 @@ Valid target 必须是 Layer，以上白名单节点不可能是 target。上次
 - 白名单批次折叠为空、仅有图片资源通知、多个 scene 与完整重建后，校验事件和快照生命周期正确。
 - 借助测试中的路径观测或 profiler 确认快路径确实省去 resolver 全量扫描；用性能对比分离校验成本与已有 runtime 刷新成本，不使用机器相关耗时阈值作为单元测试门禁。
 
+## 输出窗口数值校验复用
+
+对应 [P2 bounds 合法性校验重复](https://github.com/Tencent/libpag/pull/3826#discussion_r4535363216)。`OutputView.cpp` 的 `IsFiniteRect()` 与 `PAGXImporter.cpp` 中 `ParseOutputBounds()` 尾部具有相同数值规则。按 CR 提取现有实现，importer 只负责严格的字符串解析，再调用同一个数值校验函数。
+
+### 最小修改范围
+
+1. 将现有 `IsFiniteRect()` 原实现移出 `OutputView.cpp` 的匿名命名空间，命名为 `IsValidOutputBounds()`，在已经存在的内部 `src/pagx/utils/OutputView.h` 声明。importer 已包含该头文件，无需新建校验模块或发布 SDK 接口。
+2. `ParseOutputBounds()` 保留四字段、逗号分隔和完整消费字符串的语法检查，删除尾部重复的数值判断。`ParseOutputView()` 将解析结果与共享校验组合；`ResolveOutputView()` 也改用同一个函数。
+3. 不修改通用 `Rect`、`ParseRect()`、`ParseFloatList()` 的规则。它们的宽松解析或空矩形语义与 outputBounds 不同，不能为了复用而替换严格解析器。
+4. 共享数值规则和核心要求说明。importer 继续补充原始属性值、XML 位置，运行时继续提供程序化赋值的错误上下文；不要求两种入口的整条诊断完全相同。
+
+```cpp
+bool IsValidOutputBounds(const Rect& bounds);
+
+// In ParseOutputView:
+bool boundsValid =
+    ParseOutputBounds(boundsAttr, &bounds) && IsValidOutputBounds(bounds);
+```
+
+### 保持现有数值和解析行为
+
+- x、y、width、height 均为有限数，width 和 height 严格大于零。
+- 按原来的 float 加法检查 `x + width`、`y + height` 仍为有限数，不能改成扩大到 double 后才检查。
+- 保留负 origin、正负号、逗号周围空白、科学计数法和可表示的微小正尺寸。
+- 不新增 epsilon 截断、最小像素尺寸或“端点必须严格大于 origin”的条件；大 origin 加极小正 width 被 float 舍入时仍按现有规则处理。
+- 不增加 `errno == ERANGE` 的一概拒绝。`strtof` 可能返回正 subnormal 并报告下溢，仍应根据所得 float 值校验；下溢为零时，width/height 拒绝，origin 按原行为允许。
+- 语法失败或数值不合法时，保留原始非法声明供导出回写，避免变成没有输出声明的全画布文档。`RectToString()`、`FloatToString()` 和 XSD 不在本项修改范围。
+
+### 验收用例
+
+复用 `PAGXImporterValidationTest.OutputViewInvalidBoundsRejected`、`OutputViewBoundsAcceptWhitespaceAndExponents` 和 `OutputViewTinyBoundsRoundTrip`，再补导入文本与程序化设置 Rect 后 `ResolveOutputView()` 的一致性用例：
+
+- 合法负 origin、普通正尺寸、可表示的微小正尺寸和正 subnormal。
+- NaN、正负 Inf、零与负尺寸，包括负零尺寸。
+- 所有分量分别有限但 float 端点相加溢出，例如 `FLT_MAX + FLT_MAX`。
+- 缺逗号、连续或尾部逗号、字段不足或过多、尾部垃圾字符和不完整指数仍被拒绝。
+- 导入错误继续包含原始值和 XML 上下文；程序化非法 bounds 返回 Invalid，修复后的有效数据正常恢复。
+
+程序化用例可使用 `PAGXRuntimeTest.OutputViewBounds` 前缀，导入用例沿用 `PAGXImporterValidationTest.OutputView` 前缀，纳入后述定向命令。先建立有效 target，隔离数值校验失败与目标引用失败，避免测试因另一个错误提前结束。
+
 ## 执行和验证
 
-先读取仓库 `AGENTS.md` 与 `.codebuddy/rules/`、`.claude/rules/` 中的适用规则。代码与注释使用英语，避免 lambda，保持 C++17 和现有风格。只实施本文档确认的项目，保留其他会话的改动。先提取扩展已有 RasterLayerParent 并通过既有栅格化回归，再将输出视图失败传播与稳定状态作为一组接入，最后实现纯渲染校验快路径。保留原有 runtime 恢复时序，不为本 PR 反向改写正确的导出实现。
+先读取仓库 `AGENTS.md` 与 `.codebuddy/rules/`、`.claude/rules/` 中的适用规则。代码与注释使用英语，避免 lambda，保持 C++17 和现有风格。只实施本文档确认的项目，保留其他会话的改动。先提取扩展已有 RasterLayerParent 并通过既有栅格化回归，再将输出视图失败传播与稳定状态作为一组接入；共享 bounds 规则可独立提取并验证，随后实现纯渲染校验快路径。保留原有 runtime 恢复时序，不为本 PR 反向改写正确的导出实现。
 
 在工作目录中先执行格式化、全模块构建和定向测试：
 
@@ -300,7 +341,7 @@ Valid target 必须是 Layer，以上白名单节点不可能是 target。上次
 cmake -G Ninja -DPAG_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Debug -B cmake-build-debug
 cmake --build cmake-build-debug --target PAGFullTest_OpenGL
 ./cmake-build-debug/PAGFullTest_OpenGL \
-  --gtest_filter='PAGXRuntimeTest.*TargetView*:PAGXRuntimeTest.*OutputView*:PAGXTest.HitTest*:PAGXGlassRenderTest.TargetView*:PAGXCliTest.Render_TargetView*:PAGXUtilsTest.RasterLayer*:PAGXUtilsTest.SVGExportPreservesDepthWithoutPerspective:PAGXSVGTest.*Bake*:PAGXPPTTest.*Backdrop*:PAGXPPTTest.*ScrollRect*'
+  --gtest_filter='PAGXRuntimeTest.*TargetView*:PAGXRuntimeTest.*OutputView*:PAGXImporterValidationTest.OutputView*:PAGXTest.HitTest*:PAGXGlassRenderTest.TargetView*:PAGXCliTest.Render_TargetView*:PAGXUtilsTest.RasterLayer*:PAGXUtilsTest.SVGExportPreservesDepthWithoutPerspective:PAGXSVGTest.*Bake*:PAGXPPTTest.*Backdrop*:PAGXPPTTest.*ScrollRect*'
 ```
 
 在基线缓存已同步的环境中执行完整 SwiftShader 回归：
@@ -323,8 +364,8 @@ cmake --build cmake-build-hit-test-swiftshader --target PAGFullTest_OpenGL
 
 ## 交付
 
-按仓库规则仅提交本次修改，不自动推送。共享工具可先提交为 `Reuse raster layer parenting for output views.`；稳定状态与失败传播建议提交信息为 `Reuse target view rendering state and report setup failures.`；校验快路径可单独提交为 `Avoid output view revalidation for proven render only changes.`。最终报告列出修改文件、实际测试结果、未解决的环境或基线问题和 commit ID。本文档后续只追加用户确认后的方案。
+按仓库规则仅提交本次修改，不自动推送。共享工具可先提交为 `Reuse raster layer parenting for output views.`；稳定状态与失败传播建议提交信息为 `Reuse target view rendering state and report setup failures.`；共享 bounds 校验可单独提交为 `Share output bounds validation across import and runtime.`；校验快路径可单独提交为 `Avoid output view revalidation for proven render only changes.`。最终报告列出修改文件、实际测试结果、未解决的环境或基线问题和 commit ID。本文档后续只追加用户确认后的方案。
 
 ```codex-prompt
-请在 /Users/codywwang/Desktop/PAGX/libpag 按本文档已确认的方案执行。先检查当前分支、提交和工作区；命中测试修复已有本地提交 ba4a8a179，复核并回归，避免重复实现。以已有 RasterLayerParent 为基础提取并扩展共享工具，删除 OutputTargetParent；保留已有 Raster 的坐标、无 parent 支持和两种背景输出策略。OutputTargetState 只委托共享工具管理 scene 的跨帧生命周期；CLI 和 Raster 调用保持单次恢复。接通准备失败传播，再加入可证明语义不变的渲染叶子校验快路径；未知变更与 Invalid 全检，重绘通知、runtime 刷新和 wrapper reset 不得被跳过。只修改 libpag，不反向改写正确的既有导出实现。验证 scene、Record、CLI、SVG/PPT、命中、缓存和生命周期行为。遵守仓库规则，保留其他会话改动，仅提交本次修改，不推送。不要扩展到尚未讨论确认的 PR 评论。完成后报告变更、测试、阻塞和 commit ID。
+请在 /Users/codywwang/Desktop/PAGX/libpag 按本文档已确认的方案执行。先检查当前分支、提交和工作区；命中测试修复已有本地提交 ba4a8a179，复核并回归，避免重复实现。以已有 RasterLayerParent 为基础提取并扩展共享工具，删除 OutputTargetParent；保留已有 Raster 的坐标、无 parent 支持和两种背景输出策略。OutputTargetState 只委托共享工具管理 scene 的跨帧生命周期；CLI 和 Raster 调用保持单次恢复。接通准备失败传播，提取现有 bounds 数值校验供导入和运行时共用，保留严格解析及浮点行为。再加入可证明语义不变的渲染叶子校验快路径；未知变更与 Invalid 全检，重绘通知、runtime 刷新和 wrapper reset 不得被跳过。只修改 libpag，不反向改写正确的既有导出实现。验证 scene、Record、CLI、SVG/PPT、导入、命中、缓存和生命周期行为。遵守仓库规则，保留其他会话改动，仅提交本次修改，不推送。不要扩展到尚未讨论确认的 PR 评论。完成后报告变更、测试、阻塞和 commit ID。
 ```
