@@ -300,7 +300,6 @@ void PAGXView::applySceneDisplayOptions() {
   }
   options->setRenderMode(PAGRenderMode::Tiled);
   options->setTileUpdateMode(PAGTileUpdateMode::Smooth);
-  options->setMaxTileCount(512);
   options->setMaxTilesRefinedPerFrame(currentMaxTilesRefinedPerFrame);
 }
 

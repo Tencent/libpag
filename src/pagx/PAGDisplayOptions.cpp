@@ -130,18 +130,6 @@ void PAGDisplayOptions::setTileSize(int tileSize) {
   }
 }
 
-int PAGDisplayOptions::getMaxTileCount() const {
-  auto displayList = getDisplayList();
-  return displayList != nullptr ? displayList->maxTileCount() : 0;
-}
-
-void PAGDisplayOptions::setMaxTileCount(int count) {
-  auto displayList = getDisplayList();
-  if (displayList != nullptr) {
-    displayList->setMaxTileCount(count);
-  }
-}
-
 PAGTileUpdateMode PAGDisplayOptions::getTileUpdateMode() const {
   auto displayList = getDisplayList();
   return displayList != nullptr ? ToPAGX(displayList->tileUpdateMode())

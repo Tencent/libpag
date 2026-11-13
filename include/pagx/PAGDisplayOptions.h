@@ -149,17 +149,6 @@ class PAGDisplayOptions {
   void setTileSize(int tileSize);
 
   /**
-   * Returns the maximum number of tiles that can be created in tiled rendering mode.
-   */
-  int getMaxTileCount() const;
-
-  /**
-   * Sets the maximum number of tiles that can be created in tiled rendering mode.
-   * @param count maximum tile count; implementation may raise too-small values internally.
-   */
-  void setMaxTileCount(int count);
-
-  /**
    * Returns the current tile update mode used in tiled rendering mode.
    */
   PAGTileUpdateMode getTileUpdateMode() const;

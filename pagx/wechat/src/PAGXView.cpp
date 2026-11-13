@@ -109,7 +109,6 @@ constexpr uint64_t BIG_IMG_THRESHOLD = 1000000ULL;
 // Log throttling interval for image load/upgrade logs.
 constexpr uint32_t IMAGE_LOG_THROTTLE = 32;
 // Display list tile and subtree cache configuration.
-constexpr size_t DEFAULT_MAX_TILE_COUNT = 256;
 constexpr size_t DEFAULT_SUBTREE_CACHE_SIZE = 2048;
 // Subtree cache size when zoomed out.
 constexpr size_t ZOOMED_OUT_SUBTREE_CACHE_SIZE = 1024;
@@ -1283,7 +1282,6 @@ void PAGXView::buildLayers() {
   auto* options = scene->getDisplayOptions();
   options->setRenderMode(PAGRenderMode::Tiled);
   options->setTileUpdateMode(PAGTileUpdateMode::Fast);
-  options->setMaxTileCount(static_cast<int>(DEFAULT_MAX_TILE_COUNT));
   options->setMaxTilesRefinedPerFrame(currentMaxTilesRefinedPerFrame);
   options->setSubtreeCacheMaxSize(static_cast<int>(DEFAULT_SUBTREE_CACHE_SIZE));
   options->setBackgroundColor({backgroundTGFXColor.red, backgroundTGFXColor.green,

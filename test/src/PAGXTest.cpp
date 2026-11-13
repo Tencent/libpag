@@ -7205,9 +7205,6 @@ PAGX_TEST(PAGXTest, DisplayOptionsSetGet) {
   options->setTileSize(512);
   EXPECT_EQ(options->getTileSize(), 512);
 
-  options->setMaxTileCount(64);
-  EXPECT_EQ(options->getMaxTileCount(), 64);
-
   EXPECT_EQ(options->getTileUpdateMode(), pagx::PAGTileUpdateMode::Immediate);
   for (auto mode : {pagx::PAGTileUpdateMode::Immediate, pagx::PAGTileUpdateMode::Smooth,
                     pagx::PAGTileUpdateMode::Fast}) {
