@@ -63,7 +63,7 @@ static bool ReadCacheDirArgument(napi_env env, napi_callback_info info, std::str
     return false;
   }
   cacheDir->resize(length);
-  return true;
+  return cacheDir->find('\0') == std::string::npos;
 }
 
 static napi_value SetCacheDir(napi_env env, napi_callback_info info) {
@@ -74,9 +74,9 @@ static napi_value SetCacheDir(napi_env env, napi_callback_info info) {
   return nullptr;
 }
 
-static napi_value SetDefaultCacheDir(napi_env env, napi_callback_info info) {
+static napi_value SetDefaultCacheDirInternal(napi_env env, napi_callback_info info) {
   std::string cacheDir;
-  if (ReadCacheDirArgument(env, info, &cacheDir)) {
+  if (ReadCacheDirArgument(env, info, &cacheDir) && !cacheDir.empty()) {
     NativePlatform::SetDefaultCacheDir(cacheDir);
   }
   return nullptr;
@@ -130,7 +130,7 @@ bool JPAGDiskCache::Init(napi_env env, napi_value exports) {
       PAG_STATIC_METHOD_ENTRY(SetMaxDiskSize, SetMaxDiskSize),
       PAG_STATIC_METHOD_ENTRY(RemoveAll, RemoveAll),
       PAG_STATIC_METHOD_ENTRY(SetCacheDir, SetCacheDir),
-      PAG_STATIC_METHOD_ENTRY(SetDefaultCacheDir, SetDefaultCacheDir),
+      PAG_STATIC_METHOD_ENTRY(SetDefaultCacheDirInternal, SetDefaultCacheDirInternal),
       PAG_STATIC_METHOD_ENTRY(ReadFile, ReadFile),
       PAG_STATIC_METHOD_ENTRY(WriteFile, WriteFile)};
   auto status = DefineClass(env, exports, ClassName(), sizeof(classProp) / sizeof(classProp[0]),

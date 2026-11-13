@@ -20,6 +20,7 @@
 #include <mutex>
 #include "platform/ohos/NativeDisplayLink.h"
 #include "platform/ohos/OHOSSoftwareDecoderWrapper.h"
+#include "rendering/caches/DiskCache.h"
 
 namespace pag {
 static std::mutex DefaultCacheDirLocker = {};
@@ -59,8 +60,14 @@ const Platform* Platform::Current() {
 }
 
 void NativePlatform::SetDefaultCacheDir(const std::string& dir) {
-  std::lock_guard<std::mutex> autoLock(DefaultCacheDirLocker);
-  DefaultCacheDir = dir;
+  if (dir.empty()) {
+    return;
+  }
+  {
+    std::lock_guard<std::mutex> autoLock(DefaultCacheDirLocker);
+    DefaultCacheDir = dir;
+  }
+  DiskCache::SetDefaultCacheDir(dir);
 }
 
 std::string NativePlatform::getCacheDir() const {
