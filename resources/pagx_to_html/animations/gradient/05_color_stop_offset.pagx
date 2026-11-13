@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: ColorStop offset pushes the white band from the left third to the right edge.
+     Target: ColorStop  Channel: offset  Type: float
+     Expect: gap
+     Ref: - -->
+<pagx width="320" height="200">
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F8FAFC"/>
+  </Layer>
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Ellipse position="160,100" size="180,150"/>
+    <Fill>
+      <LinearGradient id="stopShiftGrad" startPoint="0,0" endPoint="1,0">
+        <ColorStop offset="0" color="#0891B2"/>
+        <ColorStop id="midStop" offset="0.2" color="#FFFFFF"/>
+        <ColorStop offset="1" color="#F59E0B"/>
+      </LinearGradient>    </Fill>
+  </Layer>
+  <Animations>
+    <Animation id="bandSlide" duration="60" frameRate="60" loop="once">
+      <Object target="midStop">
+        <Channel name="offset" type="float">
+          <Key time="0" value="0.2" interpolation="linear"/>
+          <Key time="60" value="0.8"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>

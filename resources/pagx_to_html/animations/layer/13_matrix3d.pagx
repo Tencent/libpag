@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: Layer matrix3D rotates the box out of the screen plane instead of scaling it in 2D.
+     Target: Layer  Channel: matrix3D  Type: matrix3D
+     Expect: supported
+     Ref: - -->
+<pagx width="320" height="200">
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F8FAFC"/>
+  </Layer>
+  <Layer id="matrix3DBox" x="120" y="60" width="80" height="80" perspective="400">
+    <Polystar type="polygon" pointCount="4" outerRadius="44" position="40,40"/>
+    <Fill color="#4F46E5"/>
+  </Layer>
+  <Animations>
+    <Animation id="turnIn3D" duration="60" frameRate="60" loop="once">
+      <Object target="matrix3DBox">
+        <Channel name="matrix3D" type="matrix3D">
+          <Key time="0" value="1,0,0,0,0,1,0,0,0,0,1,0,120,60,0,1" interpolation="linear"/>
+          <Key time="60" value="0.5,0,-0.866,0,0,1,0,0,0.866,0,0.5,0,120,60,0,1"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>

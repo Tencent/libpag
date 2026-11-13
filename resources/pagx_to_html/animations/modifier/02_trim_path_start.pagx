@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: TrimPath start eats the stroke from its beginning while the end stays at the full path.
+     Target: TrimPath  Channel: start  Type: float
+     Expect: supported
+     Ref: - -->
+<pagx width="320" height="200">
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F8FAFC"/>
+  </Layer>
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Polystar position="160,100" type="star" pointCount="5" outerRadius="80" innerRadius="34" rotation="-90"/>
+    <TrimPath id="trimStart" type="separate" start="0" end="1"/>
+    <Stroke color="#9333EA" width="14" cap="round"/>
+  </Layer>
+  <Animations>
+    <Animation id="trimIn" duration="60" frameRate="60" loop="once">
+      <Object target="trimStart">
+        <Channel name="start" type="float">
+          <Key time="0" value="0" interpolation="linear"/>
+          <Key time="60" value="0.5"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>

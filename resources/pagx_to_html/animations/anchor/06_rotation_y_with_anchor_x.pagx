@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: rotation.y and anchor.x animate in the same object, so the card turns while its pivot slides across the
+     card; the two channels must compose per frame instead of one overriding the other.
+     Target: Layer  Channel: rotation.y,anchor.x  Type: float
+     Expect: supported
+     Ref: - -->
+<pagx width="320" height="200">
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F8FAFC"/>
+  </Layer>
+  <Layer id="cardBoth" x="100" y="60" width="120" height="80" anchor="0,40" perspective="600">
+    <Rectangle position="60,40" size="120,80" roundness="12"/>
+    <Fill color="#C2410C"/>
+    <Group position="24,24">
+      <Rectangle position="36,16" size="72,32" roundness="8"/>
+      <Fill color="#FED7AA"/>
+    </Group>
+  </Layer>
+  <Animations>
+    <Animation id="cardTurnAndSlide" duration="60" frameRate="60" loop="once">
+      <Object target="cardBoth">
+        <Channel name="rotation.y" type="float">
+          <Key time="0" value="-30" interpolation="linear"/>
+          <Key time="60" value="30"/>
+        </Channel>
+        <Channel name="anchor.x" type="float">
+          <Key time="0" value="0" interpolation="linear"/>
+          <Key time="60" value="120"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>

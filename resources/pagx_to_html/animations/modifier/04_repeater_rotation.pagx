@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: Repeater rotation swings the copies around the layer origin, turning a straight row into an arc.
+     Target: Repeater  Channel: rotation  Type: float
+     Expect: supported
+     Ref: - -->
+<pagx width="320" height="200">
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F8FAFC"/>
+  </Layer>
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle position="150,90" size="50,50" roundness="10"/>
+    <Fill color="#9333EA"/>
+    <Repeater id="copyFan" copies="3" offset="0" anchor="0,0" position="0,0" rotation="0" scale="1,1" startAlpha="1" endAlpha="1"/>
+  </Layer>
+  <Animations>
+    <Animation id="fanOut" duration="60" frameRate="60" loop="once">
+      <Object target="copyFan">
+        <Channel name="rotation" type="float">
+          <Key time="0" value="0" interpolation="linear"/>
+          <Key time="60" value="20"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>

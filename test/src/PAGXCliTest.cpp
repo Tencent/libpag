@@ -2071,6 +2071,64 @@ CLI_TEST(PAGXCliTest, Export_MultipleInputsRejectedForSvg) {
   EXPECT_FALSE(std::filesystem::exists(outputPath));
 }
 
+// HTML-only flags are prefixed like the SVG and PPT ones; the legacy spelling stays accepted so
+// existing scripts keep working.
+CLI_TEST(PAGXCliTest, Export_HtmlNoAnimationsFlagIsPrefixed) {
+  auto inputPath = CopyResourceToTemp(
+      "resources/pagx_to_html/animations/fill/04_alpha_on_text.pagx", "CliHtmlNoAnim.pagx");
+  auto prefixedOutput = TempDir() + "/CliHtmlNoAnim_prefixed.html";
+  auto legacyOutput = TempDir() + "/CliHtmlNoAnim_legacy.html";
+  auto withAnimations = TempDir() + "/CliHtmlNoAnim_on.html";
+
+  EXPECT_EQ(CallRun(pagx::cli::RunExport, {"export", "--html-no-animations", "--input", inputPath,
+                                           "--output", prefixedOutput}),
+            0);
+  EXPECT_EQ(CallRun(pagx::cli::RunExport,
+                    {"export", "--no-animations", "--input", inputPath, "--output", legacyOutput}),
+            0);
+  EXPECT_EQ(
+      CallRun(pagx::cli::RunExport, {"export", "--input", inputPath, "--output", withAnimations}),
+      0);
+
+  auto prefixed = ReadFile(prefixedOutput);
+  auto legacy = ReadFile(legacyOutput);
+  EXPECT_EQ(prefixed.find("@keyframes"), std::string::npos);
+  EXPECT_EQ(prefixed, legacy);
+  EXPECT_NE(ReadFile(withAnimations).find("@keyframes"), std::string::npos);
+}
+
+// A format-scoped flag used with another format used to be dropped without a word, so the export
+// silently produced output the caller did not ask for.
+CLI_TEST(PAGXCliTest, Export_RejectsFormatScopedFlagOnOtherFormat) {
+  auto inputPath = TestResourcePath("render_basic.pagx");
+  auto svgOutput = TempDir() + "/CliRejectFlag.svg";
+  auto htmlOutput = TempDir() + "/CliRejectFlag.html";
+  // The output directory survives between runs, so drop stale files before asserting nothing is
+  // written for the rejected invocations.
+  std::filesystem::remove(svgOutput);
+  std::filesystem::remove(htmlOutput);
+
+  EXPECT_NE(CallRun(pagx::cli::RunExport,
+                    {"export", "--no-animations", "--input", inputPath, "--output", svgOutput}),
+            0);
+  EXPECT_FALSE(std::filesystem::exists(svgOutput));
+
+  EXPECT_NE(CallRun(pagx::cli::RunExport,
+                    {"export", "--svg-indent", "4", "--input", inputPath, "--output", htmlOutput}),
+            0);
+  EXPECT_FALSE(std::filesystem::exists(htmlOutput));
+
+  EXPECT_NE(CallRun(pagx::cli::RunExport, {"export", "--ppt-ignore-glyphruns", "--input", inputPath,
+                                           "--output", svgOutput}),
+            0);
+  EXPECT_FALSE(std::filesystem::exists(svgOutput));
+
+  EXPECT_EQ(CallRun(pagx::cli::RunExport,
+                    {"export", "--svg-indent", "4", "--input", inputPath, "--output", svgOutput}),
+            0);
+  EXPECT_TRUE(std::filesystem::exists(svgOutput));
+}
+
 CLI_TEST(PAGXCliTest, Import_WriteFailure) {
   auto svgPath = ExportToSVG("render_basic.pagx", "ImportSVG_WriteFail.svg");
   auto outputPath = "/nonexistent_dir_xyz/output.pagx";

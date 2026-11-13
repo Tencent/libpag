@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: anchor.z is animated under a static 30 degree rotationX, so the pivot travels along Z and the projected
+     card grows instead of holding one depth.
+     Target: Layer  Channel: anchor.z  Type: float
+     Expect: supported
+     Ref: - -->
+<pagx width="320" height="200">
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F8FAFC"/>
+  </Layer>
+  <Layer id="cardDepth" x="100" y="60" width="120" height="80" anchor="0,80,0" rotationX="30" perspective="600">
+    <Rectangle position="60,40" size="120,80" roundness="12"/>
+    <Fill color="#C2410C"/>
+    <Group position="24,24">
+      <Rectangle position="36,16" size="72,32" roundness="8"/>
+      <Fill color="#FED7AA"/>
+    </Group>
+  </Layer>
+  <Animations>
+    <Animation id="pivotDepth" duration="60" frameRate="60" loop="once">
+      <Object target="cardDepth">
+        <Channel name="anchor.z" type="float">
+          <Key time="0" value="0" interpolation="linear"/>
+          <Key time="60" value="40"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>

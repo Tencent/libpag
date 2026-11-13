@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: an animated x channel stacks on top of a static 30 degree rotationZ instead of replacing
+     it. A static non-unit matrix would override x/y entirely, so the static transform is a component.
+     Target: Layer  Channel: x  Type: float
+     Expect: supported
+     Ref: - -->
+<pagx width="320" height="200">
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F8FAFC"/>
+  </Layer>
+  <Layer id="tiltBox" x="40" y="80" width="80" height="80" rotationZ="30">
+    <Polystar type="polygon" pointCount="4" outerRadius="44" position="40,40"/>
+    <Fill color="#4F46E5"/>
+  </Layer>
+  <Animations>
+    <Animation id="tiltSlide" duration="60" frameRate="60" loop="once">
+      <Object target="tiltBox">
+        <Channel name="x" type="float">
+          <Key time="0" value="40" interpolation="linear"/>
+          <Key time="60" value="160" interpolation="linear"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>

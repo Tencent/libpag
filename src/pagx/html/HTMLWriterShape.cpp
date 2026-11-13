@@ -51,6 +51,21 @@ static float ClampedRectangleRoundness(const Rectangle* rect, const Size& size) 
   return std::min(rect->roundness, std::min(size.width / 2, size.height / 2));
 }
 
+float HTMLWriter::StrokeExtentPad(const Stroke* stroke) {
+  if (stroke == nullptr || !(stroke->width > 0.0f)) {
+    return 0.0f;
+  }
+  switch (stroke->align) {
+    case StrokeAlign::Inside:
+      return 0.0f;
+    case StrokeAlign::Outside:
+      return stroke->width;
+    case StrokeAlign::Center:
+    default:
+      return stroke->width * 0.5f;
+  }
+}
+
 bool HTMLWriter::ComputeGeosBoundingBox(const std::vector<GeoInfo>& geos, float pad,
                                         bool useModifiedPathData, float& outX, float& outY,
                                         float& outW, float& outH) {
@@ -912,15 +927,12 @@ std::string TransformPathDataToSVG(const PathData& pathData, const Matrix& m) {
   return PathDataToSVGString(result);
 }
 
-Matrix BuildRepeaterCopyMatrix(const Repeater* rep, int i) {
+Matrix BuildRepeaterCopyMatrixAtProg(const Repeater* rep, float prog, float rotation) {
   // Mirror the per-copy transform formula writeRepeater applies in HTMLWriterText.cpp. The
   // factoring is deliberate: anchor-out → scale → rotate → translate → anchor-in, composed
   // right-to-left so the anchor (0,0) by default) stays fixed while each copy moves by a
   // progressive delta. Using a shared helper keeps path-level geometry expansion (used when
   // a Repeater lives inside a Group) in lockstep with DOM-level copy emission (outer path).
-  int n = static_cast<int>(std::ceil(rep->copies));
-  int idx = (rep->order == RepeaterOrder::AboveOriginal) ? i : (n - 1 - i);
-  float prog = static_cast<float>(idx) + rep->offset;
   Matrix m = {};
   if (!FloatNearlyZero(rep->anchor.x) || !FloatNearlyZero(rep->anchor.y)) {
     m = Matrix::Translate(-rep->anchor.x, -rep->anchor.y);
@@ -930,7 +942,7 @@ Matrix BuildRepeaterCopyMatrix(const Repeater* rep, int i) {
   if (!FloatNearlyZero(sx - 1.0f) || !FloatNearlyZero(sy - 1.0f)) {
     m = Matrix::Scale(sx, sy) * m;
   }
-  float rot = rep->rotation * prog;
+  float rot = rotation * prog;
   if (!FloatNearlyZero(rot)) {
     m = Matrix::Rotate(rot) * m;
   }
@@ -943,6 +955,16 @@ Matrix BuildRepeaterCopyMatrix(const Repeater* rep, int i) {
     m = Matrix::Translate(rep->anchor.x, rep->anchor.y) * m;
   }
   return m;
+}
+
+Matrix BuildRepeaterCopyMatrix(const Repeater* rep, int i, float rotation) {
+  int n = static_cast<int>(std::ceil(rep->copies));
+  int idx = (rep->order == RepeaterOrder::AboveOriginal) ? i : (n - 1 - i);
+  return BuildRepeaterCopyMatrixAtProg(rep, static_cast<float>(idx) + rep->offset, rotation);
+}
+
+Matrix BuildRepeaterCopyMatrix(const Repeater* rep, int i) {
+  return BuildRepeaterCopyMatrix(rep, i, rep->rotation);
 }
 
 void GeoToPathData(const Element* element, NodeType type, PathData& pathData) {
@@ -1625,6 +1647,10 @@ void HTMLWriter::renderCSSDiv(HTMLBuilder& out, const GeoInfo& geo, const Fill* 
   }
 
   out.openTag("div");
+  auto animId = _ctx->claimAnimatedDomId({fill, geo.element});
+  if (!animId.empty()) {
+    out.addAttr("id", animId);
+  }
   out.addAttr("style", style);
   out.closeTagSelfClosing();
 }
@@ -1663,7 +1689,7 @@ void HTMLWriter::renderSVGConicStroke(HTMLBuilder& out, const std::vector<GeoInf
     renderSVG(out, geos, fill, nullptr, alpha, painterBlend, trim, MergePathMode::Append);
   }
   // Compute bounding box of all geometries including stroke padding.
-  float pad = (stroke->align != StrokeAlign::Center) ? stroke->width * 2.0f : stroke->width;
+  float pad = StrokeExtentPad(stroke);
   float x0 = 0, y0 = 0, bw = 0, bh = 0;
   if (!ComputeGeosBoundingBox(geos, pad, true, x0, y0, bw, bh)) {
     return;
@@ -1913,13 +1939,20 @@ void HTMLWriter::renderSVG(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
   bool conicStroke =
       stroke && stroke->color && stroke->color->nodeType() == NodeType::ConicGradient;
   if (conicStroke) {
+    flushPendingSVGDraws(out);
     renderSVGConicStroke(out, geos, fill, stroke, alpha, painterBlend, trim);
     return;
   }
-  float pad = 0.0f;
-  if (stroke) {
-    pad = (stroke->align != StrokeAlign::Center) ? stroke->width * 2.0f : stroke->width;
+  if (_coalesceSVGDraws && painterBlend == BlendMode::Normal) {
+    float pad = StrokeExtentPad(stroke);
+    float x0 = 0, y0 = 0, sw = 0, sh = 0;
+    if (ComputeGeosBoundingBox(geos, pad, true, x0, y0, sw, sh)) {
+      _pendingSVGDraws.push_back({geos, fill, stroke, alpha, trim});
+    }
+    return;
   }
+  flushPendingSVGDraws(out);
+  float pad = StrokeExtentPad(stroke);
   float x0 = 0, y0 = 0, sw = 0, sh = 0;
   if (!ComputeGeosBoundingBox(geos, pad, true, x0, y0, sw, sh)) {
     return;
@@ -1952,6 +1985,76 @@ void HTMLWriter::renderSVG(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
   out.addAttr("style", svgStyle);
   out.closeTagStart();
 
+  emitSVGContent(out, geos, fill, stroke, 1.0f, trim, x0, y0, sw, sh);
+
+  out.closeTag();  // </svg>
+}
+
+void HTMLWriter::flushPendingSVGDraws(HTMLBuilder& out) {
+  if (_pendingSVGDraws.empty()) {
+    return;
+  }
+  auto draws = std::move(_pendingSVGDraws);
+  _pendingSVGDraws.clear();
+  if (draws.size() == 1) {
+    bool savedCoalesce = _coalesceSVGDraws;
+    _coalesceSVGDraws = false;
+    renderSVG(out, draws[0].geos, draws[0].fill, draws[0].stroke, draws[0].alpha, BlendMode::Normal,
+              draws[0].trim);
+    _coalesceSVGDraws = savedCoalesce;
+    return;
+  }
+  float minX = std::numeric_limits<float>::max();
+  float minY = std::numeric_limits<float>::max();
+  float maxX = std::numeric_limits<float>::lowest();
+  float maxY = std::numeric_limits<float>::lowest();
+  bool hasAny = false;
+  for (const auto& draw : draws) {
+    float pad = StrokeExtentPad(draw.stroke);
+    float x0 = 0, y0 = 0, sw = 0, sh = 0;
+    if (ComputeGeosBoundingBox(draw.geos, pad, true, x0, y0, sw, sh)) {
+      minX = std::min(minX, x0);
+      minY = std::min(minY, y0);
+      maxX = std::max(maxX, x0 + sw);
+      maxY = std::max(maxY, y0 + sh);
+      hasAny = true;
+    }
+  }
+  if (!hasAny || maxX <= minX || maxY <= minY) {
+    return;
+  }
+  float x0 = std::floor(minX);
+  float y0 = std::floor(minY);
+  float sw = std::ceil(maxX) - x0;
+  float sh = std::ceil(maxY) - y0;
+  std::string svgStyle =
+      "position:absolute;left:" + CssFloatToString(x0 + _ctx->savedChildLayerOffsetX) +
+      "px;top:" + CssFloatToString(y0 + _ctx->savedChildLayerOffsetY) + "px";
+  out.openTag("svg");
+  out.addAttr("width", CssFloatToString(sw));
+  out.addAttr("height", CssFloatToString(sh));
+  out.addAttr("viewBox", CssFloatToString(x0) + " " + CssFloatToString(y0) + " " +
+                             CssFloatToString(sw) + " " + CssFloatToString(sh));
+  out.addAttr("style", svgStyle);
+  out.closeTagStart();
+  for (const auto& draw : draws) {
+    float dx0 = x0, dy0 = y0, dsw = sw, dsh = sh;
+    ComputeGeosBoundingBox(draw.geos, 0.0f, true, dx0, dy0, dsw, dsh);
+    emitSVGContent(out, draw.geos, draw.fill, draw.stroke, draw.alpha, draw.trim, dx0, dy0, dsw,
+                   dsh);
+  }
+  out.closeTag();  // </svg>
+}
+
+void HTMLWriter::emitSVGContent(HTMLBuilder& out, const std::vector<GeoInfo>& geos,
+                                const Fill* fill, const Stroke* stroke, float alpha,
+                                const TrimPath* trim, float x0, float y0, float sw, float sh) {
+  bool needOpacityGroup = (alpha < 1.0f);
+  if (needOpacityGroup) {
+    out.openTag("g");
+    out.addAttr("opacity", CssFloatToString(alpha));
+    out.closeTagStart();
+  }
   bool needStrokeClip = stroke && stroke->align != StrokeAlign::Center;
   std::string strokeClipId;
   if (needStrokeClip) {
@@ -1981,8 +2084,12 @@ void HTMLWriter::renderSVG(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
     if (isContinuousTrim && !isContinuousTrimVisible(trim, pathLengths, totalPathLength, geoIdx)) {
       continue;
     }
+    std::string geoAnimId = _ctx->claimAnimatedDomId({stroke, fill, trim, g.element});
     if (!g.modifiedPathData.empty()) {
       out.openTag("path");
+      if (!geoAnimId.empty()) {
+        out.addAttr("id", geoAnimId);
+      }
       out.addAttr("d", g.modifiedPathData);
       applySVGFill(out, trim ? nullptr : fill, x0, y0, sw, sh);
       if (isContinuousTrim) {
@@ -2013,6 +2120,9 @@ void HTMLWriter::renderSVG(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
             d = PathDataToSVGString(pathData);
           }
           out.openTag("path");
+          if (!geoAnimId.empty()) {
+            out.addAttr("id", geoAnimId);
+          }
           out.addAttr("d", d);
         } else {
           auto pos = r->renderPosition();
@@ -2020,6 +2130,9 @@ void HTMLWriter::renderSVG(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
           float x = pos.x - size.width / 2;
           float y = pos.y - size.height / 2;
           out.openTag("rect");
+          if (!geoAnimId.empty()) {
+            out.addAttr("id", geoAnimId);
+          }
           if (!FloatNearlyZero(x)) {
             out.addAttr("x", CssFloatToString(x));
           }
@@ -2051,12 +2164,18 @@ void HTMLWriter::renderSVG(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
           GeoToPathData(g.element, g.type, pathData);
           std::string d = PathDataToSVGString(pathData);
           out.openTag("path");
+          if (!geoAnimId.empty()) {
+            out.addAttr("id", geoAnimId);
+          }
           out.addAttr("d", d);
         } else {
           auto e = static_cast<const Ellipse*>(g.element);
           auto pos = e->renderPosition();
           auto size = e->renderSize();
           out.openTag("ellipse");
+          if (!geoAnimId.empty()) {
+            out.addAttr("id", geoAnimId);
+          }
           out.addAttr("cx", CssFloatToString(pos.x));
           out.addAttr("cy", CssFloatToString(pos.y));
           out.addAttr("rx", CssFloatToString(size.width / 2));
@@ -2077,12 +2196,15 @@ void HTMLWriter::renderSVG(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
         auto p = static_cast<const Path*>(g.element);
         std::string d = GetPathSVGString(p);
         if (!d.empty()) {
-          if (!trim && g.modifiedPathData.empty()) {
+          if (!trim && g.modifiedPathData.empty() && geoAnimId.empty()) {
             auto defId = getOrCreatePathDef(d);
             out.openTag("use");
             out.addAttr("href", "#" + defId);
           } else {
             out.openTag("path");
+            if (!geoAnimId.empty()) {
+              out.addAttr("id", geoAnimId);
+            }
             out.addAttr("d", d);
           }
           applySVGFill(out, trim ? nullptr : fill, x0, y0, sw, sh);
@@ -2101,12 +2223,15 @@ void HTMLWriter::renderSVG(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
         auto ps = static_cast<const Polystar*>(g.element);
         std::string d = BuildPolystarPath(ps);
         if (!d.empty()) {
-          if (!trim && g.modifiedPathData.empty()) {
+          if (!trim && g.modifiedPathData.empty() && geoAnimId.empty()) {
             auto defId = getOrCreatePathDef(d);
             out.openTag("use");
             out.addAttr("href", "#" + defId);
           } else {
             out.openTag("path");
+            if (!geoAnimId.empty()) {
+              out.addAttr("id", geoAnimId);
+            }
             out.addAttr("d", d);
           }
           applySVGFill(out, trim ? nullptr : fill, x0, y0, sw, sh);
@@ -2128,7 +2253,9 @@ void HTMLWriter::renderSVG(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
   if (needStrokeClip) {
     out.closeTag();  // </g> stroke clip group
   }
-  out.closeTag();  // </svg>
+  if (needOpacityGroup) {
+    out.closeTag();  // </g> opacity group
+  }
 }
 
 void HTMLWriter::renderGeo(HTMLBuilder& out, const std::vector<GeoInfo>& geos, const Fill* fill,
@@ -2144,15 +2271,13 @@ void HTMLWriter::renderGeo(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
     painterBlend = stroke->blendMode;
   }
   if (hasMerge) {
+    flushPendingSVGDraws(out);
     std::string mergedPath;
     std::string fillRule = "nonzero";
     bool needClipPath = (mergeMode == MergePathMode::Intersect);
 
     if (needClipPath) {
-      float pad = 0.0f;
-      if (stroke) {
-        pad = (stroke->align != StrokeAlign::Center) ? stroke->width * 2.0f : stroke->width;
-      }
+      float pad = StrokeExtentPad(stroke);
       float x0 = 0, y0 = 0, sw = 0, sh = 0;
       if (!ComputeGeosBoundingBox(geos, pad, false, x0, y0, sw, sh)) {
         return;
@@ -2209,6 +2334,12 @@ void HTMLWriter::renderGeo(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
           out.closeTagStart();
         }
         out.openTag("path");
+        // The merged path is the only tag that can carry the painter's animation; without an id the
+        // weaver has nothing to attach the keyframes to and the animation is dropped.
+        auto mergeAnimId = _ctx->claimAnimatedDomId({fill, stroke});
+        if (!mergeAnimId.empty()) {
+          out.addAttr("id", mergeAnimId);
+        }
         out.addAttr("d", firstPathD);
         applySVGFill(out, fill, x0, y0, sw, sh);
         applySVGStroke(out, stroke);
@@ -2256,10 +2387,7 @@ void HTMLWriter::renderGeo(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
     if (mergedPath.empty()) {
       return;
     }
-    float pad = 0.0f;
-    if (stroke) {
-      pad = (stroke->align != StrokeAlign::Center) ? stroke->width * 2.0f : stroke->width;
-    }
+    float pad = StrokeExtentPad(stroke);
     float x0 = 0, y0 = 0, sw = 0, sh = 0;
     // Include modified path data in the bounding box so Repeater-expanded geometry (which stores
     // the transformed per-copy path in modifiedPathData) drives the SVG viewBox. Using the
@@ -2289,6 +2417,10 @@ void HTMLWriter::renderGeo(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
     out.addAttr("style", svgStyle);
     out.closeTagStart();
     out.openTag("path");
+    auto mergedAnimId = _ctx->claimAnimatedDomId({fill, stroke});
+    if (!mergedAnimId.empty()) {
+      out.addAttr("id", mergedAnimId);
+    }
     out.addAttr("d", mergedPath);
     bool hasMergeFillRule = fillRule != "nonzero";
     if (hasMergeFillRule) {
@@ -2309,6 +2441,7 @@ void HTMLWriter::renderGeo(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
   // 5. Fallback → renderSVG (complex geometries, stroke modes, trims)
   if (fill && fill->color && fill->color->nodeType() == NodeType::DiamondGradient &&
       geos.size() == 1 && !stroke) {
+    flushPendingSVGDraws(out);
     renderDiamondCanvas(out, geos[0], fill, alpha, painterBlend);
     return;
   }
@@ -2320,6 +2453,7 @@ void HTMLWriter::renderGeo(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
     // variants fall through to the CSS branch below, which keeps the HTML DOM-inspectable and
     // avoids writing PNGs for simple tiled fills.
     if (p->image && !ImagePatternCSSable(p)) {
+      flushPendingSVGDraws(out);
       renderImagePatternCanvas(out, geos[0], fill, alpha, painterBlend);
       return;
     }
@@ -2330,10 +2464,12 @@ void HTMLWriter::renderGeo(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
     // foreignObject content is not painted inside <defs>). Fall back to tgfx rasterization when
     // a resource output (static image directory or in-memory resource writer) is available, so
     // the gradient is always visible.
+    flushPendingSVGDraws(out);
     renderConicCanvas(out, geos, fill, alpha, painterBlend);
     return;
   }
   if (canCSS(geos, fill, stroke, hasTrim, false)) {
+    flushPendingSVGDraws(out);
     renderCSSDiv(out, geos[0], fill, alpha, painterBlend);
   } else {
     renderSVG(out, geos, fill, stroke, alpha, painterBlend, trim, mergeMode);

@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: ConicGradient startAngle rotates the color wheel across the card.
+     Target: ConicGradient  Channel: startAngle  Type: float
+     Expect: gap
+     Ref: - -->
+<pagx width="320" height="200">
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F8FAFC"/>
+  </Layer>
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Ellipse position="160,100" size="180,150"/>
+    <Fill>
+      <ConicGradient id="conicSpinGrad" center="0.5,0.5" startAngle="0" endAngle="360">
+        <ColorStop offset="0" color="#0891B2"/>
+        <ColorStop offset="0.5" color="#FFFFFF"/>
+        <ColorStop offset="1" color="#F59E0B"/>
+      </ConicGradient>    </Fill>
+  </Layer>
+  <Animations>
+    <Animation id="wheelTurn" duration="60" frameRate="60" loop="once">
+      <Object target="conicSpinGrad">
+        <Channel name="startAngle" type="float">
+          <Key time="0" value="0" interpolation="linear"/>
+          <Key time="60" value="180"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>

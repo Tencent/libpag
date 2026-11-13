@@ -23,6 +23,7 @@
 #include <fstream>
 #include <iostream>
 #include <string>
+#include "pagx/html/HTMLAnimationWriter.h"
 #include "pagx/html/HTMLBuilder.h"
 #include "pagx/html/HTMLStyleExtractor.h"
 #include "pagx/html/HTMLWriter.h"
@@ -206,6 +207,8 @@ std::string BuildHTML(PAGXDocument& doc, HTMLOutputMode mode, const HTMLExporter
     doc.applyLayout();
   }
 
+  HTMLAnimationSession animSession(doc, ctx, options.exportAnimations);
+
   // Pre-pass: for every compatible PlusDarker Layer, render a cropped backdrop PNG with the layer
   // temporarily hidden. The resulting base64 data URLs are consumed by writeLayer below to emit an
   // SVG filter (feImage + feComposite arithmetic) that matches tgfx PlusDarker pixel-for-pixel.
@@ -271,12 +274,27 @@ std::string BuildHTML(PAGXDocument& doc, HTMLOutputMode mode, const HTMLExporter
     }
     writer.writeLayer(body, layer);
   }
+  std::string bodyStr = body.release();
+
+  // Animation CSS is independent of the font rules: keep it in its own buffer and emit it in its
+  // own <style> so that changing how fonts are written can never drop the keyframes.
+  std::string animationCss;
+  if (animSession.isActive()) {
+    animationCss = animSession.emitKeyframesAndWeave(bodyStr);
+  }
 
   // Insert @font-face rules for embedded WOFF2 fonts
   if (!fontFaceRules.empty()) {
     html.openTag("style");
     html.closeTagStart();
     html.addRawContent(fontFaceRules);
+    html.closeTag();  // </style>
+  }
+
+  if (!animationCss.empty()) {
+    html.openTag("style");
+    html.closeTagStart();
+    html.addRawContent(animationCss);
     html.closeTag();  // </style>
   }
 
@@ -293,7 +311,7 @@ std::string BuildHTML(PAGXDocument& doc, HTMLOutputMode mode, const HTMLExporter
     html.closeTag();  // </svg>
   }
 
-  html.addRawContent(body.release());
+  html.addRawContent(bodyStr);
 
   html.closeTag();  // </div>
 
