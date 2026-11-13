@@ -2,11 +2,11 @@
 
 初始来源：[PAGX PR 3826 已确认修复方案](https://chatgpt.com/space/page_10f412c402d08191aed705349af2aac1)。后续确认的方案以本仓库文档为执行和追加入口。
 
-本文档用于在另一个会话中实施 [PR 3826](https://github.com/Tencent/libpag/pull/3826) 已讨论并确认的修复。当前记录命中测试一致性、目标绘制失败传播、复用已有栅格化挂接工具、稳定复用输出视图状态、纯渲染变更的声明校验快路径、输出窗口数值校验复用六项。先扩展已有工具，再接入输出视图；失败传播与稳定状态需要合并实施，校验快路径沿用同一 runtime 恢复时序。后续评论的方案经用户确认后再追加。
+本文档用于在另一个会话中实施 [PR 3826](https://github.com/Tencent/libpag/pull/3826) 已确认的修复。当前记录命中测试一致性、目标绘制失败传播、复用已有栅格化挂接工具、稳定复用输出视图状态、纯渲染变更的声明校验快路径、输出窗口数值校验复用、统一导出拒绝检查与 CLI 诊断七项。先扩展已有工具，再接入输出视图；失败传播与稳定状态需要合并实施，校验快路径沿用同一 runtime 恢复时序。用户已授权：后续评论经核查能够按 CR 意见处理的，直接记录方案，无需逐条确认；需要偏离 CR 建议或存在未决取舍时，再与用户讨论。
 
 ## 当前执行状态
 
-核对日期：2026 年 11 月 13 日。工作目录：`/Users/codywwang/Desktop/PAGX/libpag`。分支：`feature/codywwang_glass`。本次更新前的核对基点为 `399aef760`。执行前重新检查实际工作区与提交，保留其他会话产生的改动。
+核对日期：2026 年 11 月 13 日。工作目录：`/Users/codywwang/Desktop/PAGX/libpag`。分支：`feature/codywwang_glass`。本次更新前的核对基点为 `6c4159067`。执行前重新检查实际工作区与提交，保留其他会话产生的改动。
 
 | 项目 | 状态 | 执行动作 |
 | --- | --- | --- |
@@ -16,6 +16,7 @@
 | 稳定复用输出视图状态 | 方案已确认，尚未实施 | 仅修改 libpag，不修改 TGFX |
 | 纯渲染变更的声明校验快路径 | 方案已确认，尚未实施 | 只跳过能够证明不影响声明语义的重校验 |
 | 输出窗口数值校验复用 | 方案已确认，尚未实施 | 提取现有规则，导入与程序化校验共用 |
+| 统一导出拒绝检查与 CLI 诊断 | 方案已确认，尚未实施 | 共用声明检查和拒绝原因，复用现有错误接口 |
 
 ## 命中测试一致性
 
@@ -330,9 +331,49 @@ bool boundsValid =
 
 程序化用例可使用 `PAGXRuntimeTest.OutputViewBounds` 前缀，导入用例沿用 `PAGXImporterValidationTest.OutputView` 前缀，纳入后述定向命令。先建立有效 target，隔离数值校验失败与目标引用失败，避免测试因另一个错误提前结束。
 
+## 统一导出拒绝检查与 CLI 诊断
+
+对应 [P2 导出器拒绝逻辑重复且 CLI 丢失拒绝原因](https://github.com/Tencent/libpag/pull/3826#discussion_r4535364628)。按 CR 在已有 OutputView 工具中集中检查与文案，移除 PPT 同一调用链中的重复判断，并让 CLI 明确报告不支持输出视图。继续复用 HTML 的 `errorMsg`、SVG 的 `warnings` 和 PPT `ToData()` 的 `errorMsg`，不新增或修改公共导出 API。
+
+### 公共检查与行为契约
+
+在内部 `src/pagx/utils/OutputView.h/.cpp` 提供一个检查函数，内部继续调用已有 `HasDeclaredOutputView()`。可采用以下签名，返回 true 表示没有需要拒绝的输出视图声明，返回 false 时向非空 `errorMsg` 写入原因：
+
+```cpp
+bool CheckOutputViewExportSupport(const PAGXDocument& document, const char* format,
+                                 std::string* errorMsg);
+```
+
+拒绝原因统一由该实现生成，例如 `SVG export does not support documents with targetLayer/outputBounds.`，格式名称使用 SVG、HTML、PPT。删除各导出器中的重复字面量与 HTML 局部常量。检查声明是否存在，包含只写一个字段、目标缺失、非法 bounds 和 importer 保留的原始非法属性；不能改成仅拒绝 `ResolveOutputView() == Valid`。
+
+### 导出器接入
+
+1. HTML 的 `ToHTML()` 与 `ToData()` 是两个独立入口，分别调用公共检查。`ToFile()` 已委托 `ToHTML()`，不再增加检查。保留已有资源目录、BuildHTML 和内存 ZIP 写入流程，不能只删除其中一个独立入口的保护。
+2. SVG 的 `ToSVG()` 使用公共检查，将拒绝原因写入现有 `warnings`，然后返回空字符串。`ToFile()` 已委托 `ToSVG()` 并透传 warnings，保持该调用关系。
+3. PPT 的 `ToFile()` 和 `ToData()` 均直接调用内部 `BuildSlides()`。将输出视图预扫描统一放到 `BuildSlides()` 开头，在任何页面布局之前检查所有非空文档；移除逐页循环中的同类判断和 `ToData()` 的重复预扫描。保留空文档列表、null 文档、unresolved import 和布局失败的既有处理。
+4. 给内部 `BuildSlides()` 增加可空的错误输出参数。`ToFile()` 显式传 nullptr；`ToData()` 使用局部错误字符串，失败时优先传递具体拒绝原因，否则使用原有通用错误。不能因调用者传入预先填好的 errorMsg 而保留过期原因。保持 ToData 在任意页面含声明时、尚未执行其他页面布局就拒绝的现有顺序。
+
+PPT 保留磁盘 ZIP 与内存 ZIP 两条既有写入路径，不为了共享检查把 `ToFile()` 改成先生成完整内存归档再写文件。
+
+### CLI 接入
+
+- 在 `src/cli/CommandExport.cpp` 中，沿用现有加载失败、import 警告和 unresolved-import 检查的顺序，然后对 SVG、HTML、PPT 调用公共检查。拒绝时输出 `pagx export: error: ` 加共享原因并返回 1，不继续调用导出器。
+- 多页 PPT 对每个输入执行检查，诊断附带对应输入文件名，不能只检查第一页。因此无需为此扩展 `PPTExporter::ToFile()` 的公共错误参数。
+- SVG CLI 传入已有 warnings 参数，并在成功和失败时输出收集的诊断。输出视图错误已由前置检查明确报告，不应重复输出或退化为 `failed to write`。其他写入失败保留原有通用错误，其他 SVG warnings 正常透传。
+- HTML 继续使用已有 errorMsg 传递导出错误；CLI 前置检查与各独立 SDK 导出入口的保护分别负责命令行诊断和直接调用安全，不互相替代。
+
+### 验收用例
+
+- 扩展 `PAGXCliTest.Export_TargetViewRejectedByWriters`，复用测试文件已有的 `StreamCapture` 捕获 stderr，除非零退出码外，断言包含相应格式名称和 `targetLayer/outputBounds`，不再只有 `failed to write`。
+- 覆盖只声明一个字段、非法 bounds、缺失 target 的输入；确认保留的非法声明也被拒绝。
+- 直接覆盖 HTML 的 `ToHTML()`、`ToFile()` 和 `ToData()`，SVG 的 `ToSVG()`/`ToFile()`，PPT 的 `ToFile()`/`ToData()`；失败返回值和已有诊断通道均符合契约。复用 `PAGXHtmlTest.TargetViewZipExportRejected`，不另建平行测试工具。
+- 多页 PPT 第一页正常、后续页面含声明时，两个导出入口都拒绝；ToData 返回具体原因，CLI 指明后续输入文件。验证前面的文档未因该拒绝被提前布局。
+- 在全新、唯一输出路径下验证拒绝不会创建目标文件；普通无声明文档仍能正常导出。SVG CLI 的已有 warnings 能被输出。
+- 新用例沿用各现有测试套件，以 `TargetView` 命名；复用 `PAGXHtmlTest.RootDocument`、`PAGXHTMLDataTest.ToData_BasicArchive`、`PAGXSVGTest.SVGExport_ToFile` 和 `PAGXPPTTest.RectangleSolidFill` 回归正常路径，不用渲染截图基线测试代替拒绝与诊断断言。
+
 ## 执行和验证
 
-先读取仓库 `AGENTS.md` 与 `.codebuddy/rules/`、`.claude/rules/` 中的适用规则。代码与注释使用英语，避免 lambda，保持 C++17 和现有风格。只实施本文档确认的项目，保留其他会话的改动。先提取扩展已有 RasterLayerParent 并通过既有栅格化回归，再将输出视图失败传播与稳定状态作为一组接入；共享 bounds 规则可独立提取并验证，随后实现纯渲染校验快路径。保留原有 runtime 恢复时序，不为本 PR 反向改写正确的导出实现。
+先读取仓库 `AGENTS.md` 与 `.codebuddy/rules/`、`.claude/rules/` 中的适用规则。代码与注释使用英语，避免 lambda，保持 C++17 和现有风格。只实施本文档确认的项目，保留其他会话的改动。先提取扩展已有 RasterLayerParent 并通过既有栅格化回归，再将输出视图失败传播与稳定状态作为一组接入；共享 bounds 规则可独立提取并验证，随后实现纯渲染校验快路径。导出拒绝检查与 CLI 诊断可独立实施，复用已存在的错误接口。保留原有 runtime 恢复时序，不为本 PR 反向改写正确的导出实现。
 
 在工作目录中先执行格式化、全模块构建和定向测试：
 
@@ -341,7 +382,7 @@ bool boundsValid =
 cmake -G Ninja -DPAG_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Debug -B cmake-build-debug
 cmake --build cmake-build-debug --target PAGFullTest_OpenGL
 ./cmake-build-debug/PAGFullTest_OpenGL \
-  --gtest_filter='PAGXRuntimeTest.*TargetView*:PAGXRuntimeTest.*OutputView*:PAGXImporterValidationTest.OutputView*:PAGXTest.HitTest*:PAGXGlassRenderTest.TargetView*:PAGXCliTest.Render_TargetView*:PAGXUtilsTest.RasterLayer*:PAGXUtilsTest.SVGExportPreservesDepthWithoutPerspective:PAGXSVGTest.*Bake*:PAGXPPTTest.*Backdrop*:PAGXPPTTest.*ScrollRect*'
+  --gtest_filter='PAGXRuntimeTest.*TargetView*:PAGXRuntimeTest.*OutputView*:PAGXImporterValidationTest.OutputView*:PAGXTest.HitTest*:PAGXGlassRenderTest.TargetView*:PAGXCliTest.Render_TargetView*:PAGXCliTest.Export_*:PAGXHtmlTest.*TargetView*:PAGXHTMLDataTest.*TargetView*:PAGXSVGTest.*TargetView*:PAGXPPTTest.*TargetView*:PAGXHtmlTest.RootDocument:PAGXHTMLDataTest.ToData_BasicArchive:PAGXSVGTest.SVGExport_ToFile:PAGXPPTTest.RectangleSolidFill:PAGXUtilsTest.RasterLayer*:PAGXUtilsTest.SVGExportPreservesDepthWithoutPerspective:PAGXSVGTest.*Bake*:PAGXPPTTest.*Backdrop*:PAGXPPTTest.*ScrollRect*'
 ```
 
 在基线缓存已同步的环境中执行完整 SwiftShader 回归：
@@ -364,8 +405,8 @@ cmake --build cmake-build-hit-test-swiftshader --target PAGFullTest_OpenGL
 
 ## 交付
 
-按仓库规则仅提交本次修改，不自动推送。共享工具可先提交为 `Reuse raster layer parenting for output views.`；稳定状态与失败传播建议提交信息为 `Reuse target view rendering state and report setup failures.`；共享 bounds 校验可单独提交为 `Share output bounds validation across import and runtime.`；校验快路径可单独提交为 `Avoid output view revalidation for proven render only changes.`。最终报告列出修改文件、实际测试结果、未解决的环境或基线问题和 commit ID。本文档后续只追加用户确认后的方案。
+按仓库规则仅提交本次修改，不自动推送。共享工具可先提交为 `Reuse raster layer parenting for output views.`；稳定状态与失败传播建议提交信息为 `Reuse target view rendering state and report setup failures.`；共享 bounds 校验可单独提交为 `Share output bounds validation across import and runtime.`；校验快路径可单独提交为 `Avoid output view revalidation for proven render only changes.`；导出拒绝与诊断可单独提交为 `Share output view export checks and report rejection reasons.`。最终报告列出修改文件、实际测试结果、未解决的环境或基线问题和 commit ID。本文档后续只追加已确认的方案，或依用户授权经核查能够直接按 CR 意见处理的方案；需要偏离 CR 建议或存在未决取舍时先讨论。
 
 ```codex-prompt
-请在 /Users/codywwang/Desktop/PAGX/libpag 按本文档已确认的方案执行。先检查当前分支、提交和工作区；命中测试修复已有本地提交 ba4a8a179，复核并回归，避免重复实现。以已有 RasterLayerParent 为基础提取并扩展共享工具，删除 OutputTargetParent；保留已有 Raster 的坐标、无 parent 支持和两种背景输出策略。OutputTargetState 只委托共享工具管理 scene 的跨帧生命周期；CLI 和 Raster 调用保持单次恢复。接通准备失败传播，提取现有 bounds 数值校验供导入和运行时共用，保留严格解析及浮点行为。再加入可证明语义不变的渲染叶子校验快路径；未知变更与 Invalid 全检，重绘通知、runtime 刷新和 wrapper reset 不得被跳过。只修改 libpag，不反向改写正确的既有导出实现。验证 scene、Record、CLI、SVG/PPT、导入、命中、缓存和生命周期行为。遵守仓库规则，保留其他会话改动，仅提交本次修改，不推送。不要扩展到尚未讨论确认的 PR 评论。完成后报告变更、测试、阻塞和 commit ID。
+请在 /Users/codywwang/Desktop/PAGX/libpag 按本文档已确认的方案执行。先检查当前分支、提交和工作区；命中测试修复已有本地提交 ba4a8a179，复核并回归，避免重复实现。以已有 RasterLayerParent 为基础提取并扩展共享工具，删除 OutputTargetParent；保留已有 Raster 的坐标、无 parent 支持和两种背景输出策略。OutputTargetState 只委托共享工具管理 scene 的跨帧生命周期；CLI 和 Raster 调用保持单次恢复。接通准备失败传播，提取现有 bounds 数值校验供导入和运行时共用，保留严格解析及浮点行为。再加入可证明语义不变的渲染叶子校验快路径；未知变更与 Invalid 全检，重绘通知、runtime 刷新和 wrapper reset 不得被跳过。统一导出输出视图的声明拒绝检查和文案，保留 HTML 独立入口保护，将 PPT 同链检查收拢到 BuildSlides，并复用已有错误接口补齐 CLI 诊断和 SVG warnings。只修改 libpag，不反向改写正确的既有导出实现。验证 scene、Record、CLI、HTML/SVG/PPT、导入、命中、缓存和生命周期行为。遵守仓库规则，保留其他会话改动，仅提交本次修改，不推送。不要扩展到本文档尚未收录的 PR 评论。完成后报告变更、测试、阻塞和 commit ID。
 ```
