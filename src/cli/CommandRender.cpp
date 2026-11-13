@@ -29,6 +29,7 @@
 #include <iostream>
 #include <string>
 #include "cli/CliUtils.h"
+#include "pag/pag.h"
 #include "cli/XPathQuery.h"
 #include "pagx/FontConfig.h"
 #include "pagx/PAGAnimation.h"
@@ -70,6 +71,10 @@ struct RenderOptions {
   std::string xpath = {};
   std::vector<std::string> fontFiles = {};
   std::vector<std::string> fallbacks = {};
+  // Render a legacy PAG file through the PAGFile/PAGPlayer pipeline instead of the PAGX scene
+  // pipeline. Used by the migration comparison tooling to render a PAGX-exported .pag with the
+  // legacy runtime.
+  bool legacy = false;
   // When set, the document's animations are evaluated at this playback time (in seconds) and the
   // resulting frame is rendered through the runtime animation path (PAGScene + PAGTimeline) rather
   // than the static layer-tree path. Negative means "no time requested" (static render).
@@ -95,7 +100,10 @@ static void PrintRenderUsage() {
       << "  --background <color>      Background color (hex: #RRGGBB or #RRGGBBAA)\n"
       << "  --font <path>             Register a font file (can be specified multiple times)\n"
       << "  --fallback <path|name>    Add a fallback font file or system font name (can be\n"
-         "                            specified multiple times)\n";
+         "                            specified multiple times)\n"
+      << "  --legacy                  Render a legacy PAG file through the PAGPlayer pipeline\n"
+         "                            (incompatible with --crop, --id, --xpath, --background,\n"
+         "                            --font and --fallback)\n";
 }
 
 static bool ParseHexColor(const std::string& hex, float* red, float* green, float* blue,
@@ -210,6 +218,8 @@ static int ParseRenderOptions(int argc, char* argv[], RenderOptions* options) {
       options->id = argv[++i];
     } else if (arg == "--xpath" && i + 1 < argc) {
       options->xpath = argv[++i];
+    } else if (arg == "--legacy") {
+      options->legacy = true;
     } else if (arg == "--font" && i + 1 < argc) {
       options->fontFiles.push_back(argv[++i]);
     } else if (arg == "--fallback" && i + 1 < argc) {
@@ -227,6 +237,13 @@ static int ParseRenderOptions(int argc, char* argv[], RenderOptions* options) {
   }
   if (!options->id.empty() && !options->xpath.empty()) {
     std::cerr << "pagx render: --id and --xpath are mutually exclusive\n";
+    return 1;
+  }
+  if (options->legacy && (options->hasCrop || !options->id.empty() || !options->xpath.empty() ||
+                           options->hasBackground || !options->fontFiles.empty() ||
+                           !options->fallbacks.empty())) {
+    std::cerr << "pagx render: --legacy cannot be combined with --crop, --id, --xpath, "
+                 "--background, --font or --fallback\n";
     return 1;
   }
   if (options->hasTime && (!options->id.empty() || !options->xpath.empty())) {
@@ -349,7 +366,53 @@ static tgfx::Bitmap RenderAnimatedFrame(const std::shared_ptr<PAGXDocument>& doc
   return bitmap;
 }
 
+// Renders a legacy PAG file through the PAGFile/PAGPlayer pipeline: the composition auto-fits
+// the offscreen surface (PAGPlayer's default matrix scales it), --time maps to the playback
+// progress, and --scale drives the surface size.
+static tgfx::Bitmap RenderLegacyFrame(const RenderOptions& options) {
+  auto pagFile = pag::PAGFile::Load(options.inputFile);
+  if (pagFile == nullptr) {
+    std::cerr << "pagx render: failed to load legacy PAG '" << options.inputFile << "'\n";
+    return {};
+  }
+  auto width = static_cast<int>(ceilf(pagFile->width() * options.scale));
+  auto height = static_cast<int>(ceilf(pagFile->height() * options.scale));
+  if (width <= 0 || height <= 0) {
+    std::cerr << "pagx render: output dimensions are zero\n";
+    return {};
+  }
+  auto surface = pag::PAGSurface::MakeOffscreen(width, height);
+  if (surface == nullptr) {
+    std::cerr << "pagx render: failed to create surface (" << width << "x" << height << ")\n";
+    return {};
+  }
+  auto player = std::make_shared<pag::PAGPlayer>();
+  player->setSurface(surface);
+  player->setComposition(pagFile);
+  if (options.hasTime) {
+    auto duration = pagFile->duration();
+    player->setProgress(
+        duration > 0 ? static_cast<double>(options.timeSeconds) * 1000000.0 / duration : 0.0);
+  }
+  player->flush();
+  tgfx::Bitmap bitmap(width, height, false, false);
+  if (bitmap.isEmpty()) {
+    std::cerr << "pagx render: failed to allocate bitmap\n";
+    return {};
+  }
+  tgfx::Pixmap pixmap(bitmap);
+  if (!surface->readPixels(pag::ColorType::RGBA_8888, pag::AlphaType::Premultiplied,
+                            pixmap.writablePixels(), pixmap.rowBytes())) {
+    std::cerr << "pagx render: failed to read pixels from surface\n";
+    return {};
+  }
+  return bitmap;
+}
+
 static tgfx::Bitmap RenderCore(const RenderOptions& options) {
+  if (options.legacy) {
+    return RenderLegacyFrame(options);
+  }
   auto document = LoadDocument(options.inputFile, "pagx render");
   if (document == nullptr) {
     return {};
