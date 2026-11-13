@@ -598,10 +598,11 @@ std::shared_ptr<Transform3DContext> PAGLayer::createTransform3DContext() const {
   Frame frame = 0;
   for (auto item = parent->layers.rbegin(); item != parent->layers.rend(); ++item) {
     auto candidate = item->get();
-    if (candidate->layerVisible && candidate->layerType() == LayerType::Camera &&
-        candidate->frameVisible()) {
+    auto candidateFrame = candidate->contentFrame + candidate->layer->startTime;
+    if (candidate->layerVisible &&
+        Transform3DFilter::IsActiveCamera(candidate->layer, candidateFrame)) {
       camera = static_cast<CameraLayer*>(candidate->layer);
-      frame = candidate->contentFrame + camera->startTime;
+      frame = candidateFrame;
       break;
     }
   }

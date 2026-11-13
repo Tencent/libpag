@@ -23,12 +23,16 @@
 #include "rendering/filters/Transform3DFilter.h"
 
 namespace pag {
+class PAGComposition;
 
 struct Transform3DSceneLayer {
   std::shared_ptr<Graphic> graphic;
   Transform3DDepthPlane depthPlane;
   BlendMode blendMode = BlendMode::Normal;
 };
+
+/** 返回合成当前缓存的三维场景图形，供测试核验复用与失效；无缓存时返回空。 */
+std::shared_ptr<Graphic> GetCached3DGraphic(const PAGComposition* composition);
 
 class Transform3DSceneBuilder {
  public:

@@ -47,6 +47,9 @@ class Transform3DFilter : public RuntimeFilter {
   static std::shared_ptr<Transform3DContext> MakeContext(int width, int height, CameraLayer* camera,
                                                          Frame frame);
 
+  /** 判断图层是否为给定帧处活动的相机（活动标记且落在其时间区间内）。 */
+  static bool IsActiveCamera(const Layer* layer, Frame frame);
+
   /** 在像素空间累乘图层及其完整父链的变换。 */
   static tgfx::Matrix3D BuildModelMatrix(Layer* layer, Frame frame);
 

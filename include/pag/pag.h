@@ -993,8 +993,6 @@ class PAG_API PAGComposition : public PAGLayer {
 
  private:
   VectorComposition* emptyComposition = nullptr;
-  std::shared_ptr<Graphic> cached3DGraphic = nullptr;
-  uint32_t cached3DContentVersion = 0;
 
   static void FindLayers(std::function<bool(PAGLayer* pagLayer)> filterFunc,
                          std::vector<std::shared_ptr<PAGLayer>>* result,

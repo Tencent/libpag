@@ -21,6 +21,7 @@
 #include <cmath>
 #include <cstring>
 #include <limits>
+#include "base/utils/Log.h"
 #include "rendering/filters/utils/Filter3DFactory.h"
 #include "rendering/filters/utils/Std140Uniforms.h"
 
@@ -383,20 +384,6 @@ class SceneBlendFilter : public RuntimeFilter {
   }
 };
 
-std::shared_ptr<tgfx::GPUBuffer> MakeUniformBuffer(tgfx::GPU* gpu, const PeelUniforms& uniforms) {
-  auto buffer = gpu->createBuffer(sizeof(uniforms), tgfx::GPUBufferUsage::UNIFORM);
-  if (buffer == nullptr) {
-    return nullptr;
-  }
-  auto data = buffer->map();
-  if (data == nullptr) {
-    return nullptr;
-  }
-  memcpy(data, &uniforms, sizeof(uniforms));
-  buffer->unmap();
-  return buffer;
-}
-
 }  // namespace
 
 size_t Transform3DSceneFilter::Resources::memoryUsage() const {
@@ -458,6 +445,7 @@ bool Transform3DSceneFilter::prepareTextures(Resources* resources, tgfx::GPU* gp
   resources->depth = gpu->createTexture(depth);
   resources->color = gpu->createTexture(color);
   if (resources->depth == nullptr || resources->color == nullptr) {
+    LOGE("Transform3DSceneFilter: failed to allocate scene textures %dx%d", width, height);
     return false;
   }
   for (size_t index = 0; index < 2; index++) {
@@ -466,6 +454,7 @@ bool Transform3DSceneFilter::prepareTextures(Resources* resources, tgfx::GPU* gp
     resources->accumulated[index] = gpu->createTexture(color);
     if (resources->encodedDepth[index] == nullptr || resources->index[index] == nullptr ||
         resources->accumulated[index] == nullptr) {
+      LOGE("Transform3DSceneFilter: failed to allocate scene textures %dx%d", width, height);
       return false;
     }
   }
@@ -477,7 +466,8 @@ bool Transform3DSceneFilter::prepareTextures(Resources* resources, tgfx::GPU* gp
 // tgfx 的 OpenGL 管线只有一个颜色附件，三个输出须重复同一次深度选择而不能依赖 MRT。
 bool Transform3DSceneFilter::drawPeel(tgfx::CommandEncoder* encoder, Resources* resources,
                                       const std::vector<std::shared_ptr<tgfx::Texture>>& inputs,
-                                      const std::vector<std::shared_ptr<tgfx::GPUBuffer>>& uniforms,
+                                      const std::shared_ptr<tgfx::GPUBuffer>& uniforms,
+                                      size_t uniformStride,
                                       const std::shared_ptr<tgfx::GPUBuffer>& vertices,
                                       size_t passIndex) const {
   auto current = passIndex % 2;
@@ -499,8 +489,8 @@ bool Transform3DSceneFilter::drawPeel(tgfx::CommandEncoder* encoder, Resources* 
     pass->setTexture(2, resources->index[previous], resources->sampler);
     for (size_t index = inputs.size() - 1; index > 0; index--) {
       pass->setTexture(0, inputs[index], resources->sampler);
-      auto buffer = uniforms[((passIndex == 0 ? 0 : 3) + output) * layerCount + index - 1];
-      pass->setUniformBuffer(0, buffer, 0, sizeof(PeelUniforms));
+      auto slot = ((passIndex == 0 ? 0 : 3) + output) * layerCount + index - 1;
+      pass->setUniformBuffer(0, uniforms, slot * uniformStride, sizeof(PeelUniforms));
       pass->draw(tgfx::PrimitiveType::TriangleStrip, 4);
     }
     pass->end();
@@ -581,11 +571,11 @@ bool Transform3DSceneFilter::onDraw(
   }
   auto values =
       computeVertices(resources->color.get(), resources->color.get(), tgfx::Point::Zero());
-#ifdef TGFX_USE_WEBGPU
-  for (size_t index = 1; index < values.size(); index += 4) {
-    values[index] = -values[index];
+  if (NeedsClipSpaceYFlip()) {
+    for (size_t index = 1; index < values.size(); index += 4) {
+      values[index] = -values[index];
+    }
   }
-#endif
   auto vertices = gpu->createBuffer(values.size() * sizeof(float), tgfx::GPUBufferUsage::VERTEX);
   if (vertices == nullptr) {
     return false;
@@ -600,7 +590,20 @@ bool Transform3DSceneFilter::onDraw(
   for (const auto& plane : planes) {
     depthUniforms.push_back(MakeDepthUniforms(plane, width, height));
   }
-  std::vector<std::shared_ptr<tgfx::GPUBuffer>> uniforms;
+  size_t alignment = std::max(gpu->limits()->minUniformBufferOffsetAlignment, 1);
+  size_t stride = (sizeof(PeelUniforms) + alignment - 1) / alignment * alignment;
+  // 将 2 pass x 3 output x N 层共 6N 份 uniform 合并到单个 UBO，按对齐偏移索引，
+  // 避免每帧分配 6N 个独立缓冲。
+  auto uniforms = gpu->createBuffer(planes.size() * 6 * stride, tgfx::GPUBufferUsage::UNIFORM);
+  if (uniforms == nullptr) {
+    LOGE("Transform3DSceneFilter: failed to allocate uniform buffer for %zu layers", planes.size());
+    return false;
+  }
+  auto uniformData = static_cast<uint8_t*>(uniforms->map());
+  if (uniformData == nullptr) {
+    LOGE("Transform3DSceneFilter: failed to map uniform buffer");
+    return false;
+  }
   for (int pass = 0; pass < 2; pass++) {
     for (int output = 0; output < 3; output++) {
       for (size_t index = 0; index < planes.size(); index++) {
@@ -609,16 +612,14 @@ bool Transform3DSceneFilter::onDraw(
         value.mode = static_cast<uint32_t>(blendModes[index]);
         value.flags |= pass == 0 ? 1 : 0;
         value.output = output;
-        auto buffer = MakeUniformBuffer(gpu, value);
-        if (buffer == nullptr) {
-          return false;
-        }
-        uniforms.push_back(std::move(buffer));
+        auto slot = (static_cast<size_t>(pass) * 3 + output) * planes.size() + index;
+        memcpy(uniformData + slot * stride, &value, sizeof(value));
       }
     }
   }
+  uniforms->unmap();
   for (size_t pass = 0; pass < planes.size(); pass++) {
-    if (!drawPeel(encoder, resources, inputTextures, uniforms, vertices, pass) ||
+    if (!drawPeel(encoder, resources, inputTextures, uniforms, stride, vertices, pass) ||
         !drawBlend(encoder, resources, blendPipeline, inputTextures[0], vertices, pass)) {
       return false;
     }

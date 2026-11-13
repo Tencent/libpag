@@ -75,7 +75,7 @@ class Transform3DSceneFilter : public RuntimeFilter {
   bool prepareTextures(Resources* resources, tgfx::GPU* gpu) const;
   bool drawPeel(tgfx::CommandEncoder* encoder, Resources* resources,
                 const std::vector<std::shared_ptr<tgfx::Texture>>& inputs,
-                const std::vector<std::shared_ptr<tgfx::GPUBuffer>>& uniforms,
+                const std::shared_ptr<tgfx::GPUBuffer>& uniforms, size_t uniformStride,
                 const std::shared_ptr<tgfx::GPUBuffer>& vertices, size_t passIndex) const;
   bool drawBlend(tgfx::CommandEncoder* encoder, Resources* resources,
                  const std::shared_ptr<tgfx::RenderPipeline>& pipeline,

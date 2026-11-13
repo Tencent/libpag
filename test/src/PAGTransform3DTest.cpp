@@ -1202,7 +1202,7 @@ PAG_PIXEL_TEST(PAGTransform3DTest, ModifiedSceneCacheInvalidation) {
   auto surface = OffscreenSurface::Make(100, 100);
   ASSERT_NE(surface, nullptr);
   auto player = Make3DPlayer(file, surface);
-  auto first = file->cached3DGraphic;
+  auto first = GetCached3DGraphic(file.get());
   ASSERT_NE(first, nullptr);
   auto cacheSize = player->renderCache->snapshotCaches.size();
   auto color = SamplePixel(surface, 50, 50);
@@ -1210,7 +1210,7 @@ PAG_PIXEL_TEST(PAGTransform3DTest, ModifiedSceneCacheInvalidation) {
     player->setProgress((i + 1) * 0.1);
     Recorder recorder;
     file->draw(&recorder);
-    EXPECT_EQ(file->cached3DGraphic, first);
+    EXPECT_EQ(GetCached3DGraphic(file.get()), first);
     surface->clearAll();
     player->flush();
     EXPECT_EQ(player->renderCache->snapshotCaches.size(), cacheSize);
@@ -1218,12 +1218,12 @@ PAG_PIXEL_TEST(PAGTransform3DTest, ModifiedSceneCacheInvalidation) {
   }
   edited->setAlpha(1);
   player->flush();
-  EXPECT_NE(file->cached3DGraphic, first);
+  EXPECT_NE(GetCached3DGraphic(file.get()), first);
   EXPECT_NE(SamplePixel(surface, 50, 50), color);
-  auto second = file->cached3DGraphic;
+  auto second = GetCached3DGraphic(file.get());
   edited->setVisible(false);
   player->flush();
-  EXPECT_NE(file->cached3DGraphic, second);
+  EXPECT_NE(GetCached3DGraphic(file.get()), second);
 }
 
 /** 验证相机动画会使已修改合成的录制缓存失效。 */
@@ -1237,11 +1237,11 @@ PAG_PIXEL_TEST(PAGTransform3DTest, AnimatedSceneCacheInvalidation) {
   auto surface = OffscreenSurface::Make(100, 100);
   ASSERT_NE(surface, nullptr);
   auto player = Make3DPlayer(file, surface);
-  auto graphic = file->cached3DGraphic;
+  auto graphic = GetCached3DGraphic(file.get());
   ASSERT_NE(graphic, nullptr);
   player->setProgress(0.75);
   player->flush();
-  EXPECT_NE(file->cached3DGraphic, graphic);
+  EXPECT_NE(GetCached3DGraphic(file.get()), graphic);
   EXPECT_GT(SamplePixel(surface, 15, 50)[3], 0);
 }
 

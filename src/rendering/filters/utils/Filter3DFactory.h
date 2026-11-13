@@ -43,4 +43,10 @@ float Clamp3DScale(const tgfx::GPU* gpu, float width, float height, float scale)
 /** 检查图层自身或父链是否包含三维变换。 */
 bool Has3DTransform(const Layer* layer);
 
+/**
+ * 当前 GPU 后端的裁剪空间 Y 轴是否相对左上角内容约定翻转，需要在投影前做竖直翻转。
+ * 集中封装后端差异，避免 Y 轴约定散落在多处矩阵与顶点计算里。
+ */
+bool NeedsClipSpaceYFlip();
+
 }  // namespace pag
