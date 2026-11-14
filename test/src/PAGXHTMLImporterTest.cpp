@@ -2317,6 +2317,29 @@ PAG_TEST(PAGXHTMLImporterTest, CurrentStateSnapshotPreservesAuthoredFlexAndUserD
   EXPECT_EQ(row->customData.at("action"), "select");
 }
 
+PAG_TEST(PAGXHTMLImporterTest, SnapshotPaintProtocolDoesNotProtectGeneratedLayers) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body data-pagx-paint-order="fixed" style="width:200px;height:100px">
+      <div id="host" data-action="select" style="width:100px;height:40px">
+        <div data-pagx-paint-order="fixed" data-pagx-paint-source="7"
+             data-pagx-paint-decoration="true" data-pagx-paint-surface="true"
+             style="width:100%;height:100%;background:red"></div>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* body = doc->layers.front();
+  auto* host = body->children.front();
+  ASSERT_EQ(host->children.size(), 1u);
+  EXPECT_TRUE(body->customData.empty());
+  EXPECT_TRUE(host->children.front()->customData.empty());
+  pagx::PAGXOptimizer::Optimize(doc.get());
+  EXPECT_TRUE(host->children.empty());
+  EXPECT_EQ(host->id, "host");
+  EXPECT_EQ(host->customData.at("action"), "select");
+  EXPECT_NE(FindElementOfType<pagx::Rectangle>(host), nullptr);
+}
+
 PAG_TEST(PAGXHTMLImporterTest, SnapshotIntrinsicInlineRowKeepsAdaptiveWidthAfterFlexInference) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:1120px;height:80px">

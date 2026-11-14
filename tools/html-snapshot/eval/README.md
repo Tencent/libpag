@@ -97,6 +97,12 @@ for direction.
 
 ## Why a baseline at all
 
+For hierarchy changes, also run `node eval/hierarchy.js <file.pagx|directory>` from
+`tools/html-snapshot`. It reports scene Layer counts, maximum Layer depth, depth
+including Group/TextBox containers, mask counts and the depth histogram. Resource
+definitions are excluded. Compare each case's pixels and hierarchy separately;
+a smaller corpus average must not hide a paint-order or animation regression.
+
 The snapshot pipeline strips JS, animations, and any subpixel detail Chromium
 paints differently from PAG. A naive perfect-fidelity comparison is therefore
 unattainable; what matters is the *delta* across iterations of `snapshot.js`,
