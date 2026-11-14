@@ -1670,9 +1670,9 @@ static ShadowShape FindLayerShadowShape(const Layer* layer) {
 
 void HTMLWriter::writeLayerContents(HTMLBuilder& out, const Layer* layer, float alpha,
                                     bool distribute, LayerPlacement targetPlacement) {
-  // Forward the layer's padding (when non-zero) so inner GeoInfo carries it. Skipping the
-  // pointer when padding is zero keeps downstream fast paths unchanged for the common case.
-  const Padding* layerPadding = layer->padding.isZero() ? nullptr : &layer->padding;
+  // Vector contents may use a different frame from the layer's child layout.
+  const auto contentsPadding = layer->contentsPadding.value_or(layer->padding);
+  const Padding* layerPadding = contentsPadding.isZero() ? nullptr : &contentsPadding;
   writeElements(out, layer->contents, alpha, distribute, targetPlacement, layerPadding);
 }
 

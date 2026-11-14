@@ -23,6 +23,9 @@
 namespace pagx {
 
 bool HasLayerOnlyFeatures(const Layer* layer) {
+  if (layer->contentsPadding || layer->referencePadding) {
+    return true;
+  }
   if (!layer->id.empty() || !layer->name.empty()) {
     return true;
   }

@@ -20,6 +20,7 @@
 
 #include <cmath>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 #include "pagx/nodes/Composition.h"
@@ -293,6 +294,20 @@ class Layer : public Node, public LayoutNode {
    * The inner padding of the layout container. The default value is zero on all sides.
    */
   Padding padding = {};
+
+  /**
+   * Optional padding for this layer's vector contents, independent of child-layer layout.
+   * When absent, contents use padding. An explicit zero lets decorations fill the entire
+   * layer while child layers still participate in a padded container layout.
+   */
+  std::optional<Padding> contentsPadding = {};
+
+  /**
+   * Optional inset of the parent's bounds used to resolve this layer's constraints and
+   * percentage size. When absent, uses the parent's padding. Ignored for children in flex
+   * flow. This is a reference frame, not an additional translation or this layer's own padding.
+   */
+  std::optional<Padding> referencePadding = {};
 
   /**
    * The alignment of child elements along the cross axis. The default value is Stretch. A flex

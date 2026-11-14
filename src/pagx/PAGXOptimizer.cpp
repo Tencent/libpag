@@ -527,6 +527,10 @@ bool TryConvertRectMaskToScrollRect(Layer* layer, const Layer* parent,
   if (parent != nullptr && (parent->layout != LayoutMode::None || !parent->padding.isZero())) {
     return false;
   }
+  if (layer->contentsPadding || layer->referencePadding || m->contentsPadding ||
+      m->referencePadding) {
+    return false;
+  }
   if (layer->layout != LayoutMode::None || !layer->padding.isZero() ||
       m->layout != LayoutMode::None || !m->padding.isZero() || LayoutNodeHasConstraints(m)) {
     return false;
@@ -987,7 +991,7 @@ bool DowngradeShellChildrenInLayer(PAGXDocument* doc, Layer* layer,
   for (auto* child : layer->children) {
     changed |= DowngradeShellChildrenInLayer(doc, child, maskRefs);
   }
-  if (layer->layout != LayoutMode::None) {
+  if (layer->layout != LayoutMode::None || layer->contentsPadding) {
     return changed;
   }
   if (layer->children.empty()) {
@@ -1364,6 +1368,9 @@ bool AxisFills(float childSize, float parentSize, float childPercent) {
 }
 
 bool ChildFillsParent(const Layer* parent, const Layer* child) {
+  if (parent->contentsPadding || child->referencePadding) {
+    return false;
+  }
   if (child->x != 0.0f || child->y != 0.0f || child->z != 0.0f) {
     return false;
   }
@@ -1399,7 +1406,7 @@ bool ChildHasNoPaintAffectingEffect(const Layer* child) {
          child->compositionFilePath.empty() && child->externalDoc == nullptr &&
          child->timelines.empty() && child->styles.empty() && child->filters.empty() &&
          child->customData.empty() && child->vmContext.empty() && child->padding.isZero() &&
-         child->layout == LayoutMode::None;
+         child->layout == LayoutMode::None && !child->contentsPadding;
 }
 
 bool CanAbsorbFillingChild(const Layer* parent, const Layer* child,
@@ -1494,7 +1501,7 @@ bool CanDropShellParent(const Layer* parent, const Layer* child,
   if (HasUnresolvedImport(parent)) {
     return false;
   }
-  if (child->flex != 0.0f || !child->includeInLayout) {
+  if (child->flex != 0.0f || !child->includeInLayout || child->referencePadding) {
     return false;
   }
   return true;

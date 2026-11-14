@@ -1766,6 +1766,12 @@ static void WriteLayer(XMLBuilder& xml, const Layer* node, const Options& option
   if (!node->padding.isZero()) {
     xml.addAttribute("padding", PaddingToString(node->padding));
   }
+  if (node->contentsPadding) {
+    xml.addAttribute("contentsPadding", PaddingToString(*node->contentsPadding));
+  }
+  if (node->referencePadding) {
+    xml.addAttribute("referencePadding", PaddingToString(*node->referencePadding));
+  }
   if (node->alignment != Default<Layer>().alignment) {
     xml.addAttribute("alignment", AlignmentToString(node->alignment));
   }

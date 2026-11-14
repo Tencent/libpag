@@ -289,7 +289,15 @@ void PAGXDocument::layoutLayers(const std::vector<Layer*>& layers, float contain
   for (auto* layer : layers) {
     layer->updateSize(context);
   }
-  std::vector<LayoutNode*> nodes(layers.begin(), layers.end());
+  std::vector<LayoutNode*> nodes;
+  for (auto* layer : layers) {
+    if (layer->referencePadding) {
+      LayoutNode::PerformConstraintLayout({layer}, containerW, containerH,
+                                         *layer->referencePadding, context);
+    } else {
+      nodes.push_back(layer);
+    }
+  }
   LayoutNode::PerformConstraintLayout(nodes, containerW, containerH, {}, context);
 }
 

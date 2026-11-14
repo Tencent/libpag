@@ -119,6 +119,7 @@ void MoveLayoutSlot(Layer* outer, Layer* inner) {
   outer->percentHeight = inner->percentHeight;
   outer->includeInLayout = inner->includeInLayout;
   outer->flex = inner->flex;
+  outer->referencePadding = inner->referencePadding;
 }
 
 // Resets the positional anchors and flex slot on `inner` so the parent layout will route
@@ -134,6 +135,7 @@ void ResetLayoutAnchors(Layer* inner) {
   inner->centerY = NAN;
   inner->includeInLayout = true;
   inner->flex = 0.0f;
+  inner->referencePadding.reset();
 }
 
 // `background-clip: text` paints the glyphs with the element's background, so the rectangle that

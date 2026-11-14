@@ -458,14 +458,15 @@ static void ReadDimension(const DOMNode* node, const std::string& name, float* o
   *outAbsolute = value;
 }
 
-static Padding GetPaddingAttribute(const DOMNode* node, PAGXDocument* doc) {
-  auto& str = GetAttribute(node, "padding");
+static Padding GetPaddingAttribute(const DOMNode* node, PAGXDocument* doc,
+                                   const std::string& name = "padding") {
+  auto& str = GetAttribute(node, name);
   if (str.empty()) {
     return {};
   }
   auto count = ParseFloatList(str).size();
   if (count != 1 && count != 2 && count != 4) {
-    ReportError(doc, node, "Invalid value '" + str + "' for 'padding' attribute.");
+    ReportError(doc, node, "Invalid value '" + str + "' for '" + name + "' attribute.");
     return {};
   }
   return PaddingFromString(str);
@@ -527,6 +528,12 @@ static Layer* ParseLayer(const DOMNode* node, PAGXDocument* doc) {
   layer->gap = GetFloatAttribute(node, "gap", Default<Layer>().gap, doc);
   layer->flex = GetFloatAttribute(node, "flex", Default<Layer>().flex, doc);
   layer->padding = GetPaddingAttribute(node, doc);
+  if (node->findAttribute("contentsPadding") != nullptr) {
+    layer->contentsPadding = GetPaddingAttribute(node, doc, "contentsPadding");
+  }
+  if (node->findAttribute("referencePadding") != nullptr) {
+    layer->referencePadding = GetPaddingAttribute(node, doc, "referencePadding");
+  }
   layer->alignment = GET_ENUM(node, "alignment", "stretch", doc, Alignment);
   layer->arrangement = GET_ENUM(node, "arrangement", "start", doc, Arrangement);
   layer->includeInLayout =

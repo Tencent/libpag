@@ -657,21 +657,34 @@ Cross-axis: Uses explicit `width`/`height` if set; when the parent has `alignmen
 
 Content area is `width × height` minus `padding` on each side.
 
+Layers can independently select the reference insets for drawing and constraint layout:
+
+| Attribute | Default | Meaning |
+|-----------|---------|---------|
+| `contentsPadding` | inherit this Layer's `padding` | Insets used for its vector contents. Explicit `0` lets a background fill the Layer while child Layers use a padded layout. |
+| `referencePadding` | inherit the parent Layer's `padding` | Insets of the parent's bounds used for this Layer's constraints and percentage sizes. Ignored in flex flow. |
+
+Both accept the same one-, two-, or four-value syntax as `padding`. They select a
+reference rectangle, not an additional translation. Measurement includes each
+reference frame's inset once; changing the parent dimensions recomputes percentage
+sizes and far-edge anchors against that frame.
+
 #### Background with Padding
 
-Since `padding` insets the constraint reference frame for all contents, a background Rectangle with `width="100%" height="100%"` inside a padded Layer will only fill the inset area, not the full Layer bounds. When a background needs to fill the entire Layer, use a two-layer structure: the outer Layer holds the background, and the inner layer carries `padding`:
+Set `contentsPadding="0"` to let a background fill the entire Layer independently
+of its padded child layout:
 
 ```xml
-<Layer width="300" height="200">
+<Layer width="300" height="200" layout="horizontal" gap="8"
+       padding="16" contentsPadding="0">
   <Rectangle width="100%" height="100%" roundness="12"/>
   <Fill color="#FFF"/>
-  <Layer width="100%" height="100%" layout="horizontal" gap="8" padding="16">
-    <!-- content here -->
-  </Layer>
+  <!-- child Layers participate directly in the padded layout -->
 </Layer>
 ```
 
-Choose the inner container type based on need: use `Layer` when container layout (`layout`, `gap`, `alignment`, `arrangement`) is required; use `Group` for a lighter-weight container that only needs `padding` to inset VectorElements.
+Use a `Group` with its own padding when vector content inside that same Layer
+needs an inset reference frame and separate painter scope.
 
 For content-measured containers (no explicit `width`/`height`), padding is added to the measured size, so a Group wrapping a 100×50 Rectangle with `padding="20"` measures as 140×90.
 

@@ -10811,6 +10811,69 @@ PAGX_TEST(PAGXTest, LayerTranslationWriteUsesDecomposedTranslationUnderPerspecti
  * Test case: the constraint layout position stays outside the local transform. Authored x / y add
  * to it, and a matrix3D write replaces only the local transform.
  */
+PAGX_TEST(PAGXTest, LayerIndependentLayoutFramesSurviveResizeAndSerialization) {
+  auto doc = pagx::PAGXImporter::FromXML(R"XML(<pagx width="400" height="240">
+    <Layer id="host" width="200" height="100" layout="horizontal"
+           padding="14,22,14,22" contentsPadding="0">
+      <Rectangle id="background" width="100%" height="100%"/>
+      <Fill color="#FF0000"/>
+      <Layer id="flow" width="10" height="10"/>
+      <Layer id="absolute" referencePadding="2" includeInLayout="false"
+             width="50%" height="20" right="5" bottom="7"/>
+      <Layer id="stretch" referencePadding="2" includeInLayout="false"
+             left="3" right="4" top="2" height="5"/>
+    </Layer></pagx>)XML");
+  ASSERT_NE(doc, nullptr);
+  ASSERT_TRUE(doc->errors.empty());
+  for (int pass = 0; pass < 2; pass++) {
+    auto* host = doc->findNode<pagx::Layer>("host");
+    auto* absolute = doc->findNode<pagx::Layer>("absolute");
+    auto* stretch = doc->findNode<pagx::Layer>("stretch");
+    auto* flow = doc->findNode<pagx::Layer>("flow");
+    auto* background = doc->findNode<pagx::Rectangle>("background");
+    ASSERT_NE(host, nullptr);
+    for (float width : {200.0f, 300.0f}) {
+      host->width = width;
+      doc->applyLayout();
+      EXPECT_FLOAT_EQ(background->layoutBounds().x, 0);
+      EXPECT_FLOAT_EQ(background->layoutBounds().width, width);
+      EXPECT_FLOAT_EQ(background->layoutBounds().height, 100);
+      EXPECT_FLOAT_EQ(flow->layoutBounds().x, 22);
+      EXPECT_FLOAT_EQ(flow->layoutBounds().y, 14);
+      EXPECT_FLOAT_EQ(absolute->layoutBounds().width, (width - 4) / 2);
+      EXPECT_FLOAT_EQ(absolute->layoutBounds().x, (width - 4) / 2 - 3);
+      EXPECT_FLOAT_EQ(absolute->layoutBounds().y, 71);
+      EXPECT_FLOAT_EQ(stretch->layoutBounds().x, 5);
+      EXPECT_FLOAT_EQ(stretch->layoutBounds().width, width - 11);
+    }
+    doc = pagx::PAGXImporter::FromXML(pagx::PAGXExporter::ToXML(*doc));
+    ASSERT_NE(doc, nullptr);
+    ASSERT_TRUE(doc->errors.empty());
+  }
+}
+
+PAGX_TEST(PAGXTest, LayerIndependentFramesMeasureIntrinsicContentOnce) {
+  auto doc = pagx::PAGXImporter::FromXML(R"XML(<pagx width="400" height="240">
+    <Layer id="host" padding="10" contentsPadding="0">
+      <Rectangle id="background" width="100%" height="100%"/>
+      <Fill color="#FF0000"/>
+      <Layer id="child" referencePadding="5,7,5,7" width="50" height="30"/>
+    </Layer></pagx>)XML");
+  ASSERT_NE(doc, nullptr);
+  for (int pass = 0; pass < 2; pass++) {
+    doc->applyLayout();
+    auto* host = doc->findNode<pagx::Layer>("host");
+    auto* background = doc->findNode<pagx::Rectangle>("background");
+    auto* child = doc->findNode<pagx::Layer>("child");
+    EXPECT_FLOAT_EQ(host->layoutBounds().width, 64);
+    EXPECT_FLOAT_EQ(host->layoutBounds().height, 40);
+    EXPECT_FLOAT_EQ(background->layoutBounds().width, 64);
+    EXPECT_FLOAT_EQ(background->layoutBounds().height, 40);
+    EXPECT_FLOAT_EQ(child->layoutBounds().x, 7);
+    EXPECT_FLOAT_EQ(child->layoutBounds().y, 5);
+  }
+}
+
 PAGX_TEST(PAGXTest, LayerLayoutPositionStaysOutsideLocalTransform) {
   auto doc = pagx::PAGXDocument::Make(200, 100);
   auto* parent = doc->makeNode<pagx::Layer>("parent");

@@ -155,25 +155,28 @@ void Layer::onMeasure(LayoutContext*) {
     }
   }
 
-  // Measure from constraint-laid-out descendants: all contents (VectorElements) plus non-flex
-  // child Layers. These share the padded content box, so padding is added once to their combined
-  // extent.
+  // Vector contents and child layers may use different reference frames. Add each frame's
+  // inset to its own extent before taking the maximum; never add one frame's padding twice.
   float constraintW = 0;
   float constraintH = 0;
   MeasureChildNodes(contents, NAN, NAN, constraintW, constraintH);
+  const auto paintInset = contentsPadding.value_or(padding);
+  constraintW += paintInset.left + paintInset.right;
+  constraintH += paintInset.top + paintInset.bottom;
+  constraintW = std::max(constraintW, padding.left + padding.right);
+  constraintH = std::max(constraintH, padding.top + padding.bottom);
   if (layout == LayoutMode::None) {
     for (auto* child : children) {
       if (!child->includeInLayout) {
         continue;
       }
-      float cx = child->preferredWidth + child->constraintExtentX();
-      float cy = child->preferredHeight + child->constraintExtentY();
+      const auto inset = child->referencePadding.value_or(padding);
+      float cx = child->preferredWidth + child->constraintExtentX() + inset.left + inset.right;
+      float cy = child->preferredHeight + child->constraintExtentY() + inset.top + inset.bottom;
       constraintW = std::max(constraintW, cx);
       constraintH = std::max(constraintH, cy);
     }
   }
-  constraintW += padding.left + padding.right;
-  constraintH += padding.top + padding.bottom;
   measuredW = std::max(measuredW, constraintW);
   measuredH = std::max(measuredH, constraintH);
 
@@ -221,6 +224,11 @@ void Layer::setLayoutSize(LayoutContext* context, float targetWidth, float targe
     maxX = std::max(maxX, extX);
     maxY = std::max(maxY, extY);
   }
+  const auto paintInset = contentsPadding.value_or(padding);
+  maxX += paintInset.left + paintInset.right;
+  maxY += paintInset.top + paintInset.bottom;
+  maxX = std::max(maxX, padding.left + padding.right);
+  maxY = std::max(maxY, padding.top + padding.bottom);
   if (layout != LayoutMode::None && !children.empty()) {
     bool horizontal = (layout == LayoutMode::Horizontal);
     float totalMain = 0;
@@ -253,13 +261,12 @@ void Layer::setLayoutSize(LayoutContext* context, float targetWidth, float targe
       if (!child->includeInLayout) {
         continue;
       }
-      float extX = child->constraintExtentX() + child->layoutWidth;
-      float extY = child->constraintExtentY() + child->layoutHeight;
+      const auto inset = child->referencePadding.value_or(padding);
+      float extX = child->constraintExtentX() + child->layoutWidth + inset.left + inset.right;
+      float extY = child->constraintExtentY() + child->layoutHeight + inset.top + inset.bottom;
       maxX = std::max(maxX, extX);
       maxY = std::max(maxY, extY);
     }
-    maxX += padding.left + padding.right;
-    maxY += padding.top + padding.bottom;
   }
   float prevW = layoutWidth;
   float prevH = layoutHeight;
@@ -305,15 +312,19 @@ void Layer::updateLayout(LayoutContext* context) {
     performContainerLayout(context);
   }
 
-  // VectorElements (contents): use padding-inset bounds.
+  // Decorations can use full bounds independently of a padded child layout.
   auto contentNodes = LayoutNode::CollectLayoutNodes(contents, false);
-  LayoutNode::PerformConstraintLayout(contentNodes, layoutWidth, layoutHeight, padding, context);
+  LayoutNode::PerformConstraintLayout(contentNodes, layoutWidth, layoutHeight,
+                                     contentsPadding.value_or(padding), context);
 
   // Child Layers not in flex flow: use padding-inset bounds.
   std::vector<LayoutNode*> childNodes;
   for (auto* child : children) {
     bool inFlexFlow = (layout != LayoutMode::None && child->includeInLayout);
-    if (!inFlexFlow) {
+    if (!inFlexFlow && child->referencePadding) {
+      LayoutNode::PerformConstraintLayout({child}, layoutWidth, layoutHeight,
+                                         *child->referencePadding, context);
+    } else if (!inFlexFlow) {
       childNodes.push_back(child);
     }
   }
