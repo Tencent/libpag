@@ -265,6 +265,15 @@ absolute children in their emitted order: geometric separation alone does not pr
 descendants, shadows or overflowing content can be reordered safely. Explicit flex layouts
 remain supported.
 
+The snapshot builds a `PaintScene` before serializing the subset. Its `sources` table records
+source identity and DOM parent ids; ordered paint items separately record stacking contexts and
+clip scopes. The snapshot API exposes this table as `sourceTree`. A contiguous element decoration
+and its content share one source box. Non-contiguous anonymous coordinate ancestors are omitted
+when their offsets can be composed exactly; named elements, custom data, effect scopes and clips
+remain explicit. Clip-local coordinate conversion does not require a reset wrapper. Normal and
+current-state captures share this lowering. Private paint attributes are consumed by the importer
+and are not PAGX custom data.
+
 ### 4.5 Text
 
 | CSS | PAGX |

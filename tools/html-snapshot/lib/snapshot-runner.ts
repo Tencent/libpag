@@ -341,6 +341,8 @@ export interface RunSnapshotResult {
   height: number;
   /** Painting features that require a model beyond the supported static 2D subset. */
   warnings?: string[];
+  /** Source identity/ancestry, independent of the serialized paint hierarchy. */
+  sourceTree?: import('./paint-plan').SceneSource[];
   fonts: SavedFont[];
   images: SavedImage[];
 }
@@ -826,6 +828,7 @@ async function captureSnapshot(
     // ships the ~70-byte entry expression now.
     const snapshot = await page.evaluate(snapshotExpr) as {
       html: string; width: number; height: number; warnings?: string[];
+      sourceTree?: import('./paint-plan').SceneSource[];
     };
     for (const warning of snapshot.warnings || []) {
       if (log) log(warning);

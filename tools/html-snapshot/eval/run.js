@@ -422,8 +422,13 @@ async function processCase(entry, outDir, opts, browser) {
     }
   }
 
-  // 5. metrics
+  // 5. metrics, including actual scene structure rather than Layer count alone.
   try {
+    const hierarchy = require('./hierarchy').measureHierarchy(fs.readFileSync(subsetPagx, 'utf8'));
+    fs.writeFileSync(path.join(caseDir, 'hierarchy.json'), JSON.stringify(hierarchy, null, 2) + '\n');
+    row.layers = hierarchy.layers;
+    row.layerDepth = hierarchy.layerDepth;
+    row.structureDepth = hierarchy.structureDepth;
     const m = compare.pixelMetrics(baselinePng, subsetPng, diffPng);
     row.width = m.width;
     row.height = m.height;
@@ -471,6 +476,7 @@ function writeCsv(rows, outPath) {
   const headers = [
     'name', 'width', 'height',
     'ssim', 'pixelDiffRatio', 'meanRgbDelta',
+    'layers', 'layerDepth', 'structureDepth',
     'flexLive', 'flexSubset', 'flexDelta', 'flexRetention', 'flexInflation',
     'importerWarnings', 'flexInferred', 'flexSkipped',
     'baselineMs', 'snapshotMs', 'importMs', 'renderMs',
@@ -524,7 +530,7 @@ function summarize(rows) {
 }
 
 function writeMarkdown(rows, outPath, label) {
-  const headers = ['name', 'ssim', 'pixelDiff%', 'rgbΔ', 'flexLive', 'flexSubset', 'flexΔ', 'kept%', 'infl×', 'warn', 'flexInf', 'flexSkip', 'error'];
+  const headers = ['name', 'ssim', 'pixelDiff%', 'rgbΔ', 'layers', 'layerDepth', 'structureDepth', 'flexLive', 'flexSubset', 'flexΔ', 'kept%', 'infl×', 'warn', 'flexInf', 'flexSkip', 'error'];
   const lines = [];
   lines.push(`# Eval report — ${label}`);
   lines.push('');
@@ -548,6 +554,9 @@ function writeMarkdown(rows, outPath, label) {
       fmt(r.ssim, 4),
       isFinite(r.pixelDiffRatio) ? fmt(r.pixelDiffRatio * 100, 2) : '-',
       fmt(r.meanRgbDelta, 2),
+      String(r.layers ?? '-'),
+      String(r.layerDepth ?? '-'),
+      String(r.structureDepth ?? '-'),
       String(r.flexLive),
       String(r.flexSubset),
       (r.flexDelta > 0 ? '+' : '') + String(r.flexDelta),

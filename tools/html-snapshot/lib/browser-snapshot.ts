@@ -5125,13 +5125,18 @@ function snapshotMainImpl(opts) {
     const savedPriority = backgroundNode.style.getPropertyPriority('background-color');
     backgroundNode.style.setProperty('background-color', 'transparent', 'important');
     let content;
-    try { content = render(document.documentElement, origin); }
+    let scene;
+    try {
+      beginPaintCapture(document.documentElement);
+      scene = buildPaintScene(render(document.documentElement, origin));
+      content = serializePaintScene(scene);
+    }
     finally {
       if (savedColor) backgroundNode.style.setProperty('background-color', savedColor, savedPriority);
       else backgroundNode.style.removeProperty('background-color');
     }
     const defs = (window.__pagxClipDefs || []).join('');
-    return { width, height, html: `<!DOCTYPE html><html><head><style>` +
+    return { width, height, sourceTree: scene.sources, html: `<!DOCTYPE html><html><head><style>` +
       `div,span,img,svg,body{box-sizing:border-box}body{margin:0;padding:0;position:relative}` +
       collectCarryOverFontFaces(document.styleSheets, document.baseURI, true).map(fontFaceRuleCss).join('') +
       `</style></head><body data-pagx-capture-mode="current-state" style="width:${width}px;height:${height}px;overflow:hidden;background-color:${rootBackground}">` +
@@ -5167,7 +5172,8 @@ function snapshotMainImpl(opts) {
   // keeps the subset aligned with the baseline. `bodyRect.left` is always 0
   // here (block body, zeroed margin), so the horizontal axis is unaffected.
   const rootOrigin = canvasRootRect(canvasWidth, canvasHeight);
-  const content = compilePaintMarkup(renderChildrenInto(body, rootOrigin, getComputedStyle(body)));
+  const scene = buildPaintScene(renderChildrenInto(body, rootOrigin, getComputedStyle(body)));
+  const content = serializePaintScene(scene);
 
   const title = (document.title || '').trim();
   const bodyComputed = getComputedStyle(body);
@@ -5275,6 +5281,7 @@ ${clipDefsSvg}${content}
 `,
     width: canvasWidth,
     height: canvasHeight,
+    sourceTree: scene.sources,
   };
 }
 
@@ -5285,7 +5292,7 @@ function snapshotMain(opts) {
   if (opts && opts.mode === 'current-state') {
     SNAPSHOT_CURRENT_STATE = true;
     try { return snapshotMainImpl(opts); }
-    finally { SNAPSHOT_CURRENT_STATE = false; }
+    finally { SNAPSHOT_CURRENT_STATE = false; endPaintCapture(); }
   }
   normalizeEmptyImagePlaceholders();
   window.__pagxInitialRunsUsed = new WeakSet();

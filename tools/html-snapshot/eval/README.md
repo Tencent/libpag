@@ -74,6 +74,8 @@ Outputs land in `eval/out/<label>/`:
 - `index.html` — side-by-side `baseline / subset / diff` viewer; open in a browser.
 - `<case>/baseline.png`, `subset.png`, `diff.png`, `subset.html`, `subset.pagx`,
   `import.stderr.txt`, `snapshot.stderr.txt`, …
+- `<case>/hierarchy.json` — Layer count/depth, Group-inclusive structure depth, masks,
+  and depth histogram. CSV and Markdown reports include the three primary hierarchy metrics.
 
 ## Metrics
 

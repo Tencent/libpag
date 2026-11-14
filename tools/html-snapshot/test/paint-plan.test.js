@@ -4,7 +4,7 @@
 const {
   paintStyleRecord, planPaintContext, beginPaintCapture, capturePaintGeometry,
   markPaintSource, markPaintDecoration, markPaintSurface, paintNeedsSeparateChildren,
-  compilePaintMarkup, endPaintCapture,
+  compilePaintMarkup, buildPaintScene, serializePaintScene, endPaintCapture,
 } = require('../dist/lib/paint-plan');
 const { computedStyle, setRect } = require('./dom-helpers');
 
@@ -118,6 +118,45 @@ function compile(html = Array.from(document.body.childNodes, markup).join('')) {
 function leaves(output) { return Array.from(output.querySelectorAll('[data-leaf]'), el => el.dataset.leaf); }
 
 describe('paint capture and markup', () => {
+  test('keeps source ancestry independently of generated paint fragments', () => {
+    start('<div id="contents" style="display:contents"><span id="text">hello</span></div>');
+    const scene = buildPaintScene(Array.from(document.body.childNodes, markup).join(''));
+    expect(scene.sources.map(({ id, parentId, elementId }) => ({ id, parentId, elementId })))
+      .toEqual([{ id: 0, parentId: null, elementId: '' },
+        { id: 1, parentId: 0, elementId: 'contents' },
+        { id: 2, parentId: 1, elementId: 'text' }]);
+    expect(serializePaintScene(scene)).toContain('hello');
+    expect(scene.sources[2].parentId).toBe(1);
+  });
+
+  test('combines contiguous background and content into the named source element', () => {
+    start('<div id="card" name="Card" style="background:red"><span>text</span></div>');
+    const output = compile();
+    expect(output.children).toHaveLength(1);
+    expect(output.firstElementChild.id).toBe('card');
+    expect(output.firstElementChild.getAttribute('name')).toBe('Card');
+    expect(output.firstElementChild.style.background).toBe('red');
+    expect(output.firstElementChild.textContent).toBe('text');
+  });
+
+  test('hoists a split anonymous coordinate frame while preserving borders and paint order', () => {
+    start('<div style="background:red;border:2px solid black;width:100px;height:40px"></div>' +
+      '<div style="background:blue;width:100px;height:40px"></div>');
+    const [host, sibling] = document.body.children;
+    const html = markPaintSource(host, '<div style="position:absolute;left:20px;top:10px;' +
+      'width:100px;height:40px;background:red;border:2px solid black">' +
+      '<span data-leaf="text" style="position:absolute;left:10px;top:5px;width:30px;height:10px">A</span></div>') +
+      markPaintSource(sibling, '<div style="position:absolute;left:0px;top:0px;width:10px;height:10px;background:blue"/>');
+    const output = compile(html);
+    const text = output.querySelector('[data-leaf=text]');
+    expect(text.parentElement).toBe(output);
+    expect(text.style.left).toBe('32px');
+    expect(text.style.top).toBe('17px');
+    expect(output.children).toHaveLength(3);
+    expect(output.children[0].style.background).toBe('red');
+    expect(output.children[1].style.background).toBe('blue');
+  });
+
   test('markers are inert outside capture and are removed from compiled XML-compatible output', () => {
     const el = document.createElement('div');
     expect(markPaintSource(el, '<div/>')).toBe('<div/>');

@@ -11,6 +11,52 @@ const PAINT_CAPTURE = {
   active: false, nodes: [], byElement: new WeakMap(), warnings: [], animations: new Map(),
 };
 
+// Source ancestry and paint order are separate: one source can contribute several paint items
+// to its enclosing stacking context. The source table remains stable when those items move.
+export interface SceneSource {
+  id: number;
+  parentId: number | null;
+  tag: string;
+  elementId: string;
+  bounds: { left: number; top: number; width: number; height: number } | null;
+}
+
+export interface PaintScene {
+  sources: SceneSource[];
+  root: PaintBox;
+  items: PaintItem[];
+}
+
+interface PaintSource {
+  id: number;
+  el: Element;
+  style: ReturnType<typeof paintStyleRecord> & { replaced: boolean };
+  parent: PaintSource | null;
+  geometry: SceneSource['bounds'];
+  parentRect: { left: number; top: number } | null;
+  clips: PaintSource[];
+  escapes: boolean;
+}
+
+interface PaintBox {
+  el: Node;
+  source: PaintSource | null;
+  parent: PaintBox | null;
+  order: number;
+  children: PaintBox[];
+  atomic?: boolean;
+  preserve?: boolean;
+  decoration?: boolean;
+  surface?: boolean;
+}
+
+interface PaintItem {
+  box: PaintBox;
+  kind: 'atom' | 'context' | 'decoration' | 'context-decoration' | 'flow-content';
+  items?: PaintItem[] | null;
+  clips?: PaintSource[];
+}
+
 function paintProperty(style, name) {
   return String(style.getPropertyValue(name) || '').trim();
 }
@@ -404,6 +450,64 @@ function paintPath(item, root) {
   return path.reverse();
 }
 
+function paintBoxOffset(box) {
+  if (box.el.nodeType !== 1) return null;
+  const clone = box.el.cloneNode(false);
+  positionPaintClone(clone, box.source);
+  const style = clone.style;
+  if (style.position !== 'absolute') return null;
+  const px = value => !value || /^-?(?:\d+(?:\.\d*)?|\.\d+)px$/.test(value);
+  if (!px(style.left) || !px(style.top) || style.right || style.bottom) return null;
+  return { x: (parseFloat(style.left) || 0) + paintBorder(clone, 'Left'),
+    y: (parseFloat(style.top) || 0) + paintBorder(clone, 'Top') };
+}
+
+function planScenePaths(root, items) {
+  const paths = items.map(item => paintPath(item, root));
+  const spans = new Map();
+  for (let index = 0; index < items.length; index++) {
+    const boxes = paths[index].map(entry => entry.box).concat(items[index].box);
+    for (const box of boxes) {
+      let span = spans.get(box);
+      if (!span) spans.set(box, span = { first: index, last: index, count: 0 });
+      span.last = index;
+      span.count++;
+    }
+  }
+  return paths.map((path, index) => {
+    const result = [];
+    let x = 0, y = 0;
+    for (const entry of path) {
+      const box = entry.box;
+      const span = spans.get(box);
+      const contiguous = span.last - span.first + 1 === span.count;
+      const offset = paintBoxOffset(box);
+      // Keep real contiguous source subtrees. Non-contiguous neutral ancestors only supply
+      // coordinates; replaying their full paths for every paint fragment multiplies depth.
+      // Clips and generated effect/layout scopes must retain their own coordinate frame.
+      const canHoist = box.source && !contiguous && !box.source.style.context &&
+        !box.source.style.clips && !box.el.id && !box.el.getAttribute('name') &&
+        !Array.from(box.el.attributes).some(attr => attr.name.startsWith('data-') &&
+          attr.name !== PAINT_ORDER_ATTR) &&
+        offset && paintBoxOffset(items[index].box);
+      if (canHoist) {
+        x += offset.x;
+        y += offset.y;
+      } else {
+        result.push({ ...entry, offsetX: x, offsetY: y });
+        x = y = 0;
+      }
+    }
+    return { path: result, offsetX: x, offsetY: y };
+  });
+}
+
+function offsetPaintNode(node, x, y) {
+  if (node.nodeType !== 1 || (!x && !y)) return;
+  node.style.left = `${(parseFloat(node.style.left) || 0) + x}px`;
+  node.style.top = `${(parseFloat(node.style.top) || 0) + y}px`;
+}
+
 function clearPaintEffects(el) {
   for (const property of Array.from(el.style)) {
     if (['opacity', 'filter', 'backdrop-filter', '-webkit-backdrop-filter', 'mix-blend-mode',
@@ -463,27 +567,24 @@ function makePaintClip(clipBox, root, identities) {
     position: 'absolute', left: `${x}px`, top: `${y}px`,
     width: `${rect.width}px`, height: `${rect.height}px`, overflow: 'hidden', margin: '0',
   });
-  // Restore the context's coordinate origin after entering the clipping box.
-  const reset = document.createElement('div');
-  Object.assign(reset.style, {
-    position: 'absolute',
-    left: `${-x - paintBorder(clip, 'Left')}px`,
-    top: `${-y - paintBorder(clip, 'Top')}px`,
-    width: root.el.style.width || '100%', height: root.el.style.height || '100%',
-  });
-  reset.setAttribute(PAINT_ORDER_ATTR, 'fixed');
-  clip.appendChild(reset);
   insetPaintClip(clip);
-  return { outer: clip, inner: reset };
+  // The scene compiler changes coordinates directly; no coordinate-reset element is needed.
+  return { outer: clip,
+    offsetX: -(parseFloat(clip.style.left) || 0) - paintBorder(clip, 'Left'),
+    offsetY: -(parseFloat(clip.style.top) || 0) - paintBorder(clip, 'Top') };
 }
 
 function emitPaintItems(root, items, target, identities, pendingClips = []) {
   let previous = [];
   let containers = [target];
-  for (const item of items) {
+  let origins = [{ x: 0, y: 0 }];
+  const plans = planScenePaths(root, items);
+  for (let index = 0; index < items.length; index++) {
+    const item = items[index];
+    const plan = plans[index];
     const clips = paintItemClips(item);
     const applied = pendingClips.filter(box => clips.includes(box.source));
-    const path = applied.map(box => ({ box, proxy: true })).concat(paintPath(item, root));
+    const path = applied.map(box => ({ box, proxy: true })).concat(plan.path);
     const deferred = pendingClips.filter(box => !applied.includes(box));
     for (const entry of path) {
       if (entry.clip === false && !deferred.includes(entry.box)) deferred.push(entry.box);
@@ -491,21 +592,30 @@ function emitPaintItems(root, items, target, identities, pendingClips = []) {
     let common = 0;
     while (common < previous.length && common < path.length &&
            previous[common].box === path[common].box && previous[common].clip === path[common].clip &&
-           previous[common].proxy === path[common].proxy) common++;
+           previous[common].proxy === path[common].proxy &&
+           previous[common].offsetX === path[common].offsetX &&
+           previous[common].offsetY === path[common].offsetY) common++;
     containers.length = common + 1;
+    origins.length = common + 1;
     for (let i = common; i < path.length; i++) {
       const entry = path[i];
       if (entry.proxy) {
         const proxy = makePaintClip(entry.box, root, identities);
+        const origin = origins[origins.length - 1];
+        offsetPaintNode(proxy.outer, origin.x, origin.y);
         containers[containers.length - 1].appendChild(proxy.outer);
-        containers.push(proxy.inner);
+        containers.push(proxy.outer);
+        origins.push({ x: proxy.offsetX, y: proxy.offsetY });
         continue;
       }
       const wrapper = clonePaintBox(entry.box, false, true, identities);
+      const origin = origins[origins.length - 1];
+      offsetPaintNode(wrapper, (entry.offsetX || 0) + origin.x, (entry.offsetY || 0) + origin.y);
       if (!entry.clip) wrapper.style.overflow = 'visible';
       else if (entry.box.source && entry.box.source.style.clips) insetPaintClip(wrapper);
       containers[containers.length - 1].appendChild(wrapper);
       containers.push(wrapper);
+      origins.push({ x: 0, y: 0 });
     }
     let node;
     if (item.kind === 'context') {
@@ -535,12 +645,32 @@ function emitPaintItems(root, items, target, identities, pendingClips = []) {
         node.style.overflow = 'visible';
       }
     }
+    const origin = origins[origins.length - 1];
+    offsetPaintNode(node, plan.offsetX + origin.x, plan.offsetY + origin.y);
     containers[containers.length - 1].appendChild(node);
     previous = path;
+    // Decoration followed by its own contiguous descendants is the source element itself,
+    // not a painted sibling plus a duplicate neutral wrapper. Clips cannot be folded here:
+    // CSS overflow excludes an outer shadow and may apply to only some descendants.
+    const next = plans[index + 1];
+    if (item.kind === 'decoration' && item.box.source && !item.box.source.style.clips &&
+        !item.box.el.style.boxShadow &&
+        next && next.path.length > path.length && next.path[path.length].box === item.box &&
+        path.every((entry, i) => entry.box === next.path[i].box)) {
+      previous = next.path.slice(0, path.length + 1);
+      containers.push(node);
+      origins.push({ x: 0, y: 0 });
+      if (!identities.has(item.box.el)) {
+        for (const name of ['id', 'name']) {
+          if (item.box.el.hasAttribute(name)) node.setAttribute(name, item.box.el.getAttribute(name));
+        }
+        identities.add(item.box.el);
+      }
+    }
   }
 }
 
-function compilePaintMarkup(html) {
+function buildPaintScene(html): PaintScene {
   const template = document.createElement('template');
   template.innerHTML = html;
   const host = document.createElement('div');
@@ -552,13 +682,26 @@ function compilePaintMarkup(html) {
     root.children.push(buildPaintBoxes(child, root, sequence));
   }
   assignPaintOrder(root, { value: 0 });
+  return {
+    sources: PAINT_CAPTURE.nodes.map(source => ({ id: source.id,
+      parentId: PAINT_CAPTURE.byElement.get(source.el.parentElement)?.id ?? null,
+      tag: source.el.tagName.toLowerCase(), elementId: source.el.id || '', bounds: source.geometry })),
+    root, items: planPaintContext(root),
+  };
+}
+
+function serializePaintScene(scene) {
   const output = document.createElement('div');
-  emitPaintItems(root, planPaintContext(root), output, new Set());
+  emitPaintItems(scene.root, scene.items, output, new Set());
   if (!output.hasChildNodes()) return '';
   // The native importer consumes XML-compatible HTML. innerHTML would turn <img/> into
   // <img>, and serialize non-breaking spaces as the HTML-only &nbsp; entity.
   const serialized = new XMLSerializer().serializeToString(output);
   return serialized.slice(serialized.indexOf('>') + 1, serialized.lastIndexOf('</div>'));
+}
+
+function compilePaintMarkup(html) {
+  return serializePaintScene(buildPaintScene(html));
 }
 
 function endPaintCapture() {
@@ -577,7 +720,8 @@ const PAINT_PLAN_HELPERS_SRC = [
   markPaintDecoration, markPaintSurface, paintParticipant, paintPseudoContainer, paintInline,
   paintHasDecoration, buildPaintBoxes, assignPaintOrder, planPaintContext, planPaintFlow, collectPaintFlow,
   neutralPaintStyle, positionPaintClone, clonePaintBox, paintItemSource, paintItemClips, paintPath,
-  clearPaintEffects, paintBorder, insetPaintClip, makePaintClip, emitPaintItems, compilePaintMarkup,
+  paintBoxOffset, planScenePaths, offsetPaintNode, clearPaintEffects, paintBorder, insetPaintClip,
+  makePaintClip, emitPaintItems, buildPaintScene, serializePaintScene, compilePaintMarkup,
   endPaintCapture,
 ].map(fn => fn.toString()).join('\n\n');
 
@@ -595,4 +739,5 @@ export {
   PAINT_PLAN_HELPERS_SRC, PAINT_PLAN_CONSTANTS_SRC, paintStyleRecord, planPaintContext,
   beginPaintCapture, capturePaintGeometry, markPaintSource, markPaintDecoration, markPaintSurface,
   paintNeedsSeparateChildren, compilePaintMarkup, endPaintCapture,
+  buildPaintScene, serializePaintScene,
 };
