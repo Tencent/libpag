@@ -19,6 +19,7 @@
 #include "pagx/html/importer/HTMLBackgroundLayout.h"
 #include "pagx/html/importer/HTMLParserContext.h"
 #include "pagx/nodes/Fill.h"
+#include "pagx/nodes/Group.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/ImagePattern.h"
 #include "pagx/nodes/Layer.h"
@@ -119,6 +120,39 @@ void HTMLParserContext::emitImageContent(Layer* layer, const HTMLBoxAttributes& 
     return;
   }
   if (object.width <= 0 || object.height <= 0 || content.width <= 0 || content.height <= 0) return;
+  const bool rounded = box.borderRadiusEllipse || box.borderRadiusTLPx > 0 ||
+                       box.borderRadiusTRPx > 0 || box.borderRadiusBRPx > 0 ||
+                       box.borderRadiusBLPx > 0;
+  if (image && !rounded) {
+    auto nativeSize = decodeImageNativeSize(image);
+    if (nativeSize.first > 0 && nativeSize.second > 0) {
+      // The visible geometry is the intersection of the content and object boxes. A pattern
+      // matrix carries object-fit/position, eliminating both a clipping Layer and an offset
+      // image Layer. Keep a painter scope so the image Fill cannot recolor the CSS background.
+      float left = std::max(content.x, object.x);
+      float top = std::max(content.y, object.y);
+      float right = std::min(content.x + content.width, object.x + object.width);
+      float bottom = std::min(content.y + content.height, object.y + object.height);
+      if (right <= left || bottom <= top) return;
+      auto* group = _document->makeNode<Group>();
+      auto* rect = _document->makeNode<Rectangle>();
+      rect->width = right - left;
+      rect->height = bottom - top;
+      rect->position = {left + rect->width / 2, top + rect->height / 2};
+      auto* pattern = _document->makeNode<ImagePattern>();
+      pattern->image = image;
+      pattern->scaleMode = ScaleMode::None;
+      pattern->matrix = Matrix::Translate(object.x, object.y) *
+                        Matrix::Scale(object.width / nativeSize.first,
+                                      object.height / nativeSize.second);
+      auto* fill = _document->makeNode<Fill>();
+      fill->color = pattern;
+      if (!layer->children.empty()) fill->placement = LayerPlacement::Foreground;
+      group->elements = {rect, fill};
+      layer->contents.push_back(group);
+      return;
+    }
+  }
   auto* clip = box.borderRadiusSet ? _layerBuilder->makeBackgroundClip(box, content)
                                    : _document->makeNode<Layer>();
   clip->left = content.x;

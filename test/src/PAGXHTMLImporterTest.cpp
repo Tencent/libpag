@@ -4666,13 +4666,11 @@ PAG_TEST(PAGXHTMLImporterTest, InnerSpanLineHeightLiftedToTextBoxForFixedHeightB
     </body></html>
   )HTML");
   ASSERT_NE(doc, nullptr);
-  // The outer span carries `background-color`, so convertTextLeaf splits it into an outer
-  // Layer (Rectangle+Fill) and an inner host Layer that hosts the TextBox.
+  // The TextBox supplies its own painter scope beside the background in the same Layer.
   auto* outer = doc->layers.front()->children.front();
   ASSERT_NE(outer, nullptr);
-  ASSERT_FALSE(outer->children.empty());
-  auto* innerHost = outer->children.front();
-  auto* tb = FindElementOfType<pagx::TextBox>(innerHost);
+  ASSERT_TRUE(outer->children.empty());
+  auto* tb = FindElementOfType<pagx::TextBox>(outer);
   ASSERT_NE(tb, nullptr);
   EXPECT_FLOAT_EQ(tb->lineHeight, 20.0f);
 }
@@ -5348,6 +5346,37 @@ PAG_TEST(PAGXHTMLImporterTest, ImageWithAsymmetricBorderRadiusEmitsPath) {
   ASSERT_NE(fill, nullptr);
   auto* pattern = As<pagx::ImagePattern>(fill->color);
   ASSERT_NE(pattern, nullptr);
+}
+
+PAG_TEST(PAGXHTMLImporterTest, OffsetRasterImageUsesPatternAndContentGeometry) {
+  auto path = ProjectPath::Absolute("resources/apitest/imageReplacement.png");
+  auto doc = ParseRaw("<html><body style='width:120px;height:100px'>"
+                     "<img src='" + path + "' data-pagx-image-width='80' data-pagx-image-height='40' "
+                     "style='width:100px;height:80px;padding:10px;object-fit:none;"
+                     "object-position:right bottom'/></body></html>");
+  ASSERT_NE(doc, nullptr);
+  auto* image = doc->layers.front()->children.front();
+  ASSERT_EQ(image->children.size(), 1u);
+  auto* paint = image->children.front();
+  EXPECT_TRUE(paint->children.empty());
+  ASSERT_EQ(paint->contents.size(), 1u);
+  auto* group = As<pagx::Group>(paint->contents.front());
+  ASSERT_NE(group, nullptr);
+  ASSERT_EQ(group->elements.size(), 2u);
+  auto* fill = As<pagx::Fill>(group->elements[1]);
+  ASSERT_NE(fill, nullptr);
+  auto* pattern = As<pagx::ImagePattern>(fill->color);
+  ASSERT_NE(pattern, nullptr);
+  EXPECT_EQ(pattern->scaleMode, pagx::ScaleMode::None);
+  EXPECT_FLOAT_EQ(pattern->matrix.tx, 10);
+  EXPECT_FLOAT_EQ(pattern->matrix.ty, 30);
+  auto* rect = As<pagx::Rectangle>(group->elements[0]);
+  ASSERT_NE(rect, nullptr);
+  doc->applyLayout();
+  EXPECT_FLOAT_EQ(rect->layoutBounds().width, 80);
+  EXPECT_FLOAT_EQ(rect->layoutBounds().height, 40);
+  EXPECT_FLOAT_EQ(rect->layoutBounds().x, 10);
+  EXPECT_FLOAT_EQ(rect->layoutBounds().y, 30);
 }
 
 PAG_TEST(PAGXHTMLImporterTest, ImageObjectFitContainMapsToLetterBox) {
@@ -8052,8 +8081,8 @@ PAG_TEST(PAGXHTMLImporterTest, AnimationOnTextLeafProducesTransformChannels) {
   EXPECT_EQ(anim->duration, 84);
   auto* glyph = doc->layers.front()->children.front();
   EXPECT_EQ(glyph->id, "glyph");
-  ASSERT_EQ(glyph->children.size(), 1u);
-  auto* obj = FindObjectByTarget(anim, glyph->children.front()->id);
+  EXPECT_TRUE(glyph->children.empty());
+  auto* obj = FindObjectByTarget(anim, glyph->id);
   ASSERT_NE(obj, nullptr);
   auto* yCh = dynamic_cast<pagx::TypedChannel<float>*>(FindChannel(anim, "y"));
   ASSERT_NE(yCh, nullptr);
@@ -8065,12 +8094,10 @@ PAG_TEST(PAGXHTMLImporterTest, AnimationOnTextLeafProducesTransformChannels) {
   EXPECT_EQ(yCh->keyframes.back().time, 84);
   EXPECT_FLOAT_EQ(yCh->keyframes.back().value, 0.0f);
 
-  // Transform splitting must keep the visual child in intrinsic measurement. Excluding it makes
-  // an auto-width text leaf collapse to zero, which stacks every animated flex character at the
-  // same x coordinate.
+  // Direct animation preserves intrinsic text measurement and therefore the flex slot.
   doc->applyLayout();
   EXPECT_GT(glyph->layoutBounds().width, 0.0f);
-  EXPECT_GT(glyph->children.front()->layoutBounds().width, 0.0f);
+  EXPECT_FALSE(glyph->contents.empty());
 }
 
 // The builder emits one Animation per animated element; a post-pass then coalesces animations that
@@ -8176,6 +8203,50 @@ PAG_TEST(PAGXHTMLImporterTest, AnimationTranslateProducesXYChannels) {
   ASSERT_EQ(yCh->keyframes.size(), 2u);
   EXPECT_FLOAT_EQ(xCh->keyframes.back().value, 40.0f);
   EXPECT_FLOAT_EQ(yCh->keyframes.back().value, 20.0f);
+}
+
+PAG_TEST(PAGXHTMLImporterTest, TranslationAnimationTargetsSourceLayerAcrossLayoutAndTime) {
+  auto doc = ParseRaw(R"HTML(
+    <html><head><style>
+      @keyframes move { from { transform:translate(0px,0px) }
+                         to { transform:translate(40px,20px) } }
+    </style></head><body style="width:400px;height:200px">
+      <div id="host" style="display:flex;width:200px;height:100px;padding:12px 20px;border:2px solid black">
+        <div id="flow" style="width:10px;height:10px;background:red;animation:move 1s linear forwards"></div>
+        <div id="absolute" style="position:absolute;right:5px;bottom:7px;width:10px;height:10px;
+          background:blue;animation:move 1s linear forwards"></div>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  doc = pagx::PAGXImporter::FromXML(pagx::PAGXExporter::ToXML(*doc));
+  ASSERT_NE(doc, nullptr);
+  auto* flow = doc->findNode<pagx::Layer>("flow");
+  auto* absolute = doc->findNode<pagx::Layer>("absolute");
+  ASSERT_NE(flow, nullptr);
+  ASSERT_NE(absolute, nullptr);
+  EXPECT_TRUE(flow->children.empty());
+  EXPECT_TRUE(absolute->children.empty());
+  for (float width : {200.f, 300.f}) {
+    doc->findNode<pagx::Layer>("host")->width = width;
+    doc->applyLayout();
+    auto scene = pagx::PAGScene::Make(doc);
+    ASSERT_NE(scene, nullptr);
+    auto timeline = scene->getDefaultTimeline();
+    ASSERT_NE(timeline, nullptr);
+    auto* binding = scene->mutableBinding();
+    auto flowRuntime = binding->get<tgfx::Layer>(flow);
+    auto absoluteRuntime = binding->get<tgfx::Layer>(absolute);
+    ASSERT_NE(flowRuntime, nullptr);
+    ASSERT_NE(absoluteRuntime, nullptr);
+    for (int step = 0; step <= 4; ++step) {
+      timeline->advanceAndApply(step == 0 ? 0 : 250'000);
+      EXPECT_NEAR(flowRuntime->matrix3D().getRowColumn(0, 3), 22 + step * 10, .001f);
+      EXPECT_NEAR(flowRuntime->matrix3D().getRowColumn(1, 3), 14 + step * 5, .001f);
+      EXPECT_NEAR(absoluteRuntime->matrix3D().getRowColumn(0, 3), width - 17 + step * 10, .001f);
+      EXPECT_NEAR(absoluteRuntime->matrix3D().getRowColumn(1, 3), 81 + step * 5, .001f);
+    }
+  }
 }
 
 PAG_TEST(PAGXHTMLImporterTest, AnimationTransformChannelMatchesRuntimeMatrixPriority) {
@@ -15107,29 +15178,33 @@ PAG_TEST(PAGXHTMLImporterTest, ImageNaturalSizesArePerInstanceAndRoundTrip) {
   auto doc = ParseFromString(html);
   ASSERT_NE(doc, nullptr);
   auto check = [&](pagx::PAGXDocument* document) {
-    std::vector<pagx::Layer*> objects;
-    auto visit = [&](auto&& self, pagx::Layer* layer) -> void {
-      for (auto* element : layer->contents) {
-        auto* fill = As<pagx::Fill>(element);
-        if (fill && As<pagx::ImagePattern>(fill->color)) objects.push_back(layer);
+    std::vector<pagx::ImagePattern*> patterns;
+    auto visitContents = [&](auto&& self, const std::vector<pagx::Element*>& elements) -> void {
+      for (auto* element : elements) {
+        if (auto* fill = As<pagx::Fill>(element)) {
+          if (auto* pattern = As<pagx::ImagePattern>(fill->color)) patterns.push_back(pattern);
+        } else if (auto* group = As<pagx::Group>(element)) {
+          self(self, group->elements);
+        }
       }
+    };
+    auto visit = [&](auto&& self, pagx::Layer* layer) -> void {
+      visitContents(visitContents, layer->contents);
       EXPECT_EQ(layer->customData.count("pagx-image-width"), 0u);
       EXPECT_EQ(layer->customData.count("pagx-image-height"), 0u);
       for (auto* child : layer->children) self(self, child);
     };
     for (auto* layer : document->layers) visit(visit, layer);
-    ASSERT_EQ(objects.size(), 3u);
+    ASSERT_EQ(patterns.size(), 3u);
     pagx::Image* shared = nullptr;
-    for (size_t i = 0; i < objects.size(); ++i) {
-      auto* object = objects[i];
+    for (size_t i = 0; i < patterns.size(); ++i) {
+      auto* pattern = patterns[i];
       float width = 16.f / static_cast<float>(1 << i);
-      EXPECT_FLOAT_EQ(object->width, width);
-      EXPECT_FLOAT_EQ(object->height, width / 2);
-      EXPECT_FLOAT_EQ(object->left, 100 - width);
-      EXPECT_FLOAT_EQ(object->top, 60 - width / 2);
-      EXPECT_FALSE(object->includeInLayout);
-      auto* pattern = As<pagx::ImagePattern>(FindElementOfType<pagx::Fill>(object)->color);
-      EXPECT_EQ(pattern->scaleMode, pagx::ScaleMode::Stretch);
+      EXPECT_EQ(pattern->scaleMode, pagx::ScaleMode::None);
+      EXPECT_FLOAT_EQ(pattern->matrix.a * 4, width);
+      EXPECT_FLOAT_EQ(pattern->matrix.d * 2, width / 2);
+      EXPECT_FLOAT_EQ(pattern->matrix.tx, 100 - width);
+      EXPECT_FLOAT_EQ(pattern->matrix.ty, 60 - width / 2);
       if (shared) EXPECT_EQ(pattern->image, shared);
       shared = pattern->image;
     }

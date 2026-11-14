@@ -806,15 +806,9 @@ SolidColor* FindSolidFillInElements(const std::vector<Element*>& elements, int e
   return nullptr;
 }
 
-// Splits `outer` into a layout-only outer plus a fully-visual `inner` so a CSS `transform`
-// animation can target `inner` without disturbing the layout box. The runtime `x` / `y`
-// channels overwrite the matrix translation absolutely, which would otherwise clobber the
-// position layout has assigned to `outer` (e.g. a flex child's main-axis offset, or the
-// padding origin of a constraint-laid-out child). By moving every visual / container attribute
-// onto a child Layer that fills its parent (`percentWidth/Height = 100`, no positional
-// constraints), `inner.layoutBounds` is guaranteed to be (0, 0) so the CSS keyframe values can be
-// written verbatim onto `inner.x` / `inner.y` without baking in any static layout offset. The inner
-// layer remains included in its outer's measurement: intrinsically-sized text leaves have no
+// Splits `outer` into a layout-only outer plus a fully-visual `inner` when a separate compositing
+// or pivot scope is required. Ordinary translate animation targets the source Layer directly.
+// The inner layer remains included in its outer's measurement: intrinsically-sized text leaves have no
 // authored width, so excluding the only visual child would collapse every flex slot to zero and
 // stack animated characters on top of one another. Percentage children fall back to their
 // preferred content size while their content-measured parent is unresolved, then fill the refined
@@ -1536,8 +1530,7 @@ bool HTMLAnimationBuilder::buildForElement(
   // displays during the delay (when fill-mode is `none` or `forwards`) and after the animation
   // ends (when fill-mode is `none` or `backwards`).
   //   alpha: the layer's resolved opacity, already populated from CSS by the layer importer.
-  //   x / y: zero — translate-animated layers route their channels onto an inner wrapper whose
-  //          local position starts at (0, 0); the wrapper remains inside the outer layout slot.
+  //   x / y: zero — local translation composes after the independently resolved layout position.
   //   color: the SolidColor's current color, populated from CSS background-color/color before
   //          this method runs. The fill must be located before SplitForTransformAnimation moves
   //          contents to the inner wrapper, but the SolidColor pointer remains stable across the
@@ -1636,20 +1629,12 @@ bool HTMLAnimationBuilder::buildForElement(
         "[subset:animation-finite-count]");
   }
 
-  // Preserve the element's parent-facing layout slot while keeping CSS translate keyframes on a
-  // fully-visual inner layer. The outer layer retains absolute/flex positioning; the inner layer
-  // fills it and owns the local animated transform. Done lazily so static elements stay flat.
-  Layer* xyTarget = nullptr;
-  if (!xKeys.empty() || !yKeys.empty()) {
-    xyTarget = SplitForTransformAnimation(layer, _document, _idAllocator);
-  }
-
   // Tracks the innermost layer that still owns the element's renderable state after any
   // transform wrappers are introduced. Filter and clip-path animations must be attached here:
   // targeting an outer wrapper after its contents, filters and mask have been moved inward would
   // duplicate static effects and can leave newly-created animation targets outside the visual
   // subtree.
-  Layer* visualTarget = xyTarget != nullptr ? xyTarget : layer;
+  Layer* visualTarget = layer;
 
   // Keep a pure rotation's pivot outside the animated matrix. The first split preserves the
   // element's parent-facing layout slot; the second creates a visual child that carries every
@@ -1706,11 +1691,11 @@ bool HTMLAnimationBuilder::buildForElement(
     animation->objects.push_back(object);
   }
 
-  // Layer-targeted x / y channels — routed to the inner wrapper when present so the CSS
-  // translate values stack on top of the layout offset instead of overwriting it.
+  // Runtime transform channels are local to the element. LayerBuilder composes the layout
+  // position outside the animated pose, so translation requires no layout wrapper.
   if (!xKeys.empty() || !yKeys.empty()) {
     auto* object = _document->makeNode<AnimationObject>();
-    object->target = xyTarget != nullptr ? xyTarget->id : layer->id;
+    object->target = layer->id;
     if (!xKeys.empty()) {
       auto* ch = _document->makeNode<TypedChannel<float>>();
       ch->name = "x";

@@ -22,6 +22,7 @@
 #include <memory>
 #include <string>
 #include <unordered_map>
+#include <vector>
 #include "pagx/html/importer/HTMLBackgroundLayout.h"
 #include "pagx/html/importer/HTMLBoxAttributes.h"
 #include "pagx/html/importer/HTMLSvgFilterDecoder.h"
@@ -143,7 +144,7 @@ class HTMLLayerBuilder {
   Layer* wrapForMargin(Layer* inner, const HTMLBoxAttributes& box);
 
   /** Emits a single text-decoration line (underline or line-through) onto `host`. */
-  void emitTextDecorationLine(Layer* host, const Color& textColor, const Color& decorationColor,
+  void emitTextDecorationLine(std::vector<Element*>& contents, const Color& textColor, const Color& decorationColor,
                               bool decorationColorDiffers, float bottom, float centerY);
 
  private:

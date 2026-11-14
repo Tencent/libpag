@@ -1326,7 +1326,7 @@ Layer* HTMLLayerBuilder::wrapForMargin(Layer* inner, const HTMLBoxAttributes& bo
   return outer;
 }
 
-void HTMLLayerBuilder::emitTextDecorationLine(Layer* host, const Color& /*textColor*/,
+void HTMLLayerBuilder::emitTextDecorationLine(std::vector<Element*>& contents, const Color& /*textColor*/,
                                               const Color& decorationColor,
                                               bool decorationColorDiffers, float bottom,
                                               float centerY) {
@@ -1339,10 +1339,10 @@ void HTMLLayerBuilder::emitTextDecorationLine(Layer* host, const Color& /*textCo
     auto group = _document->makeNode<Group>();
     group->elements.push_back(rect);
     group->elements.push_back(buildSolidFill(decorationColor));
-    host->contents.push_back(group);
+    contents.push_back(group);
   } else {
-    host->contents.push_back(rect);
-    host->contents.push_back(buildSolidFill(decorationColor));
+    contents.push_back(rect);
+    contents.push_back(buildSolidFill(decorationColor));
   }
 }
 

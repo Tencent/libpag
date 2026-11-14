@@ -194,7 +194,7 @@ Layer* HTMLTextFragmentBuilder::buildPAGXTextHost(const std::shared_ptr<DOMNode>
   // Force the bare <Text>+<Fill> path. The WOFF2 span's `line-height:1` is a visual-layer
   // implementation detail of the glyph positioning; letting it drive needsTextBox would wrap
   // every restored text in a TextBox the original PAGX never had.
-  populateTextHostContents(textHost, fragments, inherited, box,
+  populateTextHostContents(textHost->contents, fragments, inherited, box,
                            /*needsTextBox=*/false, /*isVertical=*/false, /*hasNoWrap=*/false);
   _idAllocator.assign(wrapper, element);
   return wrapper;
@@ -521,9 +521,41 @@ Layer* HTMLTextFragmentBuilder::convertTextLeaf(const std::shared_ptr<DOMNode>& 
   Layer* textHost = nullptr;
   Layer* wrapper =
       buildTextHostLayers(element, box, hasBgVisuals, shrinkWidth, shrinkHeight, textHost);
-  populateTextHostContents(textHost, fragments, inherited, box, needsTextBox, isVertical,
-                           hasNoWrap);
-  emitTextDecorations(textHost, fragments, inherited);
+  std::vector<Element*> contents;
+  populateTextHostContents(contents, fragments, inherited, box, needsTextBox, isVertical, hasNoWrap);
+  emitTextDecorations(contents, fragments, inherited);
+  if (hasBgVisuals) {
+    // A TextBox already provides a painter scope. Reuse it instead of nesting a text host;
+    // bare text and decoration runs need one Group to isolate their Fill from the background.
+    Group* scope = contents.size() == 1 && contents.front()->nodeType() == NodeType::TextBox
+                       ? static_cast<Group*>(contents.front())
+                       : nullptr;
+    if (scope == nullptr) {
+      scope = _document->makeNode<Group>();
+      scope->percentWidth = scope->percentHeight = 100;
+      scope->elements = std::move(contents);
+    }
+    scope->padding = box.padding;
+    if (!textHost->children.empty()) {
+      // Tiled backgrounds are child layers. Text must paint above that background stack.
+      auto foreground = [&](auto&& self, const std::vector<Element*>& elements) -> void {
+        for (auto* element : elements) {
+          auto type = element->nodeType();
+          if (type == NodeType::Fill) {
+            static_cast<Fill*>(element)->placement = LayerPlacement::Foreground;
+          } else if (type == NodeType::Stroke) {
+            static_cast<Stroke*>(element)->placement = LayerPlacement::Foreground;
+          } else if (type == NodeType::Group || type == NodeType::TextBox) {
+            self(self, static_cast<Group*>(element)->elements);
+          }
+        }
+      };
+      foreground(foreground, scope->elements);
+    }
+    textHost->contents.push_back(scope);
+  } else {
+    textHost->contents = std::move(contents);
+  }
 
   _idAllocator.assign(wrapper, element);
   return wrapper;
@@ -599,12 +631,6 @@ Layer* HTMLTextFragmentBuilder::buildTextHostLayers(const std::shared_ptr<DOMNod
   Layer* textHost = outer;
   if (hasBgVisuals) {
     _layerBuilder.applyBackgroundVisuals(outer, box);
-    auto inner = _document->makeNode<Layer>();
-    inner->percentWidth = 100.0f;
-    inner->percentHeight = 100.0f;
-    if (box.paddingSet) inner->padding = box.padding;
-    outer->children.push_back(inner);
-    textHost = inner;
   } else if (box.paddingSet) {
     outer->padding = box.padding;
   }
@@ -617,7 +643,7 @@ Layer* HTMLTextFragmentBuilder::buildTextHostLayers(const std::shared_ptr<DOMNod
   return wrapper;
 }
 
-void HTMLTextFragmentBuilder::populateTextHostContents(Layer* textHost,
+void HTMLTextFragmentBuilder::populateTextHostContents(std::vector<Element*>& contents,
                                                        const std::vector<TextFragment>& fragments,
                                                        const HTMLInheritedStyle& inherited,
                                                        const HTMLBoxAttributes& box,
@@ -625,10 +651,10 @@ void HTMLTextFragmentBuilder::populateTextHostContents(Layer* textHost,
                                                        bool hasNoWrap) {
   if (!needsTextBox) {
     const auto& f = fragments.front();
-    textHost->contents.push_back(buildTextElement(f));
-    textHost->contents.push_back(buildTextFill(f));
+    contents.push_back(buildTextElement(f));
+    contents.push_back(buildTextFill(f));
     if (auto* stroke = buildTextStroke(f)) {
-      textHost->contents.push_back(stroke);
+      contents.push_back(stroke);
     }
     return;
   }
@@ -712,10 +738,10 @@ void HTMLTextFragmentBuilder::populateTextHostContents(Layer* textHost,
       textBox->elements.push_back(group);
     }
   }
-  textHost->contents.push_back(textBox);
+  contents.push_back(textBox);
 }
 
-void HTMLTextFragmentBuilder::emitTextDecorations(Layer* textHost,
+void HTMLTextFragmentBuilder::emitTextDecorations(std::vector<Element*>& contents,
                                                   const std::vector<TextFragment>& fragments,
                                                   const HTMLInheritedStyle& inherited) {
   std::string deco = ToLower(Trim(inherited.textDecoration));
@@ -731,12 +757,12 @@ void HTMLTextFragmentBuilder::emitTextDecorations(Layer* textHost,
     }
   }
   if (deco.find("underline") != std::string::npos) {
-    _layerBuilder.emitTextDecorationLine(textHost, textColor, decorationColor,
+    _layerBuilder.emitTextDecorationLine(contents, textColor, decorationColor,
                                          decorationColorDiffers,
                                          /*bottom=*/0.0f, /*centerY=*/NAN);
   }
   if (deco.find("line-through") != std::string::npos) {
-    _layerBuilder.emitTextDecorationLine(textHost, textColor, decorationColor,
+    _layerBuilder.emitTextDecorationLine(contents, textColor, decorationColor,
                                          decorationColorDiffers,
                                          /*bottom=*/NAN, /*centerY=*/0.0f);
   }
