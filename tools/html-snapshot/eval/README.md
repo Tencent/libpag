@@ -93,9 +93,8 @@ Outputs land in `eval/out/<label>/`:
 | `flexInferred` | `subset:flex-inferred` warnings — C++ `AbsoluteToFlexInferencePass` recovered a flex layout from absolute children. |
 | `flexSkipped` | `subset:flex-inference-skipped` warnings — the C++ pass gave up and left the parent absolute. |
 
-The acceptance criterion is "corpus-level mean improves" (no per-case
-regression gate), so use the markdown summary rows at the top of `report.md`
-for direction.
+Use corpus averages as trend indicators. Gate hierarchy changes on per-case
+geometry, paint-order and animation checks as well as the pixel metrics.
 
 ## Why a baseline at all
 
@@ -105,7 +104,55 @@ including Group/TextBox containers, mask counts and the depth histogram. Resourc
 definitions are excluded. Compare each case's pixels and hierarchy separately;
 a smaller corpus average must not hide a paint-order or animation regression.
 
-The snapshot pipeline strips JS, animations, and any subpixel detail Chromium
-paints differently from PAG. A naive perfect-fidelity comparison is therefore
-unattainable; what matters is the *delta* across iterations of `snapshot.js`,
-which is exactly what the labelled `out/<label>/` directories let us track.
+The snapshot captures computed layout and supported animation channels. Browser
+and native text rasterization, unsupported CSS and subpixel rounding can still
+differ. Keep both a browser reference and a previous native render so a change
+can be distinguished from an existing rendering limitation.
+
+## Hierarchy lowering validation
+
+The five `layertest` inputs were evaluated from baseline commit `86898af1a`
+through `e2be15541`. HTML depth counts `body` as 1 and treats each inline SVG
+as one HTML element. PAGX metrics use the resolved scene, excluding resource
+definitions. Structure depth includes Layer, Group and TextBox containers.
+
+| Case | Source HTML depth | Layer depth before → after | Structure depth before → after | Layers before → after |
+| --- | --- | --- | --- | --- |
+| 23-六月实习报告 | 12 | 14 → 8 | 15 → 9 | 963 → 821 |
+| 27-Boltshift销售看板 | 11 | 14 → 10 | 15 → 11 | 640 → 513 |
+| 28-真牛逼便利店首页 | 12 | 18 → 13 | 19 → 14 | 329 → 278 |
+| 48-文字动效 | 5 | 7 → 5 | 7 → 5 | 71 → 55 |
+| 63-看板六视图 | 9 | 11 → 10 | 12 → 11 | 172 → 144 |
+
+Contiguous source decoration/content now share a Layer; padding and absolute-child
+reference frames no longer require layout hosts. Safe coordinate ancestors and
+clip reset boxes are composed away. Clipping, background blending/tile antialiasing
+and animation pivots still retain scopes when their semantics require them. No
+private paint-order attributes remain in exported custom data.
+
+Validation completed:
+
+- 98 Jest suites / 1418 tests passed; 1 suite / 12 tests skipped by their existing
+  conditions. The current-state subset passed all 40 tests.
+- 990 native HTML, optimizer, layout and constraint tests passed, including resize,
+  serialization, transform interpolation and independent text/background targets.
+  `PAG_SKIP_BASELINE_CHECK=ON` was used; image comparisons ran separately below.
+- Browser comparisons: paint order 40/40; background layout and shadows 26/26;
+  object layout and text fragments 70/71. The existing elliptical-radius image
+  case fails its mean-error threshold (1.3588 versus 0.5). Rebuilding the original
+  importer produced byte-identical PAGX for that fixture, confirming it predates
+  this change.
+- Reimporting the original captured subsets isolates native lowering: cases 23,
+  48 and 63 retain identical pixels; cases 27 and 28 change 1224 and 1058 pixels
+  respectively where fractional box sizes previously passed through a rounded
+  100% wrapper before flex placement.
+- Fresh full-source exports reach the depths above. Browser SSIM is respectively
+  0.9249, 0.8888, 0.9610, 0.7167 and 0.9540; this is not a claim of exact browser
+  fidelity. Final semantic animation binding changes none of their pixels or
+  hierarchy compared with the preceding stage.
+
+Local review artifacts are in `out/layertest-hierarchy/`: `index.html`, `report.md`,
+per-case HTML/PAGX/PNGs and `hierarchy.json`, plus `animation-binding-audit.json`.
+The original `out/layertest/` is preserved. These generated artifacts remain ignored
+by Git. Reproduce with `run.js` using the same five-source corpus and
+`--pagx-images embed`; run `hierarchy.js` on both output directories to compare structure.
