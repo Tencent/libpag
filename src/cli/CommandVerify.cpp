@@ -2345,7 +2345,8 @@ static void DetectContentOriginOffset(const Layer* layer, const Layer* parentLay
   if (!inParentLayout && !hasSizeDependentConstraint) {
     return;
   }
-  CheckContentOriginOffset(layer->contents, layer->padding, layer->sourceLine, diagnostics);
+  CheckContentOriginOffset(layer->contents, layer->contentsPadding.value_or(layer->padding),
+                           layer->sourceLine, diagnostics);
 }
 
 static void DetectContentOriginOffsetForGroup(const Group* group,
@@ -2843,6 +2844,13 @@ static void AccumulatePixelBounds(const std::vector<Element*>& elements, float o
 
 static void DetectContentCenteringAsymmetry(const Layer* layer, const Layer* parentLayer,
                                             std::vector<VerifyDiagnostic>& diagnostics) {
+  // A union of independently framed decorations and children has no single padding-relative
+  // center. Checking it against the flow padding would flag a correctly centered border box.
+  if (layer->contentsPadding ||
+      std::any_of(layer->children.begin(), layer->children.end(),
+                  [](const Layer* child) { return child->referencePadding.has_value(); })) {
+    return;
+  }
   bool checkX = !std::isnan(layer->centerX) && layer->centerX == 0.0f;
   bool checkY = !std::isnan(layer->centerY) && layer->centerY == 0.0f;
   if (!checkX && !checkY) {
@@ -2993,7 +3001,8 @@ static void RunSpatialDetectionOnLayer(const Layer* layer, const Layer* parentLa
   DetectConstraintConflicts(layer, layer->sourceLine, diagnostics);
   DetectExplicitSizeShadowedByOppositeEdge(layer, layer->sourceLine, diagnostics);
   DetectRedundantZeroConstraints(layer, layer->sourceLine, diagnostics);
-  DetectStretchFillAffectedByPadding(layer->contents, layer->padding, diagnostics);
+  DetectStretchFillAffectedByPadding(layer->contents, layer->contentsPadding.value_or(layer->padding),
+                                     diagnostics);
   if (checkVisibleBounds) {
     DetectChildExceedingParent(layer, parentLayer, maskLayers, diagnostics);
   }

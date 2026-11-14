@@ -857,8 +857,11 @@ PAG_TEST(PAGXHTMLImporterTest, BorderShiftsAbsoluteChildren) {
   ASSERT_EQ(outer->children.size(), 1u);
   auto* inner = outer->children.front();
   EXPECT_FALSE(inner->includeInLayout);
-  EXPECT_FLOAT_EQ(inner->left, 10.0f);
-  EXPECT_FLOAT_EQ(inner->top, 10.0f);
+  EXPECT_FLOAT_EQ(inner->left, 0.0f);
+  EXPECT_FLOAT_EQ(inner->top, 0.0f);
+  doc->applyLayout();
+  EXPECT_FLOAT_EQ(inner->layoutBounds().x, 10.0f);
+  EXPECT_FLOAT_EQ(inner->layoutBounds().y, 10.0f);
 }
 
 // Regression: layout-flow children of a bordered container must start inside the
@@ -876,9 +879,8 @@ PAG_TEST(PAGXHTMLImporterTest, BorderExpandsLayoutPadding) {
   )HTML");
   ASSERT_NE(doc, nullptr);
   auto* outer = doc->layers.front()->children.front();
-  // The double-host split puts layout/padding on the inner host.
   ASSERT_EQ(outer->children.size(), 1u);
-  auto* host = outer->children.front();
+  auto* host = outer;
   EXPECT_FLOAT_EQ(host->padding.top, 9.0f);
   EXPECT_FLOAT_EQ(host->padding.right, 9.0f);
   EXPECT_FLOAT_EQ(host->padding.bottom, 9.0f);
@@ -1155,7 +1157,7 @@ PAG_TEST(PAGXHTMLImporterTest, AbsolutePositionMapping) {
   EXPECT_FLOAT_EQ(div->top, -6.0f);
 }
 
-PAG_TEST(PAGXHTMLImporterTest, OuterBackgroundInnerPaddedSplit) {
+PAG_TEST(PAGXHTMLImporterTest, BackgroundAndPaddedLayoutShareElementLayer) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:100px;height:100px">
       <div style="display:flex;flex-direction:column;padding:10px;gap:4px;
@@ -1171,13 +1173,43 @@ PAG_TEST(PAGXHTMLImporterTest, OuterBackgroundInnerPaddedSplit) {
   EXPECT_GE(CountElements<pagx::Rectangle>(outer->contents), 1u);
   EXPECT_GE(CountElements<pagx::Fill>(outer->contents), 1u);
   EXPECT_EQ(outer->styles.size(), 1u);
-  EXPECT_EQ(outer->layout, pagx::LayoutMode::None);  // layout sits on inner host
-  EXPECT_FLOAT_EQ(outer->padding.left, 0.0f);
-  // Inner host carries the layout + padding.
+  EXPECT_EQ(outer->layout, pagx::LayoutMode::Vertical);
+  EXPECT_FLOAT_EQ(outer->padding.left, 10.0f);
+  ASSERT_TRUE(outer->contentsPadding.has_value());
+  EXPECT_TRUE(outer->contentsPadding->isZero());
   ASSERT_EQ(outer->children.size(), 1u);
-  auto* inner = outer->children.front();
-  EXPECT_EQ(inner->layout, pagx::LayoutMode::Vertical);
-  EXPECT_FLOAT_EQ(inner->padding.left, 10.0f);
+  auto* child = outer->children.front();
+  doc->applyLayout();
+  EXPECT_FLOAT_EQ(child->layoutBounds().x, 10.0f);
+  EXPECT_FLOAT_EQ(child->layoutBounds().y, 10.0f);
+  EXPECT_FLOAT_EQ(outer->layoutBounds().width, 40.0f);
+  EXPECT_FLOAT_EQ(outer->layoutBounds().height, 40.0f);
+}
+
+PAG_TEST(PAGXHTMLImporterTest, FractionalPaddedBoxKeepsExtentBeforeFlexPlacement) {
+  auto doc = ParseRaw(R"HTML(
+    <html><body style="width:120px;height:80px">
+      <div style="width:99.1px;height:59.1px;display:flex;align-items:center;
+                  justify-content:center;padding:7px;border:2px solid black;
+                  border-radius:8px;overflow:hidden;background:white">
+        <div style="width:10.4px;height:10.4px;background:red"></div>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* host = doc->layers.front()->children.front();
+  ASSERT_EQ(host->children.size(), 2u);
+  ASSERT_NE(host->mask, nullptr);
+  for (float width : {99.1f, 109.1f}) {
+    host->width = width;
+    doc->applyLayout();
+    EXPECT_FLOAT_EQ(host->layoutBounds().width, width);
+    EXPECT_FLOAT_EQ(host->children[0]->layoutBounds().x, std::round((width - 10.4f) / 2));
+    EXPECT_FLOAT_EQ(host->children[0]->layoutBounds().y, 24);
+    EXPECT_FLOAT_EQ(host->mask->layoutBounds().x, 0);
+    EXPECT_FLOAT_EQ(host->mask->layoutBounds().y, 0);
+    EXPECT_FLOAT_EQ(host->mask->layoutBounds().width, std::ceil(width));
+  }
 }
 
 PAG_TEST(PAGXHTMLImporterTest, LinearGradientAngleConversion) {
@@ -6962,25 +6994,22 @@ PAG_TEST(PAGXHTMLImporterTest, AbsoluteChildrenUsePaddingBoxWithPercentAndEndAnc
     </body></html>
   )HTML");
   ASSERT_NE(doc, nullptr);
-  doc->applyLayout();
-  auto* outer = doc->layers.front()->children.front();
-  auto* host = outer->children.front();
+  auto* host = doc->layers.front()->children.front();
   ASSERT_EQ(host->children.size(), 3u);
   auto* flow = host->children[0];
-  EXPECT_FLOAT_EQ(flow->layoutBounds().x, 22);
-  EXPECT_FLOAT_EQ(flow->layoutBounds().y, 14);
-  auto* frame = host->children[1];
-  auto* absolute = frame->children.front();
-  EXPECT_FLOAT_EQ(frame->layoutBounds().x, 2);
-  EXPECT_FLOAT_EQ(frame->layoutBounds().y, 2);
-  EXPECT_FLOAT_EQ(frame->layoutBounds().width, 196);
-  EXPECT_FLOAT_EQ(absolute->layoutBounds().width, 98);
-  EXPECT_FLOAT_EQ(frame->layoutBounds().x + absolute->layoutBounds().x, 95);
-  EXPECT_FLOAT_EQ(frame->layoutBounds().y + absolute->layoutBounds().y, 71);
-  auto* stretchFrame = host->children[2];
-  auto* stretch = stretchFrame->children.front();
-  EXPECT_FLOAT_EQ(stretch->layoutBounds().width, 189);
-  EXPECT_FLOAT_EQ(stretchFrame->layoutBounds().x + stretch->layoutBounds().x, 5);
+  auto* absolute = host->children[1];
+  auto* stretch = host->children[2];
+  for (float width : {200.0f, 300.0f}) {
+    host->width = width;
+    doc->applyLayout();
+    EXPECT_FLOAT_EQ(flow->layoutBounds().x, 22);
+    EXPECT_FLOAT_EQ(flow->layoutBounds().y, 14);
+    EXPECT_FLOAT_EQ(absolute->layoutBounds().width, (width - 4) / 2);
+    EXPECT_FLOAT_EQ(absolute->layoutBounds().x, (width - 4) / 2 - 3);
+    EXPECT_FLOAT_EQ(absolute->layoutBounds().y, 71);
+    EXPECT_FLOAT_EQ(stretch->layoutBounds().width, width - 11);
+    EXPECT_FLOAT_EQ(stretch->layoutBounds().x, 5);
+  }
 }
 
 PAG_TEST(PAGXHTMLImporterTest, BoundedPreWrapTextCreatesWrappingTextBox) {
@@ -14125,8 +14154,7 @@ PAG_TEST(PAGXHTMLImporterTest, FontConfigOptionIsApplied) {
 }
 
 PAG_TEST(PAGXHTMLImporterTest, BodyBackgroundColorEmitsRectangleFill) {
-  // A non-zero body padding splits an inner host but keeps the background on the outer border box;
-  // moving its 100%-sized Rectangle into the padded host would incorrectly inset the paint.
+  // Body paint uses the border box while its direct children use the content box.
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:80px;height:80px;background-color:#F59E0B;padding:10px">
       <div style="width:20px;height:20px;background-color:#000"></div>
@@ -14136,11 +14164,15 @@ PAG_TEST(PAGXHTMLImporterTest, BodyBackgroundColorEmitsRectangleFill) {
   auto* body = doc->layers.front();
   EXPECT_TRUE(ColorNear(SolidFillColorOf(body), HexColor(0xF59E0B)));
   ASSERT_EQ(body->children.size(), 1U);
-  auto* contentHost = body->children.front();
-  EXPECT_TRUE(NearlyEqual(contentHost->percentWidth, 100.0f));
-  EXPECT_TRUE(NearlyEqual(contentHost->percentHeight, 100.0f));
-  EXPECT_EQ(FindElementOfType<pagx::Fill>(contentHost), nullptr);
-  ASSERT_EQ(contentHost->children.size(), 1U);
+  auto* child = body->children.front();
+  EXPECT_TRUE(ColorNear(SolidFillColorOf(child), HexColor(0x000000)));
+  doc->applyLayout();
+  EXPECT_FLOAT_EQ(child->layoutBounds().x, 10);
+  EXPECT_FLOAT_EQ(child->layoutBounds().y, 10);
+  auto* background = FindElementOfType<pagx::Rectangle>(body);
+  ASSERT_NE(background, nullptr);
+  EXPECT_FLOAT_EQ(background->layoutBounds().x, 0);
+  EXPECT_FLOAT_EQ(background->layoutBounds().width, 80);
 }
 
 PAG_TEST(PAGXHTMLImporterTest, BodyZeroPaddingBackgroundAvoidsInnerHost) {
@@ -14184,9 +14216,8 @@ PAG_TEST(PAGXHTMLImporterTest, ZeroPaddingBackgroundFlexAvoidsInnerHost) {
   EXPECT_TRUE(std::isnan(host->children.front()->percentWidth));
 }
 
-PAG_TEST(PAGXHTMLImporterTest, ZeroPaddingBorderedFlexKeepsInnerHost) {
-  // An inside border contributes an effective content inset even when authored padding is zero,
-  // so the border-box paint must remain isolated from the flex layout host.
+PAG_TEST(PAGXHTMLImporterTest, BorderedFlexKeepsPaintAndChildrenInOneLayer) {
+  // The border contributes a content inset without adding a layout host.
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:100px;height:100px">
       <div style="display:flex;padding:0;width:60px;height:60px;
@@ -14199,7 +14230,7 @@ PAG_TEST(PAGXHTMLImporterTest, ZeroPaddingBorderedFlexKeepsInnerHost) {
   auto* outer = doc->layers.front()->children.front();
   EXPECT_TRUE(ColorNear(SolidFillColorOf(outer), HexColor(0xFFFFFF)));
   ASSERT_EQ(outer->children.size(), 1U);
-  auto* host = outer->children.front();
+  auto* host = outer;
   EXPECT_EQ(host->layout, pagx::LayoutMode::Horizontal);
   EXPECT_FLOAT_EQ(host->padding.top, 4.0f);
   EXPECT_FLOAT_EQ(host->padding.right, 4.0f);

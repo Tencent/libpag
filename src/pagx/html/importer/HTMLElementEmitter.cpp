@@ -1092,6 +1092,7 @@ void HTMLParserContext::applyMaskOrClip(Layer* layer, const HTMLBoxAttributes& b
   // share the masked layer's local coordinate origin. Adding it as a layout-excluded child
   // satisfies both: it is walked by LayerBuilder but neither drawn (maskOwner is set on the tgfx
   // side) nor laid out (includeInLayout is false).
+  if (!layer->padding.isZero()) maskLayer->referencePadding = Padding{};
   layer->children.push_back(maskLayer);
 }
 
@@ -1135,6 +1136,7 @@ bool HTMLParserContext::applyRasterImageMask(Layer* layer, const HTMLBoxAttribut
   // A raster `mask-image` defaults to `mask-mode: match-source`, which for an image source reads its
   // alpha channel; `mask-mode: luminance` opts into the luma-keyed form instead.
   layer->maskType = (box.maskMode == "luminance") ? MaskType::Luminance : MaskType::Alpha;
+  if (!layer->padding.isZero()) maskLayer->referencePadding = Padding{};
   layer->children.push_back(maskLayer);
   return true;
 }
@@ -1170,6 +1172,7 @@ bool HTMLParserContext::applyGradientImageMask(Layer* layer, const HTMLBoxAttrib
   // `mask-mode: match-source` resolves to the alpha channel for a gradient, which is also the
   // form the HTML exporter rebuilds from an alpha mask layer.
   layer->maskType = (box.maskMode == "luminance") ? MaskType::Luminance : MaskType::Alpha;
+  if (!layer->padding.isZero()) maskLayer->referencePadding = Padding{};
   layer->children.push_back(maskLayer);
   return true;
 }
@@ -1221,6 +1224,7 @@ void HTMLParserContext::applyRoundedOverflowClip(Layer* layer, const HTMLBoxAttr
   layer->clipToBounds = false;
   // Layout-excluded child so it shares the masked layer's local coordinate origin and stays
   // reachable by the renderer's mask lookup (mirrors `applyMaskOrClip`).
+  if (!layer->padding.isZero()) maskLayer->referencePadding = Padding{};
   layer->children.push_back(maskLayer);
 }
 

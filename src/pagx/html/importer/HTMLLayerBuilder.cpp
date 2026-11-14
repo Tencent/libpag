@@ -187,44 +187,13 @@ bool HTMLLayerBuilder::hasLayoutHostAttributes(const HTMLBoxAttributes& box) {
   return box.paddingSet || box.displayFlex || box.gapSet;
 }
 
-bool HTMLLayerBuilder::requiresInnerHost(const HTMLBoxAttributes& box) {
-  if (!box.padding.isZero()) return true;
-  // Flex-flow children sit inside the CSS border edge. The importer models that edge as extra
-  // padding on the layout host, so a bordered flex box still needs paint/layout isolation even
-  // when its authored padding is zero.
-  return box.displayFlex && box.borderSet && box.borderWidthPx > 0.0f;
-}
-
-Layer* HTMLLayerBuilder::createInnerHost(Layer* outer, const HTMLBoxAttributes& box) {
-  auto inner = _document->makeNode<Layer>();
-  inner->percentWidth = 100.0f;
-  inner->percentHeight = 100.0f;
-  applyLayoutAttributes(inner, box);
-  if (box.borderSet && box.borderWidthPx > 0.0f && inner->layout != LayoutMode::None) {
-    inner->padding.top += box.borderWidthPx;
-    inner->padding.right += box.borderWidthPx;
-    inner->padding.bottom += box.borderWidthPx;
-    inner->padding.left += box.borderWidthPx;
-  }
-  outer->children.push_back(inner);
-  return inner;
-}
-
 void HTMLLayerBuilder::appendCSSChild(Layer* host, Layer* child, const HTMLBoxAttributes& box) {
   if (!child->includeInLayout) {
     const float border = box.borderSet ? box.borderWidthPx : 0.0f;
     const auto& padding = host->padding;
     if (padding.left != border || padding.right != border || padding.top != border ||
         padding.bottom != border) {
-      auto frame = _document->makeNode<Layer>();
-      frame->includeInLayout = false;
-      frame->left = border - padding.left;
-      frame->right = border - padding.right;
-      frame->top = border - padding.top;
-      frame->bottom = border - padding.bottom;
-      frame->children.push_back(child);
-      host->children.push_back(frame);
-      return;
+      child->referencePadding = Padding{border, border, border, border};
     }
   }
   host->children.push_back(child);
@@ -298,6 +267,20 @@ void HTMLLayerBuilder::applyLayoutAttributes(Layer* layer, const HTMLBoxAttribut
   }
   if (box.gapSet) layer->gap = box.gapPx;
   if (box.paddingSet) layer->padding = box.padding;
+  if (box.borderSet && box.borderWidthPx > 0.0f) {
+    layer->padding.top += box.borderWidthPx;
+    layer->padding.right += box.borderWidthPx;
+    layer->padding.bottom += box.borderWidthPx;
+    layer->padding.left += box.borderWidthPx;
+  }
+  if (!layer->padding.isZero()) {
+    // CSS backgrounds, borders and generated paint children use the border box; flow children
+    // use the content box. Absolute children select the padding box in appendCSSChild().
+    layer->contentsPadding = Padding{};
+    for (auto* child : layer->children) {
+      child->referencePadding = Padding{};
+    }
+  }
   if (!box.alignItems.empty()) {
     static const std::unordered_map<std::string, Alignment> alignTable = {
         {"stretch", Alignment::Stretch},  {"center", Alignment::Center},

@@ -311,22 +311,22 @@ attributes (matches PAGX `data-*` convention in `spec/pagx_spec.md` §2.3). The 
 
 ## 5. Container vs. Background
 
-When a single HTML element has both painted background (color, gradient, border, shadow,
-border-radius) *and* children that require padding/layout, the importer emits the canonical
-PAGX "outer background + inner padded container" pattern (see `spec/pagx_spec.md`
-§4.2 Container Layout → Background with Padding):
+An HTML container owns its background and its direct children in one PAGX Layer. The Layer's
+`padding` includes the CSS padding and border. `contentsPadding="0"` keeps background and border
+geometry in the border box independently of child layout (see `spec/pagx_spec.md` §4.2):
 
 ```xml
-<Layer width="100%" height="100%">
+<Layer width="100%" height="100%" layout="vertical" padding="…" contentsPadding="0">
   <Rectangle width="100%" height="100%" roundness="…"/>
   <Fill color="…"/>
-  <Layer width="100%" height="100%" layout="vertical" padding="…">
-    <!-- children -->
-  </Layer>
+  <!-- direct children -->
 </Layer>
 ```
 
-Elements with neither background nor padding emit a single Layer with no wrapper.
+Absolute children use `referencePadding` equal to the parent's CSS border widths, so percentage
+sizes and positional constraints resolve against its padding box. Generated decoration and mask
+children use `referencePadding="0"`. Effect scopes may still require a wrapper, for example an
+outer box shadow outside an overflow clip; padding alone never does.
 
 ## 6. Text Decoration
 

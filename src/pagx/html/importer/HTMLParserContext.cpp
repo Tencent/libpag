@@ -757,20 +757,14 @@ Layer* HTMLParserContext::convertBody(const std::shared_ptr<DOMNode>& body, floa
   // shadow. `wrapper` is `layer` when no split happens.
   Layer* wrapper = _layerBuilder->maybeSplitBoxShadowFromClip(layer);
 
-  Layer* contentHost = layer;
-  bool needsInnerHost = hasBgVisuals && HTMLLayerBuilder::requiresInnerHost(box);
-  if (needsInnerHost) {
-    contentHost = _layerBuilder->createInnerHost(layer, box);
-  } else {
-    _layerBuilder->applyLayoutAttributes(layer, box);
-  }
+  _layerBuilder->applyLayoutAttributes(layer, box);
 
   auto child = body->getFirstChild();
   while (child) {
     if (child->type == DOMNodeType::Element) {
       auto* childLayer = convertElement(child, inherited, 1);
       if (childLayer) {
-        _layerBuilder->appendCSSChild(contentHost, childLayer, box);
+        _layerBuilder->appendCSSChild(layer, childLayer, box);
       }
     } else if (child->type == DOMNodeType::Text) {
       // Stray text directly under <body> — match convertContainer's behaviour so authors
@@ -782,7 +776,7 @@ Layer* HTMLParserContext::convertBody(const std::shared_ptr<DOMNode>& body, floa
         auto anon = MakeStrayTextSpan(trimmed);
         Layer* leaf = convertTextLeaf(anon, leafBox, inherited);
         if (leaf) {
-          contentHost->children.push_back(leaf);
+          layer->children.push_back(leaf);
         }
       }
     }
@@ -888,7 +882,6 @@ Layer* HTMLParserContext::convertContainer(const std::shared_ptr<DOMNode>& eleme
                                            const HTMLBoxAttributes& box,
                                            const HTMLInheritedStyle& inherited, int depth) {
   bool hasBgVisuals = HTMLLayerBuilder::hasBackgroundVisuals(box);
-  bool needsInner = hasBgVisuals && HTMLLayerBuilder::requiresInnerHost(box);
 
   auto layer = _document->makeNode<Layer>();
   _layerBuilder->applySizeAndPosition(layer, box);
@@ -919,19 +912,14 @@ Layer* HTMLParserContext::convertContainer(const std::shared_ptr<DOMNode>& eleme
   // inner of the split).
   Layer* wrapper = _layerBuilder->maybeSplitBoxShadowFromClip(layer);
 
-  Layer* contentHost = layer;
-  if (needsInner) {
-    contentHost = _layerBuilder->createInnerHost(layer, box);
-  } else {
-    _layerBuilder->applyLayoutAttributes(layer, box);
-  }
+  _layerBuilder->applyLayoutAttributes(layer, box);
 
   auto child = element->getFirstChild();
   while (child) {
     if (child->type == DOMNodeType::Element) {
       auto* childLayer = convertElement(child, inherited, depth + 1);
       if (childLayer) {
-        _layerBuilder->appendCSSChild(contentHost, childLayer, box);
+        _layerBuilder->appendCSSChild(layer, childLayer, box);
       }
     } else if (child->type == DOMNodeType::Text) {
       std::string trimmed = Trim(child->name);
@@ -941,7 +929,7 @@ Layer* HTMLParserContext::convertContainer(const std::shared_ptr<DOMNode>& eleme
         auto anon = MakeStrayTextSpan(trimmed);
         Layer* leaf = convertTextLeaf(anon, leafBox, inherited);
         if (leaf) {
-          contentHost->children.push_back(leaf);
+          layer->children.push_back(leaf);
         }
       }
     }

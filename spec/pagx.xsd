@@ -990,6 +990,8 @@
     <xs:attribute name="layout" type="LayoutModeType" default="none"/>
     <xs:attribute name="gap" type="xs:decimal" default="0"/>
     <xs:attribute name="padding" type="PaddingType"/>
+    <xs:attribute name="contentsPadding" type="PaddingType"/>
+    <xs:attribute name="referencePadding" type="PaddingType"/>
     <xs:attribute name="alignment" type="AlignmentType" default="stretch"/>
     <xs:attribute name="arrangement" type="ArrangementType" default="start"/>
     <xs:attribute name="includeInLayout" type="BoolType" default="true"/>

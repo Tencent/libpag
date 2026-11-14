@@ -120,23 +120,14 @@ class HTMLLayerBuilder {
   ColorSource* parseGradientByValue(const std::string& value, float boxWidth = NAN,
                                     float boxHeight = NAN);
 
-  // Inner host / wrappers --------------------------------------------------------------
+  // CSS boxes / effect wrappers --------------------------------------------------------
   /** Returns true when the box carries any visual that requires a Rectangle/Fill/Stroke
-   *  chain on the outer Layer (used to decide whether a double-host split is needed). */
+   *  chain on the element's Layer. */
   static bool hasBackgroundVisuals(const HTMLBoxAttributes& box);
 
-  /** Returns true when the box carries authored container-layout semantics. This is broader than
-   *  requiresInnerHost(): zero padding and zero-gap flex still affect structural folds even though
-   *  they do not require a separate background host. */
+  /** Returns true when the box carries authored container-layout semantics. Zero padding and
+   *  zero-gap flex still affect structural folds. */
   static bool hasLayoutHostAttributes(const HTMLBoxAttributes& box);
-
-  /** Returns true when the final layout host has a non-zero content inset, requiring the outer
-   *  Layer to carry border-box paint and an inner Layer to carry padding / layout. */
-  static bool requiresInnerHost(const HTMLBoxAttributes& box);
-
-  /** Creates the inner host Layer for the standard "outer background + inner padded
-   *  container" double-layer pattern, including the border inset of flex containers. */
-  Layer* createInnerHost(Layer* outer, const HTMLBoxAttributes& box);
 
   // Keep CSS absolute children relative to the padding box, independently of the
   // content inset used by PAGX flow layout. Each child keeps its paint-order slot.
