@@ -195,7 +195,8 @@ Layer* HTMLTextFragmentBuilder::buildPAGXTextHost(const std::shared_ptr<DOMNode>
   // implementation detail of the glyph positioning; letting it drive needsTextBox would wrap
   // every restored text in a TextBox the original PAGX never had.
   populateTextHostContents(textHost->contents, fragments, inherited, box,
-                           /*needsTextBox=*/false, /*isVertical=*/false, /*hasNoWrap=*/false);
+                           /*needsTextBox=*/false, /*isVertical=*/false, /*hasNoWrap=*/false,
+                           _layerBuilder.paintTargets(wrapper).text);
   _idAllocator.assign(wrapper, element);
   return wrapper;
 }
@@ -522,7 +523,8 @@ Layer* HTMLTextFragmentBuilder::convertTextLeaf(const std::shared_ptr<DOMNode>& 
   Layer* wrapper =
       buildTextHostLayers(element, box, hasBgVisuals, shrinkWidth, shrinkHeight, textHost);
   std::vector<Element*> contents;
-  populateTextHostContents(contents, fragments, inherited, box, needsTextBox, isVertical, hasNoWrap);
+  populateTextHostContents(contents, fragments, inherited, box, needsTextBox, isVertical, hasNoWrap,
+                           _layerBuilder.paintTargets(wrapper).text);
   emitTextDecorations(contents, fragments, inherited);
   if (hasBgVisuals) {
     // A TextBox already provides a painter scope. Reuse it instead of nesting a text host;
@@ -648,11 +650,18 @@ void HTMLTextFragmentBuilder::populateTextHostContents(std::vector<Element*>& co
                                                        const HTMLInheritedStyle& inherited,
                                                        const HTMLBoxAttributes& box,
                                                        bool needsTextBox, bool isVertical,
-                                                       bool hasNoWrap) {
+                                                       bool hasNoWrap, SolidColor*& textTarget) {
+  auto primaryFill = [&](const TextFragment& fragment) {
+    auto* fill = buildTextFill(fragment);
+    if (fill->color && fill->color->nodeType() == NodeType::SolidColor) {
+      textTarget = static_cast<SolidColor*>(fill->color);
+    }
+    return fill;
+  };
   if (!needsTextBox) {
     const auto& f = fragments.front();
     contents.push_back(buildTextElement(f));
-    contents.push_back(buildTextFill(f));
+    contents.push_back(primaryFill(f));
     if (auto* stroke = buildTextStroke(f)) {
       contents.push_back(stroke);
     }
@@ -724,7 +733,7 @@ void HTMLTextFragmentBuilder::populateTextHostContents(std::vector<Element*>& co
     const auto& f = fragments[i];
     if (i == 0) {
       textBox->elements.push_back(buildTextElement(f));
-      textBox->elements.push_back(buildTextFill(f));
+      textBox->elements.push_back(primaryFill(f));
       if (auto* stroke = buildTextStroke(f)) {
         textBox->elements.push_back(stroke);
       }

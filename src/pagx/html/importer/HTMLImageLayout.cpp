@@ -218,6 +218,7 @@ void HTMLParserContext::finishImageLayouts() {
     paint->height = bounds.height;
     paint->includeInLayout = false;
     _layerBuilder->applyBackgroundVisuals(paint, box);
+    _layerBuilder->paintTargets(pending.layer) = _layerBuilder->paintTargets(paint);
     emitImageContent(paint, box, pending.intrinsic, pending.image, pending.svgSource,
                      pending.svgContent);
     pending.layer->children.push_back(_layerBuilder->maybeSplitBoxShadowFromClip(paint));

@@ -173,6 +173,7 @@ HTMLLayerBuilder::HTMLLayerBuilder(HTMLDiagnosticSink& sink, HTMLValueParser& va
 void HTMLLayerBuilder::bindDocument(PAGXDocument* document) {
   _document = document;
   _outerBoxShadows.clear();
+  _paintTargets.clear();
   _filterDecoder.bindDocument(document);
 }
 
@@ -526,7 +527,9 @@ bool HTMLLayerBuilder::applyBackgroundLayers(Layer* layer, const HTMLBoxAttribut
     geometry->height = box.heightPx;
     geometry->left = geometry->top = 0;
     color->contents.push_back(geometry);
-    color->contents.push_back(buildSolidFill(box.backgroundColor));
+    auto* fill = buildSolidFill(box.backgroundColor);
+    _paintTargets[layer].background = static_cast<SolidColor*>(fill->color);
+    color->contents.push_back(fill);
     stack->children.push_back(color);
   }
   for (size_t i = images.size(); i-- > 0;) {
@@ -667,7 +670,9 @@ void HTMLLayerBuilder::applyBackgroundFill(Layer* layer, const HTMLBoxAttributes
                   ToLower(box.backgroundImage).find("url(") != std::string::npos;
   if (box.backgroundImage.empty() || urlImage) {
     if (box.backgroundColorSet) {
-      layer->contents.push_back(buildSolidFill(box.backgroundColor));
+      auto* fill = buildSolidFill(box.backgroundColor);
+      _paintTargets[layer].background = static_cast<SolidColor*>(fill->color);
+      layer->contents.push_back(fill);
       emitted = true;
     }
     return;
@@ -773,7 +778,9 @@ void HTMLLayerBuilder::applyBackgroundFill(Layer* layer, const HTMLBoxAttributes
     // blending against whatever sits behind the whole layer.
     bool hasBackdrop = false;
     if ((blend != BlendMode::Normal || anyShowsThrough) && box.backgroundColorSet) {
-      layer->contents.push_back(buildSolidFill(box.backgroundColor));
+      auto* fill = buildSolidFill(box.backgroundColor);
+      _paintTargets[layer].background = static_cast<SolidColor*>(fill->color);
+      layer->contents.push_back(fill);
       hasBackdrop = true;
     }
     // Gradients are pushed in reverse CSS order (the CSS-last layer first), so the first Fill
@@ -812,6 +819,7 @@ void HTMLLayerBuilder::applyBackgroundFill(Layer* layer, const HTMLBoxAttributes
     auto fill = _document->makeNode<Fill>();
     auto solid = _document->makeNode<SolidColor>();
     solid->color = box.backgroundColor;
+    _paintTargets[layer].background = solid;
     fill->color = solid;
     layer->contents.push_back(fill);
     emitted = true;
@@ -1277,6 +1285,7 @@ Layer* HTMLLayerBuilder::maybeSplitBoxShadowFromClip(Layer* inner) {
     _outerBoxShadows.erase(pending);
   }
   outer->children.push_back(inner);
+  _paintTargets[outer] = _paintTargets[inner];
   return outer;
 }
 

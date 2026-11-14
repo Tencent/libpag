@@ -39,6 +39,7 @@ class HTMLValueParser;
 class Layer;
 class PAGXDocument;
 class Stroke;
+class SolidColor;
 class Text;
 
 /**
@@ -210,7 +211,8 @@ class HTMLTextFragmentBuilder {
    *  TextBox-only attributes (text-align, line-height, word-wrap, overflow, writing-mode). */
   void populateTextHostContents(std::vector<Element*>& contents, const std::vector<TextFragment>& fragments,
                                 const HTMLInheritedStyle& inherited, const HTMLBoxAttributes& box,
-                                bool needsTextBox, bool isVertical, bool hasNoWrap);
+                                bool needsTextBox, bool isVertical, bool hasNoWrap,
+                                SolidColor*& textTarget);
 
   /** Emits underline / line-through decoration lines onto `textHost` derived from the
    *  inherited `text-decoration` and `text-decoration-color`. `<overline>` is unsupported

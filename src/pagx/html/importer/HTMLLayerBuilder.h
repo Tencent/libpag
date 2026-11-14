@@ -25,6 +25,7 @@
 #include <vector>
 #include "pagx/html/importer/HTMLBackgroundLayout.h"
 #include "pagx/html/importer/HTMLBoxAttributes.h"
+#include "pagx/html/importer/HTMLPaintTargets.h"
 #include "pagx/html/importer/HTMLSvgFilterDecoder.h"
 #include "pagx/types/BlendMode.h"
 
@@ -66,6 +67,9 @@ class HTMLLayerBuilder {
                    HTMLInlineSvgEmitter& svgEmitter, HTMLIdAllocator& idAllocator);
 
   void bindDocument(PAGXDocument* document);
+  HTMLPaintTargets& paintTargets(Layer* layer) {
+    return _paintTargets[layer];
+  }
   void setBackgroundImageResolver(std::function<HTMLBackgroundImage(const std::string&)> resolver);
   static bool usesBackgroundLayout(const HTMLBoxAttributes& box);
 
@@ -164,6 +168,7 @@ class HTMLLayerBuilder {
   HTMLSvgFilterDecoder _filterDecoder;
   PAGXDocument* _document = nullptr;
   std::unordered_map<Layer*, std::vector<Layer*>> _outerBoxShadows;
+  std::unordered_map<Layer*, HTMLPaintTargets> _paintTargets;
   std::function<HTMLBackgroundImage(const std::string&)> _backgroundImageResolver;
 };
 

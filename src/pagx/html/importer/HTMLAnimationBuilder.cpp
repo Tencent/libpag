@@ -753,59 +753,6 @@ void ApplyFillMode(std::vector<Keyframe<T>>& keys, const std::string& fillMode, 
   }
 }
 
-// Returns the first SolidColor painted by a Fill in `layer`'s subtree, or nullptr. The element's
-// background Fill may sit on the id'd wrapper itself or on a nested host (the importer's
-// "outer background + inner padded" / margin-wrapper splits), so the search descends a bounded
-// number of child levels. The wrapper's own contents are checked before descending.
-//
-// The text path keeps its Fill nested inside a Group container (e.g. a TextBox-emitted text
-// host whose `<Text>+<Fill>` pair sits in `Group.elements` rather than directly in
-// `Layer.contents`), so this also descends into Group/TextBox containers encountered while
-// scanning `Layer.contents`. NodeType is used in lieu of dynamic_cast (banned project-wide).
-//
-// Layer-vs-Element nesting is bounded with separate caps so a deeply Group-nested text fill
-// inside a margin-wrapped + transform-split layer does not silently exhaust a single shared
-// counter (the caller would see a misleading "no solid fill" warning).
-constexpr int kMaxLayerDepth = 4;
-constexpr int kMaxElementDepth = 4;
-
-SolidColor* FindSolidFillInElements(const std::vector<Element*>& elements, int elementDepth);
-
-SolidColor* FindSolidFill(Layer* layer, int layerDepth = 0) {
-  if (layer == nullptr || layerDepth > kMaxLayerDepth) return nullptr;
-  if (auto* found = FindSolidFillInElements(layer->contents, 0)) {
-    return found;
-  }
-  for (auto* child : layer->children) {
-    if (auto* found = FindSolidFill(child, layerDepth + 1)) {
-      return found;
-    }
-  }
-  return nullptr;
-}
-
-SolidColor* FindSolidFillInElements(const std::vector<Element*>& elements, int elementDepth) {
-  if (elementDepth > kMaxElementDepth) return nullptr;
-  for (auto* element : elements) {
-    if (element == nullptr) continue;
-    NodeType type = element->nodeType();
-    if (type == NodeType::Fill) {
-      auto* fill = static_cast<Fill*>(element);
-      if (fill->color != nullptr && fill->color->nodeType() == NodeType::SolidColor) {
-        return static_cast<SolidColor*>(fill->color);
-      }
-      continue;
-    }
-    if (type == NodeType::Group || type == NodeType::TextBox) {
-      auto* group = static_cast<Group*>(element);
-      if (auto* found = FindSolidFillInElements(group->elements, elementDepth + 1)) {
-        return found;
-      }
-    }
-  }
-  return nullptr;
-}
-
 // Splits `outer` into a layout-only outer plus a fully-visual `inner` when a separate compositing
 // or pivot scope is required. Ordinary translate animation targets the source Layer directly.
 // The inner layer remains included in its outer's measurement: intrinsically-sized text leaves have no
@@ -1147,7 +1094,8 @@ void HTMLAnimationBuilder::addAnimation(Animation* animation, Frame originalDela
 }
 
 bool HTMLAnimationBuilder::buildForElement(
-    const std::unordered_map<std::string, std::string>& resolvedStyle, Layer* layer) {
+    const std::unordered_map<std::string, std::string>& resolvedStyle, Layer* layer,
+    const HTMLPaintTargets& paints) {
   if (_document == nullptr || layer == nullptr || _keyframes == nullptr) return false;
 
   // Gather the animation spec from the shorthand and/or longhands.
@@ -1246,6 +1194,7 @@ bool HTMLAnimationBuilder::buildForElement(
   std::vector<Keyframe<float>> yKeys;
   std::vector<Keyframe<Matrix>> matrixKeys;
   std::vector<Keyframe<Color>> colorKeys;
+  std::vector<Keyframe<Color>> backgroundColorKeys;
   // A pure rotation can keep transform-origin structural: the animated Layer is placed at the
   // pivot and its visual child is offset by the inverse pivot. Its matrix keys then contain only
   // rotation (zero translation), avoiding the centre drift caused by independently interpolating
@@ -1339,7 +1288,8 @@ bool HTMLAnimationBuilder::buildForElement(
         }
       } else if (prop == "color" || prop == "background-color") {
         Color c = _valueParser.parseColor(val);
-        colorKeys.push_back({time, c, interp, {}, {}});
+        auto& keys = prop == "color" ? colorKeys : backgroundColorKeys;
+        keys.push_back({time, c, interp, {}, {}});
       } else if (prop == "filter") {
         FilterStop fs;
         fs.time = time;
@@ -1472,6 +1422,7 @@ bool HTMLAnimationBuilder::buildForElement(
   ApplyBezierHandles(yKeys, interp, easing.x1, easing.y1, easing.x2, easing.y2);
   ApplyBezierHandles(matrixKeys, interp, easing.x1, easing.y1, easing.x2, easing.y2);
   ApplyBezierHandles(colorKeys, interp, easing.x1, easing.y1, easing.x2, easing.y2);
+  ApplyBezierHandles(backgroundColorKeys, interp, easing.x1, easing.y1, easing.x2, easing.y2);
 
   // CSS `steps()` / `step-start` / `step-end` are not a runtime interpolation type — they expand
   // into n hold keyframes per @keyframes segment so the runtime can replay the staircase
@@ -1482,6 +1433,7 @@ bool HTMLAnimationBuilder::buildForElement(
     ExpandSteps(yKeys, easing.stepCount, easing.stepJump);
     ExpandSteps(matrixKeys, easing.stepCount, easing.stepJump);
     ExpandSteps(colorKeys, easing.stepCount, easing.stepJump);
+    ExpandSteps(backgroundColorKeys, easing.stepCount, easing.stepJump);
   }
 
   // Whether the filter channel carries playable motion: at least one stop must name a drop-shadow,
@@ -1519,8 +1471,8 @@ bool HTMLAnimationBuilder::buildForElement(
         "[subset:animation-unsupported-property]");
   }
 
-  if (alphaKeys.empty() && xKeys.empty() && yKeys.empty() && matrixKeys.empty() &&
-      colorKeys.empty() && !filterHasShadow && !filterHasBlur && !filterHasBrightness &&
+  if (alphaKeys.empty() && xKeys.empty() && yKeys.empty() && matrixKeys.empty() && colorKeys.empty() &&
+      backgroundColorKeys.empty() && !filterHasShadow && !filterHasBlur && !filterHasBrightness &&
       !clipUsable) {
     return false;
   }
@@ -1531,10 +1483,8 @@ bool HTMLAnimationBuilder::buildForElement(
   // ends (when fill-mode is `none` or `backwards`).
   //   alpha: the layer's resolved opacity, already populated from CSS by the layer importer.
   //   x / y: zero — local translation composes after the independently resolved layout position.
-  //   color: the SolidColor's current color, populated from CSS background-color/color before
-  //          this method runs. The fill must be located before SplitForTransformAnimation moves
-  //          contents to the inner wrapper, but the SolidColor pointer remains stable across the
-  //          split and is reused later as the channel target.
+  //   color: the emitter-bound SolidColor's current color. These pointers remain stable across
+  //          structural splits, so each color baseline is read when its channel is emitted.
   //   matrix: the layer's static transform (`layer->matrix`), which the renderer already seeds as
   //          the animatable baseline (LayerRuntimeTarget::initTransform). The CSS keyframe matrices
   //          override it during playback and fill-mode restores it outside the active window.
@@ -1548,14 +1498,6 @@ bool HTMLAnimationBuilder::buildForElement(
     Matrix toCenter = Matrix::Translate(matrixPivotX, matrixPivotY);
     Matrix fromCenter = Matrix::Translate(-matrixPivotX, -matrixPivotY);
     matrixChannelBaseline = fromCenter * baselineMatrix * toCenter;
-  }
-  Color baselineColor = {};
-  SolidColor* baselineSolid = nullptr;
-  if (!colorKeys.empty()) {
-    baselineSolid = FindSolidFill(layer);
-    if (baselineSolid != nullptr) {
-      baselineColor = baselineSolid->color;
-    }
   }
 
   // CSS `animation-iteration-count: 0` (or any non-positive value) suppresses playback entirely.
@@ -1593,12 +1535,6 @@ bool HTMLAnimationBuilder::buildForElement(
   ApplyFillMode(yKeys, spec.fillMode, baselineXY, loopOnce, activeEnd);
   ApplyFillMode(matrixKeys, spec.fillMode, matrixChannelBaseline, loopOnce, activeEnd);
   ApplyFillMode(brightnessAlphaKeys, spec.fillMode, 1.0f, loopOnce, activeEnd);
-  // Color channel fill-mode is conditional on having a target SolidColor; if the lookup failed
-  // the channel is dropped below, so the fill-mode mutation would be wasted work and the
-  // diagnostic message would be misleading.
-  if (!colorKeys.empty() && baselineSolid != nullptr) {
-    ApplyFillMode(colorKeys, spec.fillMode, baselineColor, loopOnce, activeEnd);
-  }
 
   // Ensure the target layer has an id (mint one when the author supplied none).
   if (layer->id.empty()) {
@@ -1735,28 +1671,28 @@ bool HTMLAnimationBuilder::buildForElement(
     animation->objects.push_back(object);
   }
 
-  // SolidColor-targeted channel (color / background-color). The fill was located before
-  // SplitForTransformAnimation moved contents into the inner wrapper; the SolidColor pointer
-  // remains stable across the split so the cached `baselineSolid` is reused as the channel
-  // target without re-searching the (now-empty) outer layer.
-  if (!colorKeys.empty()) {
-    if (baselineSolid == nullptr) {
-      _diagnostics.warn(
-          "html: 'color' animation requires a solid background-color/color fill; dropped "
-          "[subset:animation-unsupported-property]");
-    } else {
-      if (baselineSolid->id.empty()) {
-        baselineSolid->id = _idAllocator.generateUnique("anim");
-      }
-      auto* object = _document->makeNode<AnimationObject>();
-      object->target = baselineSolid->id;
-      auto* ch = _document->makeNode<TypedChannel<Color>>();
-      ch->name = "color";
-      ch->keyframes = std::move(colorKeys);
-      object->channels.push_back(ch);
-      animation->objects.push_back(object);
+  // Bind semantic paints directly. Moving or removing an implementation Layer cannot change
+  // the target, and a background animation must never pick a descendant's text/image Fill.
+  auto emitColor = [&](std::vector<Keyframe<Color>>& keys, SolidColor* target, const char* property) {
+    if (keys.empty()) return;
+    if (target == nullptr) {
+      _diagnostics.warn(std::string("html: '") + property +
+                        "' animation requires a solid semantic paint target; dropped "
+                        "[subset:animation-unsupported-property]");
+      return;
     }
-  }
+    ApplyFillMode(keys, spec.fillMode, target->color, loopOnce, activeEnd);
+    if (target->id.empty()) target->id = _idAllocator.generateUnique("anim");
+    auto* object = _document->makeNode<AnimationObject>();
+    object->target = target->id;
+    auto* channel = _document->makeNode<TypedChannel<Color>>();
+    channel->name = "color";
+    channel->keyframes = std::move(keys);
+    object->channels.push_back(channel);
+    animation->objects.push_back(object);
+  };
+  emitColor(colorKeys, paints.text, "color");
+  emitColor(backgroundColorKeys, paints.background, "background-color");
 
   // Filter channels. Drop-shadow / blur parameters map to their native scalar channels. The filter
   // nodes live on whichever layer still owns the visual content after transform/opacity wrappers

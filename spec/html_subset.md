@@ -590,7 +590,8 @@ Everything else inside a `@keyframes` stop is warned and dropped
 | `opacity` | `alpha` | the element's `Layer` | float |
 | `transform` (pure translation only) | `x` / `y` | the element's `Layer` | float |
 | `transform` (scale / rotate / skew / any non-pure-translation) | `matrix` | the element's `Layer` | matrix |
-| `color` / `background-color` | `color` | the `SolidColor` inside the element's `Fill` | color |
+| `color` | `color` | the element's bound primary text `SolidColor` | color |
+| `background-color` | `color` | the element's bound background `SolidColor` | color |
 | `filter: drop-shadow(...)` | `offsetX` / `offsetY` / `blurX` / `blurY` / `color` | a `DropShadowFilter` on the element's `Layer` | float / color |
 | `filter: blur(...)` | `blurX` / `blurY` | a `BlurFilter` on the element's `Layer` | float |
 | `filter: brightness(...)` | `alpha` (clamped to `[0,1]`) | a generated nested `Layer` | float |
@@ -613,9 +614,11 @@ pivoted around the element's `transform-origin` exactly like the static `transfo
 > take the short way around. Authoring intermediate `@keyframes` stops (the common case) avoids this.
 
 The animated element's `Layer` is given a generated `id` (prefix `anim`) when it has no author
-`id`, so the emitted `<Object target="…">` can reference it. `color` animation requires the
-element to paint a solid `background-color` (or, for text, a solid `color`); when no `SolidColor`
-fill is present the `color` channel is dropped (`subset:animation-unsupported-property`).
+`id`, so the emitted `<Object target="…">` can reference it. Text and background emitters bind
+their own paint targets before animation lowering; wrappers and nesting depth do not affect
+ownership. `color` and `background-color` produce independent channels and restore their own
+baselines. When the corresponding solid paint is absent, the channel is dropped with
+`subset:animation-unsupported-property`; another descendant's fill is never substituted.
 
 **Filter animation.** A `filter` chain animated between `none` and supported filter functions
 (or an animated `box-shadow`, which the capture layer folds into an equivalent `drop-shadow`) lowers

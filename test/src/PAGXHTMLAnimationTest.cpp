@@ -59,6 +59,7 @@ struct AnimationInput {
   pagx::HTMLAnimationBuilder builder{diagnostics, values, ids};
   std::unordered_map<std::string, pagx::html::CssKeyframesRule> rules;
   pagx::Layer* layer = document->makeNode<pagx::Layer>("box");
+  pagx::HTMLPaintTargets paints;
 
   AnimationInput() {
     diagnostics.bindDocument(document.get());
@@ -76,7 +77,7 @@ struct AnimationInput {
   }
 
   bool build(const std::string& animation = "pulse 1s linear both") {
-    return builder.buildForElement({{"animation", animation}}, layer);
+    return builder.buildForElement({{"animation", animation}}, layer, paints);
   }
 
   bool buildSvg(const Style& style = {{"animation", "pulse 1s linear both"}},
@@ -334,7 +335,7 @@ PAG_TEST(PAGXHTMLAnimationTest, InvalidTransformStopsPreserveSupportedChannels) 
   EXPECT_TRUE(unresolved.warned("without resolvable transform-origin"));
 }
 
-PAG_TEST(PAGXHTMLAnimationTest, ColorAnimationFindsNestedTextPaintAndRestoresBaseline) {
+PAG_TEST(PAGXHTMLAnimationTest, BoundTextPaintRestoresItsOwnBaseline) {
   AnimationInput input;
   auto* child = input.document->makeNode<pagx::Layer>();
   input.layer->children.push_back(child);
@@ -345,6 +346,7 @@ PAG_TEST(PAGXHTMLAnimationTest, ColorAnimationFindsNestedTextPaintAndRestoresBas
   color->color = {0, 1, 0, 1, pagx::ColorSpace::SRGB};
   fill->color = color;
   group->elements.push_back(fill);
+  input.paints.text = color;
   input.setStops({{0, "color:red"}, {100, "color:blue"}});
   ASSERT_TRUE(input.build("pulse 1s linear 1s"));
   auto* channel = input.channel("color", color->id);
@@ -355,7 +357,7 @@ PAG_TEST(PAGXHTMLAnimationTest, ColorAnimationFindsNestedTextPaintAndRestoresBas
   EXPECT_FLOAT_EQ(Sample<pagx::Color>(channel, 121).green, 1);
 }
 
-PAG_TEST(PAGXHTMLAnimationTest, MissingOrTooDeepSolidFillIsDiagnosed) {
+PAG_TEST(PAGXHTMLAnimationTest, PaintBindingDoesNotDependOnDepthOrTraversalOrder) {
   for (bool nestedLayers : {false, true}) {
     SCOPED_TRACE(nestedLayers);
     AnimationInput input;
@@ -374,12 +376,17 @@ PAG_TEST(PAGXHTMLAnimationTest, MissingOrTooDeepSolidFillIsDiagnosed) {
       }
     }
     auto* fill = input.document->makeNode<pagx::Fill>();
-    fill->color = input.document->makeNode<pagx::SolidColor>();
+    auto* color = input.document->makeNode<pagx::SolidColor>();
+    fill->color = color;
     elements->push_back(fill);
     input.setStops({{0, "color:red"}, {100, "color:blue"}});
     EXPECT_FALSE(input.build());
     EXPECT_TRUE(input.document->animations.empty());
     EXPECT_TRUE(input.warned("requires a solid"));
+    // The same deeply nested paint is valid when its owning source binds it explicitly.
+    input.paints.text = color;
+    ASSERT_TRUE(input.build());
+    EXPECT_NE(input.channel("color", color->id), nullptr);
   }
   AnimationInput gradient;
   auto* fill = gradient.document->makeNode<pagx::Fill>();

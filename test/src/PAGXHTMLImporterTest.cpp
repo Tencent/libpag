@@ -8484,6 +8484,72 @@ PAG_TEST(PAGXHTMLImporterTest, AnimationBackgroundColorProducesColorChannel) {
   EXPECT_TRUE(ColorNear(ch->keyframes.back().value, HexColor(0x0000FF)));
 }
 
+PAG_TEST(PAGXHTMLImporterTest, TextAndBackgroundAnimationsBindIndependentPaints) {
+  for (const std::string effects : {"", "overflow:hidden;box-shadow:2px 3px 4px black;"}) {
+    SCOPED_TRACE(effects);
+    auto doc = ParseRaw(R"HTML(
+      <html><head><style>
+        @keyframes recolor {
+          from { color:red; background-color:white; }
+          to { color:blue; background-color:lime; }
+        }
+      </style></head><body style="width:240px;height:120px">
+        <span id="label" style="display:inline-block;width:150px;height:50px;padding:5px;
+          color:#123456;background-color:#ffffff;animation:recolor 1s linear forwards;)HTML" +
+                        effects + R"HTML(">Text</span>
+      </body></html>)HTML");
+    ASSERT_NE(doc, nullptr);
+    doc = pagx::PAGXImporter::FromXML(pagx::PAGXExporter::ToXML(*doc));
+    ASSERT_NE(doc, nullptr);
+    ASSERT_EQ(doc->animations.size(), 1u);
+    auto* animation = static_cast<pagx::Animation*>(doc->animations.front());
+    ASSERT_EQ(animation->objects.size(), 2u);
+    bool sawText = false;
+    bool sawBackground = false;
+    for (auto* object : animation->objects) {
+      auto* target = doc->findNode<pagx::SolidColor>(object->target);
+      ASSERT_NE(target, nullptr);
+      const bool isText = ColorNear(target->color, HexColor(0x123456));
+      if (isText) {
+        sawText = true;
+      } else {
+        EXPECT_TRUE(ColorNear(target->color, HexColor(0xFFFFFF)));
+        sawBackground = true;
+      }
+      ASSERT_EQ(object->channels.size(), 1u);
+      auto* channel = object->channels.front();
+      EXPECT_EQ(channel->name, "color");
+      for (int step = 0; step <= 4; ++step) {
+        const auto value = channel->evaluateAt(step * 15);
+        const auto* color = std::get_if<pagx::Color>(&value);
+        ASSERT_NE(color, nullptr);
+        const float t = step * .25f;
+        const pagx::Color expected = isText
+                                        ? pagx::Color{1 - t, 0, t, 1, pagx::ColorSpace::SRGB}
+                                        : pagx::Color{1 - t, 1, 1 - t, 1, pagx::ColorSpace::SRGB};
+        EXPECT_TRUE(ColorNear(*color, expected));
+      }
+    }
+    EXPECT_TRUE(sawText);
+    EXPECT_TRUE(sawBackground);
+  }
+}
+
+PAG_TEST(PAGXHTMLImporterTest, BackgroundAnimationDoesNotBindDescendantText) {
+  auto doc = ParseRaw(R"HTML(
+    <html><head><style>
+      @keyframes recolor { from { background-color:red; } to { background-color:blue; } }
+    </style></head><body style="width:200px;height:100px">
+      <div style="width:100px;height:50px;animation:recolor 1s linear">
+        <span style="color:lime">Child</span>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  EXPECT_TRUE(doc->animations.empty());
+  EXPECT_TRUE(HasDiagnosticContaining(doc, "'background-color' animation requires a solid"));
+}
+
 // An animated `clip-path` (emitted by the capture pipeline as a canonical `path("d")` per keyframe)
 // lowers onto a contour mask whose Path geometry morphs through per-point float channels. The
 // reveal below wipes a rectangle open on the x axis, so the two right-edge points animate their x
