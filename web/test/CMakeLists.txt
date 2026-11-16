@@ -107,6 +107,7 @@ file(GLOB CLI_SOURCES CONFIGURE_DEPENDS ${ROOT}/src/cli/*.cpp)
 list(FILTER CLI_SOURCES EXCLUDE REGEX "main\\.cpp$")
 list(FILTER CLI_SOURCES EXCLUDE REGEX "CommandExport\\.cpp$")
 list(FILTER CLI_SOURCES EXCLUDE REGEX "VideoEncoder\\.cpp$")
+list(FILTER CLI_SOURCES EXCLUDE REGEX "VideoEncoderProcess_(posix|win)\\.cpp$")
 list(FILTER CLI_SOURCES EXCLUDE REGEX "VideoFrameSource\\.cpp$")
 list(APPEND TEST_SOURCES ${CLI_SOURCES})
 

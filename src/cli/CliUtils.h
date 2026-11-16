@@ -44,6 +44,12 @@ std::ostream& CommandError(const std::string& command);
 /** Parses an integer or numerator/denominator frame rate within VideoExporter's supported limits. */
 bool ParseVideoFrameRate(const char* text, VideoFrameRate* frameRate);
 
+/** Returns the equivalent frame rate reduced by its greatest common divisor. */
+VideoFrameRate NormalizeVideoFrameRate(const VideoFrameRate& frameRate);
+
+/** Returns an integer or numerator/denominator frame rate for encoder arguments and diagnostics. */
+std::string FormatVideoFrameRate(const VideoFrameRate& frameRate);
+
 inline size_t FindLastPathSeparator(const std::string& path) {
   auto slash = path.rfind('/');
   auto backslash = path.rfind('\\');

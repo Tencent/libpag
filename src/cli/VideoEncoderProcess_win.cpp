@@ -87,6 +87,29 @@ bool CreatePrivateDirectory(const std::string& path, DWORD* error) {
   return created;
 }
 
+bool RestoreFileSecurityInheritance(const std::string& path, DWORD* error) {
+  *error = ERROR_SUCCESS;
+  auto widePath = UTF8ToWide(path);
+  if (widePath.empty()) {
+    *error = ERROR_INVALID_DATA;
+    return false;
+  }
+  ACL emptyAcl = {};
+  if (!InitializeAcl(&emptyAcl, sizeof(emptyAcl), ACL_REVISION)) {
+    *error = GetLastError();
+    return false;
+  }
+  auto result =
+      SetNamedSecurityInfoW(widePath.data(), SE_FILE_OBJECT,
+                            DACL_SECURITY_INFORMATION | UNPROTECTED_DACL_SECURITY_INFORMATION,
+                            nullptr, nullptr, &emptyAcl, nullptr);
+  if (result != ERROR_SUCCESS) {
+    *error = result;
+    return false;
+  }
+  return true;
+}
+
 void InitializeVideoEncoderProcess() {
 }
 

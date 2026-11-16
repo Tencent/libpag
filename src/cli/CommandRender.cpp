@@ -649,8 +649,8 @@ static int RenderFrameSequence(const RenderOptions& options) {
   float durationSeconds =
       static_cast<float>(static_cast<double>(frameCount) / exporter->frameRate().framesPerSecond());
   std::cout << "pagx render: wrote " << frameCount << " frames to " << options.framesDir << " ("
-            << width << "x" << height << ", " << exporter->frameRate().toString() << " fps, "
-            << durationSeconds << "s)\n";
+            << width << "x" << height << ", " << FormatVideoFrameRate(exporter->frameRate())
+            << " fps, " << durationSeconds << "s)\n";
   return 0;
 }
 #endif

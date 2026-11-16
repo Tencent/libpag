@@ -386,7 +386,7 @@ bool BuildFFmpegCommandLine(const std::string& ffmpegPath, const VideoFormatSpec
     SetError(errorMsg, "the frame rate must be positive");
     return false;
   }
-  auto frameRate = options.frameRate.normalized();
+  auto frameRate = NormalizeVideoFrameRate(options.frameRate);
   if (frameRate.numerator > std::numeric_limits<int>::max() ||
       frameRate.denominator > std::numeric_limits<int>::max()) {
     SetError(errorMsg, "the frame rate is not representable by ffmpeg");
@@ -411,7 +411,7 @@ bool BuildFFmpegCommandLine(const std::string& ffmpegPath, const VideoFormatSpec
   args.insert(args.end(), {"-f", "rawvideo", "-pixel_format", "rgba"});
   args.insert(args.end(), {"-video_size",
                            std::to_string(options.width) + "x" + std::to_string(options.height)});
-  args.insert(args.end(), {"-framerate", frameRate.toString(), "-i", "pipe:0"});
+  args.insert(args.end(), {"-framerate", FormatVideoFrameRate(frameRate), "-i", "pipe:0"});
   args.emplace_back("-an");
   args.insert(args.end(),
               {"-c:v", options.encoder.empty() ? format.defaultEncoder : options.encoder});
@@ -953,6 +953,8 @@ bool VideoEncoder::finish(std::string* errorMsg) {
                            partFile + "'");
     return false;
   }
+  DWORD securityError = ERROR_SUCCESS;
+  auto securityRestored = RestoreFileSecurityInheritance(outputFile, &securityError);
 #else
   std::error_code renameError = {};
   std::filesystem::rename(partFile, outputFile, renameError);
@@ -963,7 +965,20 @@ bool VideoEncoder::finish(std::string* errorMsg) {
   }
 #endif
   std::string cleanupError = {};
-  if (!removeStagingDirectory(&cleanupError)) {
+  auto stagingRemoved = removeStagingDirectory(&cleanupError);
+#ifdef _WIN32
+  if (!securityRestored) {
+    auto message = "published '" + outputFile +
+                   "' but failed to restore output file permissions (Windows error " +
+                   std::to_string(securityError) + ")";
+    if (!stagingRemoved) {
+      message += "; " + cleanupError;
+    }
+    SetError(errorMsg, message);
+    return false;
+  }
+#endif
+  if (!stagingRemoved) {
     std::cerr << "pagx export: warning: published '" << outputFile << "'; " << cleanupError << "\n";
   }
   return true;

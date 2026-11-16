@@ -24,6 +24,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <numeric>
 #include "pagx/PAGXImporter.h"
 #include "pagx/nodes/Font.h"
 #include "renderer/FontEmbedder.h"
@@ -75,6 +76,21 @@ bool ParseVideoFrameRate(const char* text, VideoFrameRate* frameRate) {
   }
   *frameRate = parsed;
   return true;
+}
+
+VideoFrameRate NormalizeVideoFrameRate(const VideoFrameRate& frameRate) {
+  auto divisor = std::gcd(frameRate.numerator, frameRate.denominator);
+  if (divisor == 0) {
+    return frameRate;
+  }
+  return {frameRate.numerator / divisor, frameRate.denominator / divisor};
+}
+
+std::string FormatVideoFrameRate(const VideoFrameRate& frameRate) {
+  if (frameRate.denominator == 1) {
+    return std::to_string(frameRate.numerator);
+  }
+  return std::to_string(frameRate.numerator) + "/" + std::to_string(frameRate.denominator);
 }
 
 #ifdef _WIN32

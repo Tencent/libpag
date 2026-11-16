@@ -35,6 +35,7 @@
 #include "pagx/PAGXImporter.h"
 #include "pagx/PPTExporter.h"
 #include "pagx/SVGExporter.h"
+#include "pagx/VideoExportInternal.h"
 #include "pagx/VideoExporter.h"
 #include "pagx/types/Color.h"
 #include "rendering/gpu/Devices.h"
@@ -360,8 +361,8 @@ static void LimitOutputToTextureSize(const PAGXDocument& document, VideoExportOp
   }
   int requestedWidth = 0;
   int requestedHeight = 0;
-  if (!VideoExporter::ComputeOutputDimensions(document.width, document.height, options->scale,
-                                              false, &requestedWidth, &requestedHeight)) {
+  if (!ComputeVideoOutputDimensions(document.width, document.height, options->scale, false,
+                                    &requestedWidth, &requestedHeight)) {
     return;
   }
   auto device = pag::Devices::MakeDefault();
@@ -392,8 +393,8 @@ static void LimitOutputToTextureSize(const PAGXDocument& document, VideoExportOp
   while (adjustedScale > 0.0f) {
     int adjustedWidth = 0;
     int adjustedHeight = 0;
-    auto validSize = VideoExporter::ComputeOutputDimensions(
-        document.width, document.height, adjustedScale, false, &adjustedWidth, &adjustedHeight);
+    auto validSize = ComputeVideoOutputDimensions(document.width, document.height, adjustedScale,
+                                                  false, &adjustedWidth, &adjustedHeight);
     if (validSize && adjustedWidth <= maxOutputSize && adjustedHeight <= maxOutputSize) {
       break;
     }
@@ -436,8 +437,8 @@ static void PrintSizeNotice(const PAGXDocument& document, const VideoExportOptio
                             const VideoExporter& exporter, const VideoFormatSpec& format) {
   int requestedWidth = 0;
   int requestedHeight = 0;
-  if (!VideoExporter::ComputeOutputDimensions(document.width, document.height, videoOptions.scale,
-                                              false, &requestedWidth, &requestedHeight)) {
+  if (!ComputeVideoOutputDimensions(document.width, document.height, videoOptions.scale, false,
+                                    &requestedWidth, &requestedHeight)) {
     return;
   }
   if (requestedWidth != exporter.width() || requestedHeight != exporter.height()) {
@@ -526,7 +527,7 @@ static int ExportToMP4(const ExportOptions& options, const VideoFormatSpec& form
   auto durationSeconds =
       static_cast<float>(static_cast<double>(frameCount) / frameRate.framesPerSecond());
   std::cout << "pagx export: wrote " << options.outputFile << " (" << width << "x" << height << ", "
-            << frameRate.toString() << " fps, " << durationSeconds << "s, " << frameCount
+            << FormatVideoFrameRate(frameRate) << " fps, " << durationSeconds << "s, " << frameCount
             << " frames, " << encoderName << ")\n";
   return 0;
 }

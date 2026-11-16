@@ -47,6 +47,9 @@ struct VideoEncoder::ChildProcess {
 
 #ifdef _WIN32
 bool CreatePrivateDirectory(const std::string& path, DWORD* error);
+
+/** Replaces explicit file ACEs with the inheritable ACEs from the destination directory. */
+bool RestoreFileSecurityInheritance(const std::string& path, DWORD* error);
 #else
 bool CreatePrivateDirectory(const std::string& path, int* error);
 #endif

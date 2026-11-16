@@ -55,8 +55,9 @@ std::shared_ptr<pagx::PAGXDocument> MakeStaticDocument() {
       "</pagx>\n");
 }
 
-std::shared_ptr<pagx::PAGXDocument> MakeNestedAnimationDocument(
-    const std::string& frameRate = "60") {
+std::shared_ptr<pagx::PAGXDocument> MakeNestedAnimationDocument(const std::string& frameRate = "60",
+                                                                const std::string& loop = "once",
+                                                                int64_t evaluationOffset = 0) {
   return pagx::PAGXImporter::FromXML(
       "<pagx width=\"60\" height=\"60\">\n"
       "  <Resources>\n"
@@ -67,8 +68,8 @@ std::shared_ptr<pagx::PAGXDocument> MakeNestedAnimationDocument(
       "      </Layer>\n"
       "      <Animations>\n"
       "        <Animation id=\"cardShift\" duration=\"20\" frameRate=\"" +
-      frameRate +
-      "\" loop=\"once\">\n"
+      frameRate + "\" loop=\"" + loop +
+      "\">\n"
       "          <Object target=\"cardColor\">\n"
       "            <Channel name=\"color\" type=\"color\">\n"
       "              <Key time=\"0\" value=\"#00FF00\" interpolation=\"hold\"/>\n"
@@ -80,7 +81,9 @@ std::shared_ptr<pagx::PAGXDocument> MakeNestedAnimationDocument(
       "    </Composition>\n"
       "  </Resources>\n"
       "  <Layer width=\"60\" height=\"60\" composition=\"@card\">\n"
-      "    <Timelines><Animation ref=\"@cardShift\"/></Timelines>\n"
+      "    <Timelines><Animation ref=\"@cardShift\" evaluationOffset=\"" +
+      std::to_string(evaluationOffset) +
+      "\"/></Timelines>\n"
       "  </Layer>\n"
       "</pagx>\n");
 }
@@ -320,6 +323,29 @@ PAGX_TEST(PAGXVideoExporterTest, MakeUsesNestedAnimationPeriodByDefault) {
   ASSERT_TRUE(exporter != nullptr);
   EXPECT_EQ(exporter->frameRate().numerator, 60);
   EXPECT_EQ(exporter->frameCount(), 20);
+}
+
+PAGX_TEST(PAGXVideoExporterTest, MakeUsesLoopPeriodForNestedEvaluationOffsets) {
+  for (auto offset : {int64_t{-40}, int64_t{-12}, int64_t{12}, int64_t{40}}) {
+    auto exporter = pagx::VideoExporter::Make(MakeNestedAnimationDocument("60", "loop", offset));
+    ASSERT_TRUE(exporter != nullptr);
+    EXPECT_EQ(exporter->frameCount(), 20);
+  }
+}
+
+PAGX_TEST(PAGXVideoExporterTest, MakeUsesPingPongPeriodForNestedEvaluationOffset) {
+  auto exporter = pagx::VideoExporter::Make(MakeNestedAnimationDocument("60", "pingPong", 12));
+  ASSERT_TRUE(exporter != nullptr);
+  EXPECT_EQ(exporter->frameCount(), 40);
+}
+
+PAGX_TEST(PAGXVideoExporterTest, MakeAdjustsOncePeriodForNestedEvaluationOffsets) {
+  auto delayed = pagx::VideoExporter::Make(MakeNestedAnimationDocument("60", "once", 12));
+  auto trimmed = pagx::VideoExporter::Make(MakeNestedAnimationDocument("60", "once", -12));
+  ASSERT_TRUE(delayed != nullptr);
+  ASSERT_TRUE(trimmed != nullptr);
+  EXPECT_EQ(delayed->frameCount(), 32);
+  EXPECT_EQ(trimmed->frameCount(), 8);
 }
 
 PAGX_TEST(PAGXVideoExporterTest, NestedAnimationDoesNotChangeTopLevelSamplingRate) {

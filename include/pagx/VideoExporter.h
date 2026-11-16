@@ -21,7 +21,6 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
-#include <numeric>
 #include <string>
 #include <vector>
 #include "pagx/types/Color.h"
@@ -67,23 +66,6 @@ struct VideoFrameRate {
            (quotient != maxValue || remainder == 0);
   }
 
-  /** Returns the equivalent ratio reduced by its greatest common divisor. */
-  VideoFrameRate normalized() const {
-    auto divisor = std::gcd(numerator, denominator);
-    if (divisor == 0) {
-      return *this;
-    }
-    return {numerator / divisor, denominator / divisor};
-  }
-
-  /** Returns an integer or numerator/denominator representation suitable for ffmpeg. */
-  std::string toString() const {
-    if (denominator == 1) {
-      return std::to_string(numerator);
-    }
-    return std::to_string(numerator) + "/" + std::to_string(denominator);
-  }
-
   /** Frame-rate numerator. Zero is the automatic sentinel only when denominator is 1. */
   int64_t numerator = 0;
 
@@ -108,9 +90,10 @@ struct VideoExportOptions {
   VideoFrameRate frameRate = {0, 1};
 
   /**
-   * Sequence length in seconds. Values <= 0 mean "use the longest mounted animation's playback
-   * period", including both passes of a PingPong animation and any nested evaluation offset. A
-   * document without active timelines produces one static frame by default; a positive duration
+   * Sequence length in seconds. Values <= 0 mean "use the longest mounted animation's effective
+   * playback period". Once animations include any nested delay or trimming from their evaluation
+   * offset; Loop and PingPong offsets only change phase and do not alter the period. A document
+   * without active timelines produces one static frame by default; a positive duration
    * repeats that frame. Documents containing a state machine require an explicit positive duration
    * because state machines have no finite playback period. Must be finite. The frame count is
    * derived as `llround(duration * frameRate)`.
@@ -147,17 +130,15 @@ struct VideoExportOptions {
  * top-level or mounted nested timelines draw and read back only the first frame; later frames reuse
  * the same RGBA buffer.
  *
- * The exporter only renders. Encoding and muxing are the host's responsibility; the current
- * implementation is built only for native hosts and uses an external ffmpeg process. WebAssembly
- * builds exclude this implementation, so a future WebCodecs host would need its own frame-source
- * adapter. No video codec ships inside pagx.
+ * The exporter only renders. Encoding and muxing are the host's responsibility, and no video codec
+ * ships inside pagx.
  *
  * Frames are pulled one at a time so that hosts can interleave other work (a UI thread, an encoder
  * queue) between frames. Rendering the whole sequence in a single call is not supported because a
  * 1080p frame can be expensive to draw and read back.
  *
  * Frames are premultiplied RGBA8888. Containers that carry alpha need the host to unpremultiply;
- * opaque output (the mp4 path) can pass the pixels through unchanged.
+ * opaque output can pass the pixels through unchanged.
  *
  * Thread safety: an instance is not thread-safe. Make() must run on a thread that owns a GPU
  * context. Callers must not hold the same device's context lock while calling nextFrame(), since
@@ -203,20 +184,6 @@ class VideoExporter {
   VideoExporter& operator=(const VideoExporter&) = delete;
   VideoExporter(VideoExporter&&) = delete;
   VideoExporter& operator=(VideoExporter&&) = delete;
-
-  /**
-   * Computes output dimensions from document dimensions, scale and padding. Returns false for
-   * non-finite or non-positive inputs and dimensions that do not fit in an int.
-   *
-   * @param documentWidth source width in document coordinates.
-   * @param documentHeight source height in document coordinates.
-   * @param scale positive finite output scale.
-   * @param padToEvenSize whether to pad each computed dimension up to an even number.
-   * @param width receives the computed width on success.
-   * @param height receives the computed height on success.
-   */
-  static bool ComputeOutputDimensions(float documentWidth, float documentHeight, float scale,
-                                      bool padToEvenSize, int* width, int* height);
 
   /**
    * Returns the output width in pixels, which is `ceil(documentWidth * scale)` plus optional padding.

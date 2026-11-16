@@ -30,6 +30,7 @@
 #include "pagx/PAGSurface.h"
 #include "pagx/PAGTimeline.h"
 #include "pagx/PAGXDocument.h"
+#include "pagx/VideoExportInternal.h"
 #include "pagx/nodes/Animation.h"
 #include "tgfx/core/Bitmap.h"
 #include "tgfx/core/Pixmap.h"
@@ -92,7 +93,7 @@ bool ValidateOptions(const std::shared_ptr<PAGXDocument>& document,
     SetError(errorMsg, "the frame rate must be auto {0, 1} or within " +
                            std::to_string(VideoExporter::MIN_FRAME_RATE) + "-" +
                            std::to_string(VideoExporter::MAX_FRAME_RATE) + ", got " +
-                           rate.toString());
+                           std::to_string(rate.numerator) + "/" + std::to_string(rate.denominator));
     return false;
   }
   if (!std::isfinite(options.duration)) {
@@ -133,8 +134,8 @@ VideoExporter::VideoExporter() = default;
 
 VideoExporter::~VideoExporter() = default;
 
-bool VideoExporter::ComputeOutputDimensions(float documentWidth, float documentHeight, float scale,
-                                            bool padToEvenSize, int* width, int* height) {
+bool ComputeVideoOutputDimensions(float documentWidth, float documentHeight, float scale,
+                                  bool padToEvenSize, int* width, int* height) {
   if (width == nullptr || height == nullptr) {
     return false;
   }
@@ -173,7 +174,10 @@ bool VideoExporter::AddAnimation(const std::shared_ptr<PAGAnimation>& animation,
       periodUs *= 2;
     }
   }
-  auto effectivePeriodUs = static_cast<double>(periodUs) + static_cast<double>(offsetUs);
+  auto effectivePeriodUs = static_cast<double>(periodUs);
+  if (definition->loop == LoopMode::Once) {
+    effectivePeriodUs = std::max(0.0, effectivePeriodUs + static_cast<double>(offsetUs));
+  }
   if (!std::isfinite(effectivePeriodUs) ||
       effectivePeriodUs >= static_cast<double>(std::numeric_limits<int64_t>::max())) {
     SetError(errorMsg, "animation '" + definition->id + "' has an overflowing playback period");
@@ -337,8 +341,8 @@ std::shared_ptr<VideoExporter> VideoExporter::Make(std::shared_ptr<PAGXDocument>
   }
   int width = 0;
   int height = 0;
-  if (!ComputeOutputDimensions(document->width, document->height, options.scale,
-                               options.padToEvenSize, &width, &height)) {
+  if (!ComputeVideoOutputDimensions(document->width, document->height, options.scale,
+                                    options.padToEvenSize, &width, &height)) {
     SetError(errorMsg, "the output dimensions must be finite, positive, and fit in an int");
     return nullptr;
   }
