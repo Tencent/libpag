@@ -64,11 +64,11 @@
 #include "pagx/nodes/TextModifier.h"
 #include "pagx/nodes/TextPath.h"
 #include "pagx/nodes/TrimPath.h"
-#include "tgfx/core/PathMeasure.h"
 #include "pagx/nodes/ViewModel.h"
 #include "pagx/nodes/ViewModelProperty.h"
 #include "pagx/pag/SequenceCodec.h"
 #include "pagx/types/ColorSpace.h"
+#include "tgfx/core/PathMeasure.h"
 
 namespace pagx {
 // Keyframe migration (P3-5): implemented in KeyframeConverter.cpp.
@@ -425,13 +425,15 @@ static void MigrateTextAnimators(ConvertState* state, pag::TextLayer* legacyText
 //   left:               firstMargin
 //   right:              pathLength - layoutWidth + lastMargin
 //   center (and full):  (pathLength - layoutWidth) / 2 + firstMargin + lastMargin
-static void MigrateTextPathOptions(ConvertState* state, pag::TextLayer* legacyText, TextBox* textBox) {
+static void MigrateTextPathOptions(ConvertState* state, pag::TextLayer* legacyText,
+                                   TextBox* textBox) {
   auto* options = legacyText->pathOption;
   if (options == nullptr || options->path == nullptr || options->path->maskPath == nullptr) {
     return;
   }
   auto startFrame = legacyText->startTime;
-  auto* textPath = state->document->makeNode<TextPath>(LegacyLayerTargetId(legacyText) + "-textpath");
+  auto* textPath =
+      state->document->makeNode<TextPath>(LegacyLayerTargetId(legacyText) + "-textpath");
   auto handle = PropertyValueAtStart(options->path->maskPath, startFrame, nullptr);
   if (handle != nullptr) {
     textPath->path = ConvertPathData(state, *handle);
@@ -440,8 +442,7 @@ static void MigrateTextPathOptions(ConvertState* state, pag::TextLayer* legacyTe
   auto firstMargin = PropertyValueAtStart(options->firstMargin, startFrame, nullptr);
   auto lastMargin = PropertyValueAtStart(options->lastMargin, startFrame, nullptr);
   textPath->reversed = reversed;
-  textPath->perpendicular =
-      PropertyValueAtStart(options->perpendicularToPath, startFrame, nullptr);
+  textPath->perpendicular = PropertyValueAtStart(options->perpendicularToPath, startFrame, nullptr);
   auto forceAlignment = PropertyValueAtStart(options->forceAlignment, startFrame, nullptr);
   textPath->forceAlignment = forceAlignment;
   // Fold the justification into firstMargin (only the non-forceAlignment mode uses it; the
@@ -453,7 +454,7 @@ static void MigrateTextPathOptions(ConvertState* state, pag::TextLayer* legacyTe
       layoutWidth = textDocument->boxTextSize.x;
     }
     auto justification = textDocument != nullptr ? textDocument->justification
-                                                  : pag::ParagraphJustification::LeftJustify;
+                                                 : pag::ParagraphJustification::LeftJustify;
     float pathLength = 0.0f;
     if (handle != nullptr) {
       tgfx::Path path = {};
@@ -929,11 +930,127 @@ void ConvertShapeElement(ConvertState* state, pag::ShapeElement* element,
 
 // Collects the animated channels of one legacy layer into a new AnimationObject under the
 // given animation. Returns the object, or nullptr when the layer has no animation at all.
+// Legacy matrix of one transform at a frame, matching the legacy RenderTransform order:
+// translate(-anchor) * scale * rotate * translate(position).
+static void BuildLegacyTransformMatrix(pag::Transform2D* transform, pag::Frame frame,
+                                       tgfx::Matrix* out) {
+  out->setIdentity();
+  if (transform == nullptr) {
+    return;
+  }
+  auto anchor = transform->anchorPoint->getValueAt(frame);
+  auto scale = transform->scale->getValueAt(frame);
+  pag::Point position = {};
+  if (transform->position != nullptr) {
+    position = transform->position->getValueAt(frame);
+  } else {
+    position.x = transform->xPosition->getValueAt(frame);
+    position.y = transform->yPosition->getValueAt(frame);
+  }
+  out->postTranslate(-anchor.x, -anchor.y);
+  out->postScale(scale.x, scale.y);
+  out->postRotate(transform->rotation->getValueAt(frame));
+  out->postTranslate(position.x, position.y);
+}
+
+static bool TransformIsAnimated(pag::Transform2D* transform) {
+  if (transform == nullptr) {
+    return false;
+  }
+  auto animated = [](auto* property) { return property != nullptr && property->animatable(); };
+  return animated(transform->anchorPoint) || animated(transform->position) ||
+         animated(transform->xPosition) || animated(transform->yPosition) ||
+         animated(transform->scale) || animated(transform->rotation);
+}
+
+// The full world matrix of a parented layer at a frame, in the LEGACY composition order:
+// TransformCache::createCache renders the child matrix first, then post-concats each parent
+// walking outward (direct parent first), i.e. child * direct * grandparent * ... * outermost.
+static tgfx::Matrix ParentedWorldMatrixAt(pag::Layer* legacyLayer, pag::Frame frame) {
+  auto world = tgfx::Matrix::I();
+  BuildLegacyTransformMatrix(legacyLayer->transform, frame, &world);
+  for (auto* parent = legacyLayer->parent; parent != nullptr; parent = parent->parent) {
+    tgfx::Matrix matrix = tgfx::Matrix::I();
+    BuildLegacyTransformMatrix(parent->transform, frame, &matrix);
+    world.postConcat(matrix);
+  }
+  return world;
+}
+
+static Matrix3D ToMatrix3D(const tgfx::Matrix& matrix) {
+  auto result = Matrix3D();
+  result.setRowColumn(0, 0, matrix.getScaleX());
+  result.setRowColumn(1, 0, matrix.getSkewY());
+  result.setRowColumn(0, 1, matrix.getSkewX());
+  result.setRowColumn(1, 1, matrix.getScaleY());
+  result.setRowColumn(0, 3, matrix.getTranslateX());
+  result.setRowColumn(1, 3, matrix.getTranslateY());
+  return result;
+}
+
+// Parented layers fold the whole parent-chain transform into the layer matrix (flattening
+// option A): the matrix wins over the decomposed fields (priority matrix3D > matrix >
+// decomposed, spec 6.2) and the layer keeps its own timeline slot, so the rendering order
+// stays exactly the legacy array order.
+static void ApplyParentedStaticMatrix(pag::Layer* legacyLayer, Layer* child) {
+  if (legacyLayer->parent == nullptr || child == nullptr) {
+    return;
+  }
+  auto world = ParentedWorldMatrixAt(legacyLayer, legacyLayer->startTime);
+  // The matrix carries the FULL world transform (linear + translation). The renderer
+  // composes renderPosition() (resolved from x/y) ON TOP of the effective matrix, so the
+  // authored x/y must be zeroed or the layer translation applies twice.
+  child->x = 0.0f;
+  child->y = 0.0f;
+  if (!world.isIdentity()) {
+    child->matrix = {world.getScaleX(), world.getSkewY(),      world.getSkewX(),
+                     world.getScaleY(), world.getTranslateX(), world.getTranslateY()};
+  }
+}
+
+// Bakes the parented layer world matrix per frame into a matrix3D Hold channel: the legacy
+// renderer evaluates every property per frame, so per-frame holds are exactly equivalent and
+// survive any parent/child animation combination. Only the geometric channels are baked;
+// alpha and visible stay decomposed on the same object.
+static void BakeParentedMatrixAnimation(ConvertState* state, pag::Layer* legacyLayer,
+                                        float frameRate, AnimationObject* object) {
+  (void)frameRate;
+  bool animated = TransformIsAnimated(legacyLayer->transform);
+  for (auto* parent = legacyLayer->parent; parent != nullptr && !animated;
+       parent = parent->parent) {
+    animated = TransformIsAnimated(parent->transform);
+  }
+  if (!animated) {
+    return;
+  }
+  auto start = legacyLayer->startTime;
+  auto end = start + legacyLayer->duration;
+  auto* channel = state->document->makeNode<TypedChannel<Matrix3D>>();
+  channel->name = "matrix3D";
+  for (auto frame = start; frame <= end; frame++) {
+    auto world = ParentedWorldMatrixAt(legacyLayer, frame);
+    Keyframe<Matrix3D> matrixKey = {};
+    matrixKey.time = frame;
+    matrixKey.value = ToMatrix3D(world);
+    matrixKey.interpolation = KeyframeInterpolationType::Hold;
+    channel->keyframes.push_back(matrixKey);
+  }
+  if (!channel->keyframes.empty()) {
+    object->channels.push_back(channel);
+  }
+}
+
 AnimationObject* MigrateLayerAnimation(ConvertState* state, pag::Layer* legacyLayer,
                                        Animation* animation, float frameRate) {
   auto* object = state->document->makeNode<AnimationObject>();
   object->target = LegacyLayerTargetId(legacyLayer);
-  MigrateTransform2DAnimation(legacyLayer->transform, frameRate, state->document, object);
+  if (legacyLayer->parent != nullptr) {
+    // Parented layers bake the whole transform chain into matrix3D (the decomposed channels
+    // would animate in the wrong space after flattening); alpha/visible stay decomposed.
+    BakeParentedMatrixAnimation(state, legacyLayer, frameRate, object);
+  } else {
+    MigrateTransform2DAnimation(legacyLayer->transform, frameRate, state->document, object);
+  }
   MigrateLayerVisibility(legacyLayer, state->document, object);
   if (object->channels.empty()) {
     return nullptr;
@@ -1141,6 +1258,7 @@ Composition* ConvertComposition(ConvertState* state, pag::VectorComposition* leg
     auto* legacyLayer = *it;
     auto* child = ConvertLayer(state, legacyLayer, legacy->frameRate);
     if (child != nullptr) {
+      ApplyParentedStaticMatrix(legacyLayer, child);
       composition->layers.push_back(child);
       // P3-5: migrate this layer's animated channels into the composition animation. Shape
       // groups converted inside the layer append their channels to the same animation.

@@ -126,6 +126,11 @@ Matrix BuildLayerEffectiveMatrix(const Layer* layer) {
     m.b = v[1];
     m.c = v[4];
     m.d = v[5];
+    // Keep the translation so the 2D projection of matrix3D matches the authored matrix
+    // branch (baked parented transforms ride this channel; dropping the translation made
+    // animated parented layers render at the unparented position).
+    m.tx = v[12];
+    m.ty = v[13];
     return m;
   }
   if (!layer->matrix.isIdentity()) {
