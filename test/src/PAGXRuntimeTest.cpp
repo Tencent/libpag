@@ -37,6 +37,7 @@
 #include "pagx/runtime/KeyframeEvaluatorImpl.h"
 #include "pagx/tgfx.h"
 #include "tgfx/gpu/Context.h"
+#include "tgfx/layers/Layer.h"
 #include "utils/Baseline.h"
 #include "utils/TestUtils.h"
 
@@ -732,6 +733,49 @@ PAGX_TEST(PAGXRuntimeTest, SpringEasingColorClampsOvershoot) {
   EXPECT_FLOAT_EQ(color.red, 1.0f);
   EXPECT_FLOAT_EQ(color.green, 0.0f);
   EXPECT_FLOAT_EQ(color.alpha, 1.0f);
+}
+
+/**
+ * Test case: Spring overshoot on an alpha channel is clamped to [0, 1] at the runtime writer.
+ */
+PAGX_TEST(PAGXRuntimeTest, SpringOvershootClampsAlpha) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto* layer = doc->makeNode<pagx::Layer>("L");
+  doc->layers.push_back(layer);
+
+  auto* animation = doc->makeNode<pagx::Animation>("a");
+  animation->duration = 60;
+  animation->frameRate = 60.0f;
+  auto* object = doc->makeNode<pagx::AnimationObject>();
+  object->target = "L";
+  animation->objects.push_back(object);
+
+  auto* channel = doc->makeNode<pagx::TypedChannel<float>>();
+  channel->name = "alpha";
+  pagx::Keyframe<float> first = {};
+  first.time = 0;
+  first.value = 0.0f;
+  first.interpolation = pagx::KeyframeInterpolationType::Spring;
+  first.spring.bounce = 0.5f;
+  channel->keyframes.push_back(first);
+  pagx::Keyframe<float> second = {};
+  second.time = 60;
+  second.value = 1.0f;
+  second.interpolation = pagx::KeyframeInterpolationType::Linear;
+  channel->keyframes.push_back(second);
+  object->channels.push_back(channel);
+  doc->animations.push_back(animation);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_NE(scene, nullptr);
+  auto timeline = scene->getAnimation("a");
+  ASSERT_NE(timeline, nullptr);
+  auto tgfxLayer = scene->mutableBinding()->get<tgfx::Layer>(layer);
+  ASSERT_NE(tgfxLayer, nullptr);
+
+  timeline->setCurrentTime(273000);
+  timeline->apply();
+  EXPECT_FLOAT_EQ(tgfxLayer->alpha(), 1.0f);
 }
 
 /**
