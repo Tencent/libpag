@@ -783,6 +783,8 @@ async function processPagxCase(entry, outDir, opts) {
     animSSIMworst: NaN,
     freezeSSIM0: NaN,
     freezeSSIMworst: NaN,
+    stateSSIM0: NaN,
+    stateSSIMworst: NaN,
     staticAvailable: 'no',
     staticNote: '',
     // Per-instant animation loss (staticSSIM_i - animSSIM_i, signed) and the clamped worst of the
@@ -1012,6 +1014,8 @@ async function measureStaticBaseline(params) {
     animSSIMworst: NaN,
     freezeSSIM0: NaN,
     freezeSSIMworst: NaN,
+    stateSSIM0: NaN,
+    stateSSIMworst: NaN,
     staticAvailable: 'no',
     staticNote: '',
   };
@@ -1179,13 +1183,26 @@ async function measureStaticBaseline(params) {
       const staticSSIM = compare.pixelMetrics(refPng, browserPng, `${stem}.diff.png`).ssim;
       const freezeSSIM = compare.pixelMetrics(animatedPng, refPng, null).ssim;
       const animSSIM = compare.pixelMetrics(animatedPng, animatedBrowserPng, null).ssim;
+      // Did the two renderers agree that the frozen state is the animated one? Two independent
+      // readings: the PAGX renders (`freezeSSIM`, freeze correctness) and the browser renderings of
+      // both exports (`stateSSIM`, whether the static export route reproduces that same state at
+      // all). When the static route diverges, staticSSIM measures the route gap, not fidelity.
+      const stateSSIM = compare.pixelMetrics(browserPng, animatedBrowserPng, null).ssim;
       const suffix = instant.tag === '0' ? '0' : 'worst';
       row[`staticSSIM${suffix}`] = staticSSIM;
       row[`freezeSSIM${suffix}`] = freezeSSIM;
       row[`animSSIM${suffix}`] = animSSIM;
+      row[`stateSSIM${suffix}`] = stateSSIM;
       if (!(freezeSSIM >= STATIC_FREEZE_FLOOR)) {
         allExact = false;
         notes.push(`${instant.tag}:freeze-drift-${freezeSSIM.toFixed(4)}`);
+      }
+      // stateSSIM is recorded, not gated: a small value means the exporter's two routes disagree on
+      // this state, which is exactly what animLoss is meant to quantify (composite/18 scores 0.82
+      // here). Gating on it would discard the static evidence for every case whose animation path
+      // is imperfect — i.e. the cases the metric exists for.
+      if (!(stateSSIM >= STATIC_FREEZE_FLOOR)) {
+        notes.push(`${instant.tag}:state-drift-${stateSSIM.toFixed(4)}`);
       }
       fs.writeFileSync(
         metaPath,
@@ -1394,7 +1411,8 @@ function writePagxCsv(rows, outPath) {
     // Static baseline + grade. ssimMean / ssimMin above are the animated metric (animSSIM) and keep
     // their meaning; eval_gate.py reads them by name and ignores everything after.
     'staticSSIM0', 'staticSSIMworst', 'animSSIM0', 'animSSIMworst', 'freezeSSIM0',
-    'freezeSSIMworst', 'staticAvailable', 'staticNote', 'animLoss0', 'animLossWorst', 'animLoss',
+    'freezeSSIMworst', 'stateSSIM0', 'stateSSIMworst', 'staticAvailable', 'staticNote', 'animLoss0',
+    'animLossWorst', 'animLoss',
     'animGradeMean', 'animGradeMin', 'grade', 'attribution',
   ];
   const lines = [headers.join(',')];
@@ -1466,10 +1484,10 @@ function writePagxMarkdown(rows, outPath, label) {
   lines.push('');
   lines.push('## Cases');
   lines.push('');
-  lines.push('SSIM is luma-only, so a wrong hue can still score ~1; `rgbΔ` (mean per-channel RGB delta, 0-255) catches color errors. `ref span` / `export span` are the largest RGB delta from the first frame on each timeline (0 = never changes). `static0` / `staticWorst` are the two static instants; `freeze` is their self-check.');
+  lines.push('SSIM is luma-only, so a wrong hue can still score ~1; `rgbΔ` (mean per-channel RGB delta, 0-255) catches color errors. `ref span` / `export span` are the largest RGB delta from the first frame on each timeline (0 = never changes). `static0` / `staticWorst` are the two static instants; `freeze` is the PAGX-side self-check (frozen render vs the animated render at the same instant) and `state` the browser-side one (the frozen export vs the animated export at that same instant). A case is only attributed statically when both agree with the animated state (>= 0.99).');
   lines.push('');
-  lines.push('| case | expect | target.channel | frames | ssim mean | ssim min | static0 | staticWorst | animLoss0 | animLossWorst | animLoss | freeze | grade(mean) | grade(min) | grade | attribution | rgbΔ mean | rgbΔ max | pixelDiff% | ref span | export span | flag | error |');
-  lines.push('| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |');
+  lines.push('| case | expect | target.channel | frames | ssim mean | ssim min | static0 | staticWorst | animLoss0 | animLossWorst | animLoss | freeze | state | grade(mean) | grade(min) | grade | attribution | rgbΔ mean | rgbΔ max | pixelDiff% | ref span | export span | flag | error |');
+  lines.push('| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |');
   for (const r of rows) {
     const tc = r.target || r.channel ? `${r.target}.${r.channel}` : '-';
     lines.push('| ' + [
@@ -1485,6 +1503,7 @@ function writePagxMarkdown(rows, outPath, label) {
       fmt(r.animLossWorst),
       fmt(r.animLoss),
       fmt(Math.min(r.freezeSSIM0, r.freezeSSIMworst)),
+      fmt(Math.min(r.stateSSIM0, r.stateSSIMworst)),
       r.animGradeMean || '',
       r.animGradeMin || '',
       r.grade || '',
