@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <cstdint>
 #include "rendering/graphics/Canvas.h"
 #include "tgfx/core/BlendMode.h"
 #include "tgfx/core/Canvas.h"

@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <cstdint>
 #include "pag/file.h"
 
 namespace pag {

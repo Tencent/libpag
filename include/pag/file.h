@@ -19,6 +19,7 @@
 #pragma once
 
 #include <atomic>
+#include <cstdint>
 #include <mutex>
 #include "pag/types.h"
 

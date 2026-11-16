@@ -19,6 +19,7 @@
 #pragma once
 
 #include <atomic>
+#include <cstdint>
 
 namespace pag {
 class UniqueID {
