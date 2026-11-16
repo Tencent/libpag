@@ -18,8 +18,8 @@
 
 #pragma once
 
-#include "base/utils/Log.h"
 #include <cstdint>
+#include "base/utils/Log.h"
 #include "pag/types.h"
 #include "tgfx/core/Clock.h"
 
