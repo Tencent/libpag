@@ -57,33 +57,37 @@ double SpringNaturalFrequency(double zeta) {
   return SPRING_SETTLE_DECAY;
 }
 
-// Unit step response. time is the normalized segment position in [0, 1].
+// Unit step response. For normalized springs time is the normalized segment position in [0, 1];
+// for physical springs it is elapsed seconds.
 double SpringStepResponse(double zeta, double omega, double time) {
   if (time <= 0.0) {
     return 0.0;
   }
-  double decay = std::exp(-zeta * omega * time);
   if (zeta < 1.0) {
     double damped = std::sqrt(1.0 - zeta * zeta);
+    double decay = std::exp(-zeta * omega * time);
     double angle = omega * damped * time;
     return 1.0 - decay * (std::cos(angle) + zeta / damped * std::sin(angle));
   }
   if (zeta > 1.0) {
+    // Split into the two real modes so large time values cannot overflow sinh/cosh.
     double overdamped = std::sqrt(zeta * zeta - 1.0);
-    double angle = omega * overdamped * time;
-    return 1.0 - decay * (std::cosh(angle) + zeta / overdamped * std::sinh(angle));
+    double slowDecay = std::exp(-(zeta - overdamped) * omega * time);
+    double fastDecay = std::exp(-(zeta + overdamped) * omega * time);
+    return 1.0 -
+           0.5 * ((1.0 + zeta / overdamped) * slowDecay + (1.0 - zeta / overdamped) * fastDecay);
   }
+  double decay = std::exp(-omega * time);
   return 1.0 - decay * (1.0 + omega * time);
 }
 
-double SolveSpringEasing(const SpringEasing& spring, double progress) {
+double SolveNormalizedSpringEasing(double zeta, double progress) {
   if (progress <= 0.0) {
     return 0.0;
   }
   if (progress >= 1.0) {
     return 1.0;
   }
-  double zeta = std::max(1.0 - ClampBounce(spring.bounce), MIN_SPRING_DAMPING_RATIO);
   double omega = SpringNaturalFrequency(zeta);
   // Endpoint normalization pins e(0) = 0 and e(1) = 1 exactly while preserving the overshoot of
   // the raw response between them.
@@ -94,11 +98,49 @@ double SolveSpringEasing(const SpringEasing& spring, double progress) {
   return SpringStepResponse(zeta, omega, progress) / end;
 }
 
+// physical-v1 keeps the authored time base: progress is scaled by the segment duration in seconds,
+// mass and stiffness set the natural frequency, and damping sets the damping ratio.
+double SolveSpringEasing(const SpringEasing& spring, double progress,
+                         double segmentDurationSeconds) {
+  if (progress <= 0.0) {
+    return 0.0;
+  }
+  if (spring.model == SpringEasingModel::PhysicalV1) {
+    double stiffness = spring.stiffness;
+    double damping = spring.damping;
+    double mass = spring.mass;
+    if (!std::isfinite(stiffness) || !std::isfinite(damping) || !std::isfinite(mass) ||
+        stiffness <= 0.0 || damping < 0.0 || mass <= 0.0) {
+      return progress;
+    }
+    double zeta = damping / (2.0 * std::sqrt(stiffness * mass));
+    if (!std::isfinite(zeta)) {
+      return progress;
+    }
+    if (segmentDurationSeconds <= 0.0) {
+      // No time base was supplied; keep the damping ratio but use the normalized time scale.
+      return SolveNormalizedSpringEasing(std::max(zeta, MIN_SPRING_DAMPING_RATIO), progress);
+    }
+    if (progress >= 1.0) {
+      return 1.0;
+    }
+    double omega = std::sqrt(stiffness / mass);
+    double value = SpringStepResponse(zeta, omega, progress * segmentDurationSeconds);
+    return std::isfinite(value) ? value : progress;
+  }
+  if (progress >= 1.0) {
+    return 1.0;
+  }
+  double zeta = std::max(1.0 - ClampBounce(spring.bounce), MIN_SPRING_DAMPING_RATIO);
+  return SolveNormalizedSpringEasing(zeta, progress);
+}
+
 }  // namespace
 
 double EvaluateKeyframeInterpolationProgress(KeyframeInterpolationType interpolation,
                                              const Point& bezierOut, const Point& bezierIn,
-                                             const SpringEasing& spring, double progress) {
+                                             const SpringEasing& spring, double progress,
+                                             double segmentDurationSeconds) {
   switch (interpolation) {
     case KeyframeInterpolationType::None:
     case KeyframeInterpolationType::Hold:
@@ -108,7 +150,7 @@ double EvaluateKeyframeInterpolationProgress(KeyframeInterpolationType interpola
     case KeyframeInterpolationType::Bezier:
       return SolveBezierEasing(bezierOut.x, bezierOut.y, bezierIn.x, bezierIn.y, progress);
     case KeyframeInterpolationType::Spring:
-      return SolveSpringEasing(spring, progress);
+      return SolveSpringEasing(spring, progress, segmentDurationSeconds);
   }
   return progress;
 }

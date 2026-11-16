@@ -65,7 +65,7 @@ enum class KeyframeInterpolationType : uint8_t {
 
 /**
  * SpringEasingModel selects the parameter-to-curve mapping used by Spring interpolation. The model
- * is part of the document format: a later version may map the same bounce value to a different
+ * is part of the document format: a later version may map the same parameters to a different
  * curve, so readers must reject models they do not implement instead of falling back.
  */
 enum class SpringEasingModel : uint8_t {
@@ -76,6 +76,13 @@ enum class SpringEasingModel : uint8_t {
    * tolerance.
    */
   NormalizedV1 = 0,
+  /**
+   * Physical spring evaluated in real time. The segment duration in seconds (frames divided by
+   * frameRate) is the evaluation window; stiffness, damping and mass map to the second-order step
+   * response. The segment should be long enough for the spring to settle, otherwise the response
+   * is cut off at the segment end.
+   */
+  PhysicalV1 = 1,
 };
 
 /**
@@ -93,9 +100,26 @@ constexpr float MaxSpringBounce = 1.0f;
 struct SpringEasing {
   /**
    * Damping control in [MinSpringBounce, MaxSpringBounce]: 0 is critically damped, positive
-   * values overshoot, negative values approach the target without overshooting.
+   * values overshoot, negative values approach the target without overshooting. Used by
+   * NormalizedV1 only.
    */
   float bounce = 0.0f;
+
+  /**
+   * Spring stiffness, in force units per unit displacement. Positive; used by PhysicalV1 only.
+   */
+  float stiffness = 0.0f;
+
+  /**
+   * Viscous damping coefficient. Non-negative; zero yields an undamped oscillation. Used by
+   * PhysicalV1 only.
+   */
+  float damping = 0.0f;
+
+  /**
+   * Mass of the oscillating body. Positive; used by PhysicalV1 only.
+   */
+  float mass = 0.0f;
 
   /**
    * The parameter-to-curve mapping used to evaluate the spring.

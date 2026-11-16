@@ -53,7 +53,7 @@ static KeyValue EvaluateLerp(const KeyValue& a, const KeyValue& b, double t) {
 KeyValue EvaluateKeyframeSegment(const KeyValue& leftValue, const KeyValue& rightValue,
                                  double progress, KeyframeInterpolationType interp,
                                  const Point* bezierOut, const Point* bezierIn,
-                                 const SpringEasing* spring) {
+                                 const SpringEasing* spring, double segmentDurationSeconds) {
   if (interp == KeyframeInterpolationType::None || interp == KeyframeInterpolationType::Hold) {
     return leftValue;
   }
@@ -65,7 +65,7 @@ KeyValue EvaluateKeyframeSegment(const KeyValue& leftValue, const KeyValue& righ
   const auto& effectiveSpring = spring != nullptr ? *spring : defaultSpring;
   auto easedT = EvaluateKeyframeInterpolationProgress(
       interp, bezierOut != nullptr ? *bezierOut : Point{},
-      bezierIn != nullptr ? *bezierIn : Point{}, effectiveSpring, progress);
+      bezierIn != nullptr ? *bezierIn : Point{}, effectiveSpring, progress, segmentDurationSeconds);
   return EvaluateLerp(leftValue, rightValue, easedT);
 }
 

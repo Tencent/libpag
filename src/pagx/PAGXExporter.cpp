@@ -238,12 +238,20 @@ static std::string SpringEasingModelToString(SpringEasingModel model) {
   switch (model) {
     case SpringEasingModel::NormalizedV1:
       return "normalized-v1";
+    case SpringEasingModel::PhysicalV1:
+      return "physical-v1";
   }
   return "normalized-v1";
 }
 
 static void WriteSpringEasing(XMLBuilder& xml, const SpringEasing& spring) {
-  xml.addAttribute("springBounce", FloatToString(spring.bounce));
+  if (spring.model == SpringEasingModel::PhysicalV1) {
+    xml.addAttribute("springStiffness", FloatToString(spring.stiffness));
+    xml.addAttribute("springDamping", FloatToString(spring.damping));
+    xml.addAttribute("springMass", FloatToString(spring.mass));
+  } else {
+    xml.addAttribute("springBounce", FloatToString(spring.bounce));
+  }
   xml.addAttribute("springModel", SpringEasingModelToString(spring.model));
 }
 

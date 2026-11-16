@@ -1665,7 +1665,34 @@ static KeyframeInterpolationType ParseKeyframeInterpolation(const std::string& v
 
 static bool HasSpringAttributes(const DOMNode* node) {
   return node->findAttribute("springBounce") != nullptr ||
+         node->findAttribute("springStiffness") != nullptr ||
+         node->findAttribute("springDamping") != nullptr ||
+         node->findAttribute("springMass") != nullptr ||
          node->findAttribute("springModel") != nullptr;
+}
+
+static bool ParseSpringFloatAttribute(const DOMNode* node, const char* name, PAGXDocument* doc,
+                                      float* result) {
+  auto* text = node->findAttribute(name);
+  if (text == nullptr || text->empty()) {
+    ReportError(doc, node,
+                std::string("Spring interpolation requires a '") + name +
+                    "' attribute for this springModel.");
+    return false;
+  }
+  char* endPtr = nullptr;
+  float value = strtof(text->c_str(), &endPtr);
+  const char* trailing = endPtr;
+  while (*trailing == ' ' || *trailing == '\t' || *trailing == '\n' || *trailing == '\r') {
+    ++trailing;
+  }
+  if (endPtr == text->c_str() || *trailing != '\0' || !std::isfinite(value)) {
+    ReportError(doc, node,
+                std::string("Invalid value '") + *text + "' for '" + name + "' attribute.");
+    return false;
+  }
+  *result = value;
+  return true;
 }
 
 // Reads the spring parameters of one keyframe or transition. Missing or invalid parameters report
@@ -1673,32 +1700,48 @@ static bool HasSpringAttributes(const DOMNode* node) {
 // already-parsed interpolation so the document stays loadable and hosts can reject it on errors.
 static SpringEasing ParseSpringEasing(const DOMNode* node, PAGXDocument* doc) {
   SpringEasing spring = {};
-  auto* bounceText = node->findAttribute("springBounce");
-  if (bounceText == nullptr || bounceText->empty()) {
-    ReportError(doc, node, "Spring interpolation requires a 'springBounce' attribute.");
-    return spring;
-  }
-  char* endPtr = nullptr;
-  float bounce = strtof(bounceText->c_str(), &endPtr);
-  const char* trailing = endPtr;
-  while (*trailing == ' ' || *trailing == '\t' || *trailing == '\n' || *trailing == '\r') {
-    ++trailing;
-  }
-  if (endPtr == bounceText->c_str() || *trailing != '\0' || !std::isfinite(bounce)) {
-    ReportError(doc, node, "Invalid value '" + *bounceText + "' for 'springBounce' attribute.");
-    return spring;
-  }
-  if (bounce < MinSpringBounce || bounce > MaxSpringBounce) {
-    ReportError(doc, node, "springBounce must be within [-0.5, 1].");
-    return spring;
-  }
-  spring.bounce = bounce;
   auto* modelText = node->findAttribute("springModel");
-  if (modelText != nullptr && !modelText->empty() && *modelText != "normalized-v1") {
+  if (modelText != nullptr && !modelText->empty() && *modelText != "normalized-v1" &&
+      *modelText != "physical-v1") {
     ReportError(doc, node, "Unsupported springModel '" + *modelText + "'.");
     return spring;
   }
-  spring.model = SpringEasingModel::NormalizedV1;
+  bool physical = modelText != nullptr && *modelText == "physical-v1";
+  spring.model = physical ? SpringEasingModel::PhysicalV1 : SpringEasingModel::NormalizedV1;
+  if (!physical) {
+    if (node->findAttribute("springStiffness") != nullptr ||
+        node->findAttribute("springDamping") != nullptr ||
+        node->findAttribute("springMass") != nullptr) {
+      ReportError(doc, node,
+                  "springStiffness, springDamping and springMass require "
+                  "springModel=\"physical-v1\".");
+      return spring;
+    }
+    if (!ParseSpringFloatAttribute(node, "springBounce", doc, &spring.bounce)) {
+      return spring;
+    }
+    if (spring.bounce < MinSpringBounce || spring.bounce > MaxSpringBounce) {
+      ReportError(doc, node, "springBounce must be within [-0.5, 1].");
+      return spring;
+    }
+    return spring;
+  }
+  if (node->findAttribute("springBounce") != nullptr) {
+    ReportError(doc, node, "springBounce requires springModel=\"normalized-v1\".");
+    return spring;
+  }
+  if (!ParseSpringFloatAttribute(node, "springStiffness", doc, &spring.stiffness) ||
+      !ParseSpringFloatAttribute(node, "springDamping", doc, &spring.damping) ||
+      !ParseSpringFloatAttribute(node, "springMass", doc, &spring.mass)) {
+    return spring;
+  }
+  if (spring.stiffness <= 0.0f) {
+    ReportError(doc, node, "springStiffness must be greater than 0.");
+  } else if (spring.damping < 0.0f) {
+    ReportError(doc, node, "springDamping must be greater than or equal to 0.");
+  } else if (spring.mass <= 0.0f) {
+    ReportError(doc, node, "springMass must be greater than 0.");
+  }
   return spring;
 }
 
@@ -1883,8 +1926,7 @@ static void ParseKeyframes(const DOMNode* channelNode, TypedChannel<T>* channel,
         if (key.interpolation == KeyframeInterpolationType::Spring) {
           key.spring = ParseSpringEasing(child.get(), doc);
         } else if (HasSpringAttributes(child.get())) {
-          ReportError(doc, child.get(),
-                      "springBounce and springModel require interpolation=\"spring\".");
+          ReportError(doc, child.get(), "Spring attributes require interpolation=\"spring\".");
         }
         auto bezierOut = GetAttribute(child.get(), "bezierOut");
         if (bezierOut.empty()) {
@@ -2150,7 +2192,7 @@ static StateTransition* ParseTransition(const DOMNode* node, PAGXDocument* doc) 
   } else if (transition->interpolation == KeyframeInterpolationType::Spring) {
     transition->spring = ParseSpringEasing(node, doc);
   } else if (HasSpringAttributes(node)) {
-    ReportError(doc, node, "springBounce and springModel require interpolation=\"spring\".");
+    ReportError(doc, node, "Spring attributes require interpolation=\"spring\".");
   }
   transition->enableEarlyExit = GetBoolAttribute(node, "earlyExit", false, doc);
   transition->pauseOnExit = GetBoolAttribute(node, "pauseOnExit", false, doc);

@@ -63,10 +63,15 @@ float CurveMix(const StateTransition* transition, float t) {
     case KeyframeInterpolationType::Hold:
       return t >= 1.0f ? 1.0f : 0.0f;
     case KeyframeInterpolationType::Bezier:
-    case KeyframeInterpolationType::Spring:
-      return static_cast<float>(
-          EvaluateKeyframeInterpolationProgress(transition->interpolation, transition->bezierOut,
-                                                transition->bezierIn, transition->spring, t));
+    case KeyframeInterpolationType::Spring: {
+      double durationSeconds =
+          transition->frameRate > 0.0f
+              ? static_cast<double>(transition->duration) / transition->frameRate
+              : 0.0;
+      return static_cast<float>(EvaluateKeyframeInterpolationProgress(
+          transition->interpolation, transition->bezierOut, transition->bezierIn,
+          transition->spring, t, durationSeconds));
+    }
     case KeyframeInterpolationType::Linear:
     default:
       return t;

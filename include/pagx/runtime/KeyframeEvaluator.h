@@ -38,11 +38,15 @@ namespace pagx {
  * @param bezierIn the incoming bezier handle of the right keyframe.
  * @param spring the spring parameters of the left keyframe.
  * @param progress the normalized position within the segment.
+ * @param segmentDurationSeconds the segment length in seconds, used by physical springs. Values
+ *        less than or equal to zero make a physical spring fall back to the normalized model
+ *        with the damping ratio derived from its physical parameters.
  * @return the eased fraction used to interpolate the segment's values.
  */
 double EvaluateKeyframeInterpolationProgress(KeyframeInterpolationType interpolation,
                                              const Point& bezierOut, const Point& bezierIn,
-                                             const SpringEasing& spring, double progress);
+                                             const SpringEasing& spring, double progress,
+                                             double segmentDurationSeconds = 0.0);
 
 /**
  * Evaluates the interpolated value between two adjacent keyframes at a given point within their
@@ -61,11 +65,13 @@ double EvaluateKeyframeInterpolationProgress(KeyframeInterpolationType interpola
  * @param bezierIn the incoming bezier handle from keyOut, used when interp is Bezier.
  * @param spring the spring parameters from keyIn, used when interp is Spring. A null pointer
  *        selects the default critically damped spring.
+ * @param segmentDurationSeconds the segment length in seconds, used by physical springs.
  * @return the interpolated KeyValue at the given position.
  */
 KeyValue EvaluateKeyframeSegment(const KeyValue& leftValue, const KeyValue& rightValue,
                                  double progress, KeyframeInterpolationType interp,
                                  const Point* bezierOut = nullptr, const Point* bezierIn = nullptr,
-                                 const SpringEasing* spring = nullptr);
+                                 const SpringEasing* spring = nullptr,
+                                 double segmentDurationSeconds = 0.0);
 
 }  // namespace pagx

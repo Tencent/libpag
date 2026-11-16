@@ -2456,7 +2456,7 @@ A keyframe holds a property value at a specific time, together with how it trans
 | `Linear` | Linear interpolation between this keyframe and the next |
 | `Bezier` | Cubic bezier easing using `bezierOut` and the next keyframe's `bezierIn` handles |
 | `Hold` | Holds value until the next keyframe, then jumps |
-| `Spring` | Physics-based easing using this keyframe's `springBounce` and `springModel`; the segment duration is normalized so the spring reaches rest within the segment |
+| `Spring` | Physics-based easing. `normalized-v1` uses `springBounce` with the segment normalized to one time unit; `physical-v1` uses `springStiffness`, `springDamping` and `springMass` over the segment's real duration (frames divided by the animation frame rate) |
 
 **Key attributes**:
 
@@ -2467,8 +2467,11 @@ A keyframe holds a property value at a specific time, together with how it trans
 | `interpolation` | KeyframeInterpolationType | `Linear` | How the value transitions to the next keyframe |
 | `bezierIn` | string | — | Cubic bezier ease-in control point, format `"x,y"`; only used in `Bezier` mode |
 | `bezierOut` | string | — | Cubic bezier ease-out control point, format `"x,y"`; only used in `Bezier` mode |
-| `springBounce` | decimal | — | Damping control in `[-0.5, 1]`; required in `Spring` mode. Figma exposes `[0, 1]`; negative values are an overdamped extension. `0` is critically damped, positive values overshoot, negative values approach without overshooting |
-| `springModel` | string | `normalized-v1` | Parameter-to-curve mapping; only used in `Spring` mode |
+| `springBounce` | decimal | — | Damping control in `[-0.5, 1]`; required for `springModel="normalized-v1"`. Figma exposes `[0, 1]`; negative values are an overdamped extension. `0` is critically damped, positive values overshoot, negative values approach without overshooting |
+| `springStiffness` | decimal | — | Spring stiffness, greater than 0; required for `springModel="physical-v1"` |
+| `springDamping` | decimal | — | Viscous damping coefficient, greater than or equal to 0; required for `physical-v1`. `0` is undamped |
+| `springMass` | decimal | — | Oscillating mass, greater than 0; required for `springModel="physical-v1"` |
+| `springModel` | string | `normalized-v1` | `normalized-v1` or `physical-v1`; selects the parameter set and parameter-to-curve mapping. Only used in `Spring` mode |
 
 **ImageRef**: A special value for image-typed properties. It references an image resource by id, allowing keyframes to show different images at different times.
 
@@ -2487,6 +2490,16 @@ Spring parameters belong to the keyframe that starts the eased segment:
 ```xml
 <Channel name="y" type="float">
   <Key time="0" value="100" interpolation="spring" springBounce="0.35"/>
+  <Key time="60" value="0"/>
+</Channel>
+```
+
+Physical springs evaluate over the segment's real duration:
+
+```xml
+<Channel name="y" type="float">
+  <Key time="0" value="100" interpolation="spring" springModel="physical-v1"
+       springStiffness="120" springDamping="18" springMass="1"/>
   <Key time="60" value="0"/>
 </Channel>
 ```
@@ -2591,8 +2604,11 @@ Type-specific attributes:
 | `interpolation` | KeyframeInterpolationType | `linear` | Crossfade weight interpolation curve |
 | `bezierOut` | string | — | Bezier ease-out handle, format `"x,y"` (only when `interpolation="bezier"`) |
 | `bezierIn` | string | — | Bezier ease-in handle, format `"x,y"` (only when `interpolation="bezier"`) |
-| `springBounce` | decimal | — | Damping control in `[-0.5, 1]`; required when `interpolation="spring"` |
-| `springModel` | string | `normalized-v1` | Spring parameter-to-curve mapping (only when `interpolation="spring"`) |
+| `springBounce` | decimal | — | Damping control in `[-0.5, 1]`; required when `interpolation="spring"` and `springModel="normalized-v1"` |
+| `springStiffness` | decimal | — | Spring stiffness, greater than 0; required when `interpolation="spring"` and `springModel="physical-v1"` |
+| `springDamping` | decimal | — | Viscous damping coefficient, greater than or equal to 0; required for `springModel="physical-v1"` |
+| `springMass` | decimal | — | Oscillating mass, greater than 0; required for `springModel="physical-v1"` |
+| `springModel` | string | `normalized-v1` | Spring parameter-to-curve mapping: `normalized-v1` or `physical-v1` (only when `interpolation="spring"`) |
 | `earlyExit` | bool | false | If `true`, this transition may interrupt an in-progress crossfade |
 | `pauseOnExit` | bool | false | If `true`, the source state's animation freezes when the transition begins; otherwise it keeps advancing while fading out |
 
@@ -3072,6 +3088,7 @@ Additionally, `Layer` (but not `Group`) may contain `<svg>` as an import directi
 | Enum | Values |
 |------|--------|
 | **KeyframeInterpolationType** | `none`, `linear`, `bezier`, `hold`, `spring` |
+| **SpringEasingModel** | `normalized-v1`, `physical-v1` |
 | **ChannelValueType** | `float`, `bool`, `int`, `string`, `image`, `color`, `matrix`, `matrix3D` |
 | **TimelineType** | `animation`, `stateMachine` |
 

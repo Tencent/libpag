@@ -102,9 +102,11 @@ static bool FramePositionBeforeKeyframe(double value, const Keyframe<T>& kf) {
 // `interpolation`, bezier control points and spring parameters come from `keyframes[i]` (the
 // segment start) per the ownership rule: keyframes[i].interpolation describes the i -> i+1
 // segment, with keyframes[i].bezierOut and keyframes[i+1].bezierIn forming the Bezier handles and
-// keyframes[i].spring carrying the Spring parameters.
+// keyframes[i].spring carrying the Spring parameters. frameRate converts the segment span to
+// seconds for physical springs.
 template <typename T>
-T EvaluateKeyframeSequence(const std::vector<Keyframe<T>>& keyframes, double framePosition) {
+T EvaluateKeyframeSequence(const std::vector<Keyframe<T>>& keyframes, double framePosition,
+                           float frameRate = 60.0f) {
   if (keyframes.empty()) {
     return T{};
   }
@@ -129,8 +131,9 @@ T EvaluateKeyframeSequence(const std::vector<Keyframe<T>>& keyframes, double fra
     return left->value;
   }
   double rawT = (framePosition - leftTime) / span;
-  auto easedT = EvaluateKeyframeInterpolationProgress(left->interpolation, left->bezierOut,
-                                                      right->bezierIn, left->spring, rawT);
+  double spanSeconds = frameRate > 0.0f ? span / static_cast<double>(frameRate) : 0.0;
+  auto easedT = EvaluateKeyframeInterpolationProgress(
+      left->interpolation, left->bezierOut, right->bezierIn, left->spring, rawT, spanSeconds);
   return LerpKeyframeValue<T>(left->value, right->value, easedT);
 }
 

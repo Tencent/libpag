@@ -13092,6 +13092,63 @@ PAGX_TEST(PAGXTest, StateMachineRoundTrip) {
 }
 
 /**
+ * Test case: physical spring parameters survive XML round-trip.
+ */
+PAGX_TEST(PAGXTest, PhysicalSpringInterpolationRoundTrip) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto layer = doc->makeNode<pagx::Layer>("L");
+  doc->layers.push_back(layer);
+
+  auto animation = doc->makeNode<pagx::Animation>("spring");
+  animation->duration = 60;
+  doc->animations.push_back(animation);
+
+  auto object = doc->makeNode<pagx::AnimationObject>();
+  object->target = "L";
+  animation->objects.push_back(object);
+
+  auto prop = doc->makeNode<pagx::TypedChannel<float>>();
+  prop->name = "alpha";
+
+  pagx::Keyframe<float> first = {};
+  first.time = 0;
+  first.value = 0.0f;
+  first.interpolation = pagx::KeyframeInterpolationType::Spring;
+  first.spring.model = pagx::SpringEasingModel::PhysicalV1;
+  first.spring.stiffness = 120.0f;
+  first.spring.damping = 18.0f;
+  first.spring.mass = 1.0f;
+  prop->keyframes.push_back(first);
+
+  pagx::Keyframe<float> second = {};
+  second.time = 60;
+  second.value = 1.0f;
+  prop->keyframes.push_back(second);
+  object->channels.push_back(prop);
+
+  auto xml = pagx::PAGXExporter::ToXML(*doc);
+  EXPECT_NE(xml.find("interpolation=\"spring\""), std::string::npos);
+  EXPECT_NE(xml.find("springModel=\"physical-v1\""), std::string::npos);
+  EXPECT_NE(xml.find("springStiffness=\"120\""), std::string::npos);
+  EXPECT_NE(xml.find("springDamping=\"18\""), std::string::npos);
+  EXPECT_NE(xml.find("springMass=\"1\""), std::string::npos);
+  EXPECT_EQ(xml.find("springBounce"), std::string::npos);
+
+  auto loaded = pagx::PAGXImporter::FromXML(xml);
+  ASSERT_TRUE(loaded != nullptr);
+  ASSERT_TRUE(loaded->errors.empty());
+  ASSERT_EQ(loaded->animations.size(), 1u);
+  auto* loadedAnimation = static_cast<pagx::Animation*>(loaded->animations[0]);
+  auto* loadedProp =
+      static_cast<pagx::TypedChannel<float>*>(loadedAnimation->objects[0]->channels[0]);
+  ASSERT_EQ(loadedProp->keyframes.size(), 2u);
+  EXPECT_EQ(loadedProp->keyframes[0].spring.model, pagx::SpringEasingModel::PhysicalV1);
+  EXPECT_FLOAT_EQ(loadedProp->keyframes[0].spring.stiffness, 120.0f);
+  EXPECT_FLOAT_EQ(loadedProp->keyframes[0].spring.damping, 18.0f);
+  EXPECT_FLOAT_EQ(loadedProp->keyframes[0].spring.mass, 1.0f);
+}
+
+/**
  * Test case: a Transition using Spring interpolation preserves its Bounce and model through XML
  * round-trip.
  */
@@ -13139,6 +13196,61 @@ PAGX_TEST(PAGXTest, StateTransitionSpringRoundTrip) {
   EXPECT_EQ(loadedTransition->interpolation, pagx::KeyframeInterpolationType::Spring);
   EXPECT_FLOAT_EQ(loadedTransition->spring.bounce, -0.2f);
   EXPECT_EQ(loadedTransition->spring.model, pagx::SpringEasingModel::NormalizedV1);
+}
+
+/**
+ * Test case: a Transition using a physical spring preserves its three parameters through XML
+ * round-trip.
+ */
+PAGX_TEST(PAGXTest, StateTransitionPhysicalSpringRoundTrip) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+
+  auto sm = doc->makeNode<pagx::StateMachine>("btnSM");
+  doc->animations.push_back(sm);
+
+  auto region = doc->makeNode<pagx::StateRegion>();
+  region->name = "visual";
+  region->initialState = "normal";
+  sm->regions.push_back(region);
+
+  auto state = doc->makeNode<pagx::AnimationState>();
+  state->name = "normal";
+  region->states.push_back(state);
+
+  auto transition = doc->makeNode<pagx::StateTransition>();
+  transition->from = "normal";
+  transition->to = "normal";
+  transition->duration = 10;
+  transition->interpolation = pagx::KeyframeInterpolationType::Spring;
+  transition->spring.model = pagx::SpringEasingModel::PhysicalV1;
+  transition->spring.stiffness = 120.0f;
+  transition->spring.damping = 18.0f;
+  transition->spring.mass = 1.0f;
+  region->transitions.push_back(transition);
+
+  auto xml = pagx::PAGXExporter::ToXML(*doc);
+  EXPECT_NE(xml.find("springModel=\"physical-v1\""), std::string::npos);
+
+  auto loaded = pagx::PAGXImporter::FromXML(xml);
+  ASSERT_TRUE(loaded != nullptr);
+  ASSERT_TRUE(loaded->errors.empty());
+
+  pagx::StateMachine* loadedSM = nullptr;
+  for (const auto& node : loaded->nodes) {
+    if (node->nodeType() == pagx::NodeType::StateMachine) {
+      loadedSM = static_cast<pagx::StateMachine*>(node.get());
+      break;
+    }
+  }
+  ASSERT_TRUE(loadedSM != nullptr);
+  ASSERT_EQ(loadedSM->regions.size(), 1u);
+  ASSERT_EQ(loadedSM->regions[0]->transitions.size(), 1u);
+  auto* loadedTransition = loadedSM->regions[0]->transitions[0];
+  EXPECT_EQ(loadedTransition->spring.model, pagx::SpringEasingModel::PhysicalV1);
+  EXPECT_FLOAT_EQ(loadedTransition->spring.stiffness, 120.0f);
+  EXPECT_FLOAT_EQ(loadedTransition->spring.damping, 18.0f);
+  EXPECT_FLOAT_EQ(loadedTransition->spring.mass, 1.0f);
+  EXPECT_EQ(loadedTransition->spring.bounce, 0.0f);
 }
 
 PAGX_TEST(PAGXTest, StateMachineTimelineRoundTrip) {
