@@ -1130,6 +1130,20 @@
       <xs:enumeration value="none"/>
       <xs:enumeration value="bezier"/>
       <xs:enumeration value="hold"/>
+      <xs:enumeration value="spring"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:simpleType name="SpringEasingModelType">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="normalized-v1"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:simpleType name="SpringBounceType">
+    <xs:restriction base="xs:decimal">
+      <xs:minInclusive value="-0.5"/>
+      <xs:maxInclusive value="0.9"/>
     </xs:restriction>
   </xs:simpleType>
 
@@ -1159,6 +1173,10 @@
     <xs:attribute name="interpolation" type="KeyframeInterpolationType" default="linear"/>
     <xs:attribute name="bezierOut" type="PointType"/>
     <xs:attribute name="bezierIn" type="PointType"/>
+    <xs:attribute name="springBounce" type="SpringBounceType"/>
+    <xs:attribute name="springModel" type="SpringEasingModelType" default="normalized-v1"/>
+    <!-- springBounce is required when interpolation="spring"; both attributes are rejected on
+         other interpolation types. -->
     <!-- Deprecated aliases for bezierOut/bezierIn, kept for backward compatibility. -->
     <xs:attribute name="bezier-out" type="PointType"/>
     <xs:attribute name="bezier-in" type="PointType"/>
@@ -1241,6 +1259,10 @@
     <xs:attribute name="interpolation" type="KeyframeInterpolationType" default="linear"/>
     <xs:attribute name="bezierOut" type="PointType"/>
     <xs:attribute name="bezierIn" type="PointType"/>
+    <xs:attribute name="springBounce" type="SpringBounceType"/>
+    <xs:attribute name="springModel" type="SpringEasingModelType" default="normalized-v1"/>
+    <!-- springBounce is required when interpolation="spring"; both attributes are rejected on
+         other interpolation types. -->
     <!-- Deprecated aliases for bezierOut/bezierIn, kept for backward compatibility. -->
     <xs:attribute name="bezier-out" type="PointType"/>
     <xs:attribute name="bezier-in" type="PointType"/>

@@ -23,7 +23,7 @@
 #include <string>
 #include <vector>
 #include "pagx/nodes/Keyframe.h"
-#include "pagx/runtime/BezierEasing.h"
+#include "pagx/runtime/KeyframeEvaluator.h"
 #include "pagx/runtime/Matrix3DDecompose.h"
 #include "pagx/runtime/MatrixDecompose.h"
 #include "pagx/types/Color.h"
@@ -95,13 +95,14 @@ static bool FramePositionBeforeKeyframe(double value, const Keyframe<T>& kf) {
   return value < static_cast<double>(kf.time);
 }
 
-// Evaluates a Hold/None/Linear/Bezier-segmented keyframe sequence at the given continuous frame
-// position. Boundary policy is clamp-to-end: positions outside [keyframes.front().time,
+// Evaluates a Hold/None/Linear/Bezier/Spring-segmented keyframe sequence at the given continuous
+// frame position. Boundary policy is clamp-to-end: positions outside [keyframes.front().time,
 // keyframes.back().time] return the boundary value.
 //
-// `interpolation` and bezier control points come from `keyframes[i]` (the segment start) per the
-// plan's ownership rule: keyframes[i].interpolation describes the i -> i+1 segment, with
-// keyframes[i].bezierOut and keyframes[i+1].bezierIn forming the Bezier handles.
+// `interpolation`, bezier control points and spring parameters come from `keyframes[i]` (the
+// segment start) per the ownership rule: keyframes[i].interpolation describes the i -> i+1
+// segment, with keyframes[i].bezierOut and keyframes[i+1].bezierIn forming the Bezier handles and
+// keyframes[i].spring carrying the Spring parameters.
 template <typename T>
 T EvaluateKeyframeSequence(const std::vector<Keyframe<T>>& keyframes, double framePosition) {
   if (keyframes.empty()) {
@@ -123,21 +124,14 @@ T EvaluateKeyframeSequence(const std::vector<Keyframe<T>>& keyframes, double fra
   if (span <= 0.0) {
     return left->value;
   }
-  double rawT = (framePosition - leftTime) / span;
-  switch (left->interpolation) {
-    case KeyframeInterpolationType::None:
-    case KeyframeInterpolationType::Hold:
-      return left->value;
-    case KeyframeInterpolationType::Bezier:
-      return LerpKeyframeValue<T>(left->value, right->value,
-                                  SolveBezierEasing(static_cast<double>(left->bezierOut.x),
-                                                    static_cast<double>(left->bezierOut.y),
-                                                    static_cast<double>(right->bezierIn.x),
-                                                    static_cast<double>(right->bezierIn.y), rawT));
-    case KeyframeInterpolationType::Linear:
-    default:
-      return LerpKeyframeValue<T>(left->value, right->value, rawT);
+  if (left->interpolation == KeyframeInterpolationType::None ||
+      left->interpolation == KeyframeInterpolationType::Hold) {
+    return left->value;
   }
+  double rawT = (framePosition - leftTime) / span;
+  auto easedT = EvaluateKeyframeInterpolationProgress(left->interpolation, left->bezierOut,
+                                                      right->bezierIn, left->spring, rawT);
+  return LerpKeyframeValue<T>(left->value, right->value, easedT);
 }
 
 }  // namespace pagx

@@ -2456,6 +2456,7 @@ A keyframe holds a property value at a specific time, together with how it trans
 | `Linear` | Linear interpolation between this keyframe and the next |
 | `Bezier` | Cubic bezier easing using `bezierOut` and the next keyframe's `bezierIn` handles |
 | `Hold` | Holds value until the next keyframe, then jumps |
+| `Spring` | Physics-based easing using this keyframe's `springBounce` and `springModel`; the segment duration is normalized so the spring reaches rest within the segment |
 
 **Key attributes**:
 
@@ -2466,6 +2467,8 @@ A keyframe holds a property value at a specific time, together with how it trans
 | `interpolation` | KeyframeInterpolationType | `Linear` | How the value transitions to the next keyframe |
 | `bezierIn` | string | — | Cubic bezier ease-in control point, format `"x,y"`; only used in `Bezier` mode |
 | `bezierOut` | string | — | Cubic bezier ease-out control point, format `"x,y"`; only used in `Bezier` mode |
+| `springBounce` | decimal | — | Damping control in `[-0.5, 0.9]`; required in `Spring` mode. `0` is critically damped, positive values overshoot, negative values approach without overshooting |
+| `springModel` | string | `normalized-v1` | Parameter-to-curve mapping; only used in `Spring` mode |
 
 **ImageRef**: A special value for image-typed properties. It references an image resource by id, allowing keyframes to show different images at different times.
 
@@ -2476,6 +2479,15 @@ A keyframe holds a property value at a specific time, together with how it trans
   <Key time="0" value="0" interpolation="bezier" bezierOut="0.2,0,0.4,1"/>
   <Key time="30" value="1" interpolation="linear"/>
   <Key time="60" value="0" interpolation="hold"/>
+</Channel>
+```
+
+Spring parameters belong to the keyframe that starts the eased segment:
+
+```xml
+<Channel name="y" type="float">
+  <Key time="0" value="100" interpolation="spring" springBounce="0.35"/>
+  <Key time="60" value="0"/>
 </Channel>
 ```
 
@@ -2579,6 +2591,8 @@ Type-specific attributes:
 | `interpolation` | KeyframeInterpolationType | `linear` | Crossfade weight interpolation curve |
 | `bezierOut` | string | — | Bezier ease-out handle, format `"x,y"` (only when `interpolation="bezier"`) |
 | `bezierIn` | string | — | Bezier ease-in handle, format `"x,y"` (only when `interpolation="bezier"`) |
+| `springBounce` | decimal | — | Damping control in `[-0.5, 0.9]`; required when `interpolation="spring"` |
+| `springModel` | string | `normalized-v1` | Spring parameter-to-curve mapping (only when `interpolation="spring"`) |
 | `earlyExit` | bool | false | If `true`, this transition may interrupt an in-progress crossfade |
 | `pauseOnExit` | bool | false | If `true`, the source state's animation freezes when the transition begins; otherwise it keeps advancing while fading out |
 
@@ -3057,7 +3071,7 @@ Additionally, `Layer` (but not `Group`) may contain `<svg>` as an import directi
 
 | Enum | Values |
 |------|--------|
-| **KeyframeInterpolationType** | `none`, `linear`, `bezier`, `hold` |
+| **KeyframeInterpolationType** | `none`, `linear`, `bezier`, `hold`, `spring` |
 | **ChannelValueType** | `float`, `bool`, `int`, `string`, `image`, `color`, `matrix`, `matrix3D` |
 | **TimelineType** | `animation`, `stateMachine` |
 

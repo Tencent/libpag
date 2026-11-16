@@ -742,6 +742,24 @@ void PAGScene::onNodesChanged(const std::vector<Node*>& dirtyNodes) {
       return;
     }
   }
+  // Channel and AnimationObject edits only change animation data or references. They cannot alter
+  // layer runtime objects or layout, so skip the runtime-tree refresh and only invalidate resolved
+  // timeline targets; the playback clocks and pause state stay as they are.
+  bool timelineDataOnly = !dirtyNodes.empty();
+  for (auto* node : dirtyNodes) {
+    if (node == nullptr) {
+      continue;
+    }
+    auto type = node->nodeType();
+    if (type != NodeType::Channel && type != NodeType::AnimationObject) {
+      timelineDataOnly = false;
+      break;
+    }
+  }
+  if (timelineDataOnly) {
+    markTimelineTargetsDirty();
+    return;
+  }
   if (_rootComposition != nullptr) {
     // The root composition has no source Composition node (it represents the document body), so the
     // ancestor path begins empty. refreshNodes pushes each child composition's source as it
@@ -755,49 +773,51 @@ void PAGScene::onNodesChanged(const std::vector<Node*>& dirtyNodes) {
     // from the current tree so flushTextHolders / hasContentChanged stay consistent with the
     // binding state.
     collectTextHolders();
-    // An incremental refresh adds or removes layers, changing binding membership in place without
-    // recreating the reused timelines or their binding. Mark every timeline's resolved target cache
-    // stale so the next apply() re-resolves; no other signal covers this case. Top-level
-    // PAGAnimation instances (held in instantiatedTimelines with a lazily-resolved root binding) are
-    // marked separately.
-    _rootComposition->markTimelineTargetsDirty();
-    for (auto& entry : instantiatedTimelines) {
-      if (entry.second == nullptr) {
-        continue;
-      }
-      if (entry.second->type() == TimelineType::Animation) {
-        static_cast<PAGAnimation*>(entry.second.get())->targetsDirty = true;
-      } else if (entry.second->type() == TimelineType::StateMachine) {
-        static_cast<PAGStateMachine*>(entry.second.get())->markInternalTargetsDirty();
-      }
-    }
   }
-  // Reset every timeline only when a timeline node changed. Timelines (Animation drivers and the
-  // state machines that play them) can share targets and cross-reference, so the whole timeline
-  // tree is rebuilt rather than patched in place; a removed animation or state machine then simply
-  // produces no timeline, and structural edits to a state machine (added/removed states,
-  // transitions, inputs) drop the stale instance instead of running off dangling pointers. Edits
-  // that do not touch a timeline node leave playback untouched.
-  bool timelineDirty = false;
+  // Rebuild the timeline tree only when a node that defines drivers or timeline structure changed.
+  // Animation and state-machine nodes add or remove drivers, timelines and cached per-state data,
+  // so the whole tree is rebuilt and stale instances are dropped instead of running off dangling
+  // pointers.
+  bool timelineStructureDirty = false;
   for (auto* node : dirtyNodes) {
     if (node == nullptr) {
       continue;
     }
     auto type = node->nodeType();
-    if (type == NodeType::Animation || type == NodeType::AnimationObject ||
-        type == NodeType::Channel || type == NodeType::StateMachine ||
+    if (type == NodeType::Animation || type == NodeType::StateMachine ||
         type == NodeType::StateRegion || type == NodeType::State ||
         type == NodeType::StateTransition || type == NodeType::TransitionCondition ||
         type == NodeType::StateMachineInput) {
-      timelineDirty = true;
+      timelineStructureDirty = true;
       break;
     }
   }
-  if (timelineDirty) {
+  if (timelineStructureDirty) {
     if (_rootComposition != nullptr) {
       _rootComposition->resetTimelines();
     }
     instantiatedTimelines.clear();
+    return;
+  }
+  // A layer or content edit can add or remove layers, changing binding membership without
+  // recreating the reused timelines. Mark every resolved target cache stale so the next apply()
+  // re-resolves against the current tree.
+  markTimelineTargetsDirty();
+}
+
+void PAGScene::markTimelineTargetsDirty() {
+  if (_rootComposition != nullptr) {
+    _rootComposition->markTimelineTargetsDirty();
+  }
+  for (auto& entry : instantiatedTimelines) {
+    if (entry.second == nullptr) {
+      continue;
+    }
+    if (entry.second->type() == TimelineType::Animation) {
+      static_cast<PAGAnimation*>(entry.second.get())->targetsDirty = true;
+    } else if (entry.second->type() == TimelineType::StateMachine) {
+      static_cast<PAGStateMachine*>(entry.second.get())->markInternalTargetsDirty();
+    }
   }
 }
 

@@ -272,6 +272,11 @@ class PAGXDocument : public Node {
    * and content nodes; a content node refreshes its owning Layer. GlyphRun, Font, and Glyph are not
    * supported — edit the Text node with layoutChanged = true instead.
    *
+   * Channel and AnimationObject edits refresh driven data without rebuilding timelines, so the
+   * current playback time and pause state are preserved. Animation and state-machine structural
+   * edits still rebuild the timeline tree. The next apply() (for example advanceAndApply(0))
+   * evaluates the edited channels at the preserved time.
+   *
    * When layoutChanged is true, only list nodes directly edited or whose child list changed: the
    * whole chain for an "@id" reference change, or the container Layer for a structural child-list
    * edit. Any other Layer that auto layout repositions as a side effect is refreshed automatically,

@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "pagx/runtime/KeyframeEvaluator.h"
-#include "pagx/runtime/BezierEasing.h"
 #include "pagx/runtime/KeyframeEvaluatorImpl.h"
 
 namespace pagx {
@@ -53,24 +52,21 @@ static KeyValue EvaluateLerp(const KeyValue& a, const KeyValue& b, double t) {
 
 KeyValue EvaluateKeyframeSegment(const KeyValue& leftValue, const KeyValue& rightValue,
                                  double progress, KeyframeInterpolationType interp,
-                                 const Point* bezierOut, const Point* bezierIn) {
-  switch (interp) {
-    case KeyframeInterpolationType::None:
-    case KeyframeInterpolationType::Hold:
-      return leftValue;
-    case KeyframeInterpolationType::Linear:
-      return EvaluateLerp(leftValue, rightValue, progress);
-    case KeyframeInterpolationType::Bezier:
-      if (bezierOut == nullptr || bezierIn == nullptr) {
-        return EvaluateLerp(leftValue, rightValue, progress);
-      }
-      return EvaluateLerp(
-          leftValue, rightValue,
-          SolveBezierEasing(static_cast<double>(bezierOut->x), static_cast<double>(bezierOut->y),
-                            static_cast<double>(bezierIn->x), static_cast<double>(bezierIn->y),
-                            progress));
+                                 const Point* bezierOut, const Point* bezierIn,
+                                 const SpringEasing* spring) {
+  if (interp == KeyframeInterpolationType::None || interp == KeyframeInterpolationType::Hold) {
+    return leftValue;
   }
-  return leftValue;
+  if (interp == KeyframeInterpolationType::Bezier &&
+      (bezierOut == nullptr || bezierIn == nullptr)) {
+    return EvaluateLerp(leftValue, rightValue, progress);
+  }
+  SpringEasing defaultSpring = {};
+  const auto& effectiveSpring = spring != nullptr ? *spring : defaultSpring;
+  auto easedT = EvaluateKeyframeInterpolationProgress(
+      interp, bezierOut != nullptr ? *bezierOut : Point{},
+      bezierIn != nullptr ? *bezierIn : Point{}, effectiveSpring, progress);
+  return EvaluateLerp(leftValue, rightValue, easedT);
 }
 
 }  // namespace pagx

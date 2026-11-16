@@ -30,7 +30,7 @@
 #include "pagx/nodes/StateRegion.h"
 #include "pagx/nodes/StateTransition.h"
 #include "pagx/nodes/TransitionCondition.h"
-#include "pagx/runtime/BezierEasing.h"
+#include "pagx/runtime/KeyframeEvaluator.h"
 
 namespace pagx {
 
@@ -63,9 +63,10 @@ float CurveMix(const StateTransition* transition, float t) {
     case KeyframeInterpolationType::Hold:
       return t >= 1.0f ? 1.0f : 0.0f;
     case KeyframeInterpolationType::Bezier:
-      return static_cast<float>(SolveBezierEasing(transition->bezierOut.x, transition->bezierOut.y,
-                                                  transition->bezierIn.x, transition->bezierIn.y,
-                                                  t));
+    case KeyframeInterpolationType::Spring:
+      return static_cast<float>(
+          EvaluateKeyframeInterpolationProgress(transition->interpolation, transition->bezierOut,
+                                                transition->bezierIn, transition->spring, t));
     case KeyframeInterpolationType::Linear:
     default:
       return t;

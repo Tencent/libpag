@@ -226,10 +226,25 @@ static std::string KeyframeInterpolationToString(KeyframeInterpolationType inter
       return "bezier";
     case KeyframeInterpolationType::Hold:
       return "hold";
+    case KeyframeInterpolationType::Spring:
+      return "spring";
     case KeyframeInterpolationType::Linear:
       return "linear";
   }
   return "none";
+}
+
+static std::string SpringEasingModelToString(SpringEasingModel model) {
+  switch (model) {
+    case SpringEasingModel::NormalizedV1:
+      return "normalized-v1";
+  }
+  return "normalized-v1";
+}
+
+static void WriteSpringEasing(XMLBuilder& xml, const SpringEasing& spring) {
+  xml.addAttribute("springBounce", FloatToString(spring.bounce));
+  xml.addAttribute("springModel", SpringEasingModelToString(spring.model));
 }
 
 template <typename T>
@@ -306,6 +321,9 @@ static void WriteTypedChannel(XMLBuilder& xml, const TypedChannel<T>* channel,
     }
     if (key.bezierIn != Point{}) {
       xml.addAttribute("bezierIn", PointToString(key.bezierIn));
+    }
+    if (key.interpolation == KeyframeInterpolationType::Spring) {
+      WriteSpringEasing(xml, key.spring);
     }
     xml.closeElementSelfClosing();
   }
@@ -415,6 +433,8 @@ static void WriteTransition(XMLBuilder& xml, const StateTransition* transition,
       if (transition->bezierIn != Point{}) {
         xml.addAttribute("bezierIn", PointToString(transition->bezierIn));
       }
+    } else if (transition->interpolation == KeyframeInterpolationType::Spring) {
+      WriteSpringEasing(xml, transition->spring);
     }
   }
   if (transition->enableEarlyExit) {

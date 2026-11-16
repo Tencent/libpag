@@ -169,7 +169,8 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
    * Convenience method equivalent to advance(deltaMicroseconds) followed by apply(). advance() and
    * apply() drive the animations that play automatically in this scene (including nested
    * compositions). Top-level animations are not driven here; play them explicitly via
-   * getAnimation(id)->advanceAndApply(...).
+   * getAnimation(id)->advanceAndApply(...). Pass 0 after a document edit to re-evaluate the edited
+   * channels at the current time without advancing playback.
    */
   void advanceAndApply(int64_t deltaMicroseconds);
 
@@ -199,6 +200,10 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
   // this document's own nodes; rebuilds the whole tree when the edit comes from an embedded external
   // document (its nodes are not owned by this scene's document).
   void onNodesChanged(const std::vector<Node*>& dirtyNodes);
+
+  // Marks every instantiated timeline's resolved target cache stale so its next apply() re-resolves
+  // against the current animation objects and channels. Playback clocks and pause state are kept.
+  void markTimelineTargetsDirty();
 
   // Dispatch target for PAGXDocument::notifyChange when <Image> resource nodes change (e.g. host
   // loadFileData). Re-decodes any ViewModel image value built from a changed Image node, unless the

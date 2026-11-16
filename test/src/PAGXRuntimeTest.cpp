@@ -16,6 +16,9 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include <algorithm>
+#include <cmath>
+#include <vector>
 #include "pagx/PAGAnimation.h"
 #include "pagx/PAGScene.h"
 #include "pagx/PAGSurface.h"
@@ -580,6 +583,155 @@ PAGX_TEST(PAGXRuntimeTest, EvaluateKeyframeSegmentBasic) {
   left.bezierOut = {0.5f, 0.5f};
   right.bezierIn = {0.5f, 0.5f};
   EXPECT_FLOAT_EQ(eval(), 25.0f);
+}
+
+/**
+ * Test case: Spring easing pins both endpoints for underdamped, critically damped and overdamped
+ * bounces, and stays finite across the segment.
+ */
+PAGX_TEST(PAGXRuntimeTest, SpringEasingEndpoints) {
+  const float bounces[] = {-0.5f, 0.0f, 0.5f, 0.9f};
+  for (float bounce : bounces) {
+    pagx::SpringEasing spring{bounce, pagx::SpringEasingModel::NormalizedV1};
+    auto progress = [&](double t) {
+      return pagx::EvaluateKeyframeInterpolationProgress(pagx::KeyframeInterpolationType::Spring,
+                                                         pagx::Point{}, pagx::Point{}, spring, t);
+    };
+    EXPECT_DOUBLE_EQ(progress(0.0), 0.0);
+    EXPECT_DOUBLE_EQ(progress(1.0), 1.0);
+    for (double t = 0.1; t < 1.0; t += 0.1) {
+      EXPECT_TRUE(std::isfinite(progress(t)));
+    }
+  }
+}
+
+/**
+ * Test case: positive bounce overshoots the target, while critical and overdamped bounces approach
+ * it monotonically without passing it.
+ */
+PAGX_TEST(PAGXRuntimeTest, SpringEasingDampingRegimes) {
+  auto progress = [](float bounce, double t) {
+    pagx::SpringEasing spring{bounce, pagx::SpringEasingModel::NormalizedV1};
+    return pagx::EvaluateKeyframeInterpolationProgress(pagx::KeyframeInterpolationType::Spring,
+                                                       pagx::Point{}, pagx::Point{}, spring, t);
+  };
+  auto peak = [&](float bounce) {
+    double result = 0.0;
+    for (int i = 0; i <= 200; ++i) {
+      result = std::max(result, progress(bounce, i / 200.0));
+    }
+    return result;
+  };
+  EXPECT_GT(peak(0.5f), 1.02);
+  EXPECT_NEAR(peak(0.0f), 1.0, 1.0e-9);
+  EXPECT_NEAR(peak(-0.3f), 1.0, 1.0e-9);
+
+  double previous = 0.0;
+  for (int i = 0; i <= 200; ++i) {
+    double value = progress(-0.3f, i / 200.0);
+    EXPECT_GE(value, previous - 1.0e-9);
+    previous = value;
+  }
+}
+
+/**
+ * Test case: the normalized spring shape depends only on normalized segment progress, so stretching
+ * the keyframe interval does not change the values sampled at the same progress.
+ */
+PAGX_TEST(PAGXRuntimeTest, SpringEasingIntervalInvariance) {
+  pagx::Keyframe<float> left{};
+  left.time = 0;
+  left.value = 0.0f;
+  left.interpolation = pagx::KeyframeInterpolationType::Spring;
+  left.spring.bounce = 0.6f;
+
+  pagx::Keyframe<float> shortRight{};
+  shortRight.time = 60;
+  shortRight.value = 100.0f;
+  shortRight.interpolation = pagx::KeyframeInterpolationType::Linear;
+
+  pagx::Keyframe<float> longRight = shortRight;
+  longRight.time = 600;
+
+  const double progresses[] = {0.1, 0.25, 0.5, 0.75, 0.9};
+  for (double progress : progresses) {
+    auto shortValue =
+        pagx::EvaluateKeyframeSequence<float>({left, shortRight}, progress * shortRight.time);
+    auto longValue =
+        pagx::EvaluateKeyframeSequence<float>({left, longRight}, progress * longRight.time);
+    EXPECT_NEAR(shortValue, longValue, 1.0e-3);
+  }
+}
+
+/**
+ * Test case: bounces on both sides of zero stay continuous through the critical-damping branch.
+ */
+PAGX_TEST(PAGXRuntimeTest, SpringEasingNearCriticalDamping) {
+  auto progress = [](float bounce, double t) {
+    pagx::SpringEasing spring{bounce, pagx::SpringEasingModel::NormalizedV1};
+    return pagx::EvaluateKeyframeInterpolationProgress(pagx::KeyframeInterpolationType::Spring,
+                                                       pagx::Point{}, pagx::Point{}, spring, t);
+  };
+  const double samples[] = {0.1, 0.3, 0.5, 0.7, 0.9};
+  for (double sample : samples) {
+    double critical = progress(0.0f, sample);
+    EXPECT_NEAR(progress(1.0e-5f, sample), critical, 5.0e-3);
+    EXPECT_NEAR(progress(-1.0e-5f, sample), critical, 5.0e-3);
+  }
+}
+
+/**
+ * Test case: EvaluateKeyframeSegment uses the same spring curve as EvaluateKeyframeSequence, and a
+ * null spring parameter selects the default critically damped spring.
+ */
+PAGX_TEST(PAGXRuntimeTest, EvaluateKeyframeSegmentSpring) {
+  pagx::Keyframe<float> left{};
+  left.time = 0;
+  left.value = 0.0f;
+  left.interpolation = pagx::KeyframeInterpolationType::Spring;
+  left.spring.bounce = 0.6f;
+
+  pagx::Keyframe<float> right{};
+  right.time = 60;
+  right.value = 100.0f;
+  right.interpolation = pagx::KeyframeInterpolationType::Linear;
+
+  double progress = 0.3;
+  auto segment = std::get<float>(pagx::EvaluateKeyframeSegment(left.value, right.value, progress,
+                                                               left.interpolation, &left.bezierOut,
+                                                               &right.bezierIn, &left.spring));
+  auto sequence = pagx::EvaluateKeyframeSequence<float>({left, right}, progress * right.time);
+  EXPECT_NEAR(segment, sequence, 1.0e-4);
+
+  auto defaultSpring = std::get<float>(
+      pagx::EvaluateKeyframeSegment(left.value, right.value, progress, left.interpolation));
+  pagx::SpringEasing critical = {};
+  auto criticalSpring = std::get<float>(
+      pagx::EvaluateKeyframeSegment(left.value, right.value, progress, left.interpolation,
+                                    &left.bezierOut, &right.bezierIn, &critical));
+  EXPECT_NEAR(defaultSpring, criticalSpring, 1.0e-6);
+}
+
+/**
+ * Test case: spring overshoot is preserved for continuous values and clamped per channel for
+ * colors, which cannot represent components outside [0, 1].
+ */
+PAGX_TEST(PAGXRuntimeTest, SpringEasingColorClampsOvershoot) {
+  pagx::SpringEasing spring{0.5f, pagx::SpringEasingModel::NormalizedV1};
+  double overshootProgress = 0.27;
+  auto eased = pagx::EvaluateKeyframeInterpolationProgress(pagx::KeyframeInterpolationType::Spring,
+                                                           pagx::Point{}, pagx::Point{}, spring,
+                                                           overshootProgress);
+  ASSERT_GT(eased, 1.0);
+
+  pagx::KeyValue left = pagx::Color{0.0f, 0.0f, 0.0f, 1.0f, pagx::ColorSpace::SRGB};
+  pagx::KeyValue right = pagx::Color{1.0f, 0.0f, 0.0f, 1.0f, pagx::ColorSpace::SRGB};
+  auto color = std::get<pagx::Color>(pagx::EvaluateKeyframeSegment(
+      left, right, overshootProgress, pagx::KeyframeInterpolationType::Spring, nullptr, nullptr,
+      &spring));
+  EXPECT_FLOAT_EQ(color.red, 1.0f);
+  EXPECT_FLOAT_EQ(color.green, 0.0f);
+  EXPECT_FLOAT_EQ(color.alpha, 1.0f);
 }
 
 /**
