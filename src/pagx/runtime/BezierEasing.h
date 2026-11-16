@@ -25,8 +25,8 @@ namespace pagx {
  * with implicit endpoints P0=(0,0) and P3=(1,1).
  *
  * Given an input progress in [0,1] representing horizontal time progress, returns the eased
- * progress (vertical) at that point. Implementation uses Newton-Raphson with bisection fallback;
- * accuracy is well below the millisecond range needed for keyframe interpolation.
+ * progress (vertical) at that point. Implementation delegates to the legacy pag::BezierEasing
+ * (BezierPath flattening) so migrated keyframes evaluate identically to the legacy pipeline.
  *
  * Input progress outside [0,1] short-circuits to the curve endpoints: values <= 0 return 0 and
  * values >= 1 return 1. The returned value is also clamped to [0,1].
