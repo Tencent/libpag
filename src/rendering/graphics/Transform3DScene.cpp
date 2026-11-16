@@ -30,7 +30,8 @@
 
 namespace pag {
 namespace {
-// 场景滤镜固定持有的 8 张全幅纹理(深度/颜色/编码深度 x2/索引 x2/累积 x2) 加 1 张背景源。
+// The scene filter always holds 8 full-size textures (depth, color, encoded depth x2, index x2 and
+// accumulated x2) plus one background source.
 static constexpr int SCENE_FIXED_TEXTURE_COUNT = 9;
 
 std::shared_ptr<tgfx::Image> MakeSource(const std::shared_ptr<Graphic>& graphic, RenderCache* cache,
@@ -89,8 +90,9 @@ class Transform3DScene : public Graphic {
   }
 
   bool hitTest(RenderCache* cache, float x, float y) override {
-    // 像素级命中需要实际投影后的像素，故在 1x1 surface 上渲染该点回读。
-    // 非像素(几何)命中由 PAGComposition::GetChildLayerAtPoint 走 ProjectedMatrix 反投影承担。
+    // A pixel-accurate hit needs the actually projected pixel, so the point is rendered on a 1x1
+    // surface and read back. Non-pixel (geometric) hits are handled by
+    // PAGComposition::GetChildLayerAtPoint through inverse projection of the ProjectedMatrix.
     auto surface = tgfx::Surface::Make(cache->getContext(), 1, 1);
     if (surface == nullptr) {
       return false;
@@ -136,7 +138,8 @@ class Transform3DScene : public Graphic {
     std::vector<std::shared_ptr<tgfx::Image>> images;
     std::vector<Transform3DDepthPlane> planes;
     std::vector<BlendMode> modes;
-    // 深度方程使用逻辑视口，采样坐标则来自向上取整后的纹理。
+    // The depth equation uses the logical viewport while the sample coordinates come from the
+    // rounded-up texture.
     auto viewportScaleX = targetWidth / (static_cast<double>(width) * scale);
     auto viewportScaleY = targetHeight / (static_cast<double>(height) * scale);
     for (const auto& layer : layers) {

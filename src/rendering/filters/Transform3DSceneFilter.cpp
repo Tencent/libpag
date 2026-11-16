@@ -463,7 +463,8 @@ bool Transform3DSceneFilter::prepareTextures(Resources* resources, tgfx::GPU* gp
   return true;
 }
 
-// tgfx 的 OpenGL 管线只有一个颜色附件，三个输出须重复同一次深度选择而不能依赖 MRT。
+// The tgfx OpenGL pipeline has a single color attachment, so the three outputs must repeat the
+// same depth selection instead of relying on MRT.
 bool Transform3DSceneFilter::drawPeel(tgfx::CommandEncoder* encoder, Resources* resources,
                                       const std::vector<std::shared_ptr<tgfx::Texture>>& inputs,
                                       const std::shared_ptr<tgfx::GPUBuffer>& uniforms,
@@ -592,8 +593,8 @@ bool Transform3DSceneFilter::onDraw(
   }
   size_t alignment = std::max(gpu->limits()->minUniformBufferOffsetAlignment, 1);
   size_t stride = (sizeof(PeelUniforms) + alignment - 1) / alignment * alignment;
-  // 将 2 pass x 3 output x N 层共 6N 份 uniform 合并到单个 UBO，按对齐偏移索引，
-  // 避免每帧分配 6N 个独立缓冲。
+  // Merge the 6N uniform blocks of 2 passes x 3 outputs x N layers into a single UBO indexed by
+  // aligned offsets, avoiding 6N separate buffer allocations per frame.
   auto uniforms = gpu->createBuffer(planes.size() * 6 * stride, tgfx::GPUBufferUsage::UNIFORM);
   if (uniforms == nullptr) {
     LOGE("Transform3DSceneFilter: failed to allocate uniform buffer for %zu layers", planes.size());

@@ -34,23 +34,28 @@ std::shared_ptr<tgfx::Image> Apply3DEffects(std::shared_ptr<tgfx::Image> input, 
                                             const tgfx::Point& sourceScale,
                                             tgfx::Rect* filterBounds, tgfx::Point* offset);
 
-/** 判断 GPU 是否支持三维投影与逐像素透明合成所需的格式和资源限制。 */
+/** Returns true if the GPU supports the formats and resource limits required by 3D projection and
+ * per-pixel transparent compositing. */
 bool Has3DSupport(const tgfx::GPU* gpu);
 
 /**
- * 将三维内容采样比例限制在 GPU 纹理范围与显存预算内，无效输入返回零。
- * memoryBudget 为显存预算字节数（通常取 Context 的缓存上限），textureCount 为目标分辨率下
- * 需同时持有的每像素 4 字节全幅纹理数；超预算时按面积比降采样而非直接失败。
+ * Clamps the sampling scale of 3D content to the GPU texture limits and the memory budget, and
+ * returns zero for invalid input. memoryBudget is the budget in bytes, usually the cache limit of
+ * the Context; textureCount is the number of full-size 4-byte-per-pixel textures held at the
+ * target resolution at the same time. When over budget the scale is downsampled by area ratio
+ * instead of failing outright.
  */
 float Clamp3DScale(const tgfx::GPU* gpu, size_t memoryBudget, int textureCount, float width,
                    float height, float scale);
 
-/** 检查图层自身或父链是否包含三维变换。 */
+/** Returns true if the layer itself or any parent in its chain has a 3D transform. */
 bool Has3DTransform(const Layer* layer);
 
 /**
- * 当前 GPU 后端的裁剪空间 Y 轴是否相对左上角内容约定翻转，需要在投影前做竖直翻转。
- * 集中封装后端差异，避免 Y 轴约定散落在多处矩阵与顶点计算里。
+ * Returns true if the clip space Y axis of the current GPU backend is flipped relative to the
+ * top-left content convention, so a vertical flip is required before projection. The backend
+ * difference is encapsulated here instead of scattering Y axis conventions across matrix and
+ * vertex code.
  */
 bool NeedsClipSpaceYFlip();
 

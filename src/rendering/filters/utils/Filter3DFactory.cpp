@@ -47,7 +47,8 @@ std::shared_ptr<tgfx::Image> Apply3DEffects(std::shared_ptr<tgfx::Image> input, 
   return input;
 }
 
-// 深度附件支持由专用能力位判断；OpenGL 的格式查询只报告颜色附件。
+// Depth attachment support is reported by a dedicated capability bit, because the OpenGL format
+// query only covers color attachments.
 bool Has3DSupport(const tgfx::GPU* gpu) {
   if (gpu == nullptr) {
     return false;
@@ -71,8 +72,9 @@ float Clamp3DScale(const tgfx::GPU* gpu, size_t memoryBudget, int textureCount, 
   auto maximumScale = std::nextafter(static_cast<float>(limit) / std::max(width, height), 0.0f);
   scale = std::min(scale, maximumScale);
   if (memoryBudget > 0 && textureCount > 0) {
-    // 按目标分辨率下 textureCount 张每像素 4 字节全幅纹理估算工作集，超预算时按面积比降采样，
-    // 避免 4K 合成乘高倍缩放占用 GB 级显存。
+    // Estimate the working set from textureCount full-size 4-byte-per-pixel textures at the target
+    // resolution and downsample by area ratio when over budget, so a 4K composition at a high
+    // scale does not take gigabytes of VRAM.
     double perPixel = static_cast<double>(textureCount) * 4.0;
     double budgetScale = std::sqrt(static_cast<double>(memoryBudget) /
                                    (perPixel * static_cast<double>(width) * height));

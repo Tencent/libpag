@@ -27,7 +27,8 @@ namespace pag {
 
 class Transform3DSceneFilter : public RuntimeFilter {
  public:
-  /** 对已投影图层按逐像素深度排序，保留透明度、共面顺序和混合模式。 */
+  /** Sorts the projected layers per pixel by depth while preserving alpha, coplanar order and
+   * blend modes. */
   Transform3DSceneFilter(RenderCache* cache,
                          const std::vector<std::shared_ptr<tgfx::Image>>& layers,
                          const std::vector<Transform3DDepthPlane>& planes,
@@ -59,13 +60,16 @@ class Transform3DSceneFilter : public RuntimeFilter {
     std::array<std::shared_ptr<tgfx::Texture>, 2> index = {};
     std::array<std::shared_ptr<tgfx::Texture>, 2> accumulated = {};
 
-    /** 返回当前持有的单采样、无 mipmap 纹理字节数，两种格式均为每像素 4 字节。 */
+    /** Returns the bytes of the currently held single-sample textures without mipmaps, both of
+     * which use 4 bytes per pixel. */
     size_t memoryUsage() const override;
 
-    /** 在绘制帧结束时回收连续两帧空闲的场景纹理。 */
+    /** Releases scene textures that stayed idle for two consecutive frames at the end of a
+     * drawing frame. */
     void onFrameEnd() override;
 
-    /** 在非绘制查询结束时立即释放场景纹理，保留管线和采样器。 */
+    /** Releases scene textures immediately when a non-drawing query ends, keeping the pipelines
+     * and samplers. */
     void onQueryEnd() override;
 
    private:

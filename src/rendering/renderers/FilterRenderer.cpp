@@ -406,7 +406,8 @@ void FilterRenderer::DrawWithFilter(Canvas* parentCanvas, const FilterModifier* 
       return;
     }
     auto gpu = cache->getContext()->gpu();
-    // 单层三维滤镜仅持有少量全幅纹理(输入/输出/深度)，按保守数量纳入显存预算。
+    // A single-layer 3D filter only holds a few full-size textures (input, output and depth), so
+    // a conservative count is accounted in the memory budget.
     contentScale = Clamp3DScale(
         gpu, cache->getContext()->cacheLimit(), 4,
         std::max(contentBounds.width(), static_cast<float>(context->width)),

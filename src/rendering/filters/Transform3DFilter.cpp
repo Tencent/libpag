@@ -166,7 +166,8 @@ std::vector<tgfx::Vec4> ClipPolygon(const std::vector<tgfx::Vec4>& input, int pl
   return result;
 }
 
-// 统一输出零到 w 的裁剪深度，并在片元阶段检查原视锥，兼容 GL 和零到一深度的后端。
+// Emit clip depth in the zero-to-w range and check the original frustum in the fragment stage, so
+// both the OpenGL and zero-to-one depth backends work.
 static constexpr char VERTEX_SHADER[] = R"(
   in vec2 aPosition;
   in vec2 aTextureCoord;
@@ -212,7 +213,8 @@ bool Transform3DFilter::IsActiveCamera(const Layer* layer, Frame frame) {
 std::shared_ptr<Transform3DContext> Transform3DFilter::MakeContext(VectorComposition* composition,
                                                                    Frame frame) {
   CameraLayer* camera = nullptr;
-  // 多相机时取渲染顺序最靠后的顶层活动相机，与 PAGLayer 的运行期选取保持一致。
+  // With multiple cameras, pick the last top-level active camera in render order to match the
+  // runtime selection of PAGLayer.
   for (auto item = composition->layers.rbegin(); item != composition->layers.rend(); ++item) {
     if (IsActiveCamera(*item, frame)) {
       camera = static_cast<CameraLayer*>(*item);
@@ -264,7 +266,8 @@ tgfx::Matrix Transform3DFilter::ProjectedMatrix(Layer* layer, Frame frame,
   return matrix.asMatrix();
 }
 
-// 直接以双精度解投影平面的深度系数，避免单精度逆矩阵引入伪斜率和共面排序误差。
+// Solve the depth coefficients of the projected plane in double precision so a single precision
+// inverse cannot introduce a fake slope and break coplanar ordering.
 bool Transform3DFilter::DepthPlane(Layer* layer, Frame frame, const Transform3DContext& context,
                                    const tgfx::Matrix& extraMatrix, Transform3DDepthPlane* plane) {
   auto matrix = BuildModelMatrix(layer, frame);
@@ -364,7 +367,8 @@ std::shared_ptr<tgfx::Image> Transform3DFilter::Apply(
   matrix.postTranslate(sourceBounds.x() / sourceScale.x, sourceBounds.y() / sourceScale.y, 0);
   matrix.postConcat(BuildModelMatrix(layer, layerFrame));
   matrix.postConcat(context.viewProjection);
-  // 向上取整的纹理仅增加边缘留白，不能拉伸逻辑视口。
+  // The rounded-up texture only adds margin at the edges and must not stretch the logical
+  // viewport.
   auto viewportScaleX = context.width * sourceScale.x / widthValue;
   auto viewportScaleY = context.height * sourceScale.y / heightValue;
   matrix.postScale(viewportScaleX, viewportScaleY, 1);

@@ -275,7 +275,8 @@ void RenderCache::detachFromContext() {
     }
 #ifdef TGFX_USE_OPENGL
     if (context != nullptr && memoryUsage() < previousMemory) {
-      // 最后一次查询可能无后续提交，空编码器可清理 GL 释放队列；其他后端创建时可能消费等待信号。
+      // The last query may never be submitted, and an empty encoder flushes the GL release queue;
+      // other backends may consume pending wait signals on creation.
       context->gpu()->createCommandEncoder();
     }
 #endif

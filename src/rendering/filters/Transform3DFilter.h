@@ -39,32 +39,36 @@ struct Transform3DContext {
 
 class Transform3DFilter : public RuntimeFilter {
  public:
-  /** 为当前合成选择活动相机，并创建可供所有图层共享的视图投影。 */
+  /** Selects the active camera of the composition and builds the view projection shared by all
+   * layers. */
   static std::shared_ptr<Transform3DContext> MakeContext(VectorComposition* composition,
                                                          Frame frame);
 
-  /** 使用指定活动相机创建视图投影，空相机表示默认相机。 */
+  /** Builds the view projection with the given active camera; a null camera means the default
+   * camera. */
   static std::shared_ptr<Transform3DContext> MakeContext(int width, int height, CameraLayer* camera,
                                                          Frame frame);
 
-  /** 判断图层是否为给定帧处活动的相机（活动标记且落在其时间区间内）。 */
+  /** Returns true if the layer is a camera active at the given frame, that is active-flagged and
+   * inside its time range. */
   static bool IsActiveCamera(const Layer* layer, Frame frame);
 
-  /** 在像素空间累乘图层及其完整父链的变换。 */
+  /** Concatenates the transforms of the layer and its full parent chain in pixel space. */
   static tgfx::Matrix3D BuildModelMatrix(Layer* layer, Frame frame);
 
-  /** 返回包含透视和像素视口映射的二维单应矩阵。 */
+  /** Returns the 2D homography including perspective and pixel viewport mapping. */
   static tgfx::Matrix ProjectedMatrix(Layer* layer, Frame frame, const Transform3DContext& context);
 
-  /** 返回投影平面的窗口深度方程，退化平面返回 false。 */
+  /** Returns the window depth equation of the projected plane, or false for a degenerate plane. */
   static bool DepthPlane(Layer* layer, Frame frame, const Transform3DContext& context,
                          const tgfx::Matrix& extraMatrix, Transform3DDepthPlane* plane);
 
-  /** 将内容边界投影并裁剪到视锥和合成区域。 */
+  /** Projects the content bounds and clips them to the view frustum and the composition area. */
   static void TransformBounds(tgfx::Rect* bounds, Layer* layer, Frame frame,
                               const Transform3DContext& context);
 
-  /** 应用三维投影，输入或矩阵无效时返回 nullptr，不退回未变换的二维内容。 */
+  /** Applies the 3D projection. Returns nullptr when the input or matrix is invalid instead of
+   * falling back to untransformed 2D content. */
   static std::shared_ptr<tgfx::Image> Apply(const std::shared_ptr<tgfx::Image>& input,
                                             RenderCache* cache, Layer* layer, Frame layerFrame,
                                             const tgfx::Rect& contentBounds,

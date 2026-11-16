@@ -69,7 +69,8 @@ class RenderCache : public Performance {
     _sequenceCacheInvalidated = false;
   }
 
-  /** 返回快照和滤镜直接持有资源的名义字节总数，不含 Context 的资源缓存。 */
+  /** Returns the nominal bytes of resources held directly by snapshots and filters, excluding the
+   * resource caches owned by the Context. */
   size_t memoryUsage() const;
 
   /**
@@ -125,13 +126,15 @@ class RenderCache : public Performance {
   Snapshot* getSnapshot(ID assetID) const;
 
   /**
-   * 返回指定 Picture 的有效快照。仅在绘制帧内允许新建快照；非绘制查询只读复用匹配的已有
-   * 快照，不改变缓存或 LRU。
-   * 没有可用快照且不能新建或创建失败时返回 nullptr。
+   * Returns a valid snapshot of the specified Picture. New snapshots may only be created inside a
+   * drawing frame; non-drawing queries reuse a matching existing snapshot without mutating the
+   * cache or the LRU. Returns nullptr when no snapshot is usable, or when creating one is not
+   * allowed or fails.
    */
   Snapshot* getSnapshot(const Picture* picture);
 
-  /** 按显式采样比例只读查询有效快照，绘制帧内允许遵守显存预算与 LRU 回收的新建和更新。 */
+  /** Returns a valid snapshot for the explicit sampling scale. Inside a drawing frame creation and
+   * updates are allowed subject to the memory budget and LRU eviction. */
   Snapshot* getSnapshot(const Picture* picture, float scaleFactor, float minScaleFactor);
 
   /**

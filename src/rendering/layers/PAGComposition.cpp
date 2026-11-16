@@ -464,7 +464,8 @@ void PAGComposition::draw(Recorder* recorder) {
     }
   }
   if (context == nullptr) {
-    // 无 3D 子层时保留原直录路径，避免对纯 2D 文件引入逐层 Recorder 与合批退化。
+    // Keep the original direct recording path when no child has 3D, avoiding per-layer recorders
+    // and batched-draw regressions for pure 2D files.
     for (auto& childLayer : layers) {
       if (!childLayer->layerVisible) {
         continue;

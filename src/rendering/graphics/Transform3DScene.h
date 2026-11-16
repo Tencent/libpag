@@ -31,7 +31,8 @@ struct Transform3DSceneLayer {
   BlendMode blendMode = BlendMode::Normal;
 };
 
-/** 返回合成当前缓存的三维场景图形，供测试核验复用与失效；无缓存时返回空。 */
+/** Returns the 3D scene graphic currently cached by the composition, which tests use to verify
+ * reuse and invalidation; returns null when nothing is cached. */
 std::shared_ptr<Graphic> GetCached3DGraphic(const PAGComposition* composition);
 
 class Transform3DSceneBuilder {
@@ -39,12 +40,13 @@ class Transform3DSceneBuilder {
   Transform3DSceneBuilder(int width, int height) : width(width), height(height) {
   }
 
-  /** 添加图层，二维内容分隔连续三维场景，并保留背景混合关系。 */
+  /** Adds a layer. 2D content separates consecutive 3D scenes while keeping the background
+   * blending relationship. */
   void addLayer(std::shared_ptr<Graphic> graphic, Layer* layer, Frame frame,
                 const std::shared_ptr<Transform3DContext>& context,
                 const tgfx::Matrix& extraMatrix);
 
-  /** 结束最后一个三维场景并返回合成内容。 */
+  /** Finishes the last 3D scene and returns the composed graphic. */
   std::shared_ptr<Graphic> makeGraphic();
 
  private:

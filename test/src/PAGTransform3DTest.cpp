@@ -332,7 +332,7 @@ static void ExportTextCalibration(const std::shared_ptr<PAGFile>& file, const st
 }  // namespace
 
 /**
- * 用例描述: 单图层 3D 变换，验证 3D 矩阵与投影。
+ * Case: a single 3D layer, verifying the 3D matrix and projection.
  */
 PAG_PIXEL_TEST(PAGTransform3DTest, Transform3D) {
   auto font = PAGFont::RegisterFont(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"),
@@ -352,7 +352,8 @@ PAG_PIXEL_TEST(PAGTransform3DTest, Transform3D) {
 }
 
 /**
- * 用例描述: 多图层 3D 遮挡，验证共享深度缓冲的前后层级关系。
+ * Case: multiple 3D layers with occlusion, verifying front-to-back ordering through a shared
+ * depth buffer.
  */
 PAG_PIXEL_TEST(PAGTransform3DTest, Transform3D_BOX) {
   auto pagFile = LoadPAGFile("resources/filter/3D_BOX.pag");
@@ -368,7 +369,7 @@ PAG_PIXEL_TEST(PAGTransform3DTest, Transform3D_BOX) {
 }
 
 /**
- * 用例描述: 相机图层，验证 view 矩阵与 zoom。
+ * Case: a camera layer, verifying the view matrix and zoom.
  */
 PAG_PIXEL_TEST(PAGTransform3DTest, Camera) {
   auto pagFile = LoadPAGFile("resources/filter/CameraTest.pag");
@@ -384,7 +385,8 @@ PAG_PIXEL_TEST(PAGTransform3DTest, Camera) {
 }
 
 /**
- * 用例描述: 渲染尺寸与合成尺寸不同时，验证 3D 层的缩放换算与裁剪拷贝路径。
+ * Case: the render size differs from the composition size, verifying the scale conversion and the
+ * clipped copy path of 3D layers.
  */
 PAG_PIXEL_TEST(PAGTransform3DTest, ScaledSurface) {
   auto pagFile = LoadPAGFile("resources/filter/3D_BOX.pag");
@@ -401,7 +403,8 @@ PAG_PIXEL_TEST(PAGTransform3DTest, ScaledSurface) {
 }
 
 /**
- * 用例描述: 同一个播放器连续绘制多帧，验证逐帧变化时的 3D 变换与深度状态。
+ * Case: one player draws multiple frames in a row, verifying the 3D transform and depth state
+ * across frame changes.
  */
 PAG_PIXEL_TEST(PAGTransform3DTest, Transform3D_Sequence) {
   auto font = PAGFont::RegisterFont(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"),
@@ -426,7 +429,8 @@ PAG_PIXEL_TEST(PAGTransform3DTest, Transform3D_Sequence) {
   EXPECT_TRUE(Baseline::Compare(pagSurface, "PAGTransform3DTest/Transform3D_Sequence"));
 }
 
-/** 验证三维和二维混合父链、分离位置以及父层不继承透明度。 */
+/** Verifies a mixed 3D and 2D parent chain, separated positions and that parents do not inherit
+ * opacity. */
 PAG_TEST(PAGTransform3DTest, ParentChainAndSeparatedPosition) {
   NullLayer grandparent;
   grandparent.transform3D = MakeTransform3D({11, 12, 13});
@@ -453,7 +457,8 @@ PAG_TEST(PAGTransform3DTest, ParentChainAndSeparatedPosition) {
   EXPECT_FALSE(child.transform3D->verify());
 }
 
-/** 验证非法相机 zoom 和退化兴趣点不会产生非有限矩阵。 */
+/** Verifies an invalid camera zoom and a degenerate point of interest do not produce non-finite
+ * matrices. */
 PAG_TEST(PAGTransform3DTest, InvalidCameraZoom) {
   CameraLayer camera;
   camera.transform3D = MakeTransform3D({50, 50, -1000});
@@ -474,7 +479,8 @@ PAG_TEST(PAGTransform3DTest, InvalidCameraZoom) {
   EXPECT_NE(Transform3DFilter::MakeContext(100, 100, &camera, 0), nullptr);
 }
 
-/** 验证近层透明片元不会丢弃远层，且不依赖文件图层 ID。 */
+/** Verifies transparent fragments of a near layer do not discard the far layer and do not depend
+ * on file layer IDs. */
 PAG_PIXEL_TEST(PAGTransform3DTest, TransparentDepthOrder) {
   auto near = MakeSolid3D(Red, {30, 30, -100}, 128);
   auto far = MakeSolid3D(Blue, {30, 30, 100}, 255);
@@ -493,7 +499,8 @@ PAG_PIXEL_TEST(PAGTransform3DTest, TransparentDepthOrder) {
   EXPECT_EQ(SamplePixel(surface, 50, 50), color);
 }
 
-/** 验证两个相交半透明平面的前后顺序在交线两侧相反。 */
+/** Verifies two intersecting translucent planes swap front-to-back order on opposite sides of the
+ * intersection line. */
 PAG_PIXEL_TEST(PAGTransform3DTest, IntersectingTransparentPlanes) {
   auto red = MakeSolid3D(Red, {50, 50, 0}, 128);
   auto blue = MakeSolid3D(Blue, {50, 50, 0}, 128);
@@ -514,7 +521,7 @@ PAG_PIXEL_TEST(PAGTransform3DTest, IntersectingTransparentPlanes) {
   EXPECT_NEAR(right[3], 192, 1);
 }
 
-/** 验证共面图层使用原叠放顺序。 */
+/** Verifies coplanar layers keep their original stacking order. */
 PAG_PIXEL_TEST(PAGTransform3DTest, CoplanarOrder) {
   auto red = MakeSolid3D(Red, {30, 30, 0}, 128);
   auto blue = MakeSolid3D(Blue, {30, 30, 0}, 255);
@@ -529,7 +536,7 @@ PAG_PIXEL_TEST(PAGTransform3DTest, CoplanarOrder) {
   EXPECT_EQ(color[3], 255);
 }
 
-/** 验证投影后的边界及命中与像素位置一致。 */
+/** Verifies projected bounds and hit testing match the pixel positions. */
 PAG_PIXEL_TEST(PAGTransform3DTest, ProjectedBoundsAndHitTest) {
   auto solid = MakeSolid3D(Red, {50, 20, 0}, 255);
   auto file = Make3DFile({solid});
@@ -591,7 +598,8 @@ PAG_PIXEL_TEST(PAGTransform3DTest, RuntimeViewportResizeAndMove) {
   EXPECT_EQ(SamplePixel(movedSurface, 170, 50), color);
 }
 
-/** 验证活动相机的时间区间、切换与用户可见性，并覆盖场景缓存失效。 */
+/** Verifies the time ranges, switching and user visibility of active cameras, and covers scene
+ * cache invalidation. */
 PAG_PIXEL_TEST(PAGTransform3DTest, ActiveCameraTimelineAndVisibility) {
   auto first = MakeCamera(1000, 0, 30);
   auto second = MakeCamera(2000, 30, 30);
@@ -642,7 +650,8 @@ PAG_TEST(PAGTransform3DTest, CameraInterestRollAppliedOnce) {
   }
 }
 
-/** 验证无兴趣点相机与投影平面的深度方程。 */
+/** Verifies the camera without a point of interest and the depth equation of the projected
+ * plane. */
 PAG_TEST(PAGTransform3DTest, CameraWithoutInterestAndDepthPlane) {
   std::unique_ptr<CameraLayer> camera(MakeCamera(1000, 0, 60));
   delete camera->transform3D->anchorPoint;
@@ -662,7 +671,8 @@ PAG_TEST(PAGTransform3DTest, CameraWithoutInterestAndDepthPlane) {
   }
 }
 
-/** 验证投影平面深度恒定时不会因逆矩阵舍入产生伪斜率。 */
+/** Verifies a constant-depth projected plane does not get a fake slope from inverse matrix
+ * rounding. */
 PAG_TEST(PAGTransform3DTest, ConstantDepthPlanePrecision) {
   Transform3DContext context;
   context.width = 128;
@@ -687,7 +697,8 @@ PAG_TEST(PAGTransform3DTest, ConstantDepthPlanePrecision) {
   }
 }
 
-/** 验证深度平面的微小斜率不会被单精度求逆中的抵消误差覆盖。 */
+/** Verifies a tiny depth plane slope is not lost to cancellation error in a single precision
+ * inverse. */
 PAG_TEST(PAGTransform3DTest, SmallDepthSlopePrecision) {
   Transform3DContext context;
   context.width = 128;
@@ -710,7 +721,8 @@ PAG_TEST(PAGTransform3DTest, SmallDepthSlopePrecision) {
   EXPECT_FALSE(Transform3DFilter::DepthPlane(layer.get(), 0, context, tgfx::Matrix::I(), &plane));
 }
 
-/** 验证精确共面保留层序，且相邻可区分深度仍按真实前后排序。 */
+/** Verifies exact coplanar layers keep their order while adjacent distinguishable depths still
+ * sort front-to-back. */
 PAG_PIXEL_TEST(PAGTransform3DTest, PreciseCoplanarAndAdjacentDepthOrder) {
   DeviceLockScope lock;
   ASSERT_TRUE(static_cast<bool>(lock));
@@ -1013,7 +1025,7 @@ PAG_PIXEL_TEST(PAGTransform3DTest, ZeroZScaleMatchesVisiblePlane) {
   }
 }
 
-/** 验证非零特效原点不会在三维阶段被重复累计。 */
+/** Verifies a non-zero effect origin is not accumulated twice during the 3D stage. */
 PAG_PIXEL_TEST(PAGTransform3DTest, CornerPinOffset) {
   auto solid = MakeSolid3D(Red, {30, 30, 0}, 255);
   auto effect = new CornerPinEffect();
@@ -1038,7 +1050,8 @@ PAG_PIXEL_TEST(PAGTransform3DTest, CornerPinOffset) {
   EXPECT_FALSE(player->hitTestPoint(file->getLayerAt(0), 65, 65, true));
 }
 
-/** 三维场景所有混合模式均须与现有二维 tgfx 合成得到相同像素。 */
+/** All blend modes in a 3D scene must produce the same pixels as the existing 2D tgfx
+ * compositing. */
 PAG_PIXEL_TEST(PAGTransform3DTest, BlendModesMatch2D) {
   for (int mode = 0; mode <= static_cast<int>(BlendMode::Add); mode++) {
     auto back3D = MakeSolid2D({100, 150, 200}, {0, 0}, 100, 100);
@@ -1069,7 +1082,8 @@ PAG_PIXEL_TEST(PAGTransform3DTest, BlendModesMatch2D) {
   }
 }
 
-/** 验证二维子层继承三维父链，且图层自身透明度只应用一次。 */
+/** Verifies a 2D child inherits the 3D parent chain and the layer opacity is applied only
+ * once. */
 PAG_PIXEL_TEST(PAGTransform3DTest, Child2DIn3DParent) {
   auto parent = new NullLayer();
   parent->id = 1;
@@ -1088,7 +1102,7 @@ PAG_PIXEL_TEST(PAGTransform3DTest, Child2DIn3DParent) {
   EXPECT_EQ(SamplePixel(surface, 20, 20)[3], 0);
 }
 
-/** 验证相机后方的三维层既不绘制，也不参与边界和命中查询。 */
+/** Verifies a 3D layer behind the camera is neither drawn nor part of bounds and hit testing. */
 PAG_PIXEL_TEST(PAGTransform3DTest, BehindCameraIsInvisible) {
   auto solid = MakeSolid3D(Red, {30, 30, -2000}, 255);
   auto file = Make3DFile({solid});
@@ -1104,7 +1118,8 @@ PAG_PIXEL_TEST(PAGTransform3DTest, BehindCameraIsInvisible) {
   EXPECT_TRUE(file->getLayersUnderPoint(50, 50).empty());
 }
 
-/** 验证三维所需格式和资源能力不足时不启动错误的合成。 */
+/** Verifies no broken compositing starts when the formats and resource capabilities required by
+ * 3D are missing. */
 PAG_TEST(PAGTransform3DTest, GPUCapabilityFallback) {
   Test3DGPU gpu;
   EXPECT_FALSE(Has3DSupport(nullptr));
@@ -1132,7 +1147,8 @@ PAG_TEST(PAGTransform3DTest, GPUCapabilityFallback) {
   EXPECT_EQ(gpu.textureCount, 0);
 }
 
-/** 验证整数极限尺寸、高倍缩放在纹理上限内，并受显存预算降采样约束。 */
+/** Verifies integer-limit sizes and high scales stay within the texture limits and respect the
+ * memory budget downsampling. */
 PAG_TEST(PAGTransform3DTest, GPUScaleLimits) {
   Test3DGPU gpu;
   EXPECT_FLOAT_EQ(Clamp3DScale(&gpu, 0, 0, 100, 100, 1), 1);
@@ -1147,15 +1163,17 @@ PAG_TEST(PAGTransform3DTest, GPUScaleLimits) {
   EXPECT_EQ(Clamp3DScale(&gpu, 0, 0, std::numeric_limits<float>::infinity(), 100, 1), 0);
   EXPECT_EQ(Clamp3DScale(&gpu, 0, 0, 100, 100, std::numeric_limits<float>::quiet_NaN()), 0);
   EXPECT_EQ(Clamp3DScale(nullptr, 0, 0, 100, 100, 1), 0);
-  // 显存预算：10 张每像素 4 字节的 100x100 全幅纹理在 scale=1 需 400000 字节，
-  // 预算 100000 应按面积比降采样到 0.5；预算或纹理数为 0 时不约束。
+  // Memory budget: 10 full-size 100x100 textures at 4 bytes per pixel need 400000 bytes at
+  // scale=1, so a budget of 100000 downsamples to 0.5 by area ratio; a zero budget or texture
+  // count imposes no limit.
   EXPECT_FLOAT_EQ(Clamp3DScale(&gpu, 100000, 10, 100, 100, 1), 0.5f);
   EXPECT_FLOAT_EQ(Clamp3DScale(&gpu, 0, 10, 100, 100, 1), 1);
   EXPECT_FLOAT_EQ(Clamp3DScale(&gpu, 100000, 0, 100, 100, 1), 1);
   EXPECT_LE(Clamp3DScale(&gpu, 400000, 10, 100, 100, 1), 1);
 }
 
-/** 验证持续使用的深度纹理不会被空闲回收，尺寸变化和分配失败可恢复。 */
+/** Verifies a continuously used depth texture is not idle-released, and resizing as well as
+ * allocation failures recover. */
 PAG_TEST(PAGTransform3DTest, SceneResourceReuseAndResize) {
   DeviceLockScope lock;
   ASSERT_TRUE(static_cast<bool>(lock));
@@ -1197,7 +1215,8 @@ PAG_TEST(PAGTransform3DTest, SceneResourceReuseAndResize) {
   EXPECT_EQ(gpu.textureCount, count);
 }
 
-/** 验证静态三维场景复用录制和快照，修改属性后正确失效。 */
+/** Verifies a static 3D scene reuses its recording and snapshots and invalidates correctly after
+ * property changes. */
 PAG_PIXEL_TEST(PAGTransform3DTest, ModifiedSceneCacheInvalidation) {
   auto near = MakeSolid3D(Red, {30, 30, -100}, 128);
   auto far = MakeSolid3D(Blue, {30, 30, 100}, 255);
@@ -1232,7 +1251,7 @@ PAG_PIXEL_TEST(PAGTransform3DTest, ModifiedSceneCacheInvalidation) {
   EXPECT_NE(GetCached3DGraphic(file.get()), second);
 }
 
-/** 验证相机动画会使已修改合成的录制缓存失效。 */
+/** Verifies camera animation invalidates the recording cache of a modified composition. */
 PAG_PIXEL_TEST(PAGTransform3DTest, AnimatedSceneCacheInvalidation) {
   auto first = MakeCamera(1000, 0, 30);
   auto second = MakeCamera(2000, 30, 30);
@@ -1251,7 +1270,8 @@ PAG_PIXEL_TEST(PAGTransform3DTest, AnimatedSceneCacheInvalidation) {
   EXPECT_GT(SamplePixel(surface, 15, 50)[3], 0);
 }
 
-/** 验证同一文件的不同尺寸合成独立清除深度，不互相污染。 */
+/** Verifies compositions of different sizes in one file clear depth independently without
+ * polluting each other. */
 PAG_PIXEL_TEST(PAGTransform3DTest, MultipleCompositionDepthIsolation) {
   auto nearA = MakeSolid3D(Red, {20, 30, -100}, 128);
   auto farA = MakeSolid3D(Blue, {20, 30, 100}, 255);
@@ -1287,7 +1307,8 @@ PAG_PIXEL_TEST(PAGTransform3DTest, MultipleCompositionDepthIsolation) {
   }
 }
 
-/** 验证图层输入倍率不同时仍共用统一视口，输出尺寸改变后不复用旧深度。 */
+/** Verifies layers with different input scales still share one viewport and old depth is not
+ * reused after the output size changes. */
 PAG_PIXEL_TEST(PAGTransform3DTest, DifferentInputScalesAndSurfaceResize) {
   auto near = MakeSolid3D(Red, {30, 30, -100}, 128);
   auto far = MakeSolid3D(Blue, {30, 30, 100}, 255);
@@ -1374,8 +1395,9 @@ PAG_PIXEL_TEST(PAGTransform3DTest, FractionalViewportSlopedDepth) {
   tgfx::Path path;
   path.addRect(tgfx::Rect::MakeWH(101, 101));
   Transform3DSceneBuilder builder(101, 101);
-  // 交线 2*x+y=168.5 两侧的稳定颜色区域用于对照，并非相同几何点。
-  // full(61,43) 的像素 cell 中 2*x+y 为 165..168，全红；full(63,43) 为 169..172，全蓝。
+  // Stable color regions on each side of the intersection line 2*x+y=168.5 are compared, though
+  // they are not the same geometric point. In the pixel cell of full(61,43) 2*x+y is 165..168 and
+  // fully red, while full(63,43) is 169..172 and fully blue.
   builder.layers.push_back({Shape::MakeFrom(UniqueID::Next(), path, tgfx::Color::Red()),
                             {0.25f, 0.125f, 0.5f},
                             BlendMode::Normal});
@@ -1450,7 +1472,8 @@ PAG_PIXEL_TEST(PAGTransform3DTest, FractionalCornerPinIntersectingPlanes) {
   }
 }
 
-/** 验证隐藏相机后轨道遮罩的测量、用户矩阵命中与透明度和渲染一致。 */
+/** Verifies measurement, user-matrix hit testing and opacity of a track matte stay consistent
+ * with rendering after the camera is hidden. */
 PAG_PIXEL_TEST(PAGTransform3DTest, HiddenCameraTrackMatteBounds) {
   auto camera = MakeCamera(2000, 0, 60);
   auto target = MakeSolid3D(Red, {30, 30, 0}, 255);
@@ -1501,7 +1524,8 @@ PAG_PIXEL_TEST(PAGTransform3DTest, HiddenCameraTrackMatteBounds) {
   EXPECT_FALSE(player->hitTestPoint(targetLayer, 60, 50, true));
 }
 
-/** 验证三维和二维父链的旋转、缩放及锚点顺序符合独立坐标计算。 */
+/** Verifies rotation, scale and anchor order of a mixed 3D and 2D parent chain match an
+ * independent coordinate computation. */
 PAG_TEST(PAGTransform3DTest, ParentChainRotationScaleReference) {
   NullLayer grandparent;
   grandparent.transform3D = MakeTransform3D({10, 20, 30});
@@ -1525,7 +1549,8 @@ PAG_TEST(PAGTransform3DTest, ParentChainRotationScaleReference) {
   EXPECT_NEAR(result.z, -106, 0.0001f);
 }
 
-/** 验证无效三维矩阵不会上传 GPU，也不会留下可命中的未变换内容。 */
+/** Verifies an invalid 3D matrix is never uploaded to the GPU and leaves no untransformed
+ * content that can be hit. */
 PAG_PIXEL_TEST(PAGTransform3DTest, NonFiniteTransformIsInvisible) {
   auto solid = MakeSolid3D(Red, {30, 30, 0}, 255);
   solid->transform3D->xRotation->value = std::numeric_limits<float>::quiet_NaN();
@@ -1541,7 +1566,8 @@ PAG_PIXEL_TEST(PAGTransform3DTest, NonFiniteTransformIsInvisible) {
   EXPECT_FALSE(player->hitTestPoint(layer, 50, 50, true));
 }
 
-/** 验证非居中平面沿 Y 方向相交时深度顺序随位置改变。 */
+/** Verifies depth order changes with position when off-center planes intersect along the Y
+ * axis. */
 PAG_PIXEL_TEST(PAGTransform3DTest, VerticalDepthAndOffCenterViewport) {
   auto red = MakeSolid3D(Red, {50, 35, 0}, 128);
   auto blue = MakeSolid3D(Blue, {50, 35, 0}, 128);
@@ -1634,7 +1660,7 @@ PAG_PIXEL_TEST(PAGTransform3DTest, NestedProjectedHitTest) {
   }
 }
 
-/** 验证三维预合成内部非对称颜色内容不会上下颠倒。 */
+/** Verifies asymmetric color content inside a 3D precomposition is not flipped vertically. */
 PAG_PIXEL_TEST(PAGTransform3DTest, AsymmetricProjectedContent) {
   auto top = MakeSolid2D(Red, {0, 0}, 40, 20);
   auto bottom = MakeSolid2D(Blue, {0, 20}, 40, 20);

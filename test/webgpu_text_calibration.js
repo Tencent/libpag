@@ -16,7 +16,8 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-// 仅供两项跨后端文字验证使用；不改变 SDK 默认字体度量，也不补偿三维矩阵。
+// Only used by the two cross-backend text checks; it neither changes the default SDK font metrics
+// nor compensates for 3D matrices.
 export async function InstallTextCalibration(module, reference, fontBytes) {
   const compactFamily = reference.family.replaceAll(' ', '');
   const font = new FontFace(reference.style ? compactFamily + ' ' + reference.style : compactFamily, fontBytes);

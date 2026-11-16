@@ -42,7 +42,8 @@
 
 namespace pag {
 
-/** 验证场景纹理在复用、改尺寸、空闲释放和整体释放时与快照独立对称计账。 */
+/** Verifies scene textures are accounted independently and symmetrically with snapshots across
+ * reuse, resize, idle release and full release. */
 PAG_TEST(PAGTransform3DResourceTest, SceneMemoryUsageTracksOwnedTextures) {
   DeviceLockScope lock;
   ASSERT_TRUE(static_cast<bool>(lock));
@@ -97,7 +98,8 @@ PAG_TEST(PAGTransform3DResourceTest, SceneMemoryUsageTracksOwnedTextures) {
   cache.detachFromContext();
 }
 
-/** 验证尺寸元数据尚未提交的部分分配资源按实际纹理尺寸计账。 */
+/** Verifies partially allocated resources are accounted by the actual texture sizes before the
+ * size metadata is committed. */
 PAG_TEST(PAGTransform3DResourceTest, IncompleteSceneResourcesCountActualTextureSizes) {
   DeviceLockScope lock;
   ASSERT_TRUE(static_cast<bool>(lock));
@@ -149,7 +151,8 @@ struct QueryLifecycleResources : FilterResources {
 
 }  // namespace
 
-/** 验证查询只读复用匹配快照，并立即释放场景纹理而不推进绘制帧生命周期。 */
+/** Verifies queries reuse matching snapshots read-only and release scene textures immediately
+ * without advancing the drawing frame lifecycle. */
 PAG_TEST(PAGTransform3DResourceTest, QueriesReuseSnapshotsAndReleaseSceneTextures) {
   DeviceLockScope lock;
   ASSERT_TRUE(static_cast<bool>(lock));
