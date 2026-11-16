@@ -20,10 +20,13 @@
 #include <algorithm>
 #include <cmath>
 #include <iomanip>
+#include <map>
 #include <set>
 #include <sstream>
 #include "base/utils/MathUtil.h"
+#include "pagx/LayoutContext.h"
 #include "pagx/SystemFonts.h"
+#include "pagx/TextLayout.h"
 #include "pagx/html/HTMLWriter.h"
 #include "pagx/nodes/Animation.h"
 #include "pagx/nodes/AnimationObject.h"
@@ -61,6 +64,8 @@
 #include "pagx/utils/ExporterUtils.h"
 #include "pagx/utils/LayerTransformUtils.h"
 #include "pagx/utils/StringParser.h"
+#include "pagx/utils/TextUtils.h"
+#include "renderer/UTF8Utils.h"
 #include "tgfx/core/Font.h"
 
 namespace pagx {
@@ -1048,6 +1053,8 @@ struct DomTargetBundle {
   int repeaterIndex = -1;
   // Set for a RangeSelector glyph bundle: index into AnimationState::rangeSelectorGlyphs.
   int rangeGlyphIndex = -1;
+  bool composedGlyph = false;
+  size_t glyphScope = 0;
   // Set when the layer's filter chain has stages CSS cannot rewrite per frame: the frame appends
   // this def to its own `blur()` / `drop-shadow()` chain.
   std::string residualFilterId = {};
@@ -1213,6 +1220,7 @@ struct BundleChannelSet {
   // Times where two channels of the same rule want different timing functions. The stop there must
   // be split into linear sub-stops, because one stop's easing drives every property in the rule.
   std::set<Frame> mixedEasingTimes = {};
+  std::set<Frame> holdEnds = {};
   // Which property groups this rule drives, as a bit mask: 1 = opacity/visibility, 2 = everything
   // else (transform, paint, geometry...). A rule normally drives both; when the two groups want
   // different timing functions the bundle is emitted as two rules with disjoint properties.
@@ -1726,6 +1734,20 @@ BundleChannelSet CollectBundleChannels(
       // An unbound channel has no CSS property to drive, so its keys must not split the bound
       // channels' keyframes or override their easing.
       if (BindChannelToBundleSet(objTarget, ch, solidToPainter, result)) {
+        if (bundle.composedGlyph) {
+          std::set<Frame> times;
+          std::unordered_map<Frame, SegmentEasing> easings;
+          std::set<Frame> mixed;
+          ExtractChannelTimesAndEasing(ch, times, easings, mixed);
+          for (auto time = times.begin(); time != times.end(); ++time) {
+            auto next = std::next(time);
+            auto easing = easings.find(*time);
+            if (next != times.end() && easing != easings.end() &&
+                easing->second.type == KeyframeInterpolationType::Hold) {
+              result.holdEnds.insert(*next);
+            }
+          }
+        }
         ExtractChannelTimesAndEasing(ch, result.keyTimes, result.stopEasings,
                                      result.mixedEasingTimes);
         // Opacity and visibility are their own property group: they can ride their own animation
@@ -2887,6 +2909,41 @@ void MergeBundlesByDomId(std::vector<DomTargetBundle>& bundles) {
   bundles = std::move(merged);
 }
 
+template <typename T>
+bool MixedKeysOrdered(const Channel* channel) {
+  const auto& keys = static_cast<const TypedChannel<T>*>(channel)->keyframes;
+  if (keys.empty() || keys.size() > 4096) {
+    return false;
+  }
+  for (size_t index = 1; index < keys.size(); ++index) {
+    if (keys[index].time <= keys[index - 1].time) {
+      return false;
+    }
+  }
+  return true;
+}
+
+bool MixedObjectSupported(const AnimationObject* object, const Node* target) {
+  for (const auto* channel : object->channels) {
+    if (channel == nullptr) {
+      continue;
+    }
+    if (LookupChannelRole(target->nodeType(), channel->name) == TargetChannelRole::Unknown) {
+      return false;
+    }
+    bool color = channel->name == "fillColor" || channel->name == "strokeColor";
+    if (color) {
+      if (channel->valueType() != ChannelValueType::Color || !MixedKeysOrdered<Color>(channel)) {
+        return false;
+      }
+    } else if (channel->valueType() != ChannelValueType::Float ||
+               !MixedKeysOrdered<float>(channel)) {
+      return false;
+    }
+  }
+  return true;
+}
+
 std::vector<DomTargetBundle> GroupObjectsIntoDomBundles(
     PAGXDocument& doc, const Animation* anim, HTMLWriterContext& ctx,
     const std::unordered_map<const SolidColor*, const Node*>& solidToPainter,
@@ -2906,6 +2963,31 @@ std::vector<DomTargetBundle> GroupObjectsIntoDomBundles(
     std::string domId;
     const Node* primaryHost = targetNode;
     auto nType = targetNode->nodeType();
+    bool composedTarget = false;
+    for (size_t index = 0; index < ctx.animation.rangeSelectorGlyphs.size(); ++index) {
+      const auto& glyph = ctx.animation.rangeSelectorGlyphs[index];
+      if (!glyph.composed || (glyph.ownerText != targetNode && glyph.modifier != targetNode &&
+                              glyph.selector != targetNode)) {
+        continue;
+      }
+      if (!composedTarget && !MixedObjectSupported(obj, targetNode)) {
+        ctx.animationError =
+            "Mixed text animation has unsupported or unordered channels: " + targetNode->id;
+        return {};
+      }
+      DomTargetBundle glyphBundle;
+      glyphBundle.domId = glyph.id;
+      glyphBundle.primaryHost = glyph.ownerText;
+      glyphBundle.objects.push_back(obj);
+      glyphBundle.rangeGlyphIndex = static_cast<int>(index);
+      glyphBundle.composedGlyph = true;
+      glyphBundle.glyphScope = glyph.scope;
+      bundles.push_back(std::move(glyphBundle));
+      composedTarget = true;
+    }
+    if (composedTarget && nType == NodeType::Text) {
+      continue;
+    }
     if (nType == NodeType::DropShadowStyle) {
       auto idIt = ctx.animation.elementIds.find(targetNode);
       auto boxIt = ctx.animation.shadowBoxes.find(targetNode);
@@ -2972,7 +3054,8 @@ std::vector<DomTargetBundle> GroupObjectsIntoDomBundles(
     if (nType == NodeType::TextModifier) {
       const auto& glyphs = ctx.animation.rangeSelectorGlyphs;
       for (size_t index = 0; index < glyphs.size(); ++index) {
-        if (glyphs[index].modifier != targetNode || !glyphs[index].fromModifier) {
+        if (glyphs[index].composed || glyphs[index].modifier != targetNode ||
+            !glyphs[index].fromModifier) {
           continue;
         }
         DomTargetBundle glyphBundle;
@@ -2987,7 +3070,7 @@ std::vector<DomTargetBundle> GroupObjectsIntoDomBundles(
     if (nType == NodeType::RangeSelector) {
       const auto& glyphs = ctx.animation.rangeSelectorGlyphs;
       for (size_t index = 0; index < glyphs.size(); ++index) {
-        if (glyphs[index].selector != targetNode) {
+        if (glyphs[index].composed || glyphs[index].selector != targetNode) {
           continue;
         }
         DomTargetBundle glyphBundle;
@@ -3514,6 +3597,16 @@ std::string ModifierGlyphDecls(const RangeSelectorGlyph& glyph, const BundleChan
                                Frame t) {
   const TextModifier* modifier = glyph.modifier;
   float f = glyph.factor;
+  if (glyph.composed && glyph.selector != nullptr) {
+    const auto* selector = glyph.selector;
+    f = ComputeRangeSelectorFactor(selector, glyph.glyphIndex, glyph.totalGlyphs,
+                                   EvalFloatChannel(chSet.rangeStartCh, t, selector->start),
+                                   EvalFloatChannel(chSet.rangeEndCh, t, selector->end),
+                                   EvalFloatChannel(chSet.rangeOffsetCh, t, selector->offset),
+                                   EvalFloatChannel(chSet.rangeEaseInCh, t, selector->easeIn),
+                                   EvalFloatChannel(chSet.rangeEaseOutCh, t, selector->easeOut),
+                                   EvalFloatChannel(chSet.rangeWeightCh, t, selector->weight));
+  }
   float absF = std::abs(f);
   float posX = EvalFloatChannel(chSet.modPosXCh, t, modifier->position.x);
   float posY = EvalFloatChannel(chSet.modPosYCh, t, modifier->position.y);
@@ -3564,7 +3657,7 @@ std::string ModifierGlyphDecls(const RangeSelectorGlyph& glyph, const BundleChan
   AppendCssDecl(decls, "transform", transform);
   // An HTML span paints its text with `color` (and -webkit-text-stroke for the outline), an SVG
   // <text> with `fill` / `stroke`.
-  if (chSet.modFillColorCh != nullptr) {
+  if (chSet.modFillColorCh != nullptr || (glyph.composed && modifier->fillColor.has_value())) {
     Color tint = EvalColorChannel(chSet.modFillColorCh, t, modifier->fillColor.value_or(Color()));
     if (glyph.htmlSpan) {
       // The static span blends the modifier colour into the text's own fill by the glyph factor;
@@ -3572,6 +3665,9 @@ std::string ModifierGlyphDecls(const RangeSelectorGlyph& glyph, const BundleChan
       Color painted = (glyph.hasBaseFillColor && glyph.factor > 0.0f)
                           ? LerpColor(glyph.baseFillColor, tint, glyph.factor)
                           : tint;
+      if (glyph.composed && glyph.hasBaseFillColor) {
+        painted = LerpColor(glyph.baseFillColor, tint, absF);
+      }
       AppendCssDecl(decls, "color", ColorToRGBA(painted));
     } else {
       Color painted = (glyph.hasBaseFillColor && glyph.factor > 0.0f)
@@ -3612,10 +3708,214 @@ std::string ModifierGlyphDecls(const RangeSelectorGlyph& glyph, const BundleChan
       AppendCssDecl(decls, "stroke-width", CssFloatToString(width) + "px");
     }
   }
-  if (alpha < 1.0f) {
-    AppendCssDecl(decls, "opacity", CssFloatToString(1.0f + (alpha - 1.0f) * f));
+  if (glyph.composed || alpha < 1.0f) {
+    AppendCssDecl(decls, "opacity",
+                  CssFloatToString(1.0f + (alpha - 1.0f) * (glyph.composed ? absF : f)));
   }
   return decls;
+}
+
+// Only a hold segment changes its value at a key. Keep continuous channels evaluated at that key
+// while replacing hold channels by their left-hand value in this temporary, export-local snapshot.
+template <typename T>
+void MixedHoldLeft(const Channel*& channel, Frame time,
+                   std::vector<std::unique_ptr<Channel>>& storage) {
+  if (channel == nullptr) {
+    return;
+  }
+  const auto& keys = static_cast<const TypedChannel<T>*>(channel)->keyframes;
+  size_t index = 0;
+  while (index < keys.size() && keys[index].time < time) {
+    ++index;
+  }
+  if (index == 0 || index == keys.size() || keys[index].time != time ||
+      keys[index - 1].interpolation != KeyframeInterpolationType::Hold) {
+    return;
+  }
+  auto constant = std::make_unique<TypedChannel<T>>();
+  constant->keyframes.push_back(keys[index - 1]);
+  channel = constant.get();
+  storage.push_back(std::move(constant));
+}
+
+BundleChannelSet MixedLeftState(const BundleChannelSet& channels, Frame time,
+                                std::vector<std::unique_ptr<Channel>>& storage) {
+  auto state = channels;
+  const Channel** floats[] = {
+      &state.fontSizeCh,    &state.letterSpacingCh, &state.rangeStartCh,     &state.rangeEndCh,
+      &state.rangeOffsetCh, &state.rangeEaseInCh,   &state.rangeEaseOutCh,   &state.rangeWeightCh,
+      &state.modPosXCh,     &state.modPosYCh,       &state.modRotationCh,    &state.modScaleXCh,
+      &state.modScaleYCh,   &state.modSkewCh,       &state.modSkewAxisCh,    &state.modAnchorXCh,
+      &state.modAnchorYCh,  &state.modAlphaCh,      &state.modStrokeWidthCh, &state.textAnchorXCh,
+      &state.textAnchorYCh};
+  for (auto slot : floats) {
+    MixedHoldLeft<float>(*slot, time, storage);
+  }
+  MixedHoldLeft<Color>(state.modFillColorCh, time, storage);
+  MixedHoldLeft<Color>(state.modStrokeColorCh, time, storage);
+  return state;
+}
+
+struct MixedLayoutFrame {
+  Frame time = 0;
+  bool leftLimit = false;
+  float fontSize = 0.0f;
+  std::vector<tgfx::Point> positions = {};
+};
+
+struct MixedLayoutCache {
+  const Channel* fontSizeChannel = nullptr;
+  const Channel* spacingChannel = nullptr;
+  std::vector<MixedLayoutFrame> frames = {};
+};
+
+bool BuildMixedLayoutFrames(PAGXDocument& doc, const BundleChannelSet& channels,
+                            const BundleTimingInfo& timing, MixedLayoutCache& cache,
+                            const HTMLWriterContext& ctx, std::string& error) {
+  const auto& glyph = *channels.rangeGlyph;
+  const auto* owner = glyph.ownerText;
+  if (glyph.totalGlyphs > 1024 || timing.effectiveDuration > 4096 ||
+      static_cast<double>(glyph.totalGlyphs) * (timing.effectiveDuration + 1) > 262144) {
+    error = "Mixed text animation exceeds the glyph/frame budget: " + owner->id;
+    return false;
+  }
+  if (channels.fontFamilyCh != nullptr || channels.fontStyleCh != nullptr ||
+      channels.fauxBoldCh != nullptr || channels.fauxItalicCh != nullptr) {
+    error = "Mixed text animation requires a stable font face and synthesis: " + owner->id;
+    return false;
+  }
+  Text* text = nullptr;
+  if (channels.fontSizeCh != nullptr || channels.letterSpacingCh != nullptr) {
+    auto* node = ResolveTargetNode(doc, owner->id);
+    if (node == nullptr || node != owner || node->nodeType() != NodeType::Text) {
+      error = "Mixed text animation cannot resolve its layout owner: " + owner->id;
+      return false;
+    }
+    text = static_cast<Text*>(node);
+  }
+  cache.fontSizeChannel = channels.fontSizeCh;
+  cache.spacingChannel = channels.letterSpacingCh;
+  std::set<Frame> times = channels.keyTimes;
+  const Frame first = timing.bundleShiftFrames;
+  const Frame last = first + timing.effectiveDuration;
+  for (Frame frame = first; frame <= last; ++frame) {
+    times.insert(frame);
+  }
+  std::set<std::pair<Frame, bool>> sides;
+  for (Frame time : times) {
+    if (time < first || time > last) {
+      continue;
+    }
+    if (time > first && channels.holdEnds.count(time) > 0) {
+      sides.insert({time, false});
+    }
+    sides.insert({time, true});
+  }
+  LayoutContext context(&doc.fontConfig());
+  std::vector<tgfx::GlyphID> identity;
+  for (const auto& side : sides) {
+    Frame frame = side.first;
+    std::vector<std::unique_ptr<Channel>> storage;
+    auto state = side.second ? channels : MixedLeftState(channels, frame, storage);
+    MixedLayoutFrame sample;
+    sample.time = frame;
+    sample.leftLimit = !side.second;
+    sample.fontSize = owner->renderFontSize();
+    const std::vector<TextLayoutGlyphRun>* runs = nullptr;
+    TextLayoutResult result;
+    if (text != nullptr) {
+      auto params = MakeGlyphParams(text);
+      params.fontSize = EvalFloatChannel(state.fontSizeCh, frame, params.fontSize);
+      params.letterSpacing = EvalFloatChannel(state.letterSpacingCh, frame, params.letterSpacing);
+      if (!std::isfinite(params.fontSize) || params.fontSize <= 0.0f ||
+          !std::isfinite(params.letterSpacing)) {
+        error = "Mixed text animation has invalid layout parameters: " + owner->id;
+        return false;
+      }
+      auto layout = MakeStandaloneParams(text);
+      result = TextLayout::Layout({{text, params}}, layout, &context);
+      runs = result.getGlyphRuns(text);
+      sample.fontSize = params.fontSize * layout.textScale;
+    } else {
+      auto found = ctx.animation.mixedTextPositions.find(owner);
+      if (found == ctx.animation.mixedTextPositions.end() ||
+          found->second.size() != glyph.totalGlyphs) {
+        error = "Mixed text animation has no recorded glyph positions: " + owner->id;
+        return false;
+      }
+      for (const auto& position : found->second) {
+        sample.positions.push_back({position.x, position.y});
+      }
+      cache.frames.push_back(std::move(sample));
+      continue;
+    }
+    if (runs == nullptr || runs->empty()) {
+      error = "Mixed text animation produced no glyph layout: " + owner->id;
+      return false;
+    }
+    std::vector<tgfx::GlyphID> current;
+    const char* cursor = owner->text.c_str();
+    size_t bytesLeft = owner->text.size();
+    for (const auto& run : *runs) {
+      if (!run.xforms.empty() || run.positions.size() != run.glyphs.size()) {
+        error = "Mixed text animation does not support transformed glyph runs: " + owner->id;
+        return false;
+      }
+      for (size_t index = 0; index < run.glyphs.size(); ++index) {
+        int32_t codepoint = 0;
+        size_t length = DecodeUTF8(cursor, bytesLeft, &codepoint);
+        if (length == 0 || run.glyphs[index] == 0 ||
+            run.font.getGlyphID(std::string(cursor, length)) != run.glyphs[index]) {
+          error = "Mixed text animation requires one stable glyph per character: " + owner->id;
+          return false;
+        }
+        cursor += length;
+        bytesLeft -= length;
+        current.push_back(run.glyphs[index]);
+        sample.positions.push_back(run.positions[index]);
+      }
+    }
+    if (bytesLeft != 0 || current.size() != glyph.totalGlyphs ||
+        (!identity.empty() && identity != current)) {
+      error = "Mixed text animation changed its glyph mapping: " + owner->id;
+      return false;
+    }
+    identity = std::move(current);
+    cache.frames.push_back(std::move(sample));
+  }
+  return true;
+}
+
+std::string MixedGlyphStops(const BundleChannelSet& channels, const BundleTimingInfo& timing,
+                            const MixedLayoutCache& layout) {
+  const auto& glyph = *channels.rangeGlyph;
+  std::string stops;
+  for (const auto& sample : layout.frames) {
+    std::vector<std::unique_ptr<Channel>> storage;
+    auto state = sample.leftLimit ? MixedLeftState(channels, sample.time, storage) : channels;
+    std::string decls = ModifierGlyphDecls(glyph, state, sample.time);
+    AppendCssDecl(decls, "font-size", CssFloatToString(sample.fontSize) + "px");
+    const auto position = sample.positions[glyph.glyphIndex];
+    float originX =
+        EvalFloatChannel(state.textAnchorXCh, sample.time, glyph.ownerText->position.x) -
+        glyph.ownerText->position.x;
+    float originY =
+        EvalFloatChannel(state.textAnchorYCh, sample.time, glyph.ownerText->position.y) -
+        glyph.ownerText->position.y;
+    AppendCssDecl(decls, "left", CssFloatToString(position.x + originX) + "px");
+    AppendCssDecl(decls, "top",
+                  CssFloatToString(position.y - sample.positions.front().y + originY) + "px");
+    auto percent = FormatPercent(sample.time - timing.bundleShiftFrames, timing.effectiveDuration);
+    if (sample.leftLimit) {
+      std::ostringstream boundary;
+      boundary << std::fixed << std::setprecision(8)
+               << 100.0 * (sample.time - timing.bundleShiftFrames) / timing.effectiveDuration -
+                      0.000001;
+      percent = boundary.str() + "%";
+    }
+    stops += "  " + percent + " { " + decls + "; }\n";
+  }
+  return stops;
 }
 
 // Stops for one glyph whose TextModifier channel animates. The pose is linear in every modifier
@@ -3949,6 +4249,12 @@ std::vector<BundleElement> FindBundleElementsForNode(
     const AnimatedTagIndex& tagIndexByNode, const DomTargetBundle& bundle, size_t scope) {
   std::vector<BundleElement> elements = {};
   std::set<std::string> addedIds = {};
+  if (bundle.composedGlyph) {
+    if (scope == bundle.glyphScope) {
+      return FindBundleElements(tagIndex, bundle.domId);
+    }
+    return {};
+  }
   auto it = tagIndexByNode.find(bundle.primaryHost);
   if (it != tagIndexByNode.end()) {
     for (const auto& entry : it->second) {
@@ -4322,6 +4628,12 @@ void HTMLAnimationSession::ResolveAnimationTargets(
         // A Text renders as a span that can carry font-size / letter-spacing keyframes. The id is
         // not restored afterwards: it only has to be unique within this export.
         _ctx.animation.elementIds[text] = !text->id.empty() ? text->id : _ctx.nextId("animT");
+        for (const auto* channel : obj->channels) {
+          if (channel != nullptr &&
+              (channel->name == "fontSize" || channel->name == "letterSpacing")) {
+            _ctx.animation.layoutAnimatedTexts.insert(text);
+          }
+        }
       } else if (nType == NodeType::Path) {
         auto* pathNode = static_cast<const Path*>(targetNode);
         auto maskIt = _maskPathToLayer.find(pathNode);
@@ -4413,6 +4725,7 @@ std::string HTMLAnimationSession::emitKeyframesAndWeave(std::string& bodyHtml) {
   // whole body for each target.
   const auto tagIndex = BuildTagIndex(bodyHtml);
   const auto tagIndexByNode = BuildAnimatedTagIndex(_ctx);
+  std::map<std::pair<const Text*, size_t>, std::pair<const Animation*, Frame>> mixedMounts;
 
   for (const auto& mount : mounts) {
     const auto* anim = mount.animation;
@@ -4425,6 +4738,7 @@ std::string HTMLAnimationSession::emitKeyframesAndWeave(std::string& bodyHtml) {
     // Identical stops share one rule, even across bundles: a per-glyph fan-out where every glyph
     // ends up with the same keyframes (a uniform modifier colour, say) must not emit N copies.
     std::vector<std::pair<std::string, std::string>> emittedRules = {};
+    std::unordered_map<const Text*, MixedLayoutCache> mixedLayouts;
     for (const auto& bundle : bundles) {
       auto elements =
           FindBundleElementsForNode(tagIndex.nameById, tagIndexByNode, bundle, mount.scope);
@@ -4452,6 +4766,36 @@ std::string HTMLAnimationSession::emitKeyframesAndWeave(std::string& bodyHtml) {
         continue;
       }
       BundleTimingInfo timing = ComputeBundleTiming(anim, mount.offset, chSet);
+      const MixedLayoutCache* mixedLayout = nullptr;
+      if (bundle.composedGlyph && timing.effectiveDuration > 0) {
+        const auto* owner = chSet.rangeGlyph->ownerText;
+        auto key = std::make_pair(owner, mount.scope);
+        auto identity = std::make_pair(anim, mount.offset);
+        auto previous = mixedMounts.find(key);
+        if (previous != mixedMounts.end() && previous->second != identity) {
+          _ctx.animationError = "Mixed text channels must share one animation mount: " + owner->id;
+          return {};
+        }
+        mixedMounts[key] = identity;
+        auto found = mixedLayouts.find(owner);
+        if (found == mixedLayouts.end()) {
+          MixedLayoutCache layout;
+          if (!BuildMixedLayoutFrames(_doc, chSet, timing, layout, _ctx, _ctx.animationError)) {
+            return {};
+          }
+          found = mixedLayouts.emplace(owner, std::move(layout)).first;
+        } else if (found->second.fontSizeChannel != chSet.fontSizeCh ||
+                   found->second.spacingChannel != chSet.letterSpacingCh) {
+          _ctx.animationError =
+              "Mixed text animation has conflicting layout channels: " + owner->id;
+          return {};
+        }
+        mixedLayout = &found->second;
+        timing.uniformEasing = true;
+        timing.commonEasing = {};
+        chSet.crossGroupConflict = false;
+        chSet.steppedConflict = false;
+      }
 
       if (chSet.animatedMaskPath != nullptr) {
         auto idIt = _ctx.animation.maskPathIds.find(chSet.animatedMaskPath);
@@ -4559,8 +4903,10 @@ std::string HTMLAnimationSession::emitKeyframesAndWeave(std::string& bodyHtml) {
           std::string ruleKey = element.tagName + "#" + std::to_string(ruleIndex);
           auto nameIt = keyframesNameByTag.find(ruleKey);
           if (nameIt == keyframesNameByTag.end()) {
-            std::string stops = EmitBundleKeyframeStops(bundle, ruleSet, ruleTiming,
-                                                        element.tagName, needsZeroOrigin);
+            std::string stops = mixedLayout != nullptr
+                                    ? MixedGlyphStops(ruleSet, ruleTiming, *mixedLayout)
+                                    : EmitBundleKeyframeStops(bundle, ruleSet, ruleTiming,
+                                                              element.tagName, needsZeroOrigin);
             std::string kfName = {};
             for (const auto& rule : emittedRules) {
               if (rule.first == stops) {

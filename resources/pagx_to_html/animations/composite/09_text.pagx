@@ -1,9 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Tests: The two halves of the text pipeline on one Text node - a whole-text channel (fontSize,
-     which needs the line re-laid out) and per-glyph channels (the selector's window and the
-     modifier's colour, which need the baked glyph positions). The exporter currently routes such a
-     Text down the glyph path, so the whole-text half is dropped: this case is expected to fail until
-     the glyph path can reflow (see the span/glyph split in the README).
+<!-- Tests: Whole-text fontSize and per-glyph selector/colour channels share one Text. The exporter
+     re-lays out the complete line at each sample, then combines the new glyph positions with the
+     selector's current factor and the modifier's current colour in CSS keyframes. Pure whole-text
+     and pure per-glyph cases retain their existing export paths.
      Target: Composite  Channel: fontSize,fillColor,start,end  Type: mixed
      Ref: - -->
 <pagx width="320" height="200">

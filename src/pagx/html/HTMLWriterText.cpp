@@ -1161,12 +1161,22 @@ static void AppendUTF8(std::string& out, uint32_t cp);
 
 void HTMLWriter::writeTextModifier(HTMLBuilder& out, const std::vector<GeoInfo>& geos,
                                    const TextModifier* modifier, const Fill* fill,
-                                   const Stroke* stroke, const TextBox* /*tb*/, float alpha) {
+                                   const Stroke* stroke, const TextBox* tb, float alpha) {
   for (auto& g : geos) {
     if (g.type != NodeType::Text) {
       continue;
     }
     auto text = static_cast<const Text*>(g.element);
+    bool layoutAnimated = _ctx->animation.layoutAnimatedTexts.count(text) > 0;
+    if (layoutAnimated &&
+        (tb != nullptr || !text->glyphRuns.empty() || fill == nullptr || fill->color == nullptr ||
+         fill->color->nodeType() != NodeType::SolidColor ||
+         text->textAnchor != TextAnchor::Start)) {
+      _ctx->animationError =
+          "Unsupported mixed text layout (requires standalone solid start-anchor text): " +
+          text->id;
+      return;
+    }
     size_t totalGlyphs = 0;
     if (!text->glyphRuns.empty()) {
       for (auto* run : text->glyphRuns) {
@@ -1390,10 +1400,11 @@ void HTMLWriter::writeTextModifier(HTMLBuilder& out, const std::vector<GeoInfo>&
       // at the position PAGX's shaper produced (baseline coordinates), while inline-block spans let
       // the browser re-lay the run out. That costs the shaper's kerning (2-3px per kerned pair) and
       // shifts the baseline by a half-leading that depends on the font metrics.
-      bool usesSVGTextForModifier =
-          fill && fill->color && fill->color->nodeType() == NodeType::SolidColor &&
-          modifier != nullptr && !(modifier->fillColor.has_value()) && text->glyphData != nullptr &&
-          !text->glyphData->layoutRuns.empty();
+      bool usesSVGTextForModifier = !layoutAnimated && fill && fill->color &&
+                                    fill->color->nodeType() == NodeType::SolidColor &&
+                                    modifier != nullptr && !(modifier->fillColor.has_value()) &&
+                                    text->glyphData != nullptr &&
+                                    !text->glyphData->layoutRuns.empty();
 
       if (usesSVGTextForModifier) {
         usesSVGTextGradient = true;
@@ -1653,6 +1664,39 @@ void HTMLWriter::writeTextModifier(HTMLBuilder& out, const std::vector<GeoInfo>&
             }
           }
         }
+        const RangeSelector* spanSelector = nullptr;
+        for (const auto* candidate : modifier->selectors) {
+          if (candidate->nodeType() == NodeType::RangeSelector &&
+              _ctx->animation.animatedRangeSelectors.count(
+                  static_cast<const RangeSelector*>(candidate)) > 0) {
+            spanSelector = static_cast<const RangeSelector*>(candidate);
+          }
+        }
+        bool composed = layoutAnimated;
+        // A random order permutes which glyphs a window value lands on, and the composed path
+        // evaluates the selector by glyph index - it would silently turn a shuffled window into a
+        // linear one. Refuse until the permutation is carried through.
+        bool randomOrder = false;
+        if (composed && modifier->selectors.size() == 1 && modifier->selectors[0] != nullptr &&
+            modifier->selectors[0]->nodeType() == NodeType::RangeSelector) {
+          randomOrder = static_cast<const RangeSelector*>(modifier->selectors[0])->randomOrder;
+        }
+        if (composed &&
+            (modifier->selectors.size() != 1 || randomOrder ||
+             modifier->selectors[0]->nodeType() != NodeType::RangeSelector ||
+             text->text.find('\n') != std::string::npos || glyphPositions.size() != totalGlyphs)) {
+          _ctx->animationError =
+              "Mixed text animation needs one line and one ordered RangeSelector: " + text->id;
+          return;
+        }
+        if (composed) {
+          spanSelector = static_cast<const RangeSelector*>(modifier->selectors[0]);
+          auto& positions = _ctx->animation.mixedTextPositions[text];
+          positions.clear();
+          for (const auto& position : glyphPositions) {
+            positions.push_back({position.x, position.y});
+          }
+        }
         const char* p = text->text.c_str();
         size_t charIdx = 0;
         while (*p) {
@@ -1793,13 +1837,19 @@ void HTMLWriter::writeTextModifier(HTMLBuilder& out, const std::vector<GeoInfo>&
             spanModifier = modifier;
           }
           out.openTag("span");
-          if (spanModifier != nullptr) {
-            std::string spanId = spanModifier->id + "_g" + std::to_string(charIdx);
+          if (spanModifier != nullptr || composed) {
+            std::string spanId = composed ? _ctx->nextId("mixedGlyph")
+                                          : spanModifier->id + "_g" + std::to_string(charIdx);
             out.addAttr("id", spanId);
             HTMLWriterContext::AnimationState::RangeSelectorGlyph record = {};
-            record.modifier = spanModifier;
+            record.modifier = modifier;
+            record.ownerText = text;
+            record.scope = _ctx->animation.scope;
+            record.composed = composed;
+            record.selector = composed ? spanSelector : nullptr;
+            record.layoutY = glyphPositions.empty() ? 0.0f : glyphPositions[0].y;
             record.glyphIndex = charIdx;
-            record.totalGlyphs = text->text.size();
+            record.totalGlyphs = totalGlyphs;
             record.factor = absF;
             record.fromModifier = true;
             record.htmlSpan = true;
