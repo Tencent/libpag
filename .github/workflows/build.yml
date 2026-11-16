@@ -510,7 +510,7 @@ jobs:
 
       - uses: awalsh128/cache-apt-pkgs-action@latest
         with:
-          packages: libx11-dev libfontconfig1-dev
+          packages: libx11-dev libfontconfig1-dev libegl1-mesa-dev libgles2-mesa-dev
           version: 1.0
 
       - name: Build Linux
