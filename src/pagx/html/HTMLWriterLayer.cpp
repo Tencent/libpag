@@ -1078,6 +1078,40 @@ void HTMLWriter::flattenGroup(HTMLBuilder& out, const Group* group, float alpha,
   stateGuard.savedGeos.insert(stateGuard.savedGeos.end(), groupGeos.begin(), groupGeos.end());
 }
 
+void HTMLWriter::appendTextBoxContainerStyle(std::string& style, const TextBox* tb,
+                                             const std::string& extraTransform) {
+  // A TextBox is a Group, so its container carries the same two things writeGroup emits for a plain
+  // Group: the group matrix (anchor, scale, skew, rotation) and the node alpha. Both TextBox paths
+  // build their own style string and used to skip this, which left every TextBox transform-only
+  // channel (rotation / scale / skew / anchor) and its alpha on the floor.
+  //
+  // The matrix translation is dropped on purpose: the caller already emits it as `left`/`top` from
+  // renderPosition(), and folding it into both would place the box twice. For a TextBox authored
+  // only with `position` that translation is (0,0): TextBox::onMeasure never seeds preferredX/Y the
+  // way Group::onMeasure does, so the authored position never reaches layoutBounds(), and the PAGX
+  // renderer drops it as well (`pagx render --time 0` equals a plain render). Matching that here is
+  // therefore correct — adding `position` would move the box away from the reference picture.
+  Matrix matrix = BuildGroupMatrix(tb);
+  // BuildGroupMatrix applies the render position last, so removing it is a plain subtraction on the
+  // translation; the anchor translation (which is composed inside the rotation/scale) survives.
+  auto renderPos = tb->renderPosition();
+  matrix.tx -= renderPos.x;
+  matrix.ty -= renderPos.y;
+  std::string transform = matrix.isIdentity() ? std::string() : MatrixTransformToCSS(matrix);
+  if (!extraTransform.empty()) {
+    transform = transform.empty() ? extraTransform : transform + " " + extraTransform;
+  }
+  if (!transform.empty()) {
+    style += ";transform:" + transform + ";transform-origin:0 0";
+  }
+  // The node's own alpha. Ancestor divs emit their own opacity (writeGroup / writeLayer) and CSS
+  // opacity multiplies down the tree, which is the same layering PAGX renders, so this is not a
+  // second application of this node's alpha.
+  if (tb->alpha < 1.0f) {
+    style += ";opacity:" + CssFloatToString(tb->alpha);
+  }
+}
+
 void HTMLWriter::renderTextBoxWithSpans(HTMLBuilder& out, const TextBox* tb) {
   // TextBox with child elements: render as a positioned container with text styling.
   auto tbBounds = tb->layoutBounds();
@@ -1149,6 +1183,7 @@ void HTMLWriter::renderTextBoxWithSpans(HTMLBuilder& out, const TextBox* tb) {
       !std::isnan(tb->width) && tb->width == 0.0f && tb->textAlign != TextAlign::Start;
   bool heightAnchor =
       !std::isnan(tb->height) && tb->height == 0.0f && tb->paragraphAlign != ParagraphAlign::Near;
+  std::string anchorTransform;
   if (widthAnchor || heightAnchor) {
     std::string tx = "0";
     std::string ty = "0";
@@ -1158,8 +1193,12 @@ void HTMLWriter::renderTextBoxWithSpans(HTMLBuilder& out, const TextBox* tb) {
     if (heightAnchor) {
       ty = (tb->paragraphAlign == ParagraphAlign::Middle) ? "-50%" : "-100%";
     }
-    style += ";transform:translate(" + tx + "," + ty + ")";
+    // Kept as a separate transform function and composed *after* the group matrix (CSS applies the
+    // list left to right, so `matrix(...) translate(...)` shifts the already-transformed box, which
+    // is the order PAGX uses: the box shift sits inside the group's rotation/scale/anchor).
+    anchorTransform = "translate(" + tx + "," + ty + ")";
   }
+  appendTextBoxContainerStyle(style, tb, anchorTransform);
   if (tb->paragraphAlign != ParagraphAlign::Near) {
     style += ";display:flex;flex-direction:column";
     if (tb->paragraphAlign == ParagraphAlign::Middle) {
@@ -1397,6 +1436,7 @@ void HTMLWriter::renderTextBoxAsRichText(HTMLBuilder& out, const TextBox* tb,
   auto tbPos = tb->renderPosition();
   std::string style = "position:absolute;left:" + CssFloatToString(tbPos.x) +
                       "px;top:" + CssFloatToString(tbPos.y) + "px";
+  appendTextBoxContainerStyle(style, tb, std::string());
   if (!std::isnan(tb->width)) {
     style += ";width:" + CssFloatToString(tb->width) + "px";
   }
