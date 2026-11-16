@@ -69,12 +69,9 @@ class RenderCache : public Performance {
     _sequenceCacheInvalidated = false;
   }
 
-  /**
-   * Returns the total memory usage of this cache.
-   */
-  size_t memoryUsage() const {
-    return graphicsMemory;
-  }
+  /** Returns the nominal bytes of resources held directly by snapshots and filters, excluding the
+   * resource caches owned by the Context. */
+  size_t memoryUsage() const;
 
   /**
    * Returns the GPU context associated with this cache.
@@ -129,11 +126,16 @@ class RenderCache : public Performance {
   Snapshot* getSnapshot(ID assetID) const;
 
   /**
-   * Returns a snapshot cache of specified Picture. If there is no associated cache available,
-   * a new cache will be created by the Picture. Returns null if the Picture fails to make a
-   * new snapshot.
+   * Returns a valid snapshot of the specified Picture. New snapshots may only be created inside a
+   * drawing frame; non-drawing queries reuse a matching existing snapshot without mutating the
+   * cache or the LRU. Returns nullptr when no snapshot is usable, or when creating one is not
+   * allowed or fails.
    */
   Snapshot* getSnapshot(const Picture* picture);
+
+  /** Returns a valid snapshot for the explicit sampling scale. Inside a drawing frame creation and
+   * updates are allowed subject to the memory budget and LRU eviction. */
+  Snapshot* getSnapshot(const Picture* picture, float scaleFactor, float minScaleFactor);
 
   /**
    * Frees the snapshot cache associated with specified asset ID immediately.

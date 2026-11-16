@@ -84,6 +84,16 @@ function StartServer(directory) {
   });
 }
 
+// Flattens the cause chain: wrappers like puppeteer's "Waiting failed" carry the real failure
+// in error.cause, and a bare message alone is undiagnosable.
+function ErrorText(error) {
+  const parts = [];
+  for (let current = error; current; current = current.cause) {
+    parts.push(current instanceof Error ? current.message : String(current));
+  }
+  return parts.join(' <- ');
+}
+
 async function WithDeadline(promise, timeout, message) {
   let timer = null;
   try {
@@ -277,7 +287,9 @@ async function StartBrowser(session, directory, options, config, runInfo) {
     args.push('--disable-dev-shm-usage');
     if (options.backend === 'webgpu') args.push('--use-webgpu-adapter=swiftshader');
   }
-  session.browser = await require('puppeteer').launch({ headless: true, args });
+  // The suite blocks the page main thread with long synchronous WASM stretches (software video
+  // decoding), which can exceed puppeteer's default 180s protocol timeout mid-run.
+  session.browser = await require('puppeteer').launch({ headless: true, args, protocolTimeout: 600000 });
   runInfo.browser = await session.browser.version();
   session.page = await session.browser.newPage();
   session.page.on('console', function onConsole(message) { console.log(message.text()); });
@@ -326,7 +338,7 @@ async function CollectPartialArtifacts(session, output, options, runInfo) {
     runInfo.artifacts = await WithDeadline(CollectFiles(session.page, output, options), 10000,
       'Partial transfer timed out');
   } catch (artifactError) {
-    runInfo.errors.push(`Partial artifacts unavailable: ${artifactError.message}`);
+    runInfo.errors.push(`Partial artifacts unavailable: ${ErrorText(artifactError)}`);
   }
 }
 
@@ -351,8 +363,8 @@ async function Run(options) {
       TimeoutMS, 'Test or artifact transfer timed out');
   } catch (error) {
     failed = true;
-    runInfo.errors.push(error.message);
-    console.error(error.message);
+    runInfo.errors.push(ErrorText(error));
+    console.error(ErrorText(error));
     await CollectPartialArtifacts(session, output, options, runInfo);
   } finally {
     session.closing = true;

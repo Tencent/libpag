@@ -38,6 +38,7 @@ PAG_TEST(DeviceLockScopeTest, DeviceCanBeRelockedAfterScopeExit) {
   EXPECT_TRUE(static_cast<bool>(second));
 }
 
+#if !defined(__EMSCRIPTEN__)
 PAG_TEST(DeviceLockScopeTest, AnotherThreadCanWaitForTheDevice) {
   auto device = Devices::MakeDefault();
   ASSERT_NE(device, nullptr);
@@ -59,8 +60,9 @@ PAG_TEST(DeviceLockScopeTest, AnotherThreadCanWaitForTheDevice) {
   worker.join();
   EXPECT_TRUE(acquired);
 }
+#endif
 
-#if DEBUG && !defined(NO_LOG) && GTEST_HAS_DEATH_TEST
+#if DEBUG && !defined(NO_LOG) && GTEST_HAS_DEATH_TEST && !defined(__EMSCRIPTEN__)
 PAG_TEST(DeviceLockScopeDeathTest, SameThreadReentryFailsBeforeWaitingOnMutex) {
   GTEST_FLAG_SET(death_test_style, "threadsafe");
   EXPECT_DEATH(
