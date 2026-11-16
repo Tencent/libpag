@@ -301,8 +301,11 @@ std::string BuildHTML(PAGXDocument& doc, HTMLOutputMode mode, const HTMLExporter
   // Animation CSS is independent of the font rules: keep it in its own buffer and emit it in its
   // own <style> so that changing how fonts are written can never drop the keyframes.
   std::string animationCss;
-  if (animSession.isActive()) {
+  if (ctx.animationError.empty() && animSession.isActive()) {
     animationCss = animSession.emitKeyframesAndWeave(bodyStr);
+  }
+  if (!ctx.animationError.empty()) {
+    return {};
   }
 
   // Insert @font-face rules for embedded WOFF2 fonts
@@ -387,7 +390,11 @@ std::string HTMLExporter::ToHTML(PAGXDocument& doc, const std::string& resourceD
   ctx.staticImgUrlPrefix = urlPrefix;
   ctx.rasterScale = std::clamp(options.rasterScale, 0.01f, 4.0f);
 
-  return BuildHTML(doc, mode, options, ctx);
+  auto result = BuildHTML(doc, mode, options, ctx);
+  if (errorMsg != nullptr && !ctx.animationError.empty()) {
+    *errorMsg = ctx.animationError;
+  }
+  return result;
 }
 
 bool HTMLExporter::ToFile(PAGXDocument& document, const std::string& filePath,
@@ -456,6 +463,12 @@ std::shared_ptr<Data> HTMLExporter::ToData(PAGXDocument& document, const Options
   ctx.rasterScale = std::clamp(options.rasterScale, 0.01f, 4.0f);
 
   auto html = BuildHTML(document, HTMLOutputMode::FullDocument, options, ctx);
+  if (!ctx.animationError.empty()) {
+    if (errorMsg != nullptr) {
+      *errorMsg = ctx.animationError;
+    }
+    return nullptr;
+  }
   if (html.empty()) {
     if (errorMsg && errorMsg->empty()) {
       *errorMsg = "document produced no HTML output.";

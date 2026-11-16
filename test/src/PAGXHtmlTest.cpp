@@ -4956,6 +4956,173 @@ CLI_TEST(PAGXHtmlTest, AnimationTextFontSizeAndLetterSpacingAreExported) {
   EXPECT_NE(rule.find("letter-spacing: 6px"), std::string::npos) << rule;
 }
 
+static std::string MixedTextXML(bool reversed = false, bool hold = false,
+                                const std::string& text = "AB", int duration = 60) {
+  std::string body =
+      "<Layer><Text id=\"mixed\" text=\"" + text +
+      "\" fontFamily=\"Arial\" fontStyle=\"Bold\" fontSize=\"20\" position=\"40,100\"/>"
+      "<TextModifier id=\"mod\" position=\"0,-12\" fillColor=\"#9333EA\">"
+      "<RangeSelector id=\"sel\" shape=\"rampUp\" start=\"0\" end=\"1\"/>"
+      "</TextModifier><Fill color=\"#BE123C\"/></Layer>";
+  std::string size =
+      "<Object target=\"mixed\"><Channel name=\"fontSize\" type=\"float\">"
+      "<Key time=\"0\" value=\"20\" interpolation=\"" +
+      std::string(hold ? "hold" : "linear") +
+      "\"/><Key time=\"30\" value=\"40\"/></Channel>"
+      "<Channel name=\"letterSpacing\" type=\"float\">"
+      "<Key time=\"0\" value=\"0\" interpolation=\"linear\"/>"
+      "<Key time=\"60\" value=\"6\"/></Channel></Object>";
+  std::string selector =
+      "<Object target=\"sel\"><Channel name=\"start\" type=\"float\">"
+      "<Key time=\"0\" value=\"0\" interpolation=\"linear\"/>"
+      "<Key time=\"60\" value=\"0.5\"/></Channel></Object>";
+  std::string modifier =
+      "<Object target=\"mod\"><Channel name=\"fillColor\" type=\"color\">"
+      "<Key time=\"0\" value=\"#9333EA\" interpolation=\"linear\"/>"
+      "<Key time=\"60\" value=\"#0891B2\"/></Channel></Object>";
+  return "<pagx width=\"320\" height=\"200\">" + body +
+         "<Animations><Animation id=\"mix\" duration=\"" + std::to_string(duration) +
+         "\" frameRate=\"60\" loop=\"once\">" +
+         (reversed ? modifier + selector + size : size + selector + modifier) +
+         "</Animation></Animations></pagx>";
+}
+
+CLI_TEST(PAGXHtmlTest, AnimationMixedTextCombinesLayoutSelectorAndPaint) {
+  pagx::HTMLExportOptions options;
+  options.extractStyleSheet = false;
+  auto html = LoadXMLAndConvert(MixedTextXML(), options);
+  ASSERT_FALSE(html.empty());
+  std::vector<std::string> ids;
+  size_t position = 0;
+  while ((position = html.find("id=\"mixedGlyph", position)) != std::string::npos) {
+    auto end = html.find('"', position + 4);
+    ids.push_back(html.substr(position, end - position + 1));
+    position = end + 1;
+  }
+  ASSERT_EQ(ids.size(), 2u) << html;
+  auto first = KeyframeStopOf(html, ids[0], "0%");
+  auto last = KeyframeStopOf(html, ids[0], "100%");
+  EXPECT_NE(first.find("font-size: 20px"), std::string::npos) << first;
+  EXPECT_NE(last.find("font-size: 40px"), std::string::npos) << last;
+  EXPECT_NE(last.find("color: #BE123C"), std::string::npos) << last;
+  EXPECT_NE(last.find("transform: translate(0px, 0px)"), std::string::npos) << last;
+  auto startB = KeyframeStopOf(html, ids[1], "0%");
+  auto endB = KeyframeStopOf(html, ids[1], "100%");
+  ASSERT_FALSE(startB.empty());
+  ASSERT_FALSE(endB.empty());
+  EXPECT_NE(startB, endB);
+  EXPECT_NE(endB.find("translate(0px, -6px)"), std::string::npos) << endB;
+  EXPECT_NE(endB.find("left:"), std::string::npos) << endB;
+  EXPECT_EQ(html.find("<script"), std::string::npos);
+  EXPECT_EQ(html.find("steps("), std::string::npos);
+}
+
+CLI_TEST(PAGXHtmlTest, AnimationMixedTextObjectOrderDoesNotChangeOutput) {
+  pagx::HTMLExportOptions options;
+  options.extractStyleSheet = false;
+  auto forward = LoadXMLAndConvert(MixedTextXML(), options);
+  auto backward = LoadXMLAndConvert(MixedTextXML(true), options);
+  ASSERT_FALSE(forward.empty());
+  EXPECT_EQ(forward, backward);
+}
+
+CLI_TEST(PAGXHtmlTest, AnimationMixedTextHoldDoesNotFreezeContinuousLayout) {
+  pagx::HTMLExportOptions options;
+  options.extractStyleSheet = false;
+  auto html = LoadXMLAndConvert(MixedTextXML(false, true), options);
+  ASSERT_FALSE(html.empty());
+  EXPECT_EQ(html.find("steps("), std::string::npos);
+  EXPECT_NE(html.find("49.99999900%"), std::string::npos);
+  EXPECT_NE(html.find("50% { transform:"), std::string::npos);
+  EXPECT_NE(html.find("font-size: 40px"), std::string::npos);
+  auto marker = html.find("id=\"mixedGlyph");
+  ASSERT_NE(marker, std::string::npos);
+  marker = html.find("id=\"mixedGlyph", marker + 1);
+  ASSERT_NE(marker, std::string::npos);
+  auto end = html.find('"', marker + 4);
+  auto id = html.substr(marker, end - marker + 1);
+  auto before = KeyframeStopOf(html, id, "48.3333%");
+  auto left = KeyframeStopOf(html, id, "49.99999900%");
+  ASSERT_NE(before.find("left:"), std::string::npos) << before;
+  ASSERT_NE(left.find("left:"), std::string::npos) << left;
+  float beforeX = std::strtof(before.c_str() + before.find("left:") + 5, nullptr);
+  float leftX = std::strtof(left.c_str() + left.find("left:") + 5, nullptr);
+  EXPECT_GT(leftX, beforeX) << before << '\n' << left;
+  EXPECT_NEAR(leftX - beforeX, 0.1f, 0.002f) << before << '\n' << left;
+  EXPECT_NE(left.find("font-size: 20px"), std::string::npos) << left;
+}
+
+CLI_TEST(PAGXHtmlTest, AnimationMixedTextKeepsDocumentAndStaticExportUnchanged) {
+  auto doc = pagx::PAGXImporter::FromXML(MixedTextXML());
+  ASSERT_NE(doc, nullptr);
+  pagx::HTMLExportOptions options;
+  options.exportAnimations = false;
+  auto before = ConvertToHTML(doc, options);
+  options.exportAnimations = true;
+  auto animated = ConvertToHTML(doc, options);
+  ASSERT_FALSE(animated.empty());
+  options.exportAnimations = false;
+  EXPECT_EQ(before, ConvertToHTML(doc, options));
+}
+
+CLI_TEST(PAGXHtmlTest, AnimationMixedTextReportsUnsupportedInputInFileAndZipOutputs) {
+  for (const auto& xml :
+       {MixedTextXML(false, false, "A&#10;B"), MixedTextXML(false, false, "AB", 5000)}) {
+    auto doc = pagx::PAGXImporter::FromXML(xml);
+    ASSERT_NE(doc, nullptr);
+    std::string error;
+    auto html =
+        pagx::HTMLExporter::ToHTML(*doc, ProjectPath::Absolute("test/out/PAGXHtmlTest/tmp-assets"),
+                                   pagx::HTMLOutputMode::Fragment, {}, &error);
+    EXPECT_TRUE(html.empty());
+    EXPECT_NE(error.find("Mixed text animation"), std::string::npos) << error;
+    error.clear();
+    EXPECT_EQ(pagx::HTMLExporter::ToData(*doc, {}, &error), nullptr);
+    EXPECT_NE(error.find("Mixed text animation"), std::string::npos) << error;
+  }
+}
+
+// A random order permutes which glyphs a window value lands on; the composed path evaluates the
+// selector by glyph index, so it must refuse rather than silently linearise the window.
+CLI_TEST(PAGXHtmlTest, AnimationMixedTextRejectsRandomOrderSelector) {
+  auto xml = MixedTextXML();
+  auto at = xml.find("shape=\"rampUp\"");
+  ASSERT_NE(at, std::string::npos);
+  xml.insert(at + std::string("shape=\"rampUp\"").size(), " randomOrder=\"true\"");
+  auto doc = pagx::PAGXImporter::FromXML(xml);
+  ASSERT_NE(doc, nullptr);
+  std::string error;
+  auto html =
+      pagx::HTMLExporter::ToHTML(*doc, ProjectPath::Absolute("test/out/PAGXHtmlTest/tmp-assets"),
+                                 pagx::HTMLOutputMode::Fragment, {}, &error);
+  EXPECT_TRUE(html.empty());
+  EXPECT_NE(error.find("ordered RangeSelector"), std::string::npos) << error;
+}
+
+CLI_TEST(PAGXHtmlTest, AnimationMixedTextCompositionSlotsKeepIndependentPhases) {
+  auto xml = MixedTextXML();
+  auto start = xml.find("<Layer>");
+  auto end = xml.find("</pagx>");
+  auto contents = xml.substr(start, end - start);
+  auto slots =
+      "<pagx width=\"320\" height=\"200\"><Resources>"
+      "<Composition id=\"textCard\" width=\"150\" height=\"150\">" +
+      contents +
+      "</Composition></Resources>"
+      "<Layer width=\"150\" height=\"150\" composition=\"@textCard\">"
+      "<Timelines><Animation ref=\"@mix\" evaluationOffset=\"0\"/></Timelines></Layer>"
+      "<Layer x=\"160\" width=\"150\" height=\"150\" composition=\"@textCard\">"
+      "<Timelines><Animation ref=\"@mix\" evaluationOffset=\"30\"/></Timelines></Layer>"
+      "</pagx>";
+  pagx::HTMLExportOptions options;
+  options.extractStyleSheet = false;
+  auto html = LoadXMLAndConvert(slots, options);
+  ASSERT_FALSE(html.empty());
+  EXPECT_EQ(CountOccurrences(html, "id=\"mixedGlyph"), 4u);
+  EXPECT_NE(html.find("1s linear 1 both"), std::string::npos);
+  EXPECT_NE(html.find("1s linear 0.5s 1 both"), std::string::npos);
+}
+
 // Text content and font family can only switch values, not interpolate, so a channel that owns them
 // stays out of the keyframes instead of producing a rule that would replay empty stops.
 CLI_TEST(PAGXHtmlTest, AnimationTextContentChannelIsNotExported) {

@@ -242,6 +242,7 @@ class HTMLWriterContext {
   // written before the animation pass resolves, so this is the only "will anything animate?" signal
   // available while emitting markup (a static export must stay byte-identical).
   bool hasAnimations = false;
+  std::string animationError = {};
   std::unordered_set<const Composition*> visitedCompositions = {};
 
   // Guard against runaway recursion through writeLayer / writeGroup / writeComposition /
@@ -395,6 +396,10 @@ class HTMLWriterContext {
     struct RangeSelectorGlyph {
       const RangeSelector* selector = nullptr;
       const TextModifier* modifier = nullptr;
+      const Text* ownerText = nullptr;
+      size_t scope = 0;
+      bool composed = false;
+      float layoutY = 0.0f;
       size_t glyphIndex = 0;
       size_t totalGlyphs = 0;
       float glyphX = 0.0f;
@@ -451,6 +456,8 @@ class HTMLWriterContext {
     std::unordered_map<const Node*, ShadowBox> shadowBoxes = {};
     // ColorStop -> id of the <stop> element it writes, so a colour channel can animate stop-color.
     std::unordered_map<const Node*, std::string> colorStopIds = {};
+    std::unordered_set<const Text*> layoutAnimatedTexts = {};
+    std::unordered_map<const Text*, std::vector<Point>> mixedTextPositions = {};
     std::unordered_set<const RangeSelector*> animatedRangeSelectors = {};
     // TextModifiers with an animated channel: every glyph the modifier reaches needs its own rule.
     std::unordered_set<const TextModifier*> animatedModifiers = {};
