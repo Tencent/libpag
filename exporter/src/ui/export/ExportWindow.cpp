@@ -33,10 +33,10 @@ ExportWindow::ExportWindow(QApplication* app, const std::string& outputPath, QOb
 }
 
 void ExportWindow::show() {
+  BaseWindow::show();
   if (pagExport == nullptr) {
     return;
   }
-  BaseWindow::show();
 
   bool result = pagExport->exportFile();
   if (result) {

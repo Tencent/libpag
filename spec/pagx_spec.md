@@ -18,7 +18,7 @@
 
 ### 1.2 File Structure
 
-PAGX is a plain XML file (`.pagx`) that can reference external resource files (images, videos, audio, fonts, etc.) or embed resources via data URIs. PAGX and binary PAG formats are bidirectionally convertible: convert to PAG for optimized loading performance during publishing; use PAGX format for reading and editing during development and review.
+PAGX is a plain XML file (`.pagx`) that can reference external resource files (images, videos, audio, fonts, etc.) or embed resources via data URIs. A document and its images can also be packaged as a ZIP archive (see 2.12). PAGX and binary PAG formats are bidirectionally convertible: convert to PAG for optimized loading performance during publishing; use PAGX format for reading and editing during development and review.
 
 ### 1.3 Document Organization
 
@@ -242,6 +242,33 @@ External resources are referenced via relative paths or data URIs, applicable to
 - **Relative paths**: Resolved relative to the directory containing the PAGX file; supports `../` to reference parent directories
 - **Data URIs**: Begin with `data:`, format is `data:<mediatype>;base64,<data>`; only base64 encoding is supported
 - Path separators must use `/` (forward slash); `\` (backslash) is not supported
+
+### 2.12 PAGX Archive
+
+A PAGX archive is a ZIP produced by `PAGXExporter::ToData()`. It packages one document together
+with the image payloads embedded in it. The XML inside is exactly what `PAGXExporter::ToXML()`
+returns, so an archive introduces no new document semantics.
+
+**Layout**:
+
+| Entry | Required | Description |
+|---|---|---|
+| `document.pagx` | yes | The root document, stored at the archive root |
+| `images/<name>.<ext>` | no | An image payload referenced from `document.pagx` |
+
+**Rules**:
+
+- `document.pagx` is the entry a reader opens; no other entry contains a document.
+- Every other entry lives under `images/`, and its path is exactly the value the document uses in
+  `source` or `image`, so a reader resolves it with the same relative-path rules as a directory.
+- Entry paths never contain an absolute path, a `..` segment or a backslash. Entry names are
+  compared case-insensitively, so an archive extracts correctly on case-insensitive filesystems.
+- The extension follows the sniffed payload format (`png`, `jpeg`, `webp`, `gif`, `avif`,
+  `heic`, `svg`); bytes whose format cannot be identified use `bin` rather than claiming a
+  format they are not.
+- An archive is not guaranteed to be self-contained: a local file path, a `hash:` reference or a
+  remote URL is kept verbatim in the XML. `PAGXExporter::ToData()` reports such references one by
+  one through `warnings`, while `errorMsg` only reports a failed export.
 
 ---
 

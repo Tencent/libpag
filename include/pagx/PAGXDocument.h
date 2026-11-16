@@ -46,6 +46,14 @@ class ImagePattern;
  * it so post-build edits issued through notifyChange() can be broadcast to each scene. Use
  * PAGXImporter to load documents and PAGXExporter to save documents.
  */
+namespace detail {
+
+// Defined in src/pagx/DocumentAccess.h. Importers register addressable nodes while building a
+// document; the definition stays out of the public surface so nothing else can reach for it.
+struct DocumentAccess;
+
+}  // namespace detail
+
 class PAGXDocument : public Node {
  public:
   /**
@@ -188,8 +196,7 @@ class PAGXDocument : public Node {
    * individually for each file when embedding multiple images.
    * @param fileDataMap a map from file path to the file content to embed
    */
-  void loadFileDataMap(
-      const std::unordered_map<std::string, std::shared_ptr<Data>>& fileDataMap);
+  void loadFileDataMap(const std::unordered_map<std::string, std::shared_ptr<Data>>& fileDataMap);
 
   /**
    * Returns the document's font configuration. Importers populate fallback fonts here
@@ -312,10 +319,10 @@ class PAGXDocument : public Node {
 
   // Sets runtimeImage on every Image node matching filePath in this document and its resolved
   // external documents, collecting the touched Image nodes per owning document.
-  static void LoadImageInChain(PAGXDocument* document, const std::string& filePath,
-                               const std::shared_ptr<PAGImage>& image,
-                               std::unordered_map<PAGXDocument*, std::vector<Node*>>& docDirtyImages,
-                               std::unordered_set<const PAGXDocument*>& visited);
+  static void LoadImageInChain(
+      PAGXDocument* document, const std::string& filePath, const std::shared_ptr<PAGImage>& image,
+      std::unordered_map<PAGXDocument*, std::vector<Node*>>& docDirtyImages,
+      std::unordered_set<const PAGXDocument*>& visited);
 
   // Recursive layout worker. visited holds the documents on the current ancestor path so an
   // externalDoc cycle built directly through the API (bypassing loadFileData's own chain guard)
@@ -364,6 +371,7 @@ class PAGXDocument : public Node {
   friend class PAGComposition;
   friend class LayerBuilderContext;
   friend class LayerBuilderSession;
+  friend struct detail::DocumentAccess;
 };
 
 }  // namespace pagx

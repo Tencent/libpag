@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <cstdint>
 #include <vector>
 #include "tgfx/core/Typeface.h"
 

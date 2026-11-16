@@ -52,6 +52,12 @@ class WindowManager {
 
   bool showPAGViewerInstallDialog(const std::string& pagFilePath);
 
+  // Runs the Qt event loop that keeps the plugin windows interactive. A re-entrant menu click
+  // while a window is already open must not start a second, nested exec() loop: quitting only
+  // unwinds the innermost loop and would strand the After Effects main thread inside the plugin,
+  // so this returns immediately when a loop is already running or when no window is visible.
+  void runEventLoop();
+
   WindowManager(const WindowManager&) = delete;
   WindowManager& operator=(const WindowManager&) = delete;
 
@@ -60,7 +66,6 @@ class WindowManager {
 
  private:
   void init();
-  void runEventLoopIfNeeded();
 
   WindowManager();
   ~WindowManager() = default;

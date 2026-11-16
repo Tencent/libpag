@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="200" height="60" viewBox="0 0 200 60">
+  <defs>
+    <path id="motionPath" d="M10,30 Q50,5 100,30 T190,30" fill="none"/>
+  </defs>
+  <use href="#motionPath" stroke="#d1d5db" stroke-width="1" stroke-dasharray="3 3"/>
+  <circle r="8" fill="#f59e0b">
+    <animateMotion dur="3s" repeatCount="indefinite" rotate="auto">
+      <mpath href="#motionPath"/>
+    </animateMotion>
+  </circle>
+</svg>

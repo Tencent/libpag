@@ -33,7 +33,7 @@ bool AlertWindow::showWarnings(const std::vector<AlertInfo>& infos) {
   window->setPersistentGraphics(true);
   window->setPersistentSceneGraph(true);
   QQuickWindow::setTextRenderType(QQuickWindow::TextRenderType::NativeTextRendering);
-  window->show();
+  BaseWindow::show();
   wait();
 
   return continue_;
@@ -49,7 +49,7 @@ bool AlertWindow::showErrors(const std::vector<AlertInfo>& infos, const QString&
   window->setPersistentGraphics(true);
   window->setPersistentSceneGraph(true);
   QQuickWindow::setTextRenderType(QQuickWindow::TextRenderType::NativeTextRendering);
-  window->show();
+  BaseWindow::show();
   wait();
 
   return false;
@@ -58,6 +58,9 @@ bool AlertWindow::showErrors(const std::vector<AlertInfo>& infos, const QString&
 void AlertWindow::onWindowClosing() {
   cancel = true;
   BaseWindow::onWindowClosing();
+  if (eventLoop != nullptr) {
+    eventLoop->quit();
+  }
 }
 
 void AlertWindow::continueExport() {
@@ -77,10 +80,22 @@ void AlertWindow::init(const std::vector<AlertInfo>& infos) {
   context->setContextProperty("alertInfoModel", alertInfoModel.get());
 }
 
-void AlertWindow::wait() const {
-  while (!continue_ && !cancel) {
-    QApplication::processEvents();
+void AlertWindow::wait() {
+  // The window may already be closed before the loop starts (e.g. closed synchronously during
+  // show()); in that case there is no close event left to quit the loop, so return immediately
+  // as the old processEvents() condition did.
+  if (continue_ || cancel) {
+    return;
   }
+  // Pump events on a nested QEventLoop instead of busy-waiting with processEvents(), which burned
+  // 100% CPU. Every button path and the window's close event route through onWindowClosing(),
+  // which quits this loop. The scope keeps BaseWindow::isEventLoopRunning() true so a re-entrant
+  // menu click does not start a second, nested exec() loop while the alert is modal.
+  QEventLoop loop;
+  eventLoop = &loop;
+  BaseWindow::EventLoopScope scope;
+  loop.exec();
+  eventLoop = nullptr;
 }
 
 }  // namespace exporter

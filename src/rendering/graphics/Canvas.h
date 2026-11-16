@@ -18,6 +18,8 @@
 
 #pragma once
 
+#include <cstddef>
+#include <cstdint>
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/RenderFlags.h"
 #include "tgfx/core/SamplingOptions.h"

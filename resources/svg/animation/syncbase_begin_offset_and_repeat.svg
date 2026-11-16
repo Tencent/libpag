@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100">
+  <rect width="50" height="50" fill="red" stroke="black">
+    <animate id="base" attributeName="opacity" values="1;0.3" dur="1s" repeatCount="3"
+             fill="freeze"/>
+    <animate attributeName="stroke-width" from="2" to="6" begin="base.begin+0.5s" dur="0.5s" fill="freeze"/>
+  </rect>
+  <rect x="60" width="30" height="30" fill="blue" stroke="black">
+    <animate attributeName="stroke-width" from="1" to="4" begin="base.repeat(2)" dur="0.5s" fill="freeze"/>
+  </rect>
+</svg>

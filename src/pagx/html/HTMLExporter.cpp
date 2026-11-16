@@ -27,9 +27,10 @@
 #include "pagx/html/HTMLStyleExtractor.h"
 #include "pagx/html/HTMLWriter.h"
 #if defined(PAG_BUILD_HTML) || defined(PAG_BUILD_PPT)
-#include "pagx/html/HTMLZipWriter.h"
+#include "pagx/utils/MemZipWriter.h"
 #endif
 #include "pagx/nodes/Font.h"
+#include "pagx/utils/ExporterUtils.h"
 #include "pagx/utils/StringParser.h"
 #include "pagx/utils/Woff2FontGenerator.h"
 
@@ -261,7 +262,13 @@ std::string BuildHTML(PAGXDocument& doc, HTMLOutputMode mode, const HTMLExporter
 
   // Render layers into body content
   HTMLBuilder body(1, 4096);
+  CollectMaskReferenceLayers(doc, &writer.maskReferenceLayers);
   for (auto* layer : doc.layers) {
+    // A layer referenced as another layer's mask is a clip shape, not content. Importers keep it
+    // visible for downstream consumers, so the visibility check alone cannot skip it.
+    if (writer.maskReferenceLayers.count(layer) != 0) {
+      continue;
+    }
     writer.writeLayer(body, layer);
   }
 
@@ -411,7 +418,7 @@ bool HTMLExporter::ToFile(PAGXDocument& document, const std::string& filePath,
 std::shared_ptr<Data> HTMLExporter::ToData(PAGXDocument& document, const Options& options,
                                            std::string* errorMsg) {
 #if defined(PAG_BUILD_HTML) || defined(PAG_BUILD_PPT)
-  HTMLZipWriter zipWriter;
+  MemZipWriter zipWriter;
   HTMLWriterContext ctx;
   ctx.docWidth = document.width;
   ctx.docHeight = document.height;

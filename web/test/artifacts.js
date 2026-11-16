@@ -7,6 +7,15 @@ const Backends = ['webgl', 'webgpu'];
 const Modes = ['compare', 'update'];
 const ArtifactNames = ['pag-test.js', 'pag-test.wasm', 'pag-test.data', 'tgfx.esm.js',
   'ffavc.min.js', 'ffavc.wasm', 'index.html'];
+const RepositoryRoot = path.resolve(__dirname, '../..');
+
+function ResolveRepositoryPath(target) {
+  const resolved = path.resolve(target);
+  if (!resolved.startsWith(RepositoryRoot + path.sep)) {
+    throw new Error(`Path must stay inside the repository: ${target}`);
+  }
+  return resolved;
+}
 
 function ValidateBuildInfo(info, backend, mode) {
   if (!info || info.protocol !== 1 || !Backends.includes(backend) || !Modes.includes(mode) ||
@@ -77,18 +86,19 @@ function ReplaceDirectory(stage, destination) {
 }
 
 function Publish(backend, mode, buildDirectory, webDirectory = __dirname) {
-  const info = JSON.parse(fs.readFileSync(path.join(buildDirectory, 'build-info.json'), 'utf8'));
+  const directory = ResolveRepositoryPath(buildDirectory);
+  const info = JSON.parse(fs.readFileSync(path.join(directory, 'build-info.json'), 'utf8'));
   ValidateBuildInfo(info, backend, mode);
   const root = path.join(webDirectory, 'dist');
   fs.mkdirSync(root, { recursive: true });
   const stage = fs.mkdtempSync(path.join(root, '.publish-'));
   const destination = path.join(root, `${backend}-${mode}`);
   try {
-    const binding = fs.readFileSync(path.join(buildDirectory, 'tgfx-binding-path.txt'), 'utf8').trim();
+    const binding = fs.readFileSync(path.join(directory, 'tgfx-binding-path.txt'), 'utf8').trim();
     if (path.basename(binding) !== 'tgfx.esm.js') throw new Error('Invalid TGFX binding path');
     for (const name of ArtifactNames) {
       const source = name === 'tgfx.esm.js' ? binding :
-        path.join(name.startsWith('pag-test.') ? buildDirectory : webDirectory, name);
+        path.join(name.startsWith('pag-test.') ? directory : webDirectory, name);
       fs.copyFileSync(source, path.join(stage, name));
     }
     info.files = {};
@@ -149,8 +159,9 @@ function ValidateResult(result) {
   }
 }
 
-module.exports = { ArtifactNames, Backends, Modes, ValidateBuildInfo, HashFile, HashText, ReadBuild,
-  SnapshotBuild, RemoveBackup, ReplaceDirectory, Publish, FlattenStrings, ValidateCache, ValidateResult };
+module.exports = { ArtifactNames, Backends, Modes, RepositoryRoot, ResolveRepositoryPath, ValidateBuildInfo,
+  HashFile, HashText, ReadBuild, SnapshotBuild, RemoveBackup, ReplaceDirectory, Publish, FlattenStrings,
+  ValidateCache, ValidateResult };
 
 if (require.main === module) {
   try {
