@@ -427,7 +427,49 @@ static std::string GetFilePath(IDWriteFontFile* fontFile) {
   return WideToUTF8(wide.c_str(), static_cast<int>(length));
 }
 
-std::vector<FontLocation> SystemFonts::FallbackTypefaces() {
+// Resolves a family's default face to a loadable file location. A FontLocation that carries only a
+// family name cannot be loaded later, so the system fallback list must also record the file and the
+// face index, exactly like FindFont does for a named lookup.
+static FontLocation ResolveFamilyLocation(IDWriteFontFamily* fontFamily,
+                                          const std::string& familyName) {
+  FontLocation location = {};
+  location.fontFamily = familyName;
+  UINT32 fontCount = fontFamily->GetFontCount();
+  IDWriteFont* font = nullptr;
+  for (UINT32 j = 0; j < fontCount; j++) {
+    IDWriteFont* candidate = nullptr;
+    if (FAILED(fontFamily->GetFont(j, &candidate)) || candidate == nullptr) {
+      continue;
+    }
+    if (candidate->GetSimulations() != DWRITE_FONT_SIMULATIONS_NONE) {
+      SafeRelease(&candidate);
+      continue;
+    }
+    font = candidate;
+    break;
+  }
+  if (font == nullptr && fontCount > 0) {
+    fontFamily->GetFont(0, &font);
+  }
+  if (font == nullptr) {
+    return location;
+  }
+  IDWriteFontFace* fontFace = nullptr;
+  if (SUCCEEDED(font->CreateFontFace(&fontFace)) && fontFace != nullptr) {
+    UINT32 fileCount = 1;
+    IDWriteFontFile* fontFile = nullptr;
+    if (SUCCEEDED(fontFace->GetFiles(&fileCount, &fontFile)) && fontFile != nullptr) {
+      location.path = GetFilePath(fontFile);
+      location.ttcIndex = static_cast<int>(fontFace->GetIndex());
+      SafeRelease(&fontFile);
+    }
+    SafeRelease(&fontFace);
+  }
+  SafeRelease(&font);
+  return location;
+}
+
+static std::vector<FontLocation> EnumerateFallbackTypefaces() {
   IDWriteFactory* factory = nullptr;
   HRESULT hr = DWriteCreateFactory(DWRITE_FACTORY_TYPE_SHARED, __uuidof(IDWriteFactory),
                                    reinterpret_cast<IUnknown**>(&factory));
@@ -454,19 +496,28 @@ std::vector<FontLocation> SystemFonts::FallbackTypefaces() {
     }
 
     auto familyName = GetFamilyName(fontFamily);
-    SafeRelease(&fontFamily);
     if (familyName.empty()) {
+      SafeRelease(&fontFamily);
       continue;
     }
 
-    FontLocation location = {};
-    location.fontFamily = std::move(familyName);
-    fallbacks.push_back(std::move(location));
+    auto location = ResolveFamilyLocation(fontFamily, familyName);
+    SafeRelease(&fontFamily);
+    if (!location.path.empty()) {
+      fallbacks.push_back(std::move(location));
+    }
   }
 
   SafeRelease(&fontCollection);
   SafeRelease(&factory);
   return fallbacks;
+}
+
+std::vector<FontLocation> SystemFonts::FallbackTypefaces() {
+  // A LayoutContext is rebuilt for every reshape, and enumerating the collection plus resolving
+  // each family's default face costs hundreds of milliseconds, so build the list once per process.
+  static const std::vector<FontLocation> cached = EnumerateFallbackTypefaces();
+  return cached;
 }
 
 std::vector<FontFamilyEntry> SystemFonts::AllFontFamilies() {
