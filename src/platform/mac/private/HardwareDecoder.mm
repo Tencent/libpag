@@ -49,6 +49,7 @@ HardwareDecoder::HardwareDecoder(const VideoFormat& format)
 
 HardwareDecoder::~HardwareDecoder() {
   if (session) {
+    VTDecompressionSessionWaitForAsynchronousFrames(session);
     VTDecompressionSessionInvalidate(session);
     CFRelease(session);
     session = nullptr;
@@ -60,12 +61,9 @@ HardwareDecoder::~HardwareDecoder() {
   }
 
   cleanResources();
-  // Released only after the session has been invalidated and released, so no callback delivered by
-  // VideoToolbox can write into them anymore.
-  for (auto* context : staleContexts) {
-    delete context;
-  }
-  staleContexts.clear();
+  // Reclaimed only after the barrier above guaranteed VideoToolbox emitted every pending callback
+  // and the session is gone, so no callback can still reference a context.
+  contextPool.reclaimAll();
 }
 
 void HardwareDecoder::cleanResources() {
@@ -92,19 +90,6 @@ void HardwareDecoder::cleanResources() {
   pendingFrames.clear();
   outputFrameCaches.clear();
   inputEndOfStream = false;
-}
-
-void DidDecompress(void*, void* sourceFrameRefCon, OSStatus status, VTDecodeInfoFlags,
-                   CVImageBufferRef pixelBuffer, CMTime, CMTime) {
-  auto* context = static_cast<HardwareDecodeContext*>(sourceFrameRefCon);
-  if (context == nullptr) {
-    return;
-  }
-  CVPixelBufferRef outputPixelBuffer = nullptr;
-  if (status == noErr && pixelBuffer) {
-    outputPixelBuffer = CVPixelBufferRetain(pixelBuffer);
-  }
-  context->complete(outputPixelBuffer);
 }
 
 bool HardwareDecoder::initVideoToolBox(const std::vector<std::shared_ptr<tgfx::Data>>& headers,
@@ -150,15 +135,15 @@ bool HardwareDecoder::initVideoToolBox(const std::vector<std::shared_ptr<tgfx::D
 
 bool HardwareDecoder::resetVideoToolBox() {
   if (session) {
+    VTDecompressionSessionWaitForAsynchronousFrames(session);
     VTDecompressionSessionInvalidate(session);
     CFRelease(session);
     session = nullptr;
   }
 
-  for (auto* context : staleContexts) {
-    delete context;
-  }
-  staleContexts.clear();
+  // The barrier above guaranteed the old session emitted every pending callback, so the contexts it
+  // owned can no longer be written and are safe to reclaim.
+  contextPool.reclaimAll();
 
   // create decompression session
   CFDictionaryRef inAttrs = NULL;
@@ -285,17 +270,14 @@ pag::DecodingResult HardwareDecoder::onDecodeFrame() {
   if (sampleBuffer) {
     OSStatus status = 0;
     VTDecodeInfoFlags infoFlags = 0;
-    auto* context = new HardwareDecodeContext();
+    auto* context = contextPool.create();
 
     status = VTDecompressionSessionDecodeFrame(session, sampleBuffer, 0, context, &infoFlags);
 
-    bool abandoned = false;
-    outputPixelBuffer = context->takeOutput(status == noErr, &abandoned);
-    if (abandoned) {
-      // VideoToolbox promised no callback for a failed call, but a late one would still write into
-      // this context, so it is only released together with the session.
-      staleContexts.push_back(context);
-    }
+    outputPixelBuffer = context->takeBuffer();
+    // A context whose callback never arrived (failed or dropped frame) stays in the pool until the
+    // next reset or teardown barrier reclaims it; resolved ones are freed here to bound the pool.
+    contextPool.reclaimResolved();
 
     if (status != noErr && !outputPixelBuffer) {
       LOGE("HardwareDecoder:Decode failed status = %d", (int)status);

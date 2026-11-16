@@ -20,7 +20,9 @@
 
 #include <CoreMedia/CoreMedia.h>
 #include <VideoToolbox/VideoToolbox.h>
+#include <chrono>
 #include <list>
+#include <memory>
 #include <mutex>
 #include <unordered_map>
 #include <vector>
@@ -28,6 +30,8 @@
 #include "rendering/video/VideoDecoder.h"
 
 namespace pag {
+struct DecoderToken;
+
 class HardwareDecoder : public VideoDecoder {
  public:
   ~HardwareDecoder() override;
@@ -45,13 +49,16 @@ class HardwareDecoder : public VideoDecoder {
   std::shared_ptr<tgfx::ImageBuffer> onRenderFrame() override;
 
   /**
-   * Aborts any in-progress synchronous decompression by invalidating the underlying VT session.
-   * Safe to call from any thread. Used by the willResignActive observer to unblock the worker
-   * thread so it can release device.locker before the main thread enters EAGLDevice::finish().
-   * A decode that is still running is given a short grace period to return first, the session is
-   * only invalidated underneath it when it is really stuck.
+   * Invalidates the underlying VT session to abort an in-progress synchronous decode, letting the
+   * worker thread release device.locker before the main thread enters EAGLDevice::finish(). An
+   * in-flight decode is given until deadline to return on its own; only if it is still running past
+   * that point is the session invalidated underneath it. The deadline is shared across all decoders
+   * so the observer's total wait is capped rather than being the per-decoder budget times the
+   * number of decoders. Must be called only by the willResignActive observer while it holds this
+   * decoder's lifecycle-token mutex and the token still references the decoder; it is not safe to
+   * call from the decode thread itself, which would re-lock decodeLocker.
    */
-  void invalidateSession();
+  void invalidateSession(std::chrono::steady_clock::time_point deadline);
 
  private:
   bool isInitialized = false;
@@ -82,7 +89,8 @@ class HardwareDecoder : public VideoDecoder {
   CMBlockBufferRef blockBuffer = nullptr;
   CMSampleBufferRef sampleBuffer = nullptr;
   OutputFrame* outputFrame = nullptr;
-  std::vector<HardwareDecodeContext*> staleContexts = {};
+  VTDecodeContextPool contextPool = {};
+  std::shared_ptr<DecoderToken> lifecycleToken = {};
 
   friend class HardwareDecoderFactory;
 };

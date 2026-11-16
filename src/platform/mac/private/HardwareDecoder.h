@@ -72,7 +72,7 @@ class HardwareDecoder : public VideoDecoder {
   CMBlockBufferRef blockBuffer = nullptr;
   CMSampleBufferRef sampleBuffer = nullptr;
   OutputFrame* outputFrame = nullptr;
-  std::vector<HardwareDecodeContext*> staleContexts = {};
+  VTDecodeContextPool contextPool = {};
 
   friend class HardwareDecoderFactory;
 };
