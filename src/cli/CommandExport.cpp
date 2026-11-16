@@ -77,6 +77,8 @@ struct ExportOptions {
   // First option that only a video format understands, so a mismatch can be reported instead of
   // silently ignored.
   std::string firstVideoOnlyOption = {};
+  // First vector/PPT option that a video format cannot honor.
+  std::string firstNonVideoOption = {};
 };
 
 constexpr const char* kCommonUsage = R"(Usage: pagx export [options]
@@ -185,6 +187,12 @@ static void MarkVideoOnlyOption(ExportOptions* options, const char* option) {
   }
 }
 
+static void MarkNonVideoOption(ExportOptions* options, const char* option) {
+  if (options->firstNonVideoOption.empty()) {
+    options->firstNonVideoOption = option;
+  }
+}
+
 static int ParseVideoOption(int argc, char* argv[], int* index, ExportOptions* options,
                             bool* matched) {
   auto& i = *index;
@@ -285,6 +293,11 @@ static int ResolveExportOptions(ExportOptions* options) {
               << " is only supported for video formats (mp4)\n";
     return 1;
   }
+  if (videoFormat != nullptr && !options->firstNonVideoOption.empty()) {
+    std::cerr << "pagx export: error: " << options->firstNonVideoOption
+              << " is not supported for video formats (mp4)\n";
+    return 1;
+  }
   if (videoFormat != nullptr && videoFormat->requiresOpaque && options->bgAlpha < 1.0f) {
     std::cerr << "pagx export: error: " << videoFormat->name
               << " output cannot carry alpha, --background must be opaque\n";
@@ -323,14 +336,19 @@ static int ParseOptions(int argc, char* argv[], ExportOptions* options) {
         return 1;
       }
       options->svgIndent = static_cast<int>(value);
+      MarkNonVideoOption(options, "--svg-indent");
     } else if (arg == "--svg-no-xml-declaration") {
       options->svgNoXmlDeclaration = true;
+      MarkNonVideoOption(options, "--svg-no-xml-declaration");
     } else if (arg == "--text-to-path") {
       options->textToPath = true;
+      MarkNonVideoOption(options, "--text-to-path");
     } else if (arg == "--ppt-no-bake-unsupported") {
       options->pptBakeUnsupported = false;
+      MarkNonVideoOption(options, "--ppt-no-bake-unsupported");
     } else if (arg == "--ppt-ignore-glyphruns") {
       options->pptIgnoreGlyphRuns = true;
+      MarkNonVideoOption(options, "--ppt-ignore-glyphruns");
     } else if (arg == "--font" && i + 1 < argc) {
       options->fontFiles.emplace_back(argv[++i]);
       MarkVideoOnlyOption(options, "--font");

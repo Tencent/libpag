@@ -219,14 +219,15 @@ if (PAG_BUILD_TESTS)
     set(PAG_BUILD_SHARED OFF)
 endif ()
 
-# VideoExporter is native-only in the current support matrix. Respect an explicit user override.
+# VideoExporter is native-only. CLI and tests require it, so explicitly disabling it for those
+# builds is rejected rather than silently overriding the user's choice.
 if (WEB)
     set(PAG_BUILD_VIDEO_EXPORTER OFF)
 elseif ((PAG_BUILD_CLI OR PAG_BUILD_TESTS) AND NOT PAG_BUILD_VIDEO_EXPORTER)
     message(FATAL_ERROR "PAG_BUILD_CLI and PAG_BUILD_TESTS require PAG_BUILD_VIDEO_EXPORTER=ON")
 endif ()
 
-if (PAG_BUILD_VIDEO_EXPORTER)
+if (PAG_BUILD_PAGX AND PAG_BUILD_VIDEO_EXPORTER)
     list(APPEND PAG_DEFINES PAG_BUILD_VIDEO_EXPORTER)
 endif ()
 

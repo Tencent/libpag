@@ -26,6 +26,7 @@
 #include "base/PAGTest.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/PAGXImporter.h"
+#include "pagx/VideoExportInternal.h"
 #include "pagx/VideoExporter.h"
 #include "pagx/nodes/Animation.h"
 #include "pagx/nodes/AnimationObject.h"
@@ -445,6 +446,24 @@ PAGX_TEST(PAGXVideoExporterTest, MakeRejectsEmptyAndDuplicateAnimationIds) {
   EXPECT_NE(errorMsg.find("duplicate top-level animation id"), std::string::npos);
 }
 
+PAGX_TEST(PAGXVideoExporterTest, MakeRejectsEmptyAndDuplicateStateMachineIds) {
+  auto emptyIdDocument = MakeStateMachineDocument();
+  emptyIdDocument->animations.front()->id.clear();
+  std::string errorMsg = {};
+  auto exporter = pagx::VideoExporter::Make(emptyIdDocument, {}, &errorMsg);
+  EXPECT_EQ(exporter, nullptr);
+  EXPECT_NE(errorMsg.find("non-empty ids"), std::string::npos);
+
+  auto duplicateIdDocument = MakeStateMachineDocument();
+  auto* duplicate = duplicateIdDocument->makeNode<pagx::StateMachine>("duplicate");
+  duplicate->id = duplicateIdDocument->animations.front()->id;
+  duplicateIdDocument->animations.push_back(duplicate);
+  errorMsg.clear();
+  exporter = pagx::VideoExporter::Make(duplicateIdDocument, {}, &errorMsg);
+  EXPECT_EQ(exporter, nullptr);
+  EXPECT_NE(errorMsg.find("duplicate top-level state machine id"), std::string::npos);
+}
+
 PAGX_TEST(PAGXVideoExporterTest, MakeRejectsInvalidRawAnimationFrameRate) {
   for (float frameRate :
        {std::numeric_limits<float>::quiet_NaN(), std::numeric_limits<float>::infinity(),
@@ -520,6 +539,23 @@ PAGX_TEST(PAGXVideoExporterTest, MakeRejectsExcessiveOutputDimensions) {
   EXPECT_NE(errorMsg.find("dimensions"), std::string::npos);
 }
 
+PAGX_TEST(PAGXVideoExporterTest, OutputDimensionsAreAllOrNothing) {
+  int width = 17;
+  int height = 19;
+  EXPECT_FALSE(pagx::ComputeVideoOutputDimensions(100, 0, 1.0f, false, &width, &height));
+  EXPECT_EQ(width, 17);
+  EXPECT_EQ(height, 19);
+}
+
+PAGX_TEST(PAGXVideoExporterTest, NextFrameReportsDrawingFailure) {
+  auto exporter = pagx::VideoExporter::Make(pagx::PAGXDocument::Make(100, 100));
+  ASSERT_TRUE(exporter != nullptr);
+  std::string errorMsg = {};
+  EXPECT_FALSE(exporter->nextFrame(&errorMsg));
+  EXPECT_EQ(exporter->currentFrame(), 0);
+  EXPECT_NE(errorMsg.find("failed to draw frame 0"), std::string::npos);
+}
+
 PAGX_TEST(PAGXVideoExporterTest, NextFrameAdvancesSequentiallyAndStopsAtEnd) {
 #ifdef TGFX_USE_WEBGPU
   GTEST_SKIP() << "VideoExporter currently requires synchronous pixel readback";
@@ -533,7 +569,9 @@ PAGX_TEST(PAGXVideoExporterTest, NextFrameAdvancesSequentiallyAndStopsAtEnd) {
     ASSERT_TRUE(exporter->pixels() != nullptr);
     EXPECT_GE(exporter->rowBytes(), static_cast<size_t>(exporter->width()) * 4);
   }
-  EXPECT_FALSE(exporter->nextFrame());
+  std::string errorMsg = "stale error";
+  EXPECT_FALSE(exporter->nextFrame(&errorMsg));
+  EXPECT_TRUE(errorMsg.empty());
   EXPECT_EQ(exporter->currentFrame(), exporter->frameCount());
 }
 

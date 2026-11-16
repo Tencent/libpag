@@ -1050,6 +1050,29 @@ CLI_TEST(PAGXCliTest, Export_VideoOptionsAreRejectedForVectorFormats) {
   EXPECT_NE(errors.find("--duration is only supported for video formats"), std::string::npos);
 }
 
+CLI_TEST(PAGXCliTest, Export_NonVideoOptionsAreRejectedForMp4) {
+  auto inputPath = TestResourcePath("render_animated_timelines.pagx");
+  const std::vector<std::vector<std::string>> unsupportedOptions = {
+      {"--svg-indent", "4"},         {"--svg-no-xml-declaration"}, {"--text-to-path"},
+      {"--ppt-no-bake-unsupported"}, {"--ppt-ignore-glyphruns"},
+  };
+  for (const auto& option : unsupportedOptions) {
+    std::vector<std::string> arguments = {"export", "--input", inputPath, "--output",
+                                          TempDir() + "/non_video_options.mp4"};
+    arguments.insert(arguments.end(), option.begin(), option.end());
+    std::string errors;
+    int ret = 0;
+    {
+      StreamCapture capturedErr(std::cerr);
+      ret = CallRun(pagx::cli::RunExport, std::move(arguments));
+      errors = capturedErr.str();
+    }
+    EXPECT_EQ(ret, 1);
+    EXPECT_NE(errors.find(option.front() + " is not supported for video formats"),
+              std::string::npos);
+  }
+}
+
 CLI_TEST(PAGXCliTest, Export_FontOptionsAreRejectedForNonVideoFormats) {
   auto inputPath = TestResourcePath("render_animated_timelines.pagx");
   for (const auto* format : {"svg", "pptx", "html"}) {

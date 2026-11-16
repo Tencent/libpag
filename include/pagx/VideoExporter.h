@@ -158,9 +158,10 @@ class VideoExporter {
   /**
    * Creates an exporter bound to the given document. Top-level animations and state machines are
    * sampled in declaration order, and timelines mounted on nested compositions advance with the
-   * scene. Top-level animation ids must be non-empty and unique. A document without active
-   * timelines produces one static frame by default, or repeats its static scene when duration is
-   * positive. A document containing a state machine requires an explicit positive duration.
+   * scene. Top-level animation and state machine ids must be non-empty and unique. A document
+   * without active timelines produces one static frame by default, or repeats its static scene
+   * when duration is positive. A document containing a state machine requires an explicit positive
+   * duration.
    *
    * After Make() succeeds, the source document and all reachable external composition documents
    * must remain unmodified until the exporter is destroyed. Create a new exporter after changing
@@ -213,11 +214,13 @@ class VideoExporter {
   /**
    * Renders the next frame of the sequence and makes it readable through pixels().
    *
+   * @param errorMsg optional pointer cleared on entry and set to the drawing or pixel-readback
+   *                 failure reason. Normal end of sequence leaves it empty.
    * @return true when a frame was rendered; false at the end of the sequence or on failure. Use
    *         `currentFrame() < frameCount()` to tell the two apart: a failure leaves the index
    *         unadvanced.
    */
-  bool nextFrame();
+  bool nextFrame(std::string* errorMsg = nullptr);
 
   /**
    * Returns the pixels of the most recently rendered frame as RGBA8888, premultiplied. The buffer

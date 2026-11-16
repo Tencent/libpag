@@ -70,7 +70,8 @@ bool RunVideoFrames(VideoFrameSource& source, const std::string& command,
   const auto& exporter = source.exporter();
   auto frameCount = exporter->frameCount();
   int64_t progressStep = std::max<int64_t>(1, frameCount / 10);
-  while (exporter->nextFrame()) {
+  std::string frameError = {};
+  while (exporter->nextFrame(&frameError)) {
     VideoFrameView frame = {exporter->currentFrame() - 1, exporter->pixels(), exporter->rowBytes()};
     if (!consumer(frame, context, errorMsg)) {
       std::cerr << errorPrefix << *errorMsg << "\n";
@@ -82,7 +83,10 @@ bool RunVideoFrames(VideoFrameSource& source, const std::string& command,
     }
   }
   if (exporter->currentFrame() < frameCount) {
-    std::cerr << errorPrefix << "failed to render frame " << exporter->currentFrame() << "\n";
+    if (frameError.empty()) {
+      frameError = "failed to render frame " + std::to_string(exporter->currentFrame());
+    }
+    std::cerr << errorPrefix << frameError << "\n";
     return false;
   }
   return true;

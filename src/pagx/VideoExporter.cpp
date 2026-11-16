@@ -62,18 +62,19 @@ bool ComputeOutputDimension(float documentSize, float scale, bool padToEvenSize,
 }
 
 bool ValidateDocumentAnimations(const PAGXDocument& document, std::string* errorMsg) {
-  std::unordered_set<std::string> animationIds = {};
+  std::unordered_set<std::string> timelineIds = {};
   for (const auto* node : document.animations) {
-    if (node == nullptr || node->nodeType() != NodeType::Animation) {
+    if (node == nullptr ||
+        (node->nodeType() != NodeType::Animation && node->nodeType() != NodeType::StateMachine)) {
       continue;
     }
-    const auto* animation = static_cast<const Animation*>(node);
-    if (animation->id.empty()) {
-      SetError(errorMsg, "top-level animations must have non-empty ids");
+    if (node->id.empty()) {
+      SetError(errorMsg, "top-level animations and state machines must have non-empty ids");
       return false;
     }
-    if (!animationIds.insert(animation->id).second) {
-      SetError(errorMsg, "duplicate top-level animation id '" + animation->id + "'");
+    if (!timelineIds.insert(node->id).second) {
+      auto typeName = node->nodeType() == NodeType::Animation ? "animation" : "state machine";
+      SetError(errorMsg, "duplicate top-level " + std::string(typeName) + " id '" + node->id + "'");
       return false;
     }
   }
@@ -139,8 +140,15 @@ bool ComputeVideoOutputDimensions(float documentWidth, float documentHeight, flo
   if (width == nullptr || height == nullptr) {
     return false;
   }
-  return ComputeOutputDimension(documentWidth, scale, padToEvenSize, width) &&
-         ComputeOutputDimension(documentHeight, scale, padToEvenSize, height);
+  int computedWidth = 0;
+  int computedHeight = 0;
+  if (!ComputeOutputDimension(documentWidth, scale, padToEvenSize, &computedWidth) ||
+      !ComputeOutputDimension(documentHeight, scale, padToEvenSize, &computedHeight)) {
+    return false;
+  }
+  *width = computedWidth;
+  *height = computedHeight;
+  return true;
 }
 
 bool VideoExporter::AddAnimation(const std::shared_ptr<PAGAnimation>& animation, int64_t offsetUs,
@@ -249,7 +257,10 @@ bool VideoExporter::ResolvePlaybackPlan(const std::shared_ptr<PAGScene>& scene,
         SetError(errorMsg, "failed to instantiate state machine '" + node->id + "'");
         return false;
       }
-      plan->timelines.emplace_back(std::move(stateMachine));
+      if (std::find(plan->timelines.begin(), plan->timelines.end(), stateMachine) ==
+          plan->timelines.end()) {
+        plan->timelines.emplace_back(std::move(stateMachine));
+      }
       plan->hasStateMachine = true;
       plan->hasDynamicContent = true;
     }
@@ -392,7 +403,10 @@ int64_t VideoExporter::currentFrame() const {
   return nextFrameIndex;
 }
 
-bool VideoExporter::nextFrame() {
+bool VideoExporter::nextFrame(std::string* errorMsg) {
+  if (errorMsg != nullptr) {
+    errorMsg->clear();
+  }
   if (scene == nullptr || nextFrameIndex >= totalFrames) {
     return false;
   }
@@ -418,9 +432,11 @@ bool VideoExporter::nextFrame() {
   scene->advanceAndApply(deltaUs);
   previousFrameTimeUs = timeUs;
   if (!scene->draw(surface)) {
+    SetError(errorMsg, "failed to draw frame " + std::to_string(nextFrameIndex));
     return false;
   }
   if (!surface->readPixels(pixmap->writablePixels(), pixmap->rowBytes())) {
+    SetError(errorMsg, "failed to read pixels for frame " + std::to_string(nextFrameIndex));
     return false;
   }
   nextFrameIndex++;
