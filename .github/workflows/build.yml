@@ -466,6 +466,9 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force -Path third_party/tgfx/out/cache
           node third_party/vendor_tools/ms-build -a x64 win/Win32Demo.sln
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node build_pag pagx-cli -a x64 -i -DPAG_BUILD_CLI=ON -DPAG_BUILD_SHARED=OFF
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
@@ -513,6 +516,7 @@ jobs:
       - name: Build Linux
         run: |
           mkdir -p third_party/tgfx/out/cache
+          node build_pag pagx-cli -a x64 -i -DPAG_BUILD_CLI=ON -DPAG_BUILD_SHARED=OFF
           cd linux
           ./build_pag.sh
           cmake -B ./build -DCMAKE_BUILD_TYPE=Release
