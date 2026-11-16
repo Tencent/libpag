@@ -1689,7 +1689,7 @@ static SpringEasing ParseSpringEasing(const DOMNode* node, PAGXDocument* doc) {
     return spring;
   }
   if (bounce < MinSpringBounce || bounce > MaxSpringBounce) {
-    ReportError(doc, node, "springBounce must be within [-0.5, 0.9].");
+    ReportError(doc, node, "springBounce must be within [-0.5, 1].");
     return spring;
   }
   spring.bounce = bounce;

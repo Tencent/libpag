@@ -194,7 +194,7 @@ PAGX_TEST(PAGXImporterValidationTest, SpringMissingBounceRejected) {
 PAGX_TEST(PAGXImporterValidationTest, SpringOutOfRangeBounceRejected) {
   auto doc = ParseSpringKey("interpolation=\"spring\" springBounce=\"1.5\"");
   ASSERT_TRUE(doc != nullptr);
-  EXPECT_TRUE(HasError(doc, "springBounce must be within [-0.5, 0.9]"));
+  EXPECT_TRUE(HasError(doc, "springBounce must be within [-0.5, 1]"));
 }
 
 /**

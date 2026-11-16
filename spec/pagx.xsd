@@ -1143,7 +1143,7 @@
   <xs:simpleType name="SpringBounceType">
     <xs:restriction base="xs:decimal">
       <xs:minInclusive value="-0.5"/>
-      <xs:maxInclusive value="0.9"/>
+      <xs:maxInclusive value="1"/>
     </xs:restriction>
   </xs:simpleType>
 

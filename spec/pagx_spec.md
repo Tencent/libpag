@@ -2467,7 +2467,7 @@ A keyframe holds a property value at a specific time, together with how it trans
 | `interpolation` | KeyframeInterpolationType | `Linear` | How the value transitions to the next keyframe |
 | `bezierIn` | string | — | Cubic bezier ease-in control point, format `"x,y"`; only used in `Bezier` mode |
 | `bezierOut` | string | — | Cubic bezier ease-out control point, format `"x,y"`; only used in `Bezier` mode |
-| `springBounce` | decimal | — | Damping control in `[-0.5, 0.9]`; required in `Spring` mode. `0` is critically damped, positive values overshoot, negative values approach without overshooting |
+| `springBounce` | decimal | — | Damping control in `[-0.5, 1]`; required in `Spring` mode. Figma exposes `[0, 1]`; negative values are an overdamped extension. `0` is critically damped, positive values overshoot, negative values approach without overshooting |
 | `springModel` | string | `normalized-v1` | Parameter-to-curve mapping; only used in `Spring` mode |
 
 **ImageRef**: A special value for image-typed properties. It references an image resource by id, allowing keyframes to show different images at different times.
@@ -2591,7 +2591,7 @@ Type-specific attributes:
 | `interpolation` | KeyframeInterpolationType | `linear` | Crossfade weight interpolation curve |
 | `bezierOut` | string | — | Bezier ease-out handle, format `"x,y"` (only when `interpolation="bezier"`) |
 | `bezierIn` | string | — | Bezier ease-in handle, format `"x,y"` (only when `interpolation="bezier"`) |
-| `springBounce` | decimal | — | Damping control in `[-0.5, 0.9]`; required when `interpolation="spring"` |
+| `springBounce` | decimal | — | Damping control in `[-0.5, 1]`; required when `interpolation="spring"` |
 | `springModel` | string | `normalized-v1` | Spring parameter-to-curve mapping (only when `interpolation="spring"`) |
 | `earlyExit` | bool | false | If `true`, this transition may interrupt an in-progress crossfade |
 | `pauseOnExit` | bool | false | If `true`, the source state's animation freezes when the transition begins; otherwise it keeps advancing while fading out |

@@ -2457,7 +2457,7 @@ PAGX 动画系统由关键帧动画（Animation）和状态机（StateMachine）
 | `interpolation` | KeyframeInterpolationType | `Linear` | 当前关键帧到下一关键帧的插值方式 |
 | `bezierIn` | string | — | 三次贝塞尔缓入控制点，格式为 `"x,y"`，仅 `Bezier` 模式生效 |
 | `bezierOut` | string | — | 三次贝塞尔缓出控制点，格式为 `"x,y"`，仅 `Bezier` 模式生效 |
-| `springBounce` | decimal | — | 阻尼控制，范围 `[-0.5, 0.9]`；`Spring` 模式必填。`0` 为临界阻尼，正值过冲，负值不过冲 |
+| `springBounce` | decimal | — | 阻尼控制，范围 `[-0.5, 1]`；`Spring` 模式必填。Figma 仅暴露 `[0, 1]`，负值是过阻尼扩展。`0` 为临界阻尼，正值过冲，负值不过冲 |
 | `springModel` | string | `normalized-v1` | 弹簧参数到曲线的映射；仅 `Spring` 模式生效 |
 
 **ImageRef**：图片类型的特殊值，通过 id 引用图片资源，允许关键帧在不同时刻显示不同图片。
@@ -2581,7 +2581,7 @@ PAGX 状态机为需要根据运行时外部输入来控制时间线行为的场
 | `interpolation` | KeyframeInterpolationType | `linear` | 过渡/交叉淡入淡出 (crossfade)权重插值曲线 |
 | `bezierOut` | string | — | 贝塞尔缓出控制柄，格式 `"x,y"`（仅 `interpolation="bezier"` 时生效） |
 | `bezierIn` | string | — | 贝塞尔缓入控制柄，格式 `"x,y"`（仅 `interpolation="bezier"` 时生效） |
-| `springBounce` | decimal | — | 阻尼控制，范围 `[-0.5, 0.9]`；`interpolation="spring"` 时必填 |
+| `springBounce` | decimal | — | 阻尼控制，范围 `[-0.5, 1]`；`interpolation="spring"` 时必填 |
 | `springModel` | string | `normalized-v1` | 弹簧参数到曲线的映射（仅 `interpolation="spring"` 时生效） |
 | `earlyExit` | bool | false | 若为 `true`，此转换可中断正在进行的过渡/交叉淡入淡出 (crossfade) |
 | `pauseOnExit` | bool | false | 若为 `true`，源状态动画在转换开始时冻结；否则在淡出过程中继续播放 |

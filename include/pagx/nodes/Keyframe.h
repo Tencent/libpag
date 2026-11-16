@@ -79,12 +79,12 @@ enum class SpringEasingModel : uint8_t {
 };
 
 /**
- * The supported range of SpringEasing::bounce. The lower bound keeps the overdamped response from
- * becoming arbitrarily slow; the upper bound keeps the underdamped response from oscillating past
- * the point of visual usefulness.
+ * The supported range of SpringEasing::bounce. Figma exposes [0, 1]; negative values are an Ardot
+ * extension for overdamped springs. The lower bound keeps the overdamped response from becoming
+ * arbitrarily slow.
  */
 constexpr float MinSpringBounce = -0.5f;
-constexpr float MaxSpringBounce = 0.9f;
+constexpr float MaxSpringBounce = 1.0f;
 
 /**
  * SpringEasing holds the parameters of one spring-eased segment. The parameters belong to the

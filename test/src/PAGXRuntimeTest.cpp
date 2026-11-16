@@ -591,7 +591,7 @@ PAGX_TEST(PAGXRuntimeTest, EvaluateKeyframeSegmentBasic) {
  * bounces, and stays finite across the segment.
  */
 PAGX_TEST(PAGXRuntimeTest, SpringEasingEndpoints) {
-  const float bounces[] = {-0.5f, 0.0f, 0.5f, 0.9f};
+  const float bounces[] = {-0.5f, 0.0f, 0.5f, 0.9f, 1.0f};
   for (float bounce : bounces) {
     pagx::SpringEasing spring{bounce, pagx::SpringEasingModel::NormalizedV1};
     auto progress = [&](double t) {

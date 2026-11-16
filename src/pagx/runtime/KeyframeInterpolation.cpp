@@ -34,6 +34,10 @@ namespace {
 // e^(-(zeta - sqrt(zeta^2 - 1)) * omega) and the frequency is scaled by the inverse exponent.
 constexpr double SPRING_SETTLE_DECAY = 6.638;
 
+// Bounce 1 maps to a damping ratio of zero, which never settles. Keep the response finite and the
+// endpoint normalization meaningful by flooring the damping ratio.
+constexpr double MIN_SPRING_DAMPING_RATIO = 0.05;
+
 double ClampBounce(float bounce) {
   if (!std::isfinite(bounce)) {
     return 0.0;
@@ -79,7 +83,7 @@ double SolveSpringEasing(const SpringEasing& spring, double progress) {
   if (progress >= 1.0) {
     return 1.0;
   }
-  double zeta = 1.0 - ClampBounce(spring.bounce);
+  double zeta = std::max(1.0 - ClampBounce(spring.bounce), MIN_SPRING_DAMPING_RATIO);
   double omega = SpringNaturalFrequency(zeta);
   // Endpoint normalization pins e(0) = 0 and e(1) = 1 exactly while preserving the overshoot of
   // the raw response between them.
