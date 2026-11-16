@@ -64,7 +64,10 @@ const VideoFormatSpec kVideoFormats[] = {
     {"mp4", "mp4", "libx264", "yuv420p", true, true},
 };
 
-bool IsExecutableFile(const std::string& path) {
+// Takes a std::filesystem::path so callers can pass a path assembled with operator/.
+// On Windows path::string_type is std::wstring, so a path cannot be converted to std::string
+// implicitly and the previous std::string overload failed to compile there.
+bool IsExecutableFile(const std::filesystem::path& path) {
   std::error_code ec;
   if (!std::filesystem::is_regular_file(path, ec) || ec) {
     return false;
