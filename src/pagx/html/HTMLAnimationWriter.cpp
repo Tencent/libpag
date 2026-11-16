@@ -197,7 +197,7 @@ void CollectMaskPaths(const Layer* maskLayer, Layer* hostLayer,
 
 // Collects what a single layer contributes on its own: its element painters, its animation filters,
 // the paths of its mask subtree and the offsets of the timelines it mounts.
-void IndexLayerContents(Layer* layer, DocumentIndex& index) {
+void IndexLayerContents(Layer* layer, DocumentIndex& index, bool insideComposition) {
   IndexElements(layer->contents, index.solidToPainter);
   for (auto* filter : layer->filters) {
     if (filter != nullptr) {
@@ -211,7 +211,13 @@ void IndexLayerContents(Layer* layer, DocumentIndex& index) {
     if (tl != nullptr && tl->timelineType() == TimelineType::Animation) {
       auto* animTl = static_cast<const AnimationTimeline*>(tl.get());
       std::string id = StripAtPrefix(animTl->animationId);
-      if (!id.empty() && animTl->evaluationOffset != 0) {
+      // The offset is applied by the playback that owns a pre-composition: measured on
+      // boundary/03, a root-level layer mounting a root animation renders identically with
+      // evaluationOffset 0, 15 and 30, so emitting it as a CSS delay put the whole channel 30
+      // frames late. A composition instance (and anything inside one) does honour it, which is
+      // what timing/04-08 measure.
+      bool offsetApplies = layer->composition != nullptr || insideComposition;
+      if (!id.empty() && animTl->evaluationOffset != 0 && offsetApplies) {
         index.timelineOffsets[id] = animTl->evaluationOffset;
       }
     }
@@ -222,17 +228,19 @@ void IndexLayerContents(Layer* layer, DocumentIndex& index) {
 // time it is reached: siblings can mount the same source Composition.
 void IndexLayerTree(const std::vector<Layer*>& layers, DocumentIndex& index,
                     std::unordered_set<const Animation*>& seenAnimations,
-                    std::unordered_set<const Composition*>& visitedCompositions) {
+                    std::unordered_set<const Composition*>& visitedCompositions,
+                    bool insideComposition) {
   for (auto* layer : layers) {
     if (layer == nullptr) {
       continue;
     }
-    IndexLayerContents(layer, index);
+    IndexLayerContents(layer, index, insideComposition);
     if (layer->composition != nullptr && visitedCompositions.insert(layer->composition).second) {
       AppendPlayableAnimations(layer->composition->animations, index, seenAnimations);
-      IndexLayerTree(layer->composition->layers, index, seenAnimations, visitedCompositions);
+      IndexLayerTree(layer->composition->layers, index, seenAnimations, visitedCompositions, true);
     }
-    IndexLayerTree(layer->children, index, seenAnimations, visitedCompositions);
+    IndexLayerTree(layer->children, index, seenAnimations, visitedCompositions,
+                   insideComposition || layer->composition != nullptr);
   }
 }
 
@@ -242,7 +250,7 @@ DocumentIndex BuildDocumentIndex(const PAGXDocument& doc) {
   std::unordered_set<const Animation*> seenAnimations = {};
   AppendPlayableAnimations(doc.animations, index, seenAnimations);
   std::unordered_set<const Composition*> visitedCompositions = {};
-  IndexLayerTree(doc.layers, index, seenAnimations, visitedCompositions);
+  IndexLayerTree(doc.layers, index, seenAnimations, visitedCompositions, false);
   return index;
 }
 

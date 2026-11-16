@@ -3451,16 +3451,19 @@ CLI_TEST(PAGXHtmlTest, AnimationLoopModesAndDelay) {
   auto html = LoadXMLAndConvert(xml, opts);
   ASSERT_FALSE(html.empty());
 
+  // A root-level layer mounting a root animation ignores evaluationOffset (measured: the same
+  // picture at offset 0, 15 and 30), so only the key window shifts: key 30 lands at 0.5s, the
+  // 30..120 span becomes the 1.5s duration, and the 0% stop holds the first key's value.
   EXPECT_NE(html.find("@keyframes pagx_onceBox_0 {\n"
                       "  0% { opacity: 0.2; }\n"
-                      "  25% { opacity: 0.2; }\n"
                       "  100% { opacity: 1; }\n"
                       "}"),
-            std::string::npos);
+            std::string::npos)
+      << html;
 
   auto onceTag = FindTagContaining(html, "id=\"onceBox\"");
   ASSERT_FALSE(onceTag.empty());
-  EXPECT_NE(onceTag.find("2s linear 0.5s 1 both"), std::string::npos);
+  EXPECT_NE(onceTag.find("1.5s linear 0.5s 1 both"), std::string::npos) << onceTag;
 
   auto pongTag = FindTagContaining(html, "id=\"pongBox\"");
   ASSERT_FALSE(pongTag.empty());
