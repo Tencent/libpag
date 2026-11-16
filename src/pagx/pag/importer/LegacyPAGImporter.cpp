@@ -726,6 +726,17 @@ void ConvertShapeElement(ConvertState* state, pag::ShapeElement* element,
       stroke->color = solid;
       stroke->alpha = PropertyValueAtStart(legacy->opacity, startFrame, nullptr) / 255.0f;
       stroke->width = PropertyValueAtStart(legacy->strokeWidth, startFrame, nullptr);
+      // Dash pattern, cap, join and miter limit complete the stroke style; the enums share
+      // their order across the legacy and PAGX definitions.
+      for (auto* dash : legacy->dashes) {
+        stroke->dashes.push_back(PropertyValueAtStart(dash, startFrame, nullptr));
+      }
+      stroke->dashOffset = PropertyValueAtStart(legacy->dashOffset, startFrame, nullptr);
+      stroke->cap = static_cast<LineCap>(static_cast<int>(legacy->lineCap));
+      stroke->join = static_cast<LineJoin>(static_cast<int>(legacy->lineJoin));
+      if (legacy->miterLimit != nullptr) {
+        stroke->miterLimit = PropertyValueAtStart(legacy->miterLimit, startFrame, nullptr);
+      }
       contents->push_back(stroke);
       break;
     }
