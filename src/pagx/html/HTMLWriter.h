@@ -776,6 +776,11 @@ class HTMLWriter {
   // are emitted inside the TextBox container instead of as stand-alone DOM wrappers.
   void renderTextBoxAsRichText(HTMLBuilder& out, const TextBox* tb,
                                const std::vector<RichTextSpan>& richTextSpans);
+  // Appends the group half of a TextBox container style: the transform (the TextBox's group matrix
+  // plus any placement translate the caller already needs) and the node alpha. Shared by both
+  // TextBox emission paths so they cannot drift apart.
+  void appendTextBoxContainerStyle(std::string& style, const TextBox* tb,
+                                   const std::string& extraTransform);
   // Flattens a Group's elements into inline geometry and painters. Saves the current
   // fill/stroke/trim/merge/textPath/textModifier state at entry and restores it on exit, so
   // the Group defines its own element scope. The `state` parameter is mutated during traversal
