@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include <dirent.h>
+#include <algorithm>
 #include <cmath>
 #include <cstdio>
 #include <string>
@@ -30,6 +31,7 @@
 #include "pagx/PAGScene.h"
 #include "pagx/PAGSurface.h"
 #include "pagx/PAGXDocument.h"
+#include "pagx/PAGXExporter.h"
 #include "utils/ProjectPath.h"
 
 namespace {
@@ -45,6 +47,100 @@ constexpr float kMaxFrameSize = 360.0f;
 // First-pass sampling cap (spec C34's full sweep lands once the pipeline converges): at most
 // this many frames per sample, evenly spaced across the duration.
 constexpr int kMaxFramesPerSample = 6;
+
+template <typename T>
+int LegacyKeyframeCount(pag::Property<T>* property) {
+  if (property == nullptr) {
+    return 0;
+  }
+  auto* animatable = dynamic_cast<pag::AnimatableProperty<T>*>(property);
+  return animatable != nullptr ? static_cast<int>(animatable->keyframes.size()) : 0;
+}
+
+void DumpLegacyLayerTree(pag::Layer* layer, int depth, FILE* out) {
+  if (layer == nullptr || out == nullptr) {
+    return;
+  }
+  auto indent = std::string(static_cast<size_t>(depth) * 2, ' ');
+  fprintf(out, "%sLAYER type=%d name=%s startTime=%lld active=%d", indent.c_str(),
+          static_cast<int>(layer->type()), layer->name.c_str(),
+          static_cast<long long>(layer->startTime), layer->isActive ? 1 : 0);
+  if (layer->transform != nullptr) {
+    fprintf(out, " tx[pos=%d scale=%d rot=%d opacity=%d]",
+            LegacyKeyframeCount(layer->transform->position),
+            LegacyKeyframeCount(layer->transform->scale),
+            LegacyKeyframeCount(layer->transform->rotation),
+            LegacyKeyframeCount(layer->transform->opacity));
+  }
+  fprintf(out, "\n");
+  for (auto* mask : layer->masks) {
+    if (mask == nullptr) {
+      continue;
+    }
+    auto* animPath = dynamic_cast<pag::AnimatableProperty<pag::PathHandle>*>(mask->maskPath);
+    fprintf(out, "%s  MASK mode=%d inverted=%d pathKeyframes=%d", indent.c_str(),
+            static_cast<int>(mask->maskMode), mask->inverted ? 1 : 0,
+            animPath != nullptr ? static_cast<int>(animPath->keyframes.size()) : 0);
+    if (animPath != nullptr && !animPath->keyframes.empty()) {
+      fprintf(out, " firstKey=%lld lastKey=%lld",
+              static_cast<long long>(animPath->keyframes.front()->startTime),
+              static_cast<long long>(animPath->keyframes.back()->startTime));
+      for (auto* key : animPath->keyframes) {
+        auto describe = [out](const pag::PathData* pathData) {
+          if (pathData == nullptr || pathData->points.empty()) {
+            fprintf(out, "EMPTY");
+            return;
+          }
+          auto minX = pathData->points[0].x;
+          auto maxX = pathData->points[0].x;
+          auto minY = pathData->points[0].y;
+          auto maxY = pathData->points[0].y;
+          for (auto& pt : pathData->points) {
+            minX = std::min(minX, pt.x);
+            maxX = std::max(maxX, pt.x);
+            minY = std::min(minY, pt.y);
+            maxY = std::max(maxY, pt.y);
+          }
+          fprintf(out, "%zupts(%.0f,%.0f)-(%.0f,%.0f)", pathData->points.size(), minX, minY, maxX,
+                  maxY);
+        };
+        fprintf(out, " key[%lld..%lld] int=%d start=", static_cast<long long>(key->startTime),
+                static_cast<long long>(key->endTime), static_cast<int>(key->interpolationType));
+        describe(key->startValue.get());
+        fprintf(out, " end=");
+        describe(key->endValue.get());
+      }
+    }
+    auto* animFeather = dynamic_cast<pag::AnimatableProperty<pag::Point>*>(mask->maskFeather);
+    auto* animExpansion = dynamic_cast<pag::AnimatableProperty<float>*>(mask->maskExpansion);
+    auto* animOpacity = dynamic_cast<pag::AnimatableProperty<pag::Opacity>*>(mask->maskOpacity);
+    fprintf(out, " featherKeys=%d expansionKeys=%d opacityKeys=%d",
+            animFeather != nullptr ? static_cast<int>(animFeather->keyframes.size()) : 0,
+            animExpansion != nullptr ? static_cast<int>(animExpansion->keyframes.size()) : 0,
+            animOpacity != nullptr ? static_cast<int>(animOpacity->keyframes.size()) : 0);
+    if (animExpansion != nullptr && !animExpansion->keyframes.empty()) {
+      fprintf(out, " expansion=[%.2f..%.2f] keys=%lld..%lld",
+              static_cast<double>(animExpansion->keyframes.front()->startValue),
+              static_cast<double>(animExpansion->keyframes.back()->endValue),
+              static_cast<long long>(animExpansion->keyframes.front()->startTime),
+              static_cast<long long>(animExpansion->keyframes.back()->startTime));
+    }
+    fprintf(out, "\n");
+  }
+  if (layer->type() == pag::LayerType::PreCompose) {
+    auto* preCompose = static_cast<pag::PreComposeLayer*>(layer);
+    auto* vectorComp = dynamic_cast<pag::VectorComposition*>(preCompose->composition);
+    if (vectorComp != nullptr) {
+      fprintf(out, "%s  COMP id=%lld size=%dx%d duration=%lld frameRate=%.3f\n", indent.c_str(),
+              static_cast<long long>(vectorComp->id), static_cast<int>(vectorComp->width),
+              static_cast<int>(vectorComp->height), static_cast<long long>(vectorComp->duration),
+              vectorComp->frameRate);
+      for (auto* child : vectorComp->layers) {
+        DumpLegacyLayerTree(child, depth + 1, out);
+      }
+    }
+  }
+}
 
 struct SampleResult {
   std::string path;
@@ -165,6 +261,35 @@ void CompareSample(const std::string& path, SampleResult* result) {
   if (doc == nullptr) {
     result->error = "conversion failed";
     return;
+  }
+  // PAG_DUMP_EQ_XML writes each migrated document's XML into the given directory (file name
+  // filtered by PAG_DUMP_EQ_FILTER), so migration gaps can be inspected without a debugger.
+  // No effect on normal runs.
+  auto xmlDir = getenv("PAG_DUMP_EQ_XML");
+  if (xmlDir != nullptr) {
+    auto xmlFilter = getenv("PAG_DUMP_EQ_FILTER");
+    std::string xmlFilterStr = xmlFilter != nullptr ? xmlFilter : "";
+    if (xmlFilterStr.empty() || result->fileName.find(xmlFilterStr) != std::string::npos) {
+      auto safeName = result->fileName;
+      for (auto& ch : safeName) {
+        if (ch == '/') ch = '_';
+      }
+      auto xmlPath = std::string(xmlDir) + "/" + safeName + ".xml";
+      auto xmlFile = fopen(xmlPath.c_str(), "wb");
+      if (xmlFile != nullptr) {
+        auto xml = pagx::PAGXExporter::ToXML(*doc);
+        fwrite(xml.data(), 1, xml.size(), xmlFile);
+        fclose(xmlFile);
+      }
+      // Companion legacy-structure dump (.legacy.txt): the layer tree with masks and mask path
+      // keyframes, so migration gaps can be mapped back to the legacy features that produce them.
+      auto legacyPath = std::string(xmlDir) + "/" + safeName + ".legacy.txt";
+      auto legacyFile = fopen(legacyPath.c_str(), "wb");
+      if (legacyFile != nullptr) {
+        DumpLegacyLayerTree(rawFile->rootLayer, 0, legacyFile);
+        fclose(legacyFile);
+      }
+    }
   }
   auto scene = pagx::PAGScene::Make(doc);
   if (scene == nullptr) {

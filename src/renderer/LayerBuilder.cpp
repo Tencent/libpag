@@ -52,6 +52,7 @@
 #include "pagx/nodes/Layer.h"
 #include "pagx/nodes/LevelsIndividualFilter.h"
 #include "pagx/nodes/LinearGradient.h"
+#include "pagx/nodes/MaskPath.h"
 #include "pagx/nodes/MergePath.h"
 #include "pagx/nodes/MosaicFilter.h"
 #include "pagx/nodes/MotionTileFilter.h"
@@ -104,6 +105,7 @@
 #include "renderer/RadialBlurLayerFilter.h"
 #include "renderer/StrokeLayerFilter.h"
 #include "renderer/TextHolder.h"
+#include "rendering/utils/PathUtil.h"
 #include "tgfx/core/ColorSpace.h"
 #include "tgfx/core/CustomTypeface.h"
 #include "tgfx/core/Data.h"
@@ -117,6 +119,8 @@
 #include "tgfx/layers/LayerMaskType.h"
 #include "tgfx/layers/LayerPaint.h"
 #include "tgfx/layers/LayerType.h"
+#include "tgfx/layers/ShapeLayer.h"
+#include "tgfx/layers/ShapeStyle.h"
 #include "tgfx/layers/StrokeAlign.h"
 #include "tgfx/layers/VectorLayer.h"
 #include "tgfx/layers/filters/BlendFilter.h"
@@ -400,6 +404,25 @@ struct PathRuntimeTarget : RuntimeTarget {
   float scale = 1.0f;
 
   bool apply(const std::string& channel, const KeyValue& value, float mix) override {
+    if (channel == "data") {
+      // Whole-path channel (spec 6.1): the evaluated PathData replaces the geometry. The value
+      // may be the evaluator's thread-local interpolation scratch, so copy the verbs and points
+      // out synchronously. Hold keyframes can switch structures, so the verb list is replaced
+      // as well; mixing is not defined for whole paths and applies the value directly.
+      (void)mix;
+      const auto* v = std::get_if<PathData*>(&value);
+      if (v == nullptr || *v == nullptr) {
+        return true;
+      }
+      verbs = (*v)->verbs();
+      points.clear();
+      points.reserve((*v)->countPoints());
+      for (const auto& p : (*v)->points()) {
+        points.push_back(tgfx::Point::Make(p.x, p.y));
+      }
+      rebuild();
+      return true;
+    }
     size_t index = 0;
     bool isX = false;
     if (ParsePointChannel(channel, index, isX)) {
@@ -419,6 +442,9 @@ struct PathRuntimeTarget : RuntimeTarget {
   }
 
   bool hasWriter(const std::string& channel) const override {
+    if (channel == "data") {
+      return true;
+    }
     size_t index = 0;
     bool isX = false;
     if (ParsePointChannel(channel, index, isX)) {
@@ -494,6 +520,125 @@ struct PathRuntimeTarget : RuntimeTarget {
     if (shapePath != nullptr) {
       shapePath->setPath(std::move(path));
     }
+  }
+};
+
+// Whole-path layer masks (spec 7.6): a layer's MaskPath list combines into ONE path with the
+// legacy RenderMasks semantics - the first usable mask seeds the combined path (a leading
+// Subtract mode flips its inversion), every subsequent mask merges through its mode's path op,
+// and expansion grows or shrinks the shape - and the result clips the layer through a tgfx
+// ShapeLayer mask. The mask layer draws a single opaque-filled combined path, so tgfx's
+// MaskContext extracts it as a direct clipPath (no offscreen pass), matching the legacy
+// recorder's saveClip. Each MaskPath node gets one runtime target updating its slot in the
+// shared state; any "path" channel application rebuilds the combined geometry.
+struct PathMaskRuntimeTarget : RuntimeTarget {
+  struct SharedState {
+    struct Entry {
+      MaskPath* node = nullptr;
+      // Owned copy of the entry's current geometry. The evaluated PathData value may be the
+      // evaluator's thread-local interpolation scratch, which the NEXT channel application
+      // overwrites - storing the pointer would alias every entry onto the last evaluation, so
+      // the tgfx conversion happens eagerly here.
+      tgfx::Path currentPath = {};
+    };
+    std::vector<Entry> entries = {};
+    // Kept alive so late channel applications (the layer may outlive the build context) still
+    // have a mask layer to update.
+    std::shared_ptr<tgfx::ShapeLayer> maskLayer = nullptr;
+
+    // Mirrors pag::RenderMasks: returns false when no usable mask remains (every entry skipped),
+    // which maps to an inverse-empty clip (everything visible), matching the legacy behavior
+    // where an empty combined mask means "no masking at all".
+    void rebuild() {
+      tgfx::Path combined = {};
+      bool isFirst = true;
+      for (auto& entry : entries) {
+        auto* maskPath = entry.node;
+        if (maskPath == nullptr || maskPath->maskMode == MaskMode::None) {
+          continue;
+        }
+        auto path = entry.currentPath;
+        if (path.isEmpty()) {
+          continue;
+        }
+        pag::ExpandPath(&path, maskPath->expansion);
+        auto inverted = maskPath->inverted;
+        if (isFirst && maskPath->maskMode == MaskMode::Subtract) {
+          inverted = !inverted;
+        }
+        if (inverted) {
+          path.toggleInverseFillType();
+        }
+        if (isFirst) {
+          isFirst = false;
+          combined = path;
+        } else {
+          combined.addPath(
+              path,
+              pag::ToPathOp(static_cast<pag::MaskMode>(static_cast<int>(maskPath->maskMode))));
+        }
+      }
+      if (isFirst) {
+        tgfx::Path everything = {};
+        everything.toggleInverseFillType();
+        combined = everything;
+      }
+      if (combined.isInverseFillType()) {
+        // Materialize the unbounded complement into a concrete region: the mask renders through
+        // a picture whose extent comes from the path's control points, so an inverse fill would
+        // be rasterized only within the shape's own bounds and the complement outside them
+        // (usually most of the canvas) would drop out, hiding the target. Intersecting with a
+        // generous rect gives the complement real extent; the exact legacy behavior (an
+        // unbounded clip) is indistinguishable inside any sane content bounds.
+        tgfx::Path boundsPath = {};
+        boundsPath.addRect(tgfx::Rect::MakeLTRB(-100000.0f, -100000.0f, 100000.0f, 100000.0f));
+        boundsPath.addPath(combined, tgfx::PathOp::Intersect);
+        combined = boundsPath;
+      }
+      if (maskLayer != nullptr) {
+        maskLayer->setPath(std::move(combined));
+      }
+    }
+
+    // Mirrors pag::RenderMasks' usability gate: open or empty shapes contribute nothing. The
+    // closedness check reads the PAGX PathData (tgfx::Path exposes no verb inspection), so it
+    // runs at conversion time and unusable entries store an empty path.
+    static tgfx::Path ConvertUsablePath(const PathData* pathData) {
+      if (pathData == nullptr || pathData->isEmpty()) {
+        return {};
+      }
+      const auto& verbs = pathData->verbs();
+      if (verbs.empty() || verbs.back() != PathVerb::Close) {
+        return {};
+      }
+      return ToTGFX(*pathData);
+    }
+  };
+
+  std::shared_ptr<SharedState> state = nullptr;
+  size_t slot = 0;
+
+  bool apply(const std::string& channel, const KeyValue& value, float mix) override {
+    if (channel == "path" && state != nullptr && slot < state->entries.size()) {
+      // Whole-path values may be the evaluator's thread-local interpolation scratch; converting
+      // to tgfx here copies the data out before the next evaluation reuses the scratch.
+      (void)mix;
+      const auto* v = std::get_if<PathData*>(&value);
+      if (v == nullptr) {
+        return true;
+      }
+      state->entries[slot].currentPath = SharedState::ConvertUsablePath(*v);
+      state->rebuild();
+      return true;
+    }
+    return RuntimeTarget::apply(channel, value, mix);
+  }
+
+  bool hasWriter(const std::string& channel) const override {
+    if (channel == "path") {
+      return true;
+    }
+    return RuntimeTarget::hasWriter(channel);
   }
 };
 
@@ -811,9 +956,14 @@ class LayerBuilderContext {
       }
     }
     // Detach and unbind children whose source node was removed from node->children. Iterate a copy
-    // since removeFromParent mutates the parent's child list.
+    // since removeFromParent mutates the parent's child list. The whole-path mask layer attached
+    // via setMask is runtime-owned (not a document child) and stays.
+    auto ownedMask = parentLayer->mask();
     auto tgfxChildren = parentLayer->children();
     for (const auto& tgfxChild : tgfxChildren) {
+      if (ownedMask != nullptr && tgfxChild == ownedMask) {
+        continue;
+      }
       if (kept.find(tgfxChild.get()) == kept.end()) {
         unbindSubtree(tgfxChild.get());
         tgfxChild->removeFromParent();
@@ -1179,6 +1329,13 @@ class LayerBuilderContext {
       if (node->mask != nullptr) {
         _pendingMasks.emplace_back(layer, node->mask, ToTGFXMaskType(node->maskType));
       }
+      // Whole-path layer masks (spec 7.6) attach directly: the combined clip path is
+      // self-contained (no cross-layer references), so unlike track mattes it needs no second
+      // pass. A layer with BOTH a track-matte reference and mask paths keeps the matte (the
+      // single tgfx mask slot cannot express both; the corpus has no such layer yet).
+      if (!node->maskPaths.empty() && node->mask == nullptr) {
+        attachPathMask(layer.get(), node);
+      }
 
       for (const auto& child : node->children) {
         auto childLayer = convertLayer(child);
@@ -1245,6 +1402,44 @@ class LayerBuilderContext {
                                 ReadBoolean<tgfx::Layer, &tgfx::Layer::visible>);
     _result.binding.setAccessor(node, "blendMode", WriteLayerBlendMode, ReadLayerBlendMode);
     _result.binding.setAccessor(node, "name", WriteLayerName, ReadLayerName);
+  }
+
+  // Builds the whole-path mask for a layer's MaskPath list (spec 7.6): one opaque-filled
+  // ShapeLayer whose path is the legacy-style combination of every entry, attached as the
+  // target layer's Alpha mask. The opaque single-path mask lets tgfx's MaskContext collapse it
+  // into a direct clipPath, replicating the legacy recorder's saveClip without an offscreen
+  // pass. Per-MaskPath runtime targets keep the combined path live when "path" channels animate
+  // (mask coordinates live in the layer's local content space, the space tgfx evaluates a mask
+  // with no relative transform in, matching the legacy clip-then-transform order).
+  void attachPathMask(tgfx::Layer* target, const Layer* node) {
+    if (target == nullptr) {
+      return;
+    }
+    auto state = std::make_shared<PathMaskRuntimeTarget::SharedState>();
+    auto maskLayer = tgfx::ShapeLayer::Make();
+    // Opaque white: the mask only reads coverage, and MaskContext's clip extraction requires an
+    // opaque brush.
+    maskLayer->setFillStyle(tgfx::ShapeStyle::Make(tgfx::Color::White()));
+    state->maskLayer = maskLayer;
+    for (auto* maskPath : node->maskPaths) {
+      if (maskPath == nullptr) {
+        continue;
+      }
+      PathMaskRuntimeTarget::SharedState::Entry entry = {};
+      entry.node = maskPath;
+      entry.currentPath = PathMaskRuntimeTarget::SharedState::ConvertUsablePath(maskPath->path);
+      state->entries.push_back(entry);
+      auto pathTarget = std::unique_ptr<PathMaskRuntimeTarget>(new PathMaskRuntimeTarget());
+      pathTarget->state = state;
+      pathTarget->slot = state->entries.size() - 1;
+      _result.binding.setTarget(maskPath, std::move(pathTarget));
+    }
+    state->rebuild();
+    // The mask layer joins the target's subtree so both share a root (tgfx hasValidMask rejects
+    // detached masks); setMask marks it maskOwner, which hides it from drawing and bounds.
+    target->addChild(maskLayer);
+    target->setMask(maskLayer);
+    target->setMaskType(tgfx::LayerMaskType::Alpha);
   }
 
   // Converts a Composition slot. The base (static) build expands the composition's layers in place

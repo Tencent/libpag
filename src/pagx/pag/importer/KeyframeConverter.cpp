@@ -34,6 +34,7 @@
 #include "pagx/nodes/AnimationObject.h"
 #include "pagx/nodes/Channel.h"
 #include "pagx/nodes/Keyframe.h"
+#include "pagx/nodes/PathData.h"
 #include "pagx/nodes/StrokeLayerStyle.h"
 
 namespace pagx {
@@ -54,8 +55,9 @@ KeyframeInterpolationType ConvertInterpolation(pag::KeyframeInterpolationType ty
 }
 
 // Copies the first dimension's easing handles onto the new keyframe.
+template <typename T>
 void ConvertEase(const std::vector<pag::Point>& bezierOut, const std::vector<pag::Point>& bezierIn,
-                 Keyframe<float>* out) {
+                 Keyframe<T>* out) {
   if (!bezierOut.empty()) {
     out->bezierOut = {bezierOut[0].x, bezierOut[0].y};
   }
@@ -201,6 +203,94 @@ void ConvertPointChannel(pag::Property<pag::Point>* legacy, const std::string& b
 }
 
 }  // namespace
+
+// Copies a legacy PathData (verbs + points) into a PAGX PathData document node. Shared by the
+// importer's static path conversion and the path channel keyframe migration below.
+PathData* ConvertLegacyPathData(PAGXDocument* document, const pag::PathData& legacyData,
+                                const std::string& id) {
+  auto* data = document->makeNode<PathData>(id);
+  size_t pointIndex = 0;
+  const auto& points = legacyData.points;
+  for (auto verb : legacyData.verbs) {
+    switch (verb) {
+      case pag::PathDataVerb::MoveTo:
+        if (pointIndex < points.size()) {
+          data->moveTo(points[pointIndex].x, points[pointIndex].y);
+          pointIndex++;
+        }
+        break;
+      case pag::PathDataVerb::LineTo:
+        if (pointIndex < points.size()) {
+          data->lineTo(points[pointIndex].x, points[pointIndex].y);
+          pointIndex++;
+        }
+        break;
+      case pag::PathDataVerb::CurveTo:
+        if (pointIndex + 2 < points.size()) {
+          data->cubicTo(points[pointIndex].x, points[pointIndex].y, points[pointIndex + 1].x,
+                        points[pointIndex + 1].y, points[pointIndex + 2].x,
+                        points[pointIndex + 2].y);
+          pointIndex += 3;
+        }
+        break;
+      case pag::PathDataVerb::Close:
+        data->close();
+        break;
+    }
+  }
+  return data;
+}
+
+// Path-valued channels (spec 6.1): a legacy path property (mask paths, shape outlines) holds
+// keyframe SEGMENTS interpolating startValue to endValue with bezier time easing, and the value
+// interpolation is point-by-point (PathData::Interpolate). Each segment start becomes one PAGX
+// keyframe carrying the eased handles, and the final segment end appends a closing keyframe so
+// later times clamp to the end shape. Key times copy over RAW: the legacy FrameCache evaluates
+// layer properties at clampedContentFrame + startTime, i.e. the containing composition's
+// absolute clock, which is exactly the PAGX composition animation's base.
+void MigratePathDataChannel(pag::Property<pag::PathHandle>* legacy, const std::string& channelName,
+                            const std::string& idPrefix, PAGXDocument* document,
+                            AnimationObject* object) {
+  auto* animatable = dynamic_cast<pag::AnimatableProperty<pag::PathHandle>*>(legacy);
+  if (animatable == nullptr || animatable->keyframes.empty()) {
+    return;
+  }
+  auto* channel = document->makeNode<TypedChannel<PathData*>>();
+  channel->name = channelName;
+  auto keyIndex = 0;
+  for (auto* legacyKeyframe : animatable->keyframes) {
+    // Null path values have no XML form (the value serializes as an @id reference), so they
+    // drop out; the legacy codec always stores a real (possibly empty) PathData instead.
+    if (legacyKeyframe->startValue == nullptr) {
+      continue;
+    }
+    Keyframe<PathData*> keyframe = {};
+    keyframe.time = legacyKeyframe->startTime;
+    keyframe.value = ConvertLegacyPathData(document, *legacyKeyframe->startValue,
+                                           idPrefix + "-key-" + std::to_string(keyIndex));
+    keyIndex++;
+    keyframe.interpolation = ConvertInterpolation(legacyKeyframe->interpolationType);
+    ConvertEase(legacyKeyframe->bezierOut, legacyKeyframe->bezierIn, &keyframe);
+    channel->keyframes.push_back(keyframe);
+  }
+  auto* last = animatable->keyframes.back();
+  if (last->endTime > last->startTime && last->endValue != nullptr) {
+    Keyframe<PathData*> keyframe = {};
+    keyframe.time = last->endTime;
+    keyframe.value = ConvertLegacyPathData(document, *last->endValue,
+                                           idPrefix + "-key-" + std::to_string(keyIndex));
+    keyframe.interpolation = ConvertInterpolation(last->interpolationType);
+    // The closing key's bezierIn participates in the FINAL segment's easing (PAGX pairs the
+    // left key's out handle with the right key's in handle), so it copies the last legacy
+    // keyframe's in handle - the same handle the legacy SingleEaseKeyframe easing consumed.
+    ConvertEase(last->bezierOut, last->bezierIn, &keyframe);
+    channel->keyframes.push_back(keyframe);
+  }
+  if (channel->keyframes.empty()) {
+    return;
+  }
+  object->channels.push_back(channel);
+}
 
 // Position keyframes: the spatial point maps to two scalar channels "x" and "y", sampled
 // per frame when the legacy property carries spatial handles.

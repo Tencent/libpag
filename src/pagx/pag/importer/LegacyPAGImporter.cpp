@@ -44,6 +44,7 @@
 #include "pagx/nodes/Layer.h"
 #include "pagx/nodes/LevelsIndividualFilter.h"
 #include "pagx/nodes/LinearGradient.h"
+#include "pagx/nodes/MaskPath.h"
 #include "pagx/nodes/MergePath.h"
 #include "pagx/nodes/MosaicFilter.h"
 #include "pagx/nodes/MotionTileFilter.h"
@@ -111,6 +112,11 @@ void MigrateOuterGlowStyleAnimation(pag::OuterGlowStyle* style, float frameRate,
                                     PAGXDocument* document, AnimationObject* object);
 void MigrateStrokeStyleAnimation(pag::StrokeStyle* style, float frameRate, PAGXDocument* document,
                                  AnimationObject* object);
+PathData* ConvertLegacyPathData(PAGXDocument* document, const pag::PathData& legacyData,
+                                const std::string& id = "");
+void MigratePathDataChannel(pag::Property<pag::PathHandle>* legacy, const std::string& channelName,
+                            const std::string& idPrefix, PAGXDocument* document,
+                            AnimationObject* object);
 
 namespace {
 
@@ -162,6 +168,9 @@ struct ConvertState {
   Composition* currentComposition = nullptr;
   int textIdCounter = 0;
   int imageIdCounter = 0;
+  // Shape elements with animated paths get targetable ids (the Path node carries the "data"
+  // channel, spec 6.1) drawn from this deterministic counter.
+  int shapePathIdCounter = 0;
   // Displacement map references waiting for the map layer's node to convert (resolved in the
   // composition post-pass, like the track mattes).
   std::vector<std::pair<DisplacementMapFilter*, pag::Layer*>> pendingDisplacementMaps = {};
@@ -196,37 +205,7 @@ T PropertyValueAtStart(pag::Property<T>* property, pag::Frame startFrame, bool* 
 
 // Copies a legacy PathData (verbs + points) into a freshly created PAGX PathData node.
 PathData* ConvertPathData(ConvertState* state, const pag::PathData& legacyData) {
-  auto* data = state->document->makeNode<PathData>();
-  size_t pointIndex = 0;
-  const auto& points = legacyData.points;
-  for (auto verb : legacyData.verbs) {
-    switch (verb) {
-      case pag::PathDataVerb::MoveTo:
-        if (pointIndex + 1 < points.size() + 1 && pointIndex < points.size()) {
-          data->moveTo(points[pointIndex].x, points[pointIndex].y);
-          pointIndex++;
-        }
-        break;
-      case pag::PathDataVerb::LineTo:
-        if (pointIndex < points.size()) {
-          data->lineTo(points[pointIndex].x, points[pointIndex].y);
-          pointIndex++;
-        }
-        break;
-      case pag::PathDataVerb::CurveTo:
-        if (pointIndex + 2 < points.size() + 1 && pointIndex + 2 <= points.size()) {
-          data->cubicTo(points[pointIndex].x, points[pointIndex].y, points[pointIndex + 1].x,
-                        points[pointIndex + 1].y, points[pointIndex + 2].x,
-                        points[pointIndex + 2].y);
-          pointIndex += 3;
-        }
-        break;
-      case pag::PathDataVerb::Close:
-        data->close();
-        break;
-    }
-  }
-  return data;
+  return ConvertLegacyPathData(state->document, legacyData);
 }
 
 // Converts one legacy color (0-255 components) to the PAGX Color (0-1 floats).
@@ -696,11 +675,26 @@ void ConvertShapeElement(ConvertState* state, pag::ShapeElement* element,
     }
     case pag::ShapeType::ShapePath: {
       auto* legacy = static_cast<pag::ShapePathElement*>(element);
-      auto handle = PropertyValueAtStart(legacy->shapePath, startFrame, nullptr);
+      bool pathAnimated = false;
+      auto handle = PropertyValueAtStart(legacy->shapePath, startFrame, &pathAnimated);
       if (handle != nullptr) {
-        auto* path = state->document->makeNode<Path>();
+        // An animated outline rides the Path node's "data" channel (spec 6.1); the node needs a
+        // targetable id for the channel object, while static outlines keep the id-less inline
+        // serialization.
+        auto shapeId = pathAnimated
+                           ? "pag-legacy-shape-" + std::to_string(state->shapePathIdCounter++)
+                           : std::string();
+        auto* path = state->document->makeNode<Path>(shapeId);
         path->data = ConvertPathData(state, *handle);
         contents->push_back(path);
+        if (pathAnimated && state->currentAnimation != nullptr) {
+          auto* object = state->document->makeNode<AnimationObject>();
+          object->target = shapeId;
+          MigratePathDataChannel(legacy->shapePath, "data", shapeId, state->document, object);
+          if (!object->channels.empty()) {
+            state->currentAnimation->objects.push_back(object);
+          }
+        }
       }
       break;
     }
@@ -1843,6 +1837,48 @@ void ConvertLayerEffects(ConvertState* state, pag::Layer* legacyLayer, Layer* la
   }
 }
 
+// Layer masks (spec 7.6): every legacy MaskData entry becomes a MaskPath on the PAGX layer.
+// Static fields take their content-start values; an animated mask path rides the "path" channel
+// (spec 6.1) with key times shifted onto the composition clock by the layer's startTime, the
+// same content-to-composition mapping the visibility windows use.
+void ConvertLayerMasks(ConvertState* state, pag::Layer* legacyLayer, Layer* layer) {
+  if (legacyLayer->masks.empty()) {
+    return;
+  }
+  auto maskIndex = 0;
+  for (auto* legacyMask : legacyLayer->masks) {
+    if (legacyMask == nullptr) {
+      continue;
+    }
+    auto targetId = LegacyLayerTargetId(legacyLayer) + "-mask-" + std::to_string(maskIndex);
+    maskIndex++;
+    auto* maskPath = state->document->makeNode<MaskPath>(targetId);
+    bool pathAnimated = false;
+    auto startPath =
+        PropertyValueAtStart(legacyMask->maskPath, legacyLayer->startTime, &pathAnimated);
+    if (startPath != nullptr) {
+      maskPath->path = ConvertLegacyPathData(state->document, *startPath, targetId + "-shape");
+    }
+    maskPath->maskMode = static_cast<MaskMode>(static_cast<int>(legacyMask->maskMode));
+    maskPath->inverted = legacyMask->inverted;
+    auto feather = PropertyValueAtStart(legacyMask->maskFeather, legacyLayer->startTime, nullptr);
+    maskPath->feather = {feather.x, feather.y};
+    auto opacity = PropertyValueAtStart(legacyMask->maskOpacity, legacyLayer->startTime, nullptr);
+    maskPath->opacity = opacity / 255.0f;
+    maskPath->expansion =
+        PropertyValueAtStart(legacyMask->maskExpansion, legacyLayer->startTime, nullptr);
+    layer->maskPaths.push_back(maskPath);
+    if (pathAnimated && state->currentAnimation != nullptr) {
+      auto* object = state->document->makeNode<AnimationObject>();
+      object->target = targetId;
+      MigratePathDataChannel(legacyMask->maskPath, "path", targetId, state->document, object);
+      if (!object->channels.empty()) {
+        state->currentAnimation->objects.push_back(object);
+      }
+    }
+  }
+}
+
 Layer* ConvertLayer(ConvertState* state, pag::Layer* legacyLayer, float parentFrameRate) {
   if (legacyLayer == nullptr) {
     return nullptr;
@@ -1887,6 +1923,7 @@ Layer* ConvertLayer(ConvertState* state, pag::Layer* legacyLayer, float parentFr
       // HueSaturation over a nested composition).
       ConvertLayerEffects(state, legacyLayer, layer);
       ConvertLayerStyles(state, legacyLayer, layer);
+      ConvertLayerMasks(state, legacyLayer, layer);
       return layer;
     }
     case pag::LayerType::Solid: {
@@ -1910,6 +1947,7 @@ Layer* ConvertLayer(ConvertState* state, pag::Layer* legacyLayer, float parentFr
       // other layer type.
       ConvertLayerEffects(state, legacyLayer, layer);
       ConvertLayerStyles(state, legacyLayer, layer);
+      ConvertLayerMasks(state, legacyLayer, layer);
       return layer;
     }
     case pag::LayerType::Shape: {
@@ -1922,9 +1960,7 @@ Layer* ConvertLayer(ConvertState* state, pag::Layer* legacyLayer, float parentFr
       for (auto* element : legacy->contents) {
         ConvertShapeElement(state, element, &layer->contents, legacyLayer->startTime);
       }
-      if (legacyLayer->masks.empty() == false) {
-        state->warn(PAGExportWarning::UnsupportedColorSource, "layer masks");
-      }
+      ConvertLayerMasks(state, legacyLayer, layer);
       ConvertLayerEffects(state, legacyLayer, layer);
       ConvertLayerStyles(state, legacyLayer, layer);
       return layer;
@@ -2053,9 +2089,7 @@ Layer* ConvertLayer(ConvertState* state, pag::Layer* legacyLayer, float parentFr
       // the same way (the runtime applies node->filters uniformly in buildLayerInto).
       ConvertLayerEffects(state, legacyLayer, layer);
       ConvertLayerStyles(state, legacyLayer, layer);
-      if (legacyLayer->masks.empty() == false) {
-        state->warn(PAGExportWarning::UnsupportedColorSource, "layer masks");
-      }
+      ConvertLayerMasks(state, legacyLayer, layer);
       return layer;
     }
     case pag::LayerType::Image: {
@@ -2113,6 +2147,7 @@ Layer* ConvertLayer(ConvertState* state, pag::Layer* legacyLayer, float parentFr
       }
       ConvertLayerEffects(state, legacyLayer, layer);
       ConvertLayerStyles(state, legacyLayer, layer);
+      ConvertLayerMasks(state, legacyLayer, layer);
       return layer;
     }
     default:
@@ -2149,8 +2184,10 @@ void EnsureRootAnimation(ConvertState* state, pag::File* file) {
   auto* animation = state->document->makeNode<Animation>();
   animation->id = "pag-legacy-root";
   animation->frameRate = file->frameRate();
-  animation->duration =
-      static_cast<Frame>(llround(static_cast<double>(file->duration()) * file->frameRate()));
+  // pag::File::duration() already returns FRAMES (the root composition's frame count), so the
+  // duration maps directly - multiplying by the frame rate again would stretch the timeline
+  // by that factor.
+  animation->duration = file->duration();
   animation->loop = LoopMode::Once;
   state->document->animations.push_back(animation);
 }
