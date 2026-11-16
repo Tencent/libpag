@@ -576,7 +576,10 @@ function freezeToState(xml, timeSec) {
             exact = false;
             continue;
           }
-          if (destination.kind === 'skip') continue;
+          if (destination.kind === 'skip') {
+            notes.push(`skipped:${target.name}.${channelName}`);
+            continue;
+          }
           const evaluated = evaluateChannel(type, collectKeys(tags, channel), framePosition);
           if (evaluated.value == null) {
             notes.push(`unsupported-value:${target.name}.${channelName}`);
