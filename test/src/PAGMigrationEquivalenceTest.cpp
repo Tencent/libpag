@@ -225,7 +225,8 @@ void CompareSample(const std::string& path, SampleResult* result) {
     // contains PAG_DUMP_EQ_FILTER (all samples when unset) as raw files plus a manifest, for the
     // side-by-side comparison page tooling. No effect on normal runs.
     auto dumpDir = getenv("PAG_DUMP_EQ");
-    if (dumpDir != nullptr && frame == 0 && result->framesCompared == 1) {
+    auto dumpEveryFrame = getenv("PAG_DUMP_EQ_ALL") != nullptr;
+    if (dumpDir != nullptr && (dumpEveryFrame || (frame == 0 && result->framesCompared == 1))) {
       auto filter = getenv("PAG_DUMP_EQ_FILTER");
       std::string filterStr = filter != nullptr ? filter : "";
       if (filterStr.empty() || result->fileName.find(filterStr) != std::string::npos) {
@@ -233,9 +234,10 @@ void CompareSample(const std::string& path, SampleResult* result) {
         for (auto& ch : safeName) {
           if (ch == '/') ch = '_';
         }
-        auto writeRaw = [&safeName, dumpDir](const char* suffix,
-                                             const std::vector<uint8_t>& pixels) {
-          std::string outPath = std::string(dumpDir) + "/" + safeName + suffix;
+        auto writeRaw = [&safeName, dumpDir, &frame](const char* suffix,
+                                                     const std::vector<uint8_t>& pixels) {
+          std::string outPath =
+              std::string(dumpDir) + "/" + safeName + "_f" + std::to_string(frame) + suffix;
           FILE* f = fopen(outPath.c_str(), "wb");
           if (f != nullptr) {
             fwrite(pixels.data(), 1, pixels.size(), f);
