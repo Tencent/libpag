@@ -548,8 +548,9 @@ PAGX_TEST(PAGXVideoExporterTest, OutputDimensionsAreAllOrNothing) {
 }
 
 PAGX_TEST(PAGXVideoExporterTest, NextFrameReportsDrawingFailure) {
-  auto exporter = pagx::VideoExporter::Make(pagx::PAGXDocument::Make(100, 100));
+  auto exporter = pagx::VideoExporter::Make(MakeStaticDocument());
   ASSERT_TRUE(exporter != nullptr);
+  exporter->surface = nullptr;
   std::string errorMsg = {};
   EXPECT_FALSE(exporter->nextFrame(&errorMsg));
   EXPECT_EQ(exporter->currentFrame(), 0);
