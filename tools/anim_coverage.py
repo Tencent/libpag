@@ -4,11 +4,15 @@ table and the corpus headers.
 
 Run from the repo root:
 
-    python3 tools/anim_coverage.py            # print the tables
-    python3 tools/anim_coverage.py --check    # verify the invariants, non-zero exit on failure
+    python3 tools/anim_coverage.py                # print the tables
+    python3 tools/anim_coverage.py --check        # verify the invariants, non-zero exit on failure
+    python3 tools/anim_coverage.py --emit-readme  # print the counts README.md quotes
 
 The tables are copied into resources/pagx_to_html/animations/README.md, so a reviewer can re-run
-this to see that the document still matches the code.
+this to see that the document still matches the code. `--check` proves that the set of animatable
+channels parsed out of PAGXNodeChannel.cpp equals `supported ∪ exempt`, which is what makes the
+README's completeness claim machine-checkable: deleting a registry row, adding an unknown macro
+shape or registering an exemption without a reason all turn it red.
 """
 
 import argparse
@@ -34,6 +38,45 @@ NODE_ORDER = [
     "NoiseFilter",
 ]
 
+# A registry row is animatable when its fourth argument is Anim/AnimLayout. `FIELD_ENUM` appends the
+# enum type as a fifth argument, so the tail must accept `, Anim, BlendMode)`: matching only
+# `, Anim)` silently dropped `Layer.blendMode` from the universe.
+ANIM_LINE = re.compile(r", (?:Anim|AnimLayout)[,)]")
+ROW = re.compile(r'FIELD_\w+\((\w+), "([^"]+)", \w+, (?:Anim|AnimLayout)(?:, \w+)?\)')
+COLOR_ROW = '{"color", Anim, &AccessFillStrokeColor}'
+
+# `AppendGroupCommonFields<T>` writes its rows with the template parameter as the node, so each of
+# those rows belongs to every node that instantiates it.
+SHARED_TARGETS = ("Group", "TextBox", "TextPath")
+
+# Nodes that own no animatable FIELD_* row by design: Path's `point{N}.x/y` sub-channels are parsed
+# before the writer's table lookup, so an empty parse is expected there and only there.
+NODE_WITHOUT_ROWS = {"Path"}
+
+# Rows whose macro shape differs from the common one, anchored literally: they are the ones a
+# refactor can delete or de-animate without changing any other line, and the universe would shrink
+# silently because no other rule looks at them.
+REQUIRED_ROWS = (
+    'FIELD_MATRIX3D(Layer, "matrix3D"',
+    'FIELD_ENUM(Layer, "blendMode"',
+)
+
+# The parse floor: the registry has grown monotonically, so a total below this means the parse
+# broke rather than the feature set shrinking. Raise it when channel families are added.
+UNIVERSE_FLOOR = 150
+
+# Case headers that drive two nodes write two `Target:` lines, and case_pairs() flattens a header into
+# one cross product, so these pairs appear in the index without any fixture claiming them
+# (`geometry/05` drives Rectangle.size.width and Fill.color; `stroke/06` drives TrimPath.end and
+# Stroke.width). They are listed instead of being special-cased per file so that the reverse
+# assertion -- a case must not drive a channel the registry does not declare -- still has teeth.
+CROSS_NODE_PAIRS = {
+    ("Rectangle", "color"),
+    ("Fill", "size.width"),
+    ("TrimPath", "width"),
+    ("Stroke", "end"),
+}
+
 
 # Exemptions are only for channels that can never have a meaningful case, in one of three ways:
 #   1. the value cannot change a rendered pixel (`Layer.scale.z`);
@@ -57,6 +100,7 @@ JS_PENDING = "js-pending：CSS 无法表达，JS 逐帧重绘"
 JS_AFTER_STATIC = "js-after-static：静态尚未画出该效果，补齐后再逐帧动画"
 RENDERER_GAP = "renderer-gap：渲染器不应用该通道，参考帧不动，导出侧（含 JS）无解"
 NO_OP = "no-op：合成顺序决定它不改变画面，无需实现"
+EXEMPTION_TAGS = ("js-pending", "js-after-static", "renderer-gap", "no-op")
 
 CHANNEL_EXEMPTIONS = {
     # Scaling happens before the rotation on a z=0 plane, so scale.z cannot reach a pixel.
@@ -117,33 +161,83 @@ for _channel in ("alpha", "anchor.x", "anchor.y", "position.x", "position.y", "r
 
 
 def load_registry():
-    src = open(CHANNEL_SRC).read()
-    anim = {}
-    shared = re.search(r"static void AppendGroupCommonFields.*?\n}\n", src, re.S).group(0)
-    shared_rows = re.findall(r'FIELD_\w+\(T, "([^"]+)", \w+, (?:Anim|AnimLayout)\)', shared)
-    funcs = re.split(r"\nstatic std::vector<ChannelDef> (Build\w+)", src)
-    for i in range(1, len(funcs), 2):
-        name, body = funcs[i], funcs[i + 1]
-        for m in re.finditer(r'FIELD_\w+\((\w+), "([^"]+)", \w+, (?:Anim|AnimLayout)\)', body):
-            # `AppendGroupCommonFields<T>` writes its rows with the template parameter as the node, so
-            # `T` is not a node type: those rows are attached to Group / TextBox / TextPath below.
-            # Keeping them under `T` inflated the channel total by ten and hid them from --check,
-            # because check() only walks NODE_ORDER.
-            if m.group(1) == "T":
+    """Returns (node -> {channel}, audit).
+
+    `audit` keeps the provenance check_registry() needs to prove the parse lost nothing:
+    `macro_lines` is every line whose fourth argument is Anim/AnimLayout (the universe the source
+    declares), `consumed` the lines a rule below turned into a binding, `shared_lines` the rows of
+    `AppendGroupCommonFields<T>` (each expands to one binding per SHARED_TARGETS entry), `specials`
+    the `{"color", Anim, ...}` rows written without a FIELD_* macro, and `missing` the anchors that
+    were expected but not found.
+    """
+    text = open(CHANNEL_SRC).read()
+    lines = text.split("\n")
+    audit = {
+        "lines": lines,
+        "macro_lines": [],
+        "consumed": set(),
+        "shared_lines": [],
+        "specials": [],
+        "missing": [],
+    }
+    for index, line in enumerate(lines):
+        if ANIM_LINE.search(line):
+            audit["macro_lines"].append(index + 1)
+    for anchor in REQUIRED_ROWS:
+        if anchor not in text:
+            audit["missing"].append("required registry row is gone: %s" % anchor)
+
+    # Walking lines rather than split() bodies keeps the line number of every binding, which is what
+    # makes "this row was never consumed" reportable. `in_shared` follows the one function whose rows
+    # are written with `T`; `func_name` is the enclosing `Build*` builder, or None outside one.
+    in_shared = False
+    func_name = None
+    bindings = []  # (node or None for shared, channel, line number, kind)
+    for index, line in enumerate(lines):
+        lineno = index + 1
+        stripped = line.strip()
+        if stripped.startswith("static void AppendGroupCommonFields"):
+            in_shared = True
+        elif stripped.startswith("static std::vector<ChannelDef> "):
+            in_shared = False
+            func_name = stripped[len("static std::vector<ChannelDef> "):].split("(")[0].strip()
+        elif line.startswith("}"):
+            # Only an unindented closing brace ends a function: an indented `};` closes a nested
+            # initializer and must not reset the builder the following rows belong to.
+            in_shared = False
+            func_name = None
+            continue
+        row = ROW.search(line)
+        if row:
+            node, channel = row.group(1), row.group(2)
+            if in_shared:
+                bindings.append((None, channel, lineno, "shared"))
+            elif func_name is None or node == "T":
+                # The `T` rows outside `AppendGroupCommonFields<T>` name no node type, and a row
+                # outside a builder is in no table at all: neither is consumed, so check_registry()
+                # reports the line instead of inventing a binding for it.
                 continue
-            anim.setdefault(m.group(1), set()).add(m.group(2))
-        if re.search(r'\{"color", Anim,', body):
-            node = "Fill" if name == "BuildFillFields" else "Stroke"
-            anim.setdefault(node, set()).add("color")
-        if name in ("BuildGroupFields", "BuildTextBoxFields"):
-            node = "Group" if name == "BuildGroupFields" else "TextBox"
-            anim.setdefault(node, set()).update(shared_rows)
-        if name == "BuildTextPathFields":
-            anim.setdefault("TextPath", set()).update(shared_rows)
-    # matrix3D is declared with its own macro
-    if 'FIELD_MATRIX3D(Layer, "matrix3D"' in src:
-        anim.setdefault("Layer", set()).add("matrix3D")
-    return anim
+            else:
+                bindings.append((node, channel, lineno, "row"))
+            audit["consumed"].add(lineno)
+        elif COLOR_ROW in line:
+            node = {"BuildFillFields": "Fill", "BuildStrokeFields": "Stroke"}.get(func_name)
+            if node is not None:
+                bindings.append((node, "color", lineno, "special"))
+                audit["consumed"].add(lineno)
+
+    anim = {}
+    for node, channel, lineno, kind in bindings:
+        if kind == "shared":
+            audit["shared_lines"].append(lineno)
+            targets = SHARED_TARGETS
+        else:
+            if kind == "special":
+                audit["specials"].append(lineno)
+            targets = (node,)
+        for target in targets:
+            anim.setdefault(target, set()).add(channel)
+    return anim, audit
 
 
 def load_exported():
@@ -157,23 +251,37 @@ def load_exported():
     return exported
 
 
+def case_pairs(header):
+    """(node, channel) pairs a fixture header claims.
+
+    The header is read as one target list times one channel list. A fixture that drives two nodes
+    writes two `Target:` lines, so that product also yields pairs nobody claims
+    (`geometry/05` gives (Fill, size.width) as well as the real (Fill, color)); those are listed in
+    CROSS_NODE_PAIRS rather than silently renamed, because the product only ever over-credits and
+    the pair list is used to catch a registry row whose case outlived it.
+    """
+    targets = re.findall(r"Target:\s*(\S+)", header)
+    channels = []
+    for group in re.findall(r"Channel:\s*(\S+)", header):
+        channels.extend(part.strip() for part in group.split(",") if part.strip())
+    return [(target, channel) for target in targets for channel in channels]
+
+
 def load_cases():
     cases = []
     for path in sorted(glob.glob(os.path.join(CORPUS, "**", "*.pagx"), recursive=True)):
         text = open(path).read()
         rel = os.path.relpath(path, CORPUS).replace(os.sep, "/")
         header = text[: text.find("-->")]
-        targets = re.findall(r"Target:\s*(\S+)", header)
-        channels = []
-        for group in re.findall(r"Channel:\s*(\S+)", header):
-            channels.extend(part.strip() for part in group.split(",") if part.strip())
+        pairs = case_pairs(header)
         cases.append(
             {
                 "file": rel,
                 "short": rel[:-5] if rel.endswith(".pagx") else rel,
                 "family": rel.split("/")[0] if "/" in rel else "(root)",
-                "targets": targets,
-                "channels": channels,
+                "targets": list(dict.fromkeys(node for node, _ in pairs)),
+                "channels": list(dict.fromkeys(channel for _, channel in pairs)),
+                "pairs": pairs,
             }
         )
     return cases
@@ -183,9 +291,8 @@ def case_index(cases):
     """(node, channel) -> [case short names]"""
     index = {}
     for case in cases:
-        for target in case["targets"]:
-            for channel in case["channels"]:
-                index.setdefault((target, channel), []).append(case["short"])
+        for pair in case["pairs"]:
+            index.setdefault(pair, []).append(case["short"])
     return index
 
 
@@ -309,7 +416,174 @@ def check_well_formed(cases):
     return failures
 
 
-def check(anim, exported, index, cases):
+def universe(anim):
+    return set((node, channel) for node, channels in anim.items() for channel in channels)
+
+
+def exempt_set(anim):
+    """Exempt channels: the per-channel table plus every channel of an exempt node."""
+    exempt = set(CHANNEL_EXEMPTIONS)
+    for node in NODE_EXEMPTIONS:
+        for channel in anim.get(node, ()):
+            exempt.add((node, channel))
+    return exempt
+
+
+def check_reason(label, reason):
+    if not reason or not reason.strip():
+        return ["exemption has no reason: " + label]
+    tag = reason.split("：")[0].strip()
+    if tag not in EXEMPTION_TAGS:
+        return ["exemption reason must start with one of %s: %s (%s)"
+                % ("/".join(EXEMPTION_TAGS), label, reason)]
+    return []
+
+
+def check_registry(anim, audit):
+    """Proves that the parsed universe equals `supported ∪ exempt` and that the parse saw every
+    animatable row the registry declares.
+
+    The registry file is the source of truth: ANIM_LINE counts the rows it declares, and a row no
+    rule consumed means the parse dropped a feature without changing any other signal. Four other
+    shapes shrink the universe silently: a node that parses to nothing, an exemption that names a
+    channel nobody declares (it hides nothing and proves nothing), a macro row deleted outright, and
+    a parse that only looks at a fraction of the file. `--check` would otherwise claim completeness
+    over a subset it invented.
+    """
+    failures = []
+    lines = audit["lines"]
+    macro_lines = audit["macro_lines"]
+    for lineno in sorted(set(macro_lines) - audit["consumed"]):
+        failures.append(
+            "registry row not consumed by any rule: %s:%d  %s"
+            % (os.path.basename(CHANNEL_SRC), lineno, lines[lineno - 1].strip())
+        )
+
+    parsed = universe(anim)
+    expected = len(macro_lines) + len(audit["shared_lines"]) * (len(SHARED_TARGETS) - 1)
+    if expected != len(parsed):
+        failures.append(
+            "registry line count does not match the parse: %d macro rows + %d shared rows x %d "
+            "targets = %d channels, parsed %d"
+            % (len(macro_lines), len(audit["shared_lines"]), len(SHARED_TARGETS), expected, len(parsed))
+        )
+    failures.extend(audit["missing"])
+
+    if not parsed:
+        failures.append("registry parsed to zero animatable channels")
+    if len(parsed) < UNIVERSE_FLOOR:
+        failures.append(
+            "parsed %d channels, below the floor %d: the parse or the registry shrank"
+            % (len(parsed), UNIVERSE_FLOOR)
+        )
+    for node in NODE_ORDER:
+        if node in NODE_EXEMPTIONS or node in NODE_WITHOUT_ROWS:
+            continue
+        if not anim.get(node):
+            failures.append("node parsed to zero channels: %s" % node)
+
+    for node, channel in sorted(CHANNEL_EXEMPTIONS):
+        label = "%s.%s" % (node, channel)
+        failures.extend(check_reason("channel exemption " + label, CHANNEL_EXEMPTIONS[(node, channel)]))
+        if (node, channel) not in parsed:
+            failures.append("channel exemption for a channel the registry does not declare: " + label)
+    for node in sorted(NODE_EXEMPTIONS):
+        failures.extend(check_reason("node exemption " + node, NODE_EXEMPTIONS[node]))
+        if not anim.get(node):
+            failures.append("node exemption for a node the registry does not declare: " + node)
+
+    exempt = exempt_set(anim)
+    supported = parsed - exempt
+    # `supported` is derived by subtraction, so the first direction is structural and the second is
+    # the one that fires in practice: an exemption naming a channel outside the registry.
+    for node, channel in sorted(parsed - (supported | exempt)):
+        failures.append("channel in neither supported nor exempt: %s.%s" % (node, channel))
+    for node, channel in sorted((supported | exempt) - parsed):
+        failures.append("channel outside the registry universe: %s.%s" % (node, channel))
+    return failures
+
+
+def check_case_pairs(anim, cases):
+    """Every channel a single-node case drives must exist in the registry.
+
+    This is the other half of "no registry row is lost": deleting a row leaves its case driving a
+    channel nothing declares any more, and the universe would shrink without any count changing.
+    Composite cases list several nodes' channels under one header and are skipped. `Path.point{N}.x/y`
+    is the one documented exception: the writer parses it before its table lookup, so no FIELD_* row
+    exists for it.
+    """
+    failures = []
+    parsed = universe(anim)
+    for case in cases:
+        if case["family"] == "composite":
+            continue
+        for node, channel in case["pairs"]:
+            if (node, channel) in parsed or (node, channel) in CROSS_NODE_PAIRS:
+                continue
+            if node == "Path" and re.match(r"point\d+\.[xy]$", channel):
+                continue
+            failures.append(
+                "case drives a channel the registry does not declare: %s.%s (%s)"
+                % (node, channel, case["file"])
+            )
+    return failures
+
+
+def coverage_counts(anim, audit, cases):
+    parsed = universe(anim)
+    exempt = exempt_set(anim)
+    per_tag = dict.fromkeys(EXEMPTION_TAGS, 0)
+    for reason in CHANNEL_EXEMPTIONS.values():
+        tag = reason.split("：")[0].strip()
+        if tag in per_tag:
+            per_tag[tag] += 1
+    for node, reason in NODE_EXEMPTIONS.items():
+        tag = reason.split("：")[0].strip()
+        if tag in per_tag:
+            per_tag[tag] += len(anim.get(node, ()))
+    return {
+        "macro_lines": len(audit["macro_lines"]),
+        "shared_lines": len(audit["shared_lines"]),
+        "shared_targets": len(SHARED_TARGETS),
+        "universe": len(parsed),
+        "supported": len(parsed - exempt),
+        "exempt": len(exempt),
+        "per_tag": per_tag,
+        "cases": len(cases),
+    }
+
+
+def render_readme(counts):
+    """The numbers README.md quotes: printed rather than typed, so the document cannot drift."""
+    shared = counts["shared_lines"]
+    lines = [
+        "<!-- generated by `python3 tools/anim_coverage.py --emit-readme`; do not edit by hand -->",
+        "",
+        "| 量 | 值 |",
+        "|----|----|",
+        "| 宏表可动画行（`, Anim` / `, AnimLayout`） | %d |" % counts["macro_lines"],
+        "| 其中 `AppendGroupCommonFields` 公共行（×%d 节点） | %d |"
+        % (counts["shared_targets"], shared),
+        "| 行数对账（%d + %d×%d） | %d |"
+        % (counts["macro_lines"], shared, counts["shared_targets"] - 1, counts["universe"]),
+        "| 通道全集 | %d |" % counts["universe"],
+        "| supported（全集 − 豁免） | %d |" % counts["supported"],
+        "| exempt（登记在 `tools/anim_coverage.py`） | %d |" % counts["exempt"],
+    ]
+    tags = list(EXEMPTION_TAGS)
+    for index, tag in enumerate(tags):
+        branch = "└" if index == len(tags) - 1 else "├"
+        lines.append("| %s `%s` | %d |" % (branch, tag, counts["per_tag"][tag]))
+    lines.append("| 用例数 | %d |" % counts["cases"])
+    lines.append("")
+    lines.append(
+        "%d = %d (supported) + %d (exempt)"
+        % (counts["universe"], counts["supported"], counts["exempt"])
+    )
+    return "\n".join(lines)
+
+
+def check(anim, exported, index, cases, audit):
     """Returns (failures, warnings).
 
     Every animatable channel in the PAGX registry needs a case that drives it, whether the exporter
@@ -319,7 +593,7 @@ def check(anim, exported, index, cases):
     mapping entries are warnings, not failures: they are exporter bugs that the document lists,
     not corpus holes.
     """
-    failures = []
+    failures = check_registry(anim, audit)
     warnings = []
 
     for node in NODE_ORDER:
@@ -333,6 +607,7 @@ def check(anim, exported, index, cases):
             failures.append("animatable channel without a case: %s.%s" % (node, channel))
 
     failures.extend(check_well_formed(cases))
+    failures.extend(check_case_pairs(anim, cases))
 
     # A node the registry produces that NODE_ORDER does not list would be skipped by every loop
     # below, which is exactly how the `T` template parameter stayed invisible.
@@ -404,21 +679,27 @@ def check(anim, exported, index, cases):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--check", action="store_true")
+    parser.add_argument("--emit-readme", action="store_true", dest="emit_readme")
     args = parser.parse_args()
 
-    anim = load_registry()
+    anim, audit = load_registry()
     exported = load_exported()
     cases = load_cases()
     index = case_index(cases)
 
+    if args.emit_readme:
+        print(render_readme(coverage_counts(anim, audit, cases)))
+        return 0
+
     if args.check:
-        failures, warnings = check(anim, exported, index, cases)
+        failures, warnings = check(anim, exported, index, cases, audit)
         for warning in warnings:
             print("WARN", warning)
         for failure in failures:
             print("FAIL", failure)
-        total = sum(len(v) for v in anim.values())
-        print("%d animatable channels / %d node types / %d cases" % (total, len(anim), len(cases)))
+        total = len(universe(anim))
+        print("%d animatable channels (%d macro rows) / %d node types / %d cases" % (
+            total, len(audit["macro_lines"]), len(anim), len(cases)))
         return 1 if failures else 0
 
     print(render_master(channel_rows(anim, exported, index)))
@@ -426,7 +707,7 @@ def main():
     print(render_shared(anim, index))
     print()
     print("animatable=%d exported=%d cases=%d" % (
-        sum(len(v) for v in anim.values()), sum(len(v) for v in exported.values()), len(cases)))
+        len(universe(anim)), sum(len(v) for v in exported.values()), len(cases)))
     return 0
 
 
