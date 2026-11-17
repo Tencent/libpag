@@ -220,8 +220,9 @@ if (PAG_BUILD_TESTS)
 endif ()
 
 # VideoExporter is native-only. CLI and tests require it, so explicitly disabling it for those
-# builds is rejected rather than silently overriding the user's choice.
-if (WEB)
+# builds is rejected rather than silently overriding the user's choice. The wasm test binary is the
+# one web build that needs the exporter, because its async video export lane drives it directly.
+if (WEB AND NOT PAG_BUILD_WEB_VIDEO_EXPORT_TESTS)
     set(PAG_BUILD_VIDEO_EXPORTER OFF)
 elseif ((PAG_BUILD_CLI OR PAG_BUILD_TESTS) AND NOT PAG_BUILD_VIDEO_EXPORTER)
     message(FATAL_ERROR "PAG_BUILD_CLI and PAG_BUILD_TESTS require PAG_BUILD_VIDEO_EXPORTER=ON")
@@ -319,7 +320,9 @@ list(APPEND PAG_FILES ${SRC_FILES} ${PAG_GPU_BACKEND_FILES} ${PAG_CAST_BACKEND_F
 if (PAG_BUILD_PAGX)
     # pagx core + utils + xml (always included with PAGX)
     file(GLOB PAGX_CORE_SOURCES CONFIGURE_DEPENDS src/pagx/*.cpp)
-    list(FILTER PAGX_CORE_SOURCES EXCLUDE REGEX "/VideoExport(Frame|Exporter)\\.cpp$")
+    list(REMOVE_ITEM PAGX_CORE_SOURCES
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/pagx/VideoExporter.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/pagx/VideoExportFrame.cpp)
     if (PAG_BUILD_VIDEO_EXPORTER)
         list(APPEND PAGX_CORE_SOURCES src/pagx/VideoExporter.cpp src/pagx/VideoExportFrame.cpp)
     endif ()

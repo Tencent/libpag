@@ -39,6 +39,9 @@ set(PAG_USE_PNG_ENCODE ON)
 set(PAG_USE_JPEG_DECODE ON)
 set(PAG_USE_WEBP_ENCODE ON)
 set(PAG_USE_JPEG_ENCODE ON)
+# The async video export lane drives the native-only exporter from the wasm test binary, so keep it
+# in the pag library even though the web platform drops it by default.
+set(PAG_BUILD_WEB_VIDEO_EXPORT_TESTS ON)
 
 # Include vendor.cmake before add_subdirectory so that vendor variables (VENDOR_TOOLS_DIR,
 # PLATFORM, ARCH, etc.) are set in this scope. The include_guard(GLOBAL) in vendor.cmake
