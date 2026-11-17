@@ -42,8 +42,9 @@ struct HTMLTransformReference {
 
 /**
  * Resolved CSS `transform-origin` in layer-local pixels. `resolved` is false when the value uses a
- * percentage or keyword form whose reference box size is unknown, or when a token cannot be parsed;
- * callers then fall back to the top-left pivot and warn.
+ * percentage or keyword form whose reference box size is unknown; callers then fall back to the
+ * top-left pivot and warn. A token that does not parse is not merely unresolvable: it invalidates
+ * the whole declaration, so `valid` is false and `point` carries the initial `50% 50%`.
  */
 struct HTMLTransformOrigin {
   Point point = {};

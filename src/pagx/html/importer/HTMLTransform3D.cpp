@@ -181,22 +181,32 @@ bool ParseRotationDegrees(const std::string& token, float& out) {
 }
 
 // Resolves one `transform-origin` axis token to layer-local pixels. `dimension` is NaN when the
-// reference box size is unknown, which leaves percentage / keyword forms unresolvable.
-float ResolveOriginAxis(const std::string& token, float dimension, HTMLValueParser& valueParser) {
+// reference box size is unknown, which leaves percentage / keyword forms unresolvable. Returns false
+// only when the token is not a keyword / length / percentage at all; the caller then drops the whole
+// declaration the same way it drops a bad keyword pair.
+bool ResolveOriginAxis(const std::string& token, float dimension, HTMLValueParser& valueParser,
+                       float& out) {
   if (token == "center") {
-    return dimension * 0.5f;
+    out = dimension * 0.5f;
+    return true;
   }
   if (token == "left" || token == "top") {
-    return 0.0f;
+    out = 0.0f;
+    return true;
   }
   if (token == "right" || token == "bottom") {
-    return dimension;
+    out = dimension;
+    return true;
   }
   float fraction = 0.0f;
   if (ParseCssPercentage(token, fraction)) {
-    return dimension * fraction;
+    out = dimension * fraction;
+    return true;
   }
-  return valueParser.parseAbsoluteLengthPx(token);
+  // The caller reports the declaration itself as invalid, so the generic unit warning is suppressed
+  // here: `10foo 20px` yields one diagnostic, not a unit warning plus a position warning.
+  out = valueParser.parseAbsoluteLengthPx(token, /*warn=*/false);
+  return std::isfinite(out);
 }
 
 // One arity diagnostic per function family, shared by the "wrong number of arguments" and the
@@ -518,12 +528,16 @@ bool ParseFunction(const std::string& token, HTMLValueParser& valueParser,
       return true;
     }
     float distance = 0.0f;
-    if (!transformArgs.LengthAt(0, distance, 2) || !(distance > 0.0f)) {
-      diagnostics.warn("html: perspective distance must be a positive length; got '" + token +
+    if (!transformArgs.LengthAt(0, distance, 2) || !std::isfinite(distance) || distance < 0.0f) {
+      diagnostics.warn("html: perspective distance must be a non-negative length; got '" + token +
                        "'; ignored");
       return false;
     }
-    *out = MakePerspective(distance);
+    // CSS Transforms 2 clamps a distance below 1px to 1px. `perspective(0)` would otherwise be
+    // rejected and take the rest of the function list down with it, losing a sibling
+    // `translateX(10px)` that the browser still applies.
+    const float clamped = distance < 1.0f ? 1.0f : distance;
+    *out = MakePerspective(clamped);
     return true;
   }
 
@@ -609,6 +623,19 @@ bool SplitTransformFunctions(const std::string& value, std::vector<std::string>*
   return !out->empty();
 }
 
+// A declaration CSS drops falls back to the initial `50% 50%`, i.e. the box centre. That centre
+// needs a known box size; without one `resolved` stays false and the caller keeps the top-left
+// pivot and reports it once.
+HTMLTransformOrigin InvalidOrigin(float width, float height) {
+  HTMLTransformOrigin origin = {};
+  origin.valid = false;
+  if (std::isfinite(width) && std::isfinite(height)) {
+    origin.point = Point{width * 0.5f, height * 0.5f};
+    origin.resolved = true;
+  }
+  return origin;
+}
+
 HTMLTransformOrigin ResolveTransformOrigin(const std::string& value, float width, float height,
                                            HTMLValueParser& valueParser) {
   HTMLTransformOrigin origin = {};
@@ -617,8 +644,13 @@ HTMLTransformOrigin ResolveTransformOrigin(const std::string& value, float width
     text = "50% 50%";
   }
   const auto tokens = SplitTopLevelWhitespace(text);
-  if (tokens.empty() || tokens.size() > 3) {
+  if (tokens.empty()) {
     return origin;
+  }
+  // A `<position>` takes at most three values (the third is the pivot depth); four or more is not a
+  // valid declaration either.
+  if (tokens.size() > 3) {
+    return InvalidOrigin(width, height);
   }
 
   // CSS orders the two components by which axis each token belongs to, not by position: `bottom
@@ -657,27 +689,31 @@ HTMLTransformOrigin ResolveTransformOrigin(const std::string& value, float width
     }
   }
 
+  // An invalid `<position>` drops the declaration, so the initial `50% 50%` applies. Reporting it
+  // keeps the author-facing diagnostic honest rather than silently pivoting elsewhere.
   if (invalid) {
-    // An invalid `<position>` drops the declaration, so the initial `50% 50%` applies. Reporting it
-    // keeps the author-facing diagnostic honest rather than silently pivoting elsewhere.
-    origin.valid = false;
-    if (std::isfinite(width) && std::isfinite(height)) {
-      origin.point = Point{width * 0.5f, height * 0.5f};
-      origin.resolved = true;
-    }
-    return origin;
+    return InvalidOrigin(width, height);
   }
 
-  const float x = ResolveOriginAxis(tokenX, width, valueParser);
-  const float y = ResolveOriginAxis(tokenY, height, valueParser);
+  float x = 0.0f;
+  float y = 0.0f;
+  // A token that is not a keyword / length / percentage (a bad unit or a bad percentage) invalidates
+  // the declaration exactly like a bad keyword pair; pivoting at the top-left corner would be a
+  // silent, visible fallback that Chromium never takes.
+  if (!ResolveOriginAxis(tokenX, width, valueParser, x) ||
+      !ResolveOriginAxis(tokenY, height, valueParser, y)) {
+    return InvalidOrigin(width, height);
+  }
   if (!std::isfinite(x) || !std::isfinite(y)) {
+    // The tokens parsed, but their reference box size is unknown.
     return origin;
   }
   float z = 0.0f;
   if (tokens.size() == 3) {
-    z = valueParser.parseAbsoluteLengthPx(tokens[2]);
+    // The third value is a bare depth; a percentage has no basis there.
+    z = valueParser.parseAbsoluteLengthPx(tokens[2], /*warn=*/false);
     if (!std::isfinite(z)) {
-      return origin;
+      return InvalidOrigin(width, height);
     }
   }
   origin.point = Point{x, y};

@@ -394,6 +394,35 @@ PAG_TEST(PAGXHTML3DTest, NegativePerspectiveWarns) {
 }
 
 /**
+ * Test case: CSS Transforms 2 clamps a `perspective()` distance below 1px to 1px, so `0` and `0.5px`
+ * stay valid and the rest of the list still applies. Rejecting the function used to drop the whole
+ * declaration, losing the sibling `translateX(10px)` that a browser still applies.
+ */
+PAG_TEST(PAGXHTML3DTest, PerspectiveBelowOnePixelClampsAndKeepsTheList) {
+  const char* distances[] = {"0", "0.5px"};
+  for (const char* distance : distances) {
+    std::string html = R"HTML(
+      <html><body style="width:200px;height:100px">
+        <div id="box" style="width:100px;height:60px;background-color:#6366F1;
+             transform:perspective(DISTANCE) translateX(10px)"></div>
+      </body></html>
+    )HTML";
+    html.replace(html.find("DISTANCE"), 8, distance);
+    auto doc = ParseHtml(html);
+    ASSERT_NE(doc, nullptr) << distance;
+    EXPECT_FALSE(HasDiagnosticContaining(doc, "perspective")) << distance;
+    auto* layer = FindLayerById(doc, "box");
+    ASSERT_NE(layer, nullptr) << distance;
+    const auto& pose = layer->matrix3D;
+    // The clamped camera is part of the pose, so the pose is 3D: the translation sits in the 3D
+    // translation column and `-1 / 1px` puts `-1` in the projection row.
+    EXPECT_TRUE(NearlyEqual(pose.getRowColumn(0, 3), 10.0f, 1e-5f)) << distance;
+    EXPECT_TRUE(NearlyEqual(pose.getRowColumn(3, 2), -1.0f, 1e-5f)) << distance;
+    EXPECT_TRUE(layer->matrix.isIdentity()) << distance;
+  }
+}
+
+/**
  * Test case: `translateZ` keeps the depth in the 3D translation column.
  */
 PAG_TEST(PAGXHTML3DTest, TranslateZMovesInDepth) {
@@ -1734,6 +1763,40 @@ PAG_TEST(PAGXHTML3DTest, MultiValueOriginPutsEachKeywordOnItsOwnAxis) {
     ASSERT_NE(box, nullptr) << value;
     EXPECT_TRUE(NearlyEqual(box->anchor.x, 50.0f)) << value << " x=" << box->anchor.x;
     EXPECT_TRUE(NearlyEqual(box->anchor.y, 30.0f)) << value << " y=" << box->anchor.y;
+  }
+}
+
+/**
+ * Test case: a `transform-origin` token that does not parse (`10foo`, a percentage depth, four
+ * components) drops the whole declaration, exactly like a bad keyword pair: Chromium falls back to
+ * the initial `50% 50%` (the box centre) instead of pivoting at the top-left corner. The value is
+ * reported once — the per-token unit warning is suppressed so the position diagnostic stands alone.
+ */
+PAG_TEST(PAGXHTML3DTest, UnparsableOriginTokenFallsBackToTheBoxCentre) {
+  const char* values[] = {"10foo 20px", "10px 20px 30%", "10px 20px 30px 40px"};
+  for (const char* value : values) {
+    std::string html = R"HTML(
+      <html><body style="width:200px;height:200px">
+        <div id="box" style="width:100px;height:60px;background-color:#000;
+             transform:rotate(10deg);transform-origin:VALUE"></div>
+      </body></html>
+    )HTML";
+    html.replace(html.find("VALUE"), 5, value);
+    auto doc = ParseHtml(html);
+    ASSERT_NE(doc, nullptr) << value;
+    int unitWarnings = 0;
+    int positionWarnings = 0;
+    for (const auto& message : doc->errors) {
+      if (message.find("length unit") != std::string::npos) unitWarnings++;
+      if (message.find("not a valid CSS position") != std::string::npos) positionWarnings++;
+    }
+    EXPECT_EQ(unitWarnings, 0) << value;
+    EXPECT_EQ(positionWarnings, 1) << value;
+    auto* box = FindLayerById(doc, "box");
+    ASSERT_NE(box, nullptr) << value;
+    EXPECT_TRUE(NearlyEqual(box->anchor.x, 50.0f)) << value << " x=" << box->anchor.x;
+    EXPECT_TRUE(NearlyEqual(box->anchor.y, 30.0f)) << value << " y=" << box->anchor.y;
+    EXPECT_TRUE(NearlyEqual(box->anchorZ, 0.0f)) << value;
   }
 }
 
