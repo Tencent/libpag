@@ -591,6 +591,46 @@ PAGX_TEST(PAGXRuntimeTest, MatrixInterpolationRespectsPivotFlag) {
   EXPECT_NEAR(pivotCssMid.ty, 14.64f, 0.5f);
 }
 
+// Known gap against the CSS reciprocal-space result, in CSS pixels: PAGX's Value space lands on
+// 600px at the midpoint of a 1000px -> 200px `perspective` channel, while a browser renders the
+// harmonic mean 333.33px. This is the distance between the two spaces as the test observes it today,
+// NOT a value the test should keep asserting: `feature/mite085_perspective_interp` adds
+// `KeyframeInterpolationSpace::Reciprocal` and drives the channel in that space, which closes the
+// gap. Re-derive this constant (and turn the assertion into an equality against the CSS midpoint)
+// when that lands; until then it pins today's behaviour so a silent drift on either side shows up.
+static constexpr float kReciprocalKnownGapPx = 266.6667f;
+
+/**
+ * Test case: a `perspective` distance channel interpolates the distance itself in PAGX's Value space,
+ * while CSS interpolates its reciprocal. Exporting the two endpoint keys alone therefore matches at
+ * the keys and diverges in between (measured ~0.82 SSIM on the mid frames of
+ * `resources/pagx_to_html/animations/layer/12_perspective.pagx`), which is the gap the Reciprocal
+ * interpolation space has to close.
+ */
+PAGX_TEST(PAGXRuntimeTest, PerspectiveChannelInterpolatesDistanceNotReciprocal) {
+  const std::vector<pagx::Keyframe<float>> keys = {
+      {0, 1000.0f, pagx::KeyframeInterpolationType::Linear, {}, {}},
+      {60, 200.0f, pagx::KeyframeInterpolationType::Linear, {}, {}},
+  };
+
+  // Value space (the default, and the space every channel starts in): the distance itself is what
+  // interpolates, so the midpoint is the arithmetic mean.
+  const double valueMidpoint = pagx::EvaluateKeyframeSequence(keys, 30.0);
+  EXPECT_NEAR(valueMidpoint, 600.0, 0.01) << "Value space interpolates the distance linearly";
+
+  // What a browser renders for the same pair of `perspective` keyframes: the reciprocal of the
+  // distance is what interpolates, so the midpoint is the harmonic mean of the endpoints.
+  const float cssMidpoint = 1.0f / ((1.0f / 1000.0f + 1.0f / 200.0f) * 0.5f);
+  EXPECT_NEAR(cssMidpoint, 333.33f, 0.05f);
+
+  // Both endpoints are pinned above, so this only fails when the Value-space result drifts: it
+  // records the known gap between the two spaces rather than a correct value.
+  const float gapPx = static_cast<float>(valueMidpoint) - cssMidpoint;
+  EXPECT_NEAR(gapPx, kReciprocalKnownGapPx, 0.5f)
+      << "Known gap between Value space and the CSS reciprocal space; re-derive "
+         "kReciprocalKnownGapPx once the Reciprocal interpolation space lands";
+}
+
 /**
  * Test case: a perspective distance mixes its projection coefficient -1/d instead of the distance,
  * so a distance going from 1000 to 200 passes through 333.33 at the midpoint instead of 600. This is
