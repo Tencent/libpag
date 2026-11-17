@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 48 48">
+  <rect id="r" x="0" y="0" width="24" height="24" fill="red">
+    <animateTransform attributeName="transform" type="translate" from="0,0" to="24,0" dur="1s"
+                      fill="freeze"/>
+  </rect>
+</svg>

@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 120 120">
+  <g transform="translate(60 60)">
+    <rect x="-25" y="-25" width="50" height="50" rx="8" fill="#22c55e">
+      <animate attributeName="opacity" values="1;0;1" keyTimes="0;0.5;1" dur="1.5s" begin="0s" repeatCount="indefinite"/>
+    </rect>
+    <rect x="-25" y="-25" width="50" height="50" rx="8" fill="#ef4444">
+      <animate attributeName="opacity" values="0;1;0" keyTimes="0;0.5;1" dur="1.5s" begin="0s" repeatCount="indefinite"/>
+    </rect>
+  </g>
+</svg>

@@ -330,6 +330,16 @@ class SVGWriterContext {
   std::unordered_map<const Layer*, const Layer*> layerParentMap = {};
   bool layerParentMapReady = false;
 
+  // Layers referenced by another layer's Layer::mask pointer. Populated lazily by
+  // SVGWriter::isMaskReferenceLayer on first use. writeLayer skips these: their content is
+  // emitted through writeMaskDef into <defs>, so emitting them as regular content would
+  // duplicate the mask geometry. The runtime treats them the same way — LayerBuilder attaches
+  // them through setMask and tgfx does not draw a layer that owns a maskOwner — so they are mask
+  // definitions, never content. Imported documents keep them visible=true, so the visibility
+  // check in writeLayer cannot identify them.
+  std::unordered_set<const Layer*> maskReferenceLayers = {};
+  bool maskReferencesReady = false;
+
   // (mask layer, MaskType) → def-id cache. A single mask Layer can be referenced by many owners
   // (PAGX allows it explicitly), and without this cache `<mask>` / `<clipPath>` definitions get
   // re-emitted into <defs> on every reference, producing duplicate `id` values with undefined
@@ -534,6 +544,7 @@ class SVGWriter {
   // space and would silently misplace the mask otherwise, so a warning is surfaced via
   // addWarning when a cross-parent reference is detected.
   const Layer* findLayerParent(const Layer* layer);
+  bool isMaskReferenceLayer(const Layer* layer);
   // Emits a <clipPath> in _defs for layer->scrollRect and returns the generated id.
   // Caller wires the id onto the group as clip-path="url(#...)".
   std::string writeScrollRectClipDef(const Layer* layer);
@@ -1853,6 +1864,30 @@ std::string SVGWriter::writeClipPathDef(const Layer* maskLayer, const Layer* own
   return writeMaskOrClipDef(maskLayer, MaskType::Contour);
 }
 
+// Walks one layer subtree and records the parent edge of every reachable layer. `visited` keeps
+// the walk idempotent for shared-resource references and guards against composition cycles.
+static void CollectLayerParents(const Layer* parent,
+                                std::unordered_map<const Layer*, const Layer*>* map,
+                                std::unordered_set<const Layer*>* visited) {
+  if (parent == nullptr || !visited->insert(parent).second) {
+    return;
+  }
+  for (const auto* child : parent->children) {
+    if (map->find(child) == map->end()) {
+      (*map)[child] = parent;
+    }
+    CollectLayerParents(child, map, visited);
+  }
+  if (parent->composition != nullptr) {
+    for (const auto* compLayer : parent->composition->layers) {
+      if (map->find(compLayer) == map->end()) {
+        (*map)[compLayer] = parent;
+      }
+      CollectLayerParents(compLayer, map, visited);
+    }
+  }
+}
+
 const Layer* SVGWriter::findLayerParent(const Layer* layer) {
   if (layer == nullptr || _doc == nullptr) {
     return nullptr;
@@ -1868,36 +1903,27 @@ const Layer* SVGWriter::findLayerParent(const Layer* layer) {
     // that produced a `composition -> layer -> composition` self-reference cannot blow the
     // stack.
     std::unordered_set<const Layer*> visited;
-    std::function<void(const Layer*)> visit = [&](const Layer* parent) {
-      if (!visited.insert(parent).second) {
-        return;
-      }
-      for (const auto* child : parent->children) {
-        if (map.find(child) == map.end()) {
-          map[child] = parent;
-        }
-        visit(child);
-      }
-      if (parent->composition != nullptr) {
-        for (const auto* compLayer : parent->composition->layers) {
-          if (map.find(compLayer) == map.end()) {
-            map[compLayer] = parent;
-          }
-          visit(compLayer);
-        }
-      }
-    };
     for (const auto& nodePtr : _doc->nodes) {
       if (nodePtr->nodeType() != NodeType::Layer) {
         continue;
       }
-      auto* topLayer = static_cast<Layer*>(nodePtr.get());
-      visit(topLayer);
+      CollectLayerParents(static_cast<Layer*>(nodePtr.get()), &map, &visited);
     }
     _context->layerParentMapReady = true;
   }
   auto it = _context->layerParentMap.find(layer);
   return it == _context->layerParentMap.end() ? nullptr : it->second;
+}
+
+bool SVGWriter::isMaskReferenceLayer(const Layer* layer) {
+  if (layer == nullptr || _doc == nullptr) {
+    return false;
+  }
+  if (!_context->maskReferencesReady) {
+    CollectMaskReferenceLayers(*_doc, &_context->maskReferenceLayers);
+    _context->maskReferencesReady = true;
+  }
+  return _context->maskReferenceLayers.count(layer) > 0;
 }
 
 //==============================================================================
@@ -3254,6 +3280,10 @@ void SVGWriter::writeLayerContents(SVGBuilder& out, const Layer* layer, const Ma
 }
 
 void SVGWriter::writeLayer(SVGBuilder& out, const Layer* layer) {
+  // See maskReferenceLayers: a mask target is emitted into <defs>, not as content.
+  if (isMaskReferenceLayer(layer)) {
+    return;
+  }
   if (!layer->visible && layer->mask == nullptr) {
     return;
   }

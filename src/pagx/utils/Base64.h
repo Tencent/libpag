@@ -28,6 +28,13 @@ namespace pagx {
 std::shared_ptr<Data> Base64Decode(std::string_view encodedString);
 
 /**
+ * Returns true when `uri` starts with the `data:` scheme, matched case-insensitively as RFC 3986
+ * requires of URI schemes. A URI this returns true for may still fail to decode when its payload
+ * is not base64 or is malformed.
+ */
+bool IsDataUri(std::string_view uri);
+
+/**
  * Decodes the base64 payload of a `data:` URI. Returns nullptr when `dataURI` is not a
  * base64-encoded data URI. The `data:` scheme is matched case-insensitively, as RFC 3986 requires
  * of URI schemes.

@@ -17,8 +17,10 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "base/TestEnvironment.h"
+#include "cli/VideoEncoder.h"
 
 int main(int argc, char** argv) {
+  pagx::cli::InitializeVideoEncoderProcess();
   printf("Running main() from %s\n", __FILE__);
   AddGlobalTestEnvironment(new pag::TestEnvironment());
   testing::InitGoogleTest(&argc, argv);

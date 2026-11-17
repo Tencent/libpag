@@ -29,7 +29,7 @@ namespace pagx {
 // custom zlib_filefunc_def so an archive can be assembled entirely in RAM.
 // minizip seeks backward to patch each local file header's CRC / sizes once the
 // entry is closed, so this must support seek/tell/overwrite in addition to
-// append. Shared by PPTExporter and HTMLExporter (in-memory ZIP backends).
+// append. Shared by the PAGX, PPT and HTML exporters (in-memory ZIP backends).
 class MemZipBuffer {
  public:
   MemZipBuffer() = default;

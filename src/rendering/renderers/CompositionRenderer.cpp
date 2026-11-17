@@ -20,8 +20,10 @@
 #include "LayerRenderer.h"
 #include "rendering/caches/LayerCache.h"
 #include "rendering/caches/RenderCache.h"
+#include "rendering/filters/utils/Filter3DFactory.h"
 #include "rendering/graphics/Picture.h"
 #include "rendering/graphics/Recorder.h"
+#include "rendering/graphics/Transform3DScene.h"
 #include "rendering/sequences/SequenceImageProxy.h"
 #include "rendering/sequences/SequenceInfo.h"
 
@@ -32,6 +34,14 @@ std::shared_ptr<Graphic> RenderVectorComposition(VectorComposition* composition,
   recorder.saveClip(0, 0, static_cast<float>(composition->width),
                     static_cast<float>(composition->height));
   auto& layers = composition->layers;
+  std::shared_ptr<Transform3DContext> context;
+  for (auto layer : layers) {
+    if (Has3DTransform(layer)) {
+      context = Transform3DFilter::MakeContext(composition, compositionFrame);
+      break;
+    }
+  }
+  Transform3DSceneBuilder scene(composition->width, composition->height);
   // The index order of Layers in File is different from PAGLayers.
   for (int i = static_cast<int>(layers.size()) - 1; i >= 0; i--) {
     auto childLayer = layers[i];
@@ -41,10 +51,17 @@ std::shared_ptr<Graphic> RenderVectorComposition(VectorComposition* composition,
     auto layerCache = LayerCache::Get(childLayer);
     auto filterModifier =
         layerCache->cacheFilters() ? nullptr : FilterModifier::Make(childLayer, compositionFrame);
+    if (filterModifier != nullptr) {
+      filterModifier->transform3DContext = context;
+    }
     auto trackMatte = TrackMatteRenderer::Make(childLayer, compositionFrame);
-    LayerRenderer::DrawLayer(&recorder, childLayer, compositionFrame, filterModifier,
+    Recorder childRecorder;
+    LayerRenderer::DrawLayer(&childRecorder, childLayer, compositionFrame, filterModifier,
                              trackMatte.get());
+    scene.addLayer(childRecorder.makeGraphic(), childLayer, compositionFrame, context,
+                   tgfx::Matrix::I());
   }
+  recorder.drawGraphic(scene.makeGraphic());
   recorder.restore();
   auto graphic = recorder.makeGraphic();
   if (layers.size() > 1 && composition->staticContent() && !composition->hasImageContent()) {
