@@ -2555,15 +2555,12 @@ void EmitFilterCssAtFrame(const DomTargetBundle& bundle, const BundleChannelSet&
                    CssFloatToString(std::max(bx, by)) + "px " + ColorToRGBA(col, a) + ")";
     }
   }
-  // The stages CSS cannot rewrite per frame (a blend, an inner shadow) ride along as an SVG filter
-  // reference at the end of the chain, where their authored order put them.
-  if (!bundle.residualFilterId.empty()) {
-    // Stored as the ready-made `url(#id)` reference the static writer produced.
-    if (!filterVal.empty()) {
-      filterVal += ' ';
-    }
-    filterVal += bundle.residualFilterId;
-  }
+  // The stages CSS cannot rewrite per frame (a blend, an inner shadow) are NOT appended here. A
+  // `filter` list containing a `url()` is non-interpolable in Chromium: it steps the whole list at
+  // each segment's midpoint, freezing the blur and drop-shadow that do change per frame. The
+  // reference therefore rides on a wrapper div around this element instead (see
+  // residualFilterWrappers and ApplyElementEdits), which keeps the authored chain order because the
+  // wrapper's own filter runs on the already-filtered subtree.
   if (!filterVal.empty()) {
     AppendCssDecl(decls, "filter", filterVal);
   }
@@ -4947,6 +4944,12 @@ std::string HTMLAnimationSession::emitKeyframesAndWeave(std::string& bodyHtml) {
           edits.animDecls[element.id].push_back(BuildAnimationShorthand(
               anim, nameIt->second, ruleTiming, mount.offset, mount.scope != 0));
           edits.playStates[element.id].push_back(mount.playing);
+          // Only an element whose own filter is animated gets the wrapper: the reference must leave
+          // the animated declaration, and without an animated declaration the static filter already
+          // holds the full chain (wrapping then would blend twice).
+          if (chSet.hasFilterAnim && !bundle.residualFilterId.empty()) {
+            edits.residualFilterWrappers[element.id] = bundle.residualFilterId;
+          }
         }
       }
       if (needsZeroOrigin) {
@@ -4978,7 +4981,100 @@ struct TextEdit {
 };
 
 bool TextEditStartsBefore(const TextEdit& a, const TextEdit& b) {
-  return a.start < b.start;
+  if (a.start != b.start) {
+    return a.start < b.start;
+  }
+  // An insertion at an element's start has to be ordered before the edit that rewrites that same
+  // tag: the rewrite advances the cursor past the insertion point, which would drop the insertion.
+  return a.end == a.start && b.end != b.start;
+}
+
+std::string ReadTagName(const std::string& html, size_t tagStart) {
+  size_t nameStart = tagStart + 1;
+  if (nameStart < html.size() && html[nameStart] == '/') {
+    nameStart++;
+  }
+  size_t nameEnd = nameStart;
+  while (nameEnd < html.size() && !IsHtmlSpace(html[nameEnd]) && html[nameEnd] != '/' &&
+         html[nameEnd] != '>') {
+    nameEnd++;
+  }
+  std::string tagName = html.substr(nameStart, nameEnd - nameStart);
+  for (char& c : tagName) {
+    if (c >= 'A' && c <= 'Z') {
+      c = static_cast<char>(c - 'A' + 'a');
+    }
+  }
+  return tagName;
+}
+
+// Returns the offset just past the closing tag of the `tagName` element that opens at `tagStart`,
+// or npos when the document is unbalanced. Attribute values are quoted by HTMLBuilder, but a
+// `</div>` inside a data attribute or a text run must not be counted, so this walks tags and skips
+// quoted runs instead of counting raw occurrences.
+size_t FindElementEnd(const std::string& html, size_t tagStart, const std::string& tagName) {
+  size_t pos = tagStart;
+  int depth = 0;
+  while ((pos = html.find('<', pos)) != std::string::npos) {
+    if (html.compare(pos, 4, "<!--") == 0) {
+      auto commentEnd = html.find("-->", pos + 4);
+      if (commentEnd == std::string::npos) {
+        return std::string::npos;
+      }
+      pos = commentEnd + 3;
+      continue;
+    }
+    size_t scan = pos + 1;
+    bool closing = scan < html.size() && html[scan] == '/';
+    size_t nameStart = closing ? scan + 1 : scan;
+    size_t nameEnd = nameStart;
+    while (nameEnd < html.size() && !IsHtmlSpace(html[nameEnd]) && html[nameEnd] != '/' &&
+           html[nameEnd] != '>') {
+      nameEnd++;
+    }
+    std::string name = html.substr(nameStart, nameEnd - nameStart);
+    for (char& c : name) {
+      if (c >= 'A' && c <= 'Z') {
+        c = static_cast<char>(c - 'A' + 'a');
+      }
+    }
+    char quote = 0;
+    bool selfClosing = false;
+    size_t tagEndPos = std::string::npos;
+    for (size_t i = nameEnd; i < html.size(); i++) {
+      char c = html[i];
+      if (quote != 0) {
+        if (c == quote) {
+          quote = 0;
+        }
+        continue;
+      }
+      if (c == '"' || c == '\'') {
+        quote = c;
+        continue;
+      }
+      if (c == '>') {
+        selfClosing = i > 0 && html[i - 1] == '/';
+        tagEndPos = i;
+        break;
+      }
+    }
+    if (tagEndPos == std::string::npos) {
+      return std::string::npos;
+    }
+    if (name == tagName) {
+      if (closing) {
+        depth--;
+        if (depth == 0) {
+          return tagEndPos + 1;
+        }
+      } else if (!selfClosing) {
+        depth++;
+      }
+    }
+    pos = tagEndPos + 1;
+  }
+  return std::string::npos;
 }
 
 // Applies every recorded declaration and rebuilds the body once. Applying one declaration at a time
@@ -5041,6 +5137,40 @@ void HTMLAnimationSession::ApplyElementEdits(
         }
       }
     }
+  }
+
+  // A residual filter reference cannot live in an animated `filter` list (Chromium steps the whole
+  // list), so it gets one wrapper div around the element. The id stays on the element itself: the
+  // keyframes target it by id. The wrapper reuses the same def and adds nothing but the geometry
+  // and the reference, so it becomes the containing block without touching flow or clipping.
+  for (const auto& entry : edits.residualFilterWrappers) {
+    auto rangeIt = tagRanges.find(entry.first);
+    if (rangeIt == tagRanges.end()) {
+      continue;
+    }
+    size_t tagStart = rangeIt->second.first;
+    size_t tagEnd = rangeIt->second.second;
+    // `inset:0` reproduces the containing block exactly, which is only layout-neutral for an
+    // absolutely positioned host: an in-flow or flex-item host would gain a new parent box and lose
+    // its own layout role, so those keep the reference inside the animated list.
+    auto positionAt = bodyHtml.find("position:absolute", tagStart);
+    if (positionAt == std::string::npos || positionAt >= tagEnd) {
+      continue;
+    }
+    std::string tagName = ReadTagName(bodyHtml, tagStart);
+    size_t elementEnd = FindElementEnd(bodyHtml, tagStart, tagName);
+    if (elementEnd == std::string::npos) {
+      continue;
+    }
+    size_t lineStart = tagStart;
+    while (lineStart > 0 && (bodyHtml[lineStart - 1] == ' ' || bodyHtml[lineStart - 1] == '\t')) {
+      lineStart--;
+    }
+    std::string indent = bodyHtml.substr(lineStart, tagStart - lineStart);
+    textEdits.push_back(
+        {lineStart, lineStart,
+         indent + "<div style=\"position:absolute;inset:0;filter:" + entry.second + "\">\n"});
+    textEdits.push_back({elementEnd, elementEnd, "\n" + indent + "</div>"});
   }
 
   if (!textEdits.empty()) {
