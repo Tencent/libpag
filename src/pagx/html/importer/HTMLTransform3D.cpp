@@ -20,6 +20,7 @@
 #include <cctype>
 #include <cmath>
 #include <cstdlib>
+#include <unordered_map>
 #include "pagx/html/importer/HTMLDetail.h"
 #include "pagx/html/importer/HTMLDiagnosticSink.h"
 #include "pagx/html/importer/HTMLValueParser.h"
@@ -549,43 +550,34 @@ bool ParsePerspective(const TransformCall& call) {
 
 // The single list of supported transform functions: the parser dispatches on it and
 // `IsSupportedTransformFunction` answers from it, so a name cannot be known to one and unknown to the
-// other.
-struct TransformFamilyEntry {
-  const char* name;
-  TransformFamilyHandler handler;
-};
-
-constexpr TransformFamilyEntry TRANSFORM_FAMILIES[] = {
-    {"translate", ParseTranslate},
-    {"translatex", ParseTranslate},
-    {"translatey", ParseTranslate},
-    {"translatez", ParseTranslate},
-    {"translate3d", ParseTranslate},
-    {"scale", ParseScale},
-    {"scalex", ParseScale},
-    {"scaley", ParseScale},
-    {"scalez", ParseScale},
-    {"scale3d", ParseScale},
-    {"rotate", ParseRotate},
-    {"rotatex", ParseRotate},
-    {"rotatey", ParseRotate},
-    {"rotatez", ParseRotate},
-    {"rotate3d", ParseRotate3D},
-    {"skewx", ParseSkew},
-    {"skewy", ParseSkew},
-    {"skew", ParseSkew},
-    {"matrix", ParseMatrix},
-    {"matrix3d", ParseMatrix3D},
-    {"perspective", ParsePerspective},
-};
-
+// other. A hash map, not a linear scan: every transform token passes through this lookup, from the
+// subset transformer as well as from `ParseFunction`.
 TransformFamilyHandler FindTransformHandler(const std::string& name) {
-  for (const auto& family : TRANSFORM_FAMILIES) {
-    if (name == family.name) {
-      return family.handler;
-    }
-  }
-  return nullptr;
+  static const std::unordered_map<std::string, TransformFamilyHandler> TRANSFORM_FAMILIES = {
+      {"translate", ParseTranslate},
+      {"translatex", ParseTranslate},
+      {"translatey", ParseTranslate},
+      {"translatez", ParseTranslate},
+      {"translate3d", ParseTranslate},
+      {"scale", ParseScale},
+      {"scalex", ParseScale},
+      {"scaley", ParseScale},
+      {"scalez", ParseScale},
+      {"scale3d", ParseScale},
+      {"rotate", ParseRotate},
+      {"rotatex", ParseRotate},
+      {"rotatey", ParseRotate},
+      {"rotatez", ParseRotate},
+      {"rotate3d", ParseRotate3D},
+      {"skewx", ParseSkew},
+      {"skewy", ParseSkew},
+      {"skew", ParseSkew},
+      {"matrix", ParseMatrix},
+      {"matrix3d", ParseMatrix3D},
+      {"perspective", ParsePerspective},
+  };
+  const auto found = TRANSFORM_FAMILIES.find(name);
+  return found == TRANSFORM_FAMILIES.end() ? nullptr : found->second;
 }
 
 // Parses one `fn(args)` token. Returns false after emitting a diagnostic.
