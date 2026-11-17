@@ -3610,14 +3610,14 @@ CLI_TEST(PAGXCliTest, LazyInlineSvg_LayoutRenderBoundsAndExport) {
   auto svgPath = TempDir() + "/lazy_inline_svg.svg";
   EXPECT_EQ(CallRun(pagx::cli::RunExport, {"export", "--input", inputPath, "--output", svgPath}),
             0);
-  EXPECT_FALSE(ReadFile(svgPath).empty());
+  EXPECT_FALSE(ReadTextFile(svgPath).empty());
   auto htmlPath = TempDir() + "/lazy_inline_svg.html";
   EXPECT_EQ(CallRun(pagx::cli::RunExport, {"export", "--input", inputPath, "--output", htmlPath}),
             0);
-  EXPECT_FALSE(ReadFile(htmlPath).empty());
+  EXPECT_FALSE(ReadTextFile(htmlPath).empty());
   auto embedPath = TempDir() + "/lazy_inline_svg_embedded.pagx";
   EXPECT_EQ(CallRun(pagx::cli::RunEmbed, {"embed", inputPath, "--skip-fonts", "-o", embedPath}), 0);
-  EXPECT_EQ(ReadFile(embedPath).find("<svg"), std::string::npos);
+  EXPECT_EQ(ReadTextFile(embedPath).find("<svg"), std::string::npos);
   auto embedded = pagx::PAGXImporter::FromFile(embedPath);
   ASSERT_NE(embedded, nullptr);
   EXPECT_FALSE(embedded->hasUnresolvedImports());
@@ -3634,7 +3634,7 @@ CLI_TEST(PAGXCliTest, Import_ExtensionlessSourceUsesContentFormat) {
   auto outputPath = TempDir() + "/extensionless_svg_imported.pagx";
   EXPECT_EQ(CallRun(pagx::cli::RunImport, {"import", "--input", inputPath, "--output", outputPath}),
             0);
-  EXPECT_NE(ReadFile(outputPath).find("#00FF00"), std::string::npos);
+  EXPECT_NE(ReadTextFile(outputPath).find("#00FF00"), std::string::npos);
   auto doc = pagx::PAGXImporter::FromFile(outputPath);
   ASSERT_NE(doc, nullptr);
   EXPECT_FALSE(doc->hasUnresolvedImports());
@@ -3659,7 +3659,7 @@ CLI_TEST(PAGXCliTest, Embed_InlineTextAndImageAreFlattenedAndPersisted) {
   EXPECT_EQ(
       CallRun(pagx::cli::RunEmbed, {"embed", inputPath, "--fallback", fontPath, "-o", outputPath}),
       0);
-  auto output = ReadFile(outputPath);
+  auto output = ReadTextFile(outputPath);
   EXPECT_EQ(output.find("<svg"), std::string::npos);
   EXPECT_EQ(output.find("inline_embed_image.png"), std::string::npos);
   auto doc = pagx::PAGXImporter::FromFile(outputPath);
@@ -3716,7 +3716,7 @@ CLI_TEST(PAGXCliTest, Resolve_ExplicitImportOverridesInlineSvg) {
   EXPECT_TRUE(document->hasUnresolvedImports());
   auto outputPath = TempDir() + "/explicit_import_flattened.pagx";
   EXPECT_EQ(CallRun(pagx::cli::RunResolve, {"resolve", inputPath, "-o", outputPath}), 0);
-  auto output = ReadFile(outputPath);
+  auto output = ReadTextFile(outputPath);
   EXPECT_NE(output.find("#00FF00"), std::string::npos);
   EXPECT_EQ(output.find("#FF0000"), std::string::npos);
   auto flattened = pagx::PAGXImporter::FromFile(outputPath);
