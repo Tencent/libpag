@@ -1756,11 +1756,23 @@ BundleChannelSet CollectBundleChannels(
             }
           }
         }
+        auto role = LookupChannelRole(objTarget->nodeType(), ch->name);
+        if (role == TargetChannelRole::PolystarPointCount) {
+          // The point count decides how many vertices the outline has, which CSS cannot interpolate;
+          // the crossing stops and the floored `d` already express its jump. Letting its `hold` keys
+          // into the bundle's shared easings made every linear channel beside it step as well
+          // (composite/05: the star froze in 4-frame jumps). Only its times are needed.
+          std::set<Frame> countTimes = {};
+          std::unordered_map<Frame, SegmentEasing> ignoredEasings = {};
+          std::set<Frame> ignoredMixed = {};
+          ExtractChannelTimesAndEasing(ch, countTimes, ignoredEasings, ignoredMixed);
+          result.keyTimes.insert(countTimes.begin(), countTimes.end());
+          continue;
+        }
         ExtractChannelTimesAndEasing(ch, result.keyTimes, result.stopEasings,
                                      result.mixedEasingTimes);
         // Opacity and visibility are their own property group: they can ride their own animation
         // without colliding with the transform/paint group.
-        auto role = LookupChannelRole(objTarget->nodeType(), ch->name);
         bool stepped =
             role == TargetChannelRole::TextFauxBold || role == TargetChannelRole::LayerVisibility;
         bool opacityGroup = !stepped && role == TargetChannelRole::Opacity;
