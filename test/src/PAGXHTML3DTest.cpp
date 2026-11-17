@@ -423,6 +423,31 @@ PAG_TEST(PAGXHTML3DTest, PerspectiveBelowOnePixelClampsAndKeepsTheList) {
 }
 
 /**
+ * Test case: the `perspective` property clamps a value below 1px to 1px for rendering, the same rule
+ * `perspective()` follows (CSS Transforms 2, §Perspective). `0` therefore still defines a camera — a
+ * 1px one — instead of meaning "no perspective"; only `none` disables the projection.
+ */
+PAG_TEST(PAGXHTML3DTest, ZeroParentPerspectiveClampsToOnePixel) {
+  auto doc = ParseHtml(R"HTML(
+    <html><body style="width:200px;height:160px">
+      <div style="position:absolute;left:0;top:0;width:200px;height:160px;perspective:0">
+        <div id="card" style="position:absolute;left:10px;top:10px;width:80px;height:40px;
+             background-color:#38BDF8;transform:rotateY(30deg)"></div>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  EXPECT_FALSE(HasDiagnosticContaining(doc, "perspective"));
+  auto* card = FindLayerById(doc, "card");
+  ASSERT_NE(card, nullptr);
+  const auto& pose = card->matrix3D;
+  // The projection row is `-1 / 1px` times the rotation's Z row: (sin30, 0, -cos30, 1). A value of
+  // 600px would read 0.000833 / -0.001443 instead.
+  EXPECT_TRUE(NearlyEqual(pose.getRowColumn(3, 0), 0.5f, 1e-5f));
+  EXPECT_TRUE(NearlyEqual(pose.getRowColumn(3, 2), -0.866025f, 1e-5f));
+}
+
+/**
  * Test case: `translateZ` keeps the depth in the 3D translation column.
  */
 PAG_TEST(PAGXHTML3DTest, TranslateZMovesInDepth) {

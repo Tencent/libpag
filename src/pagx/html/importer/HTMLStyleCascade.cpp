@@ -788,11 +788,14 @@ void HTMLStyleCascade::parseBoxTransform(HTMLBoxAttributes& box, const PropertyM
   const std::string perspective = LookupLowerTrimmed(props, "perspective");
   if (!perspective.empty() && perspective != "none") {
     const float distance = _valueParser.parseAbsoluteLengthPx(perspective);
-    if (std::isfinite(distance) && distance > 0.0f) {
-      box.perspectivePx = distance;
+    if (std::isfinite(distance) && distance >= 0.0f) {
+      // CSS Transforms 2 §Perspective: values below 1px "must be treated as 1px for rendering
+      // purposes", the same rule `perspective()` follows, so `perspective: 0` is a 1px camera and
+      // only `none` disables the projection.
+      box.perspectivePx = distance < 1.0f ? 1.0f : distance;
     } else {
       _diagnostics.warn("html: perspective '" + perspective +
-                        "' must be a positive length; ignored");
+                        "' must be a non-negative length; ignored");
     }
   }
   if (box.perspectivePx > 0.0f) {
