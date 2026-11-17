@@ -981,15 +981,29 @@ struct SlideBuild {
 // slide's media numbering is offset by the running image total so all slides can
 // share the single ppt/media/ directory without file-name collisions.
 std::vector<SlideBuild> BuildSlides(const std::vector<PAGXDocument*>& documents,
-                                    const PPTExportOptions& options) {
+                                    const PPTExportOptions& options, std::string* errorMsg) {
   std::vector<SlideBuild> slides;
   if (documents.empty()) {
     return slides;
   }
+  // Reject every declared target view before laying out any page. ToFile() and ToData() both go
+  // through here, so a rejection cannot leave earlier pages partially laid out or let the two
+  // entry points disagree about which documents are exportable.
+  for (auto* doc : documents) {
+    if (doc != nullptr) {
+      std::string outputViewError;
+      if (!CheckOutputViewExportSupport(*doc, "PPT", &outputViewError)) {
+        if (errorMsg != nullptr) {
+          *errorMsg = std::move(outputViewError);
+        }
+        return {};
+      }
+    }
+  }
   slides.reserve(documents.size());
   int imageBase = 0;
   for (auto* doc : documents) {
-    if (doc == nullptr || doc->hasUnresolvedImports() || HasDeclaredOutputView(*doc)) {
+    if (doc == nullptr || doc->hasUnresolvedImports()) {
       return {};
     }
     auto errorCount = doc->errors.size();
@@ -1088,7 +1102,7 @@ bool WriteZipEntries(zipFile zf, const std::vector<SlideBuild>& slides, float sl
 
 bool PPTExporter::ToFile(const std::vector<PAGXDocument*>& documents, const std::string& filePath,
                          const Options& options) {
-  auto slides = BuildSlides(documents, options);
+  auto slides = BuildSlides(documents, options, nullptr);
   if (slides.empty()) {
     return false;
   }
@@ -1122,18 +1136,12 @@ bool PPTExporter::ToFile(const std::vector<PAGXDocument*>& documents, const std:
 
 std::shared_ptr<Data> PPTExporter::ToData(const std::vector<PAGXDocument*>& documents,
                                           const Options& options, std::string* errorMsg) {
-  for (auto* doc : documents) {
-    if (doc != nullptr && HasDeclaredOutputView(*doc)) {
-      if (errorMsg != nullptr) {
-        *errorMsg = "PPT export does not support documents with targetLayer/outputBounds.";
-      }
-      return nullptr;
-    }
-  }
-  auto slides = BuildSlides(documents, options);
+  std::string buildError;
+  auto slides = BuildSlides(documents, options, &buildError);
   if (slides.empty()) {
     if (errorMsg) {
-      *errorMsg = "failed to build PPTX slides from the supplied documents.";
+      *errorMsg = buildError.empty() ? "failed to build PPTX slides from the supplied documents."
+                                     : buildError;
     }
     return nullptr;
   }

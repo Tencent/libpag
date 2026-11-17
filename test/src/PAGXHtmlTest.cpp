@@ -266,9 +266,25 @@ CLI_TEST(PAGXHtmlTest, TargetViewZipExportRejected) {
       "<Layer id=\"target\"><Rectangle position=\"50,50\" size=\"100,100\"/>"
       "<Fill color=\"#3366FF\"/></Layer></pagx>");
   ASSERT_NE(doc, nullptr);
+  const std::string expected =
+      "HTML export does not support documents with targetLayer/outputBounds.";
+
   std::string error;
   EXPECT_EQ(pagx::HTMLExporter::ToData(*doc, {}, &error), nullptr);
-  EXPECT_EQ(error, "HTML export does not support documents with targetLayer/outputBounds.");
+  EXPECT_EQ(error, expected);
+
+  std::string htmlError;
+  auto html = pagx::HTMLExporter::ToHTML(*doc, ProjectPath::Absolute("test/out/PAGXHtmlTest"),
+                                         pagx::HTMLOutputMode::Fragment, {}, &htmlError);
+  EXPECT_TRUE(html.empty());
+  EXPECT_EQ(htmlError, expected);
+
+  auto outPath = ProjectPath::Absolute("test/out/PAGXHtmlTest/target_view_rejected.html");
+  std::filesystem::remove(outPath);
+  std::string fileError;
+  EXPECT_FALSE(pagx::HTMLExporter::ToFile(*doc, outPath, {}, &fileError));
+  EXPECT_EQ(fileError, expected);
+  EXPECT_FALSE(std::filesystem::exists(outPath));
 }
 
 CLI_TEST(PAGXHtmlTest, RootDocument) {

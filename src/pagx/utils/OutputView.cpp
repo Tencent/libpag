@@ -247,6 +247,18 @@ bool HasDeclaredOutputView(const PAGXDocument& document) {
          OutputViewDeclarationAccess::DeclaredBounds(document).has_value();
 }
 
+bool CheckOutputViewExportSupport(const PAGXDocument& document, const char* format,
+                                  std::string* errorMsg) {
+  if (!HasDeclaredOutputView(document)) {
+    return true;
+  }
+  if (errorMsg != nullptr) {
+    *errorMsg =
+        std::string(format) + " export does not support documents with targetLayer/outputBounds.";
+  }
+  return false;
+}
+
 uint64_t OutputViewValidationAccess::RegistryVersion(const PAGXDocument& document) {
   return document.nodeRegistryVersion;
 }

@@ -152,6 +152,38 @@ PAGX_TEST(PAGXPPTTest, EmptyDocument) {
   ASSERT_TRUE(ExportAndVerify(*doc, "empty_doc"));
 }
 
+/**
+ * Test case: PPT export rejects a deck when any page declares a target view, reports that reason
+ * from ToData, and rejects before laying out earlier pages.
+ */
+PAGX_TEST(PAGXPPTTest, TargetViewExportRejected) {
+  auto normal = pagx::PAGXImporter::FromXML(
+      "<pagx width=\"100\" height=\"100\"><Layer><Rectangle position=\"50,50\" "
+      "size=\"100,100\"/><Fill color=\"#3366FF\"/></Layer></pagx>");
+  auto target = pagx::PAGXImporter::FromXML(
+      "<pagx width=\"100\" height=\"100\" targetLayer=\"@target\" outputBounds=\"0,0,50,50\">"
+      "<Layer id=\"target\"><Rectangle position=\"50,50\" size=\"100,100\"/>"
+      "<Fill color=\"#3366FF\"/></Layer></pagx>");
+  ASSERT_NE(normal, nullptr);
+  ASSERT_NE(target, nullptr);
+  const std::string expected =
+      "PPT export does not support documents with targetLayer/outputBounds.";
+  std::vector<pagx::PAGXDocument*> documents = {normal.get(), target.get()};
+
+  std::string error;
+  EXPECT_EQ(pagx::PPTExporter::ToData(documents, {}, &error), nullptr);
+  EXPECT_EQ(error, expected);
+  EXPECT_FALSE(normal->isLayoutApplied());
+  EXPECT_FALSE(target->isLayoutApplied());
+
+  auto outPath = PPTOutDir() + "/target_view_rejected.pptx";
+  std::filesystem::remove(outPath);
+  EXPECT_FALSE(pagx::PPTExporter::ToFile(documents, outPath));
+  EXPECT_FALSE(std::filesystem::exists(outPath));
+
+  EXPECT_NE(pagx::PPTExporter::ToData({normal.get()}, {}), nullptr);
+}
+
 PAGX_TEST(PAGXPPTTest, RectangleSolidFill) {
   auto doc = pagx::PAGXDocument::Make(400, 300);
   auto* layer = doc->makeNode<pagx::Layer>();

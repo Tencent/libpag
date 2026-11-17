@@ -28,6 +28,7 @@
 #include "pagx/PAGXImporter.h"
 #include "pagx/PPTExporter.h"
 #include "pagx/SVGExporter.h"
+#include "pagx/utils/OutputView.h"
 
 namespace pagx::cli {
 
@@ -180,13 +181,23 @@ static int ExportToSVG(const ExportOptions& options) {
     std::cerr << "pagx export: error: unresolved import directive, run 'pagx resolve' first\n";
     return 1;
   }
+  std::string outputViewError;
+  if (!CheckOutputViewExportSupport(*document, "SVG", &outputViewError)) {
+    std::cerr << "pagx export: error: " << outputViewError << "\n";
+    return 1;
+  }
 
   SVGExporter::Options svgOptions = {};
   svgOptions.indent = options.svgIndent;
   svgOptions.xmlDeclaration = !options.svgNoXmlDeclaration;
   svgOptions.convertTextToPath = options.textToPath;
 
-  if (!SVGExporter::ToFile(*document, options.outputFile, svgOptions)) {
+  std::vector<std::string> warnings;
+  auto written = SVGExporter::ToFile(*document, options.outputFile, svgOptions, &warnings);
+  for (const auto& warning : warnings) {
+    std::cerr << "pagx export: warning: " << warning << "\n";
+  }
+  if (!written) {
     std::cerr << "pagx export: error: failed to write '" << options.outputFile << "'\n";
     return 1;
   }
@@ -207,6 +218,11 @@ static int ExportToHTML(const ExportOptions& options) {
   }
   if (document->hasUnresolvedImports()) {
     std::cerr << "pagx export: error: unresolved import directive, run 'pagx resolve' first\n";
+    return 1;
+  }
+  std::string outputViewError;
+  if (!CheckOutputViewExportSupport(*document, "HTML", &outputViewError)) {
+    std::cerr << "pagx export: error: " << outputViewError << "\n";
     return 1;
   }
 
@@ -235,6 +251,11 @@ static int ExportToPPT(const ExportOptions& options) {
     if (document->hasUnresolvedImports()) {
       std::cerr << "pagx export: error: unresolved import directive in '" << inputFile
                 << "', run 'pagx resolve' first\n";
+      return 1;
+    }
+    std::string outputViewError;
+    if (!CheckOutputViewExportSupport(*document, "PPT", &outputViewError)) {
+      std::cerr << "pagx export: error: " << inputFile << ": " << outputViewError << "\n";
       return 1;
     }
     documents.emplace_back(std::move(document));

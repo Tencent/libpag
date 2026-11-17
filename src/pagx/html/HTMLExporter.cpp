@@ -200,9 +200,6 @@ static std::string WrapAsHTMLDocument(const std::string& fragment, float width, 
 
 namespace {
 
-constexpr const char* OutputViewExportError =
-    "HTML export does not support documents with targetLayer/outputBounds.";
-
 std::string BuildHTML(PAGXDocument& doc, HTMLOutputMode mode, const HTMLExporter::Options& options,
                       HTMLWriterContext& ctx) {
   if (!doc.isLayoutApplied()) {
@@ -314,10 +311,7 @@ std::string BuildHTML(PAGXDocument& doc, HTMLOutputMode mode, const HTMLExporter
 std::string HTMLExporter::ToHTML(PAGXDocument& doc, const std::string& resourceDir,
                                  HTMLOutputMode mode, const Options& options,
                                  std::string* errorMsg) {
-  if (HasDeclaredOutputView(doc)) {
-    if (errorMsg != nullptr) {
-      *errorMsg = OutputViewExportError;
-    }
+  if (!CheckOutputViewExportSupport(doc, "HTML", errorMsg)) {
     return {};
   }
   if (resourceDir.empty()) {
@@ -420,10 +414,7 @@ bool HTMLExporter::ToFile(PAGXDocument& document, const std::string& filePath,
 
 std::shared_ptr<Data> HTMLExporter::ToData(PAGXDocument& document, const Options& options,
                                            std::string* errorMsg) {
-  if (HasDeclaredOutputView(document)) {
-    if (errorMsg != nullptr) {
-      *errorMsg = OutputViewExportError;
-    }
+  if (!CheckOutputViewExportSupport(document, "HTML", errorMsg)) {
     return nullptr;
   }
 #if defined(PAG_BUILD_HTML) || defined(PAG_BUILD_PPT)

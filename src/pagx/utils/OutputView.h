@@ -70,6 +70,19 @@ OutputViewStatus ResolveOutputView(const PAGXDocument* document, const Layer** t
 bool HasDeclaredOutputView(const PAGXDocument& document);
 
 /**
+ * Rejects a document that declares a target view when the calling exporter cannot honor it.
+ * Centralizes the support check and the diagnostic so every exporter reports the same rule.
+ * @param document the document to inspect.
+ * @param format the exporter name used in the diagnostic, for example "SVG".
+ * @param errorMsg optional out parameter that receives the rejection reason when the document is
+ *        rejected.
+ * @return true when the document declares no target view and may be exported; false when it must
+ *         be rejected.
+ */
+bool CheckOutputViewExportSupport(const PAGXDocument& document, const char* format,
+                                  std::string* errorMsg);
+
+/**
  * Returns true when the rectangle is usable as a target view window: all components are finite,
  * width and height are greater than zero, and the computed far edges stay finite. Shared by the
  * importer and the runtime resolver so both entry points apply one numeric rule.

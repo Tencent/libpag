@@ -479,19 +479,48 @@ CLI_TEST(PAGXCliTest, Render_TargetViewExplicitSelectionWins) {
 }
 
 CLI_TEST(PAGXCliTest, Export_TargetViewRejectedByWriters) {
-  auto path = WriteTempRenderFile(
-      "export_target_view.pagx",
-      "<pagx width=\"100\" height=\"100\" targetLayer=\"@target\" outputBounds=\"0,0,50,50\">\n"
-      "  <Layer id=\"target\">\n"
-      "    <Rectangle position=\"50,50\" size=\"100,100\"/>\n"
-      "    <Fill color=\"#3366FF\"/>\n"
-      "  </Layer>\n"
-      "</pagx>\n");
-  for (const auto* format : {"svg", "html", "pptx"}) {
-    auto output = TempDir() + "/export_target_view." + format;
-    auto ret = CallRun(pagx::cli::RunExport,
-                       {"export", "--format", format, "--input", path, "--output", output});
-    EXPECT_NE(ret, 0) << format;
+  struct ViewCase {
+    const char* name;
+    const char* attributes;
+  };
+  const ViewCase cases[] = {
+      {"paired", "targetLayer=\"@target\" outputBounds=\"0,0,50,50\""},
+      {"single_field", "targetLayer=\"@target\""},
+      {"invalid_bounds", "targetLayer=\"@target\" outputBounds=\"0,0,0,50\""},
+      {"missing_target", "targetLayer=\"@missing\" outputBounds=\"0,0,50,50\""},
+      {"unparsed_bounds", "targetLayer=\"@target\" outputBounds=\"0,0,bad,50\""},
+  };
+  struct FormatCase {
+    const char* cliName;
+    const char* exportLabel;
+  };
+  const FormatCase formats[] = {{"svg", "SVG"}, {"html", "HTML"}, {"pptx", "PPT"}};
+  for (const auto& viewCase : cases) {
+    auto fileName = "export_target_view_" + std::string(viewCase.name) + ".pagx";
+    auto path = WriteTempRenderFile(
+        fileName, "<pagx width=\"100\" height=\"100\" " + std::string(viewCase.attributes) +
+                      ">\n"
+                      "  <Layer id=\"target\">\n"
+                      "    <Rectangle position=\"50,50\" size=\"100,100\"/>\n"
+                      "    <Fill color=\"#3366FF\"/>\n"
+                      "  </Layer>\n"
+                      "</pagx>\n");
+    for (const auto& format : formats) {
+      auto output = TempDir() + "/export_target_view_" + viewCase.name + "." + format.cliName;
+      std::filesystem::remove(output);
+      StreamCapture errCapture(std::cerr);
+      auto ret = CallRun(pagx::cli::RunExport, {"export", "--format", format.cliName, "--input",
+                                                path, "--output", output});
+      auto stderrText = errCapture.str();
+      EXPECT_NE(ret, 0) << viewCase.name << " " << format.cliName;
+      auto expected = std::string(format.exportLabel) +
+                      " export does not support documents with targetLayer/outputBounds.";
+      EXPECT_NE(stderrText.find(expected), std::string::npos)
+          << viewCase.name << " " << format.cliName << ": " << stderrText;
+      EXPECT_EQ(stderrText.find("failed to write"), std::string::npos)
+          << viewCase.name << " " << format.cliName << ": " << stderrText;
+      EXPECT_FALSE(std::filesystem::exists(output)) << viewCase.name << " " << format.cliName;
+    }
   }
 }
 

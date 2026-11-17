@@ -3499,9 +3499,10 @@ std::string SVGWriter::writeScrollRectClipDef(const Layer* layer) {
 
 std::string SVGExporter::ToSVG(PAGXDocument& doc, const Options& options,
                                std::vector<std::string>* warnings) {
-  if (HasDeclaredOutputView(doc)) {
+  std::string outputViewError;
+  if (!CheckOutputViewExportSupport(doc, "SVG", &outputViewError)) {
     if (warnings != nullptr) {
-      warnings->push_back("SVG export does not support documents with targetLayer/outputBounds.");
+      warnings->push_back(outputViewError);
     }
     return {};
   }
