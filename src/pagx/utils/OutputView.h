@@ -70,6 +70,20 @@ OutputViewStatus ResolveOutputView(const PAGXDocument* document, const Layer** t
 bool HasDeclaredOutputView(const PAGXDocument& document);
 
 /**
+ * Returns true when the rectangle is usable as a target view window: all components are finite,
+ * width and height are greater than zero, and the computed far edges stay finite. Shared by the
+ * importer and the runtime resolver so both entry points apply one numeric rule.
+ * @param bounds the rectangle to validate.
+ */
+bool IsValidOutputBounds(const Rect& bounds);
+
+/**
+ * Returns the human-readable requirement that a valid target view window must satisfy. Shared by
+ * the importer and the runtime resolver so both diagnostics describe the same rule.
+ */
+const char* OutputBoundsRequirement();
+
+/**
  * Grants internal validation helpers read access to the node registration version kept on
  * PAGXDocument.
  */

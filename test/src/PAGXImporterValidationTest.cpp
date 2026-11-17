@@ -16,6 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include <limits>
 #include <string>
 #include <vector>
 #include "pagx/PAGScene.h"
@@ -273,6 +274,49 @@ PAGX_TEST(PAGXImporterValidationTest, OutputViewBoundsAcceptWhitespaceAndExponen
   EXPECT_EQ(doc->outputBounds->y, 20.0f);
   EXPECT_EQ(doc->outputBounds->width, 30.0f);
   EXPECT_EQ(doc->outputBounds->height, 40.0f);
+}
+
+/**
+ * Test case: the importer's text parser and the runtime resolver apply the same numeric rule, so
+ * the same geometry is accepted or rejected through both entry points.
+ */
+PAGX_TEST(PAGXImporterValidationTest, OutputViewBoundsValidationIsShared) {
+  struct BoundsCase {
+    const char* text;
+    pagx::Rect bounds;
+    bool valid;
+  };
+  const BoundsCase cases[] = {
+      {"0,0,10,20", pagx::Rect::MakeXYWH(0, 0, 10, 20), true},
+      {"-10,-20,30,40", pagx::Rect::MakeXYWH(-10, -20, 30, 40), true},
+      {"0,0,1e-10,3e-30", pagx::Rect::MakeXYWH(0, 0, 1e-10f, 3e-30f), true},
+      {"0,0,1e-45,1e-45", pagx::Rect::MakeXYWH(0, 0, 1e-45f, 1e-45f), true},
+      {"0,0,0,40", pagx::Rect::MakeXYWH(0, 0, 0, 40), false},
+      {"0,0,-0,40", pagx::Rect::MakeXYWH(0, 0, -0.0f, 40), false},
+      {"0,0,80,-1", pagx::Rect::MakeXYWH(0, 0, 80, -1), false},
+      {"0,0,inf,40", pagx::Rect::MakeXYWH(0, 0, std::numeric_limits<float>::infinity(), 40), false},
+      {"0,0,nan,40", pagx::Rect::MakeXYWH(0, 0, std::numeric_limits<float>::quiet_NaN(), 40),
+       false},
+      {"3.4e38,0,3.4e38,40", pagx::Rect::MakeXYWH(3.4e38f, 0, 3.4e38f, 40), false},
+      {"0,3.4e38,40,3.4e38", pagx::Rect::MakeXYWH(0, 3.4e38f, 40, 3.4e38f), false},
+  };
+  auto programmatic = pagx::PAGXImporter::FromXML(
+      "<pagx width=\"100\" height=\"100\" targetLayer=\"@target\" "
+      "outputBounds=\"0,0,10,10\"><Layer id=\"target\"/></pagx>");
+  ASSERT_NE(programmatic, nullptr);
+  ASSERT_TRUE(programmatic->errors.empty());
+  for (const auto& testCase : cases) {
+    std::string xml = "<pagx width=\"100\" height=\"100\" targetLayer=\"@target\" outputBounds=\"" +
+                      std::string(testCase.text) + "\"><Layer id=\"target\"/></pagx>";
+    auto imported = pagx::PAGXImporter::FromXML(xml);
+    ASSERT_NE(imported, nullptr) << testCase.text;
+    EXPECT_EQ(imported->errors.empty(), testCase.valid) << testCase.text;
+
+    programmatic->outputBounds = testCase.bounds;
+    auto status = pagx::ResolveOutputView(programmatic.get(), nullptr, nullptr);
+    EXPECT_EQ(status == pagx::OutputViewStatus::Valid, testCase.valid) << testCase.text;
+    EXPECT_EQ(pagx::IsValidOutputBounds(testCase.bounds), testCase.valid) << testCase.text;
+  }
 }
 
 /**

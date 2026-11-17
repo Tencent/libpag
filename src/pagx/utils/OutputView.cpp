@@ -27,18 +27,22 @@
 
 namespace pagx {
 
-namespace {
-
-bool IsFiniteRect(const Rect& rect) {
-  if (!std::isfinite(rect.x) || !std::isfinite(rect.y) || !std::isfinite(rect.width) ||
-      !std::isfinite(rect.height)) {
-    return false;
-  }
-  if (rect.width <= 0 || rect.height <= 0) {
-    return false;
-  }
-  return std::isfinite(rect.x + rect.width) && std::isfinite(rect.y + rect.height);
+const char* OutputBoundsRequirement() {
+  return "'x,y,width,height' with finite components and positive width/height";
 }
+
+bool IsValidOutputBounds(const Rect& bounds) {
+  if (!std::isfinite(bounds.x) || !std::isfinite(bounds.y) || !std::isfinite(bounds.width) ||
+      !std::isfinite(bounds.height)) {
+    return false;
+  }
+  if (bounds.width <= 0 || bounds.height <= 0) {
+    return false;
+  }
+  return std::isfinite(bounds.x + bounds.width) && std::isfinite(bounds.y + bounds.height);
+}
+
+namespace {
 
 bool IsValidTargetId(const std::string& id) {
   if (id.empty()) {
@@ -187,11 +191,9 @@ OutputViewStatus ResolveOutputView(const PAGXDocument* document, const Layer** t
     return ReportInvalid(error, "Invalid 'targetLayer' value '" + document->targetLayerId +
                                     "': the id must be non-empty and contain no whitespace.");
   }
-  if (!IsFiniteRect(*document->outputBounds)) {
+  if (!IsValidOutputBounds(*document->outputBounds)) {
     return ReportInvalid(
-        error,
-        "Invalid 'outputBounds': all components must be finite and width/height must "
-        "be greater than zero.");
+        error, std::string("Invalid 'outputBounds': expected ") + OutputBoundsRequirement() + ".");
   }
   std::unordered_set<const PAGXDocument*> visitedDocuments;
   if (HasDynamicContent(document, visitedDocuments)) {

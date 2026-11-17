@@ -3120,7 +3120,8 @@ std::shared_ptr<PAGXDocument> PAGXImporter::FromXML(const uint8_t* data, size_t 
 }
 
 // Strictly parses four comma-separated numbers so missing separators and trailing junk are
-// rejected instead of silently producing a window that later renders the wrong region.
+// rejected instead of silently producing a window that later renders the wrong region. Only the
+// text format is checked here; the numeric rule lives in IsValidOutputBounds().
 static bool ParseOutputBounds(const std::string& str, Rect* rect) {
   const char* ptr = str.c_str();
   const char* end = ptr + str.size();
@@ -3143,11 +3144,6 @@ static bool ParseOutputBounds(const std::string& str, Rect* rect) {
     }
   }
   if (ptr != end) {
-    return false;
-  }
-  if (!std::isfinite(rect->x) || !std::isfinite(rect->y) || !std::isfinite(rect->width) ||
-      !std::isfinite(rect->height) || rect->width <= 0 || rect->height <= 0 ||
-      !std::isfinite(rect->x + rect->width) || !std::isfinite(rect->y + rect->height)) {
     return false;
   }
   return true;
@@ -3182,7 +3178,7 @@ static void ParseOutputView(const DOMNode* root, PAGXDocument* doc) {
   const auto& boundsAttr = *declaredOutputBounds;
   bool targetValid = targetAttr.size() >= 2 && targetAttr[0] == '@';
   Rect bounds = {};
-  bool boundsValid = ParseOutputBounds(boundsAttr, &bounds);
+  bool boundsValid = ParseOutputBounds(boundsAttr, &bounds) && IsValidOutputBounds(bounds);
   if (!targetValid) {
     ReportError(doc, root,
                 "Invalid value '" + targetAttr +
@@ -3190,9 +3186,8 @@ static void ParseOutputView(const DOMNode* root, PAGXDocument* doc) {
   }
   if (!boundsValid) {
     ReportError(doc, root,
-                "Invalid value '" + boundsAttr +
-                    "' for 'outputBounds' attribute. Expected 'x,y,width,height' with finite "
-                    "components and positive width/height.");
+                "Invalid value '" + boundsAttr + "' for 'outputBounds' attribute. Expected " +
+                    OutputBoundsRequirement() + ".");
   }
   // Keep whichever attribute parsed so ResolveOutputView() blames the attribute that actually
   // failed instead of blaming the one that was never reached.
