@@ -292,7 +292,7 @@ bool VideoExporter::ResolveSampling(const Options& options, const PlaybackPlan& 
     }
     *frameRate = {static_cast<int64_t>(plan.documentFrameRate), 1};
   }
-  if (automaticFrameRate && frameRate->numerator == 0) {
+  if (automaticFrameRate && frameRate->frameRateNumerator == 0) {
     *frameRate = {DefaultFrameRate, 1};
   }
   auto samplingRate = frameRate->framesPerSecond();
