@@ -23,6 +23,11 @@
 #include <memory>
 #include <string>
 #include <vector>
+#ifdef _WIN32
+#include <windows.h>
+#else
+#include <sys/types.h>
+#endif
 #include "pagx/VideoExporter.h"
 
 namespace pagx::cli {
@@ -153,7 +158,21 @@ class VideoEncoder {
   std::string abort();
 
  private:
-  struct ChildProcess;
+  struct ChildProcess {
+#ifdef _WIN32
+    HANDLE process = nullptr;
+    HANDLE thread = nullptr;
+    HANDLE stdinPipe = nullptr;
+#else
+    pid_t processId = -1;
+    int stdinPipe = -1;
+    int execErrorPipe = -1;
+    int execError = 0;
+#endif
+    bool reaped = false;
+    bool exitStatusValid = false;
+    int exitCode = 0;
+  };
 
   VideoEncoder(const VideoEncodeOptions& options, std::string partFile,
                std::string stagingDirectory);

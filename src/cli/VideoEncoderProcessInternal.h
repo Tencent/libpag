@@ -19,31 +19,10 @@
 #pragma once
 
 #include "cli/VideoEncoder.h"
-#ifdef _WIN32
-#include <windows.h>
-#else
-#include <sys/types.h>
-#endif
 
 namespace pagx::cli {
 
 void SetError(std::string* errorMsg, const std::string& text);
-
-struct VideoEncoder::ChildProcess {
-#ifdef _WIN32
-  HANDLE process = nullptr;
-  HANDLE thread = nullptr;
-  HANDLE stdinPipe = nullptr;
-#else
-  pid_t processId = -1;
-  int stdinPipe = -1;
-  int execErrorPipe = -1;
-  int execError = 0;
-#endif
-  bool reaped = false;
-  bool exitStatusValid = false;
-  int exitCode = 0;
-};
 
 #ifdef _WIN32
 bool CreatePrivateDirectory(const std::string& path, DWORD* error);
