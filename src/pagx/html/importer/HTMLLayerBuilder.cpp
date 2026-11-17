@@ -696,6 +696,7 @@ void HTMLLayerBuilder::applyBackdropFilter(Layer* layer, const HTMLBoxAttributes
 
 void HTMLLayerBuilder::applyBoxTransform(Layer* layer, const HTMLBoxAttributes& box) {
   if (!box.transform.valid) {
+    applyBareParentCamera(layer, box);
     return;
   }
   // A `perspective` declared on the parent projects this element's pose; `PlacePose` folds it in and
@@ -731,6 +732,29 @@ void HTMLLayerBuilder::applyBoxTransform(Layer* layer, const HTMLBoxAttributes& 
     layer->anchorZ = box.transform.originZ;
   }
   layer->matrix3D = placement.pose;
+}
+
+void HTMLLayerBuilder::applyBareParentCamera(Layer* layer, const HTMLBoxAttributes& box) {
+  // `transform-style: preserve-3d` keeps the children in the same 3D space as this layer, so the
+  // parent camera has to be materialised here even though the layer has no pose of its own: PAGX
+  // folds the projection into the layer that owns the pose, and a layer that never writes one ends
+  // the camera chain, leaving every descendant pose orthographically rendered. The camera is not
+  // forwarded past this layer — CSS applies a `perspective` to direct children only.
+  if (!box.preserve3D || !(box.parentPerspectivePx > 0.0f)) {
+    return;
+  }
+  // The bare projection, conjugated about `perspective-origin` the same way a pose is.
+  const Matrix3D projection =
+      PushPerspective(Matrix3D{}, box.parentPerspectivePx, box.localPerspectiveOriginX,
+                      box.localPerspectiveOriginY);
+  // A camera far enough away reads as flat (see `IsFlatTransform`), so it carries no visible
+  // projection and stays off the 3D channel like every other flat pose.
+  if (IsFlatTransform(projection)) {
+    return;
+  }
+  // No `anchor` / `anchorZ` here: the conjugation above already carries the origin pivot, and the
+  // layer has no transform-origin of its own to honour.
+  layer->matrix3D = projection;
 }
 
 void HTMLLayerBuilder::applyLayerAttributes(Layer* layer, const std::shared_ptr<DOMNode>& element,

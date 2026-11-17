@@ -144,6 +144,7 @@ class HTMLLayerBuilder {
                          bool& emitted);
   void applyBoxShadows(Layer* layer, const HTMLBoxAttributes& box, bool& emitted);
   void applyBackdropFilter(Layer* layer, const HTMLBoxAttributes& box, bool& emitted);
+  void applyBareParentCamera(Layer* layer, const HTMLBoxAttributes& box);
 
   HTMLDiagnosticSink& _diagnostics;
   HTMLValueParser& _valueParser;

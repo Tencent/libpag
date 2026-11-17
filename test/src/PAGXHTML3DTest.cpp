@@ -187,6 +187,22 @@ pagx::TypedChannel<pagx::Matrix3D>* FindMatrix3DChannel(pagx::Animation* animati
   return static_cast<pagx::TypedChannel<pagx::Matrix3D>*>(channel);
 }
 
+// Composes two layer poses, so a test can assert what a child's pose becomes once an ancestor
+// layer's transform is applied to it.
+pagx::Matrix3D MultiplyPose(const pagx::Matrix3D& left, const pagx::Matrix3D& right) {
+  pagx::Matrix3D result = {};
+  for (int row = 0; row < 4; ++row) {
+    for (int column = 0; column < 4; ++column) {
+      float sum = 0.0f;
+      for (int i = 0; i < 4; ++i) {
+        sum += left.getRowColumn(row, i) * right.getRowColumn(i, column);
+      }
+      result.setRowColumn(row, column, sum);
+    }
+  }
+  return result;
+}
+
 // Renders one frame through the runtime path (PAGScene + PAGSurface), matching the CLI player.
 std::vector<uint8_t> RenderFrame(const std::shared_ptr<pagx::PAGXDocument>& doc,
                                  int64_t timeUs = 0) {
@@ -864,6 +880,144 @@ PAG_TEST(PAGXHTML3DTest, PAGXTextHostKeepsParentPerspective) {
     }
   }
   EXPECT_TRUE(sawProjection) << "the parent perspective must reach the text host pose";
+}
+
+/**
+ * Test case: a `transform-style: preserve-3d` layer without a transform of its own still has to
+ * carry the camera its parent declared. CSS keeps the grandchildren in the same 3D space, so the
+ * projection has to be materialised on the intermediate layer; without it the camera chain ends
+ * there and every descendant pose is rendered orthographically, with no diagnostic.
+ */
+PAG_TEST(PAGXHTML3DTest, Preserve3DWithoutOwnTransformCarriesTheParentCamera) {
+  auto doc = ParseHtml(R"HTML(
+    <html><body style="width:200px;height:120px">
+      <div style="position:absolute;left:0;top:0;width:200px;height:120px;perspective:600px;
+           perspective-origin:0px 0px">
+        <div id="stage" style="position:absolute;left:0;top:0;width:200px;height:120px;
+             transform-style:preserve-3d">
+          <div id="card" style="position:absolute;left:20px;top:20px;width:80px;height:60px;
+               background-color:#38BDF8;transform:rotateY(45deg);transform-origin:0px 30px"></div>
+        </div>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  EXPECT_FALSE(HasDiagnosticContaining(doc, "vanishing point"));
+  auto* stage = FindLayerById(doc, "stage");
+  auto* card = FindLayerById(doc, "card");
+  ASSERT_NE(stage, nullptr);
+  ASSERT_NE(card, nullptr);
+  ASSERT_TRUE(stage->preserve3D);
+  // The intermediate layer materialises the bare projection. Its `perspective-origin` is the parent
+  // box's top-left corner and the layer sits on it, so the conjugation leaves the plain `P`.
+  EXPECT_TRUE(NearlyEqual(stage->matrix3D.getRowColumn(3, 2), -1.0f / 600.0f, 1e-6f));
+  EXPECT_TRUE(NearlyEqual(stage->matrix3D.getRowColumn(3, 0), 0.0f, 1e-6f));
+  EXPECT_TRUE(NearlyEqual(stage->matrix3D.getRowColumn(3, 1), 0.0f, 1e-6f));
+  EXPECT_TRUE(NearlyEqual(stage->matrix3D.getRowColumn(3, 3), 1.0f, 1e-6f));
+  // The bare projection is pivot-free, so it must not claim an anchor.
+  EXPECT_TRUE(HasZeroAnchor(stage));
+  EXPECT_TRUE(pagx::IsInvertibleMatrix3D(stage->matrix3D))
+      << "the materialised camera has to be a legal PAGX pose";
+  // The card keeps its own pose and the camera reaches it through the intermediate layer.
+  EXPECT_TRUE(NearlyEqual(card->matrix3D.getRowColumn(0, 0), 0.707106f, 0.001f));
+  EXPECT_TRUE(NearlyEqual(card->matrix3D.getRowColumn(2, 0), -0.707106f, 0.001f));
+  const auto composed = MultiplyPose(stage->matrix3D, card->matrix3D);
+  // `-1/600` times the pose's Z row: the grandchild is projected, not merely rotated.
+  EXPECT_TRUE(NearlyEqual(composed.getRowColumn(3, 0), 0.0011785f, 1e-5f));
+  EXPECT_TRUE(NearlyEqual(composed.getRowColumn(3, 2), -0.0011785f, 1e-5f));
+}
+
+/**
+ * Test case: `perspective-origin` still conjugates the camera materialised on a `preserve-3d` layer.
+ * The default origin is the parent box's centre, so the projection picks up the shear that moves the
+ * vanishing point away from the layer origin.
+ */
+PAG_TEST(PAGXHTML3DTest, MaterializedCameraConjugatesPerspectiveOrigin) {
+  auto doc = ParseHtml(R"HTML(
+    <html><body style="width:200px;height:120px">
+      <div style="position:absolute;left:0;top:0;width:200px;height:120px;perspective:600px">
+        <div id="stage" style="position:absolute;left:0;top:0;width:200px;height:120px;
+             transform-style:preserve-3d">
+          <div id="card" style="position:absolute;left:20px;top:20px;width:80px;height:60px;
+               background-color:#38BDF8;transform:rotateY(45deg)"></div>
+        </div>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* stage = FindLayerById(doc, "stage");
+  ASSERT_NE(stage, nullptr);
+  // The layer sits at the parent's origin, so the camera centre is the parent box centre (100, 60):
+  // `T(o) * P * T(-o)` shears x / y by `-o/d` and keeps the projection in the bottom row.
+  EXPECT_TRUE(NearlyEqual(stage->matrix3D.getRowColumn(0, 2), -100.0f / 600.0f, 1e-5f));
+  EXPECT_TRUE(NearlyEqual(stage->matrix3D.getRowColumn(1, 2), -60.0f / 600.0f, 1e-5f));
+  EXPECT_TRUE(NearlyEqual(stage->matrix3D.getRowColumn(2, 2), 1.0f, 1e-6f));
+  EXPECT_TRUE(NearlyEqual(stage->matrix3D.getRowColumn(3, 2), -1.0f / 600.0f, 1e-6f));
+  EXPECT_TRUE(NearlyEqual(stage->matrix3D.getRowColumn(0, 3), 0.0f, 1e-6f));
+  EXPECT_TRUE(NearlyEqual(stage->matrix3D.getRowColumn(1, 3), 0.0f, 1e-6f));
+}
+
+/**
+ * Test case: without `transform-style: preserve-3d` the intermediate layer flattens its subtree, so
+ * the parent camera stops there. That is the documented CSS behaviour of a plain 2D layer and must
+ * not become a three-level camera push.
+ */
+PAG_TEST(PAGXHTML3DTest, PlainIntermediateLayerEndsTheCameraChain) {
+  auto doc = ParseHtml(R"HTML(
+    <html><body style="width:200px;height:120px">
+      <div style="position:absolute;left:0;top:0;width:200px;height:120px;perspective:600px;
+           perspective-origin:0px 0px">
+        <div id="stage" style="position:absolute;left:0;top:0;width:200px;height:120px">
+          <div id="card" style="position:absolute;left:20px;top:20px;width:80px;height:60px;
+               background-color:#38BDF8;transform:rotateY(45deg)"></div>
+        </div>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* stage = FindLayerById(doc, "stage");
+  auto* card = FindLayerById(doc, "card");
+  ASSERT_NE(stage, nullptr);
+  ASSERT_NE(card, nullptr);
+  EXPECT_FALSE(stage->preserve3D);
+  EXPECT_TRUE(stage->matrix3D.isIdentity());
+  EXPECT_TRUE(stage->matrix.isIdentity());
+  // The card keeps its own 3D pose but is no longer projected by the ancestor camera.
+  EXPECT_TRUE(NearlyEqual(card->matrix3D.getRowColumn(0, 0), 0.707106f, 0.001f));
+  const auto composed = MultiplyPose(stage->matrix3D, card->matrix3D);
+  EXPECT_TRUE(NearlyEqual(composed.getRowColumn(3, 0), 0.0f, 1e-6f));
+  EXPECT_TRUE(NearlyEqual(composed.getRowColumn(3, 2), 0.0f, 1e-6f));
+}
+
+/**
+ * Test case: a `preserve-3d` layer that has its own transform keeps the existing single-fold route.
+ * `translateZ(0)` is a flat pose pivoted on the plane, so the camera does not apply and the layer
+ * writes no projection — the camera reaches the subtree through the pose alone.
+ */
+PAG_TEST(PAGXHTML3DTest, Preserve3DWithOwnFlatTransformKeepsTheExistingRoute) {
+  auto doc = ParseHtml(R"HTML(
+    <html><body style="width:200px;height:120px">
+      <div style="position:absolute;left:0;top:0;width:200px;height:120px;perspective:600px;
+           perspective-origin:0px 0px">
+        <div id="stage" style="position:absolute;left:0;top:0;width:200px;height:120px;
+             transform-style:preserve-3d;transform:translateZ(0px)">
+          <div id="card" style="position:absolute;left:20px;top:20px;width:80px;height:60px;
+               background-color:#38BDF8;transform:rotateY(45deg)"></div>
+        </div>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* stage = FindLayerById(doc, "stage");
+  auto* card = FindLayerById(doc, "card");
+  ASSERT_NE(stage, nullptr);
+  ASSERT_NE(card, nullptr);
+  EXPECT_TRUE(stage->preserve3D);
+  EXPECT_TRUE(stage->matrix3D.isIdentity());
+  EXPECT_TRUE(stage->matrix.isIdentity());
+  const auto composed = MultiplyPose(stage->matrix3D, card->matrix3D);
+  EXPECT_TRUE(NearlyEqual(composed.getRowColumn(3, 0), 0.0f, 1e-6f));
+  EXPECT_TRUE(NearlyEqual(composed.getRowColumn(3, 2), 0.0f, 1e-6f));
 }
 
 /**
