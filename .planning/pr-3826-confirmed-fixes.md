@@ -195,8 +195,8 @@ class OutputTargetState {
 
 1. 输出状态持有 root、target 绑定信息与共享挂接工具；wrapper、原 parent 和位置、外部 mask owner 等恢复数据由 `RasterLayerParent` 唯一维护，并保存可靠引用。析构通过幂等的 `reset()` 释放工具，避免依赖已被释放的 runtime 裸指针。
 2. `prepare()` 校验所属树后，使用已有挂接工具准备 identity wrapper，再显式启用外部 mask owner 的释放能力。target 自身的 mask 以及 target 子树内部的关系保持原有规则。准备失败由工具回滚，不在输出状态里复制恢复算法。
-3. 外部 mask ownership 在 scene 准备态期间保持解除，工具随 `reset()` 释放时恢复。此处修改的是 runtime 层关系，PAGXDocument 中的源节点和 mask 声明保持原样。
-4. `draw()` 委托共享工具检查准备态和挂接关系，再沿用 wrapper 到 root 的实时相对矩阵绘制；仅做 canvas 的作用域保存和恢复。热路径不调用 `FindMaskOwner()`、`Layer::Make()`、换父或 `setMask()`。
+3. 普通 target 的 wrapper 在 scene 准备态期间保留。2026 年 11 月 17 日复核确认，target 被外部层用作 mask 时，长期解除 ownership 会改变公开聚合 bounds；按本次五项修复授权，此类 target 改用共享工具的单次挂接，绘制结束即恢复原 parent 和 mask，输出状态本身继续保存 root/target 绑定。PAGXDocument 中的源节点和 mask 声明保持原样。
+4. `draw()` 委托共享工具检查准备态和挂接关系，再沿用 wrapper 到 root 的实时相对矩阵绘制，并作用域保存和恢复 canvas。普通 target 的热路径不调用 `FindMaskOwner()`、`Layer::Make()`、换父或 `setMask()`；外部 mask target 为保持查询语义，每次绘制重新准备并恢复。
 5. 保留原树中的祖先和兄弟，继续让 TGFX 采样原有背景。target 的 transform、alpha、visibility、mask、scrollRect 和混合行为仍由同一 wrapper 合成路径应用一次。
 6. CLI 的 `DrawOutputTarget()` 创建局部输出状态，依次 prepare、draw，在作用域结束时 reset；`RenderMaskedLayer()` 继续使用单次作用域的共享挂接工具。scene 只延长该工具的生命周期，不形成另一套准备与恢复逻辑。
 
@@ -220,7 +220,7 @@ class OutputTargetState {
 
 命中测试、全局矩阵和 bounds 查询保持只读。identity wrapper 不应改变坐标结果，子树归属继续按实际 runtime 层级判定，查询结果不暴露内部 wrapper。保留 `outputViewDirty` 对文档、资源和显示参数的跟踪，并将注释从每帧临时换父的说明更新为直接渲染模式下的变更跟踪。
 
-聚合 bounds 需要单独验证：target 原先作为 mask 时会被祖先聚合边界排除，长驻准备态解除 ownership 后，root 或外部祖先的 `getBounds()`、`getGlobalBounds()` 结果可能改变。identity wrapper 不能单独保证这些查询兼容。实施时先补 prepare 前后的对比用例，保留原有查询语义；若需要调整已确认的缓存或恢复策略，先向用户说明并确认，不能静默改变 API 行为。
+聚合 bounds 由 `TargetViewMaskOwnershipKeepsBoundsStable` 覆盖：验证 root、外部祖先、mask owner、target 的局部及全局查询在重复绘制和显示变换后保持一致，验证 runtime parent/mask 恢复及多个 scene 互不影响。普通目标的稳定复用仍由 `TargetViewReusesPreparedWrapper` 覆盖。
 
 ### 验收与性能对比
 
@@ -516,6 +516,12 @@ const Layer* ResolveOutputTargetLayer(const PAGXDocument* document, std::string*
 有效输出视图的几何关系为：`surfacePoint = effectiveOffset + effectiveScale * (rootPoint - bounds.origin)`。裁剪已由 `renderTo()` 实现；ceil 多出的边缘属于未被内容覆盖的区域，是否透明还取决于背景色。文档应描述当前已生效的裁剪行为。
 
 此项不新增公开尺寸 API、不改变状态、绘制或 CLI 行为。复用 `PAGXRuntimeTest.OutputViewDisplayChangesInvalidateRenderedContent`、`RepeatedTargetViewDrawKeepsCanvasState` 和输出裁剪用例核对文档契约。文档修改本身不新增镜像实现的测试；host 适配涉及的尺寸和坐标验收见对应章节。
+
+## 2026 年 11 月 17 日五项复核修正
+
+用户已要求修复本地 review 的五项问题，并在修复后合并最新 main、提交及推送。除上述外部 mask target 的作用域恢复外，本轮同时缩小失败恢复测试的 DeviceLockScope 范围，避免 Metal 等共享设备后端重入锁；Qt 加载和 XML Apply 使用浮点逻辑窗口尺寸，整数展示宽高安全向上取整；微信 parse/build、基础 fit、评论 origin、图片 bounds 和资源 viewport 同步输出窗口；API 文档明确实际量化缩放、offset、origin 与背景色的条件。
+
+合并 main 前 OpenGL 全模块编译成功，SwiftShader 193 项定向测试通过。Qt 6 未安装，微信 Emscripten 3.1.20 和前端构建依赖缺失，两个宿主的完整构建与平台交互仍需在具备工具链的环境验证；不以核心 GTest 替代。合并后的验证结果在交付时另行报告。
 
 ## 执行和验证
 

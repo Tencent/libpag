@@ -130,12 +130,14 @@ export interface StringVector {
 
 /**
  * Content transform parameters for mapping cocraft canvas coordinates to canvas pixel positions.
- * Returned by View.getContentTransform(). These values are static per file load and canvas size.
+ * Returned by View.getContentTransform(). These values are static per file load and canvas size,
+ * without user pan/zoom. A declared output window contributes its root origin to boundsOriginX/Y;
+ * the custom or explicitly overridden origin remains the coordinate base.
  */
 export interface ContentTransform {
-    /** X coordinate of the PAGX content bounds origin in cocraft canvas coordinates. */
+    /** Custom/overridden content origin X plus the declared output window origin X. */
     boundsOriginX: number;
-    /** Y coordinate of the PAGX content bounds origin in cocraft canvas coordinates. */
+    /** Custom/overridden content origin Y plus the declared output window origin Y. */
     boundsOriginY: number;
     /** Scale factor applied to fit PAGX content into the canvas (contain mode). */
     fitScale: number;
@@ -159,8 +161,8 @@ export interface NodePosition {
 }
 
 /**
- * Root-space axis-aligned rectangle. Coordinates are in canvas pixels, already accounting for
- * the content fit scale and centering offset applied to contentLayer.
+ * Axis-aligned rectangle in base canvas pixels, accounting for the output window origin, content
+ * fit scale and centering offset. User pan/zoom is applied separately by the caller.
  */
 export interface ImageRect {
     x: number;

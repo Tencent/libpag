@@ -22,6 +22,7 @@
 #include "pagx/PAGScene.h"
 #include "pagx/PAGSurface.h"
 #include "pagx/PAGXDocument.h"
+#include "pagx/PAGXImporter.h"
 #include "pagx/nodes/Animation.h"
 #include "pagx/nodes/AnimationObject.h"
 #include "pagx/nodes/AnimationTimeline.h"
@@ -1413,8 +1414,63 @@ PAGX_TEST(PAGXRuntimeTest, TargetViewDrawsTargetReferencedAsMask) {
   std::vector<uint8_t> pixels = {};
   ASSERT_TRUE(ReadSurfacePixels(surface, &pixels));
   EXPECT_EQ(pixels[3], 255u);
-  // The mask owner is only released for the draw; the document relationship is restored.
+  // The source document relationship is never changed by runtime parenting.
   EXPECT_EQ(masked->mask, target);
+}
+
+PAGX_TEST(PAGXRuntimeTest, TargetViewMaskOwnershipKeepsBoundsStable) {
+  auto doc = pagx::PAGXImporter::FromXML(
+      "<pagx width=\"100\" height=\"100\" targetLayer=\"@target\" outputBounds=\"0,0,100,100\">"
+      "<Layer id=\"outer\"><Layer id=\"target\"><Rectangle position=\"25,25\" size=\"10,10\"/>"
+      "<Fill color=\"#FF0000\"/></Layer></Layer>"
+      "<Layer id=\"owner\" mask=\"@target\"><Rectangle position=\"50,50\" size=\"100,100\"/>"
+      "<Fill color=\"#0000FF\"/></Layer></pagx>");
+  ASSERT_NE(doc, nullptr);
+  auto scene = pagx::PAGScene::Make(doc);
+  auto otherScene = pagx::PAGScene::Make(doc);
+  ASSERT_NE(scene, nullptr);
+  ASSERT_NE(otherScene, nullptr);
+  auto root = scene->rootComposition();
+  auto outer = root->getChildren()[0];
+  auto owner = root->getChildren()[1];
+  auto target = outer->getChildren()[0];
+  auto rootBounds = root->getBounds();
+  auto outerBounds = outer->getBounds();
+  auto ownerBounds = owner->getBounds();
+  auto targetBounds = target->getBounds();
+  auto otherBounds = otherScene->rootComposition()->getBounds();
+  EXPECT_EQ(rootBounds, pagx::Rect::MakeXYWH(20, 20, 10, 10));
+  EXPECT_TRUE(outerBounds.isEmpty());
+  auto runtimeTarget = target->runtimeLayer;
+  auto* originalParent = runtimeTarget->parent();
+  ASSERT_EQ(owner->runtimeLayer->mask(), runtimeTarget);
+  auto surface = pagx::PAGSurface::MakeOffscreen(200, 200);
+  ASSERT_NE(surface, nullptr);
+  for (int scale = 1; scale <= 3; scale++) {
+    scene->getDisplayOptions()->setZoomScale(static_cast<float>(scale));
+    scene->getDisplayOptions()->setContentOffset(10, 5);
+    auto globalRoot = scene->getGlobalBounds(root);
+    auto globalOuter = scene->getGlobalBounds(outer);
+    auto globalOwner = scene->getGlobalBounds(owner);
+    auto globalTarget = scene->getGlobalBounds(target);
+    ASSERT_TRUE(scene->draw(surface));
+    EXPECT_FALSE(scene->hasContentChanged());
+    EXPECT_EQ(root->getBounds(), rootBounds);
+    EXPECT_EQ(outer->getBounds(), outerBounds);
+    EXPECT_EQ(owner->getBounds(), ownerBounds);
+    EXPECT_EQ(target->getBounds(), targetBounds);
+    EXPECT_EQ(scene->getGlobalBounds(root), globalRoot);
+    EXPECT_EQ(scene->getGlobalBounds(outer), globalOuter);
+    EXPECT_EQ(scene->getGlobalBounds(owner), globalOwner);
+    EXPECT_EQ(scene->getGlobalBounds(target), globalTarget);
+    EXPECT_EQ(runtimeTarget->parent(), originalParent);
+    EXPECT_EQ(owner->runtimeLayer->mask(), runtimeTarget);
+    EXPECT_EQ(otherScene->rootComposition()->getBounds(), otherBounds);
+  }
+  doc->clearOutputView();
+  doc->notifyChange({doc.get()}, false);
+  EXPECT_EQ(scene->getOutputViewStatus(), pagx::OutputViewStatus::None);
+  EXPECT_EQ(scene->rootComposition()->getBounds(), rootBounds);
 }
 
 PAGX_TEST(PAGXRuntimeTest, OutputViewEditsInvalidateRenderedContent) {
@@ -1871,16 +1927,18 @@ PAGX_TEST(PAGXRuntimeTest, TargetViewDamagedAfterPrepareFailsDrawAndRecord) {
   EXPECT_FALSE(scene->draw(surface));
   EXPECT_TRUE(scene->hasContentChanged());
 
-  auto device = Devices::MakeDefault();
-  ASSERT_NE(device, nullptr);
-  DeviceLockScope scope(device);
-  ASSERT_TRUE(static_cast<bool>(scope));
-  auto recordingSurface = tgfx::Surface::Make(scope.context(), 20, 20);
-  ASSERT_NE(recordingSurface, nullptr);
-  auto wrapped = pagx::MakeFrom(device, recordingSurface);
-  ASSERT_NE(wrapped, nullptr);
-  EXPECT_EQ(pagx::Record(scope.context(), scene, wrapped), nullptr);
-  EXPECT_TRUE(scene->hasContentChanged());
+  {
+    auto device = Devices::MakeDefault();
+    ASSERT_NE(device, nullptr);
+    DeviceLockScope scope(device);
+    ASSERT_TRUE(static_cast<bool>(scope));
+    auto recordingSurface = tgfx::Surface::Make(scope.context(), 20, 20);
+    ASSERT_NE(recordingSurface, nullptr);
+    auto wrapped = pagx::MakeFrom(device, recordingSurface);
+    ASSERT_NE(wrapped, nullptr);
+    EXPECT_EQ(pagx::Record(scope.context(), scene, wrapped), nullptr);
+    EXPECT_TRUE(scene->hasContentChanged());
+  }
 
   wrapper->addChild(runtimeTarget);
   EXPECT_TRUE(scene->draw(surface));

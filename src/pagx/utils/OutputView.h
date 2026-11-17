@@ -167,13 +167,14 @@ bool CanReuseOutputViewValidation(const PAGXDocument& document,
 
 /**
  * Owns the prepared target-view wrapper across draws for a single PAGScene. It keeps the shared
- * parenting tool alive so repeated draws do not re-walk the tree, allocate a wrapper or toggle mask
- * ownership. Construction, preparation and drawing are separated so a scene can prepare once and
- * reuse the state until an edit, resource update or display change invalidates it.
+ * parenting tool alive so ordinary targets reuse their wrapper across draws. A target used as an
+ * external mask instead restores its hookup after each draw: releasing that ownership between
+ * frames would change public aggregate bounds queries. Both paths use the same parenting tool.
  */
 class OutputTargetState {
  public:
   OutputTargetState() = default;
+  ~OutputTargetState();
 
   OutputTargetState(const OutputTargetState&) = delete;
   OutputTargetState& operator=(const OutputTargetState&) = delete;
@@ -198,7 +199,8 @@ class OutputTargetState {
   bool draw(tgfx::Canvas* canvas);
 
   /**
-   * Returns true when the wrapper is prepared and still occupies the target's original slot.
+   * Returns true when the wrapper is intact, or when a scoped target is back in the original
+   * tree and ready for the next draw.
    */
   bool isPrepared() const;
 
@@ -220,6 +222,7 @@ class OutputTargetState {
   RasterLayerParent parent = {};
   std::shared_ptr<tgfx::Layer> root = nullptr;
   std::shared_ptr<tgfx::Layer> target = nullptr;
+  bool scopedParenting = false;
 };
 
 /**

@@ -372,6 +372,10 @@ bool CanReuseOutputViewValidation(const PAGXDocument& document,
   return document.findNode(snapshot.targetId) == snapshot.targetLayer;
 }
 
+OutputTargetState::~OutputTargetState() {
+  reset();
+}
+
 bool OutputTargetState::prepare(const std::shared_ptr<tgfx::Layer>& root,
                                 const std::shared_ptr<tgfx::Layer>& target) {
   reset();
@@ -389,14 +393,25 @@ bool OutputTargetState::prepare(const std::shared_ptr<tgfx::Layer>& root,
   }
   this->root = root;
   this->target = target;
+  scopedParenting = parent.hasReleasedMask();
   return true;
 }
 
 bool OutputTargetState::draw(tgfx::Canvas* canvas) {
-  if (canvas == nullptr || !parent.isValid()) {
+  if (canvas == nullptr || root == nullptr || target == nullptr) {
+    if (scopedParenting) {
+      parent.reset();
+    }
     return false;
   }
-  if (root == nullptr || target == nullptr) {
+  if (scopedParenting && parent.layer() == nullptr &&
+      (!root->contains(target) || !parent.prepare(root, target, true))) {
+    return false;
+  }
+  if (!parent.isValid()) {
+    if (scopedParenting) {
+      parent.reset();
+    }
     return false;
   }
   const auto& wrapper = parent.layer();
@@ -405,10 +420,16 @@ bool OutputTargetState::draw(tgfx::Canvas* canvas) {
   tgfx::AutoCanvasRestore canvasRestore(canvas);
   canvas->concat(wrapper->getRelativeMatrix(root.get()));
   wrapper->draw(canvas);
+  if (scopedParenting) {
+    parent.reset();
+  }
   return true;
 }
 
 bool OutputTargetState::isPrepared() const {
+  if (scopedParenting && parent.layer() == nullptr) {
+    return root != nullptr && target != nullptr && root->contains(target);
+  }
   return parent.isValid();
 }
 
@@ -416,6 +437,7 @@ void OutputTargetState::reset() {
   parent.reset();
   root = nullptr;
   target = nullptr;
+  scopedParenting = false;
 }
 
 bool DrawOutputTarget(tgfx::Canvas* canvas, const std::shared_ptr<tgfx::Layer>& root,

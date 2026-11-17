@@ -41,8 +41,9 @@
 #include "pagx/nodes/Stroke.h"
 #include "pagx/tgfx.h"
 #include "pagx/types/Data.h"
-#include "tgfx/core/Data.h"
+#include "pagx/utils/OutputView.h"
 #include "tgfx/core/Canvas.h"
+#include "tgfx/core/Data.h"
 #include "tgfx/core/Image.h"
 #include "tgfx/core/ImageCodec.h"
 #include "tgfx/core/Rect.h"
@@ -333,6 +334,11 @@ void PAGXView::parsePAGX(const val& pagxData) {
   // from the freshly parsed document right after FromXML.
   pagxWidth = 0.0f;
   pagxHeight = 0.0f;
+  outputBounds = std::nullopt;
+  if (!boundsOriginOverridden) {
+    boundsOriginX = 0.0f;
+    boundsOriginY = 0.0f;
+  }
   backgroundTGFXColor = DefaultBackgroundColor();
 
   auto data = GetPagxDataFromEmscripten(pagxData);
@@ -345,9 +351,9 @@ void PAGXView::parsePAGX(const val& pagxData) {
     // Surface document dimensions and document-level custom data (background, bounds origin)
     // immediately after parse so contentWidth()/contentHeight()/getContentTransform() are usable
     // before buildLayers(). The progressive loader reads getContentTransform().fitScale right
-    // after parsePAGX() to decide first-frame image quality. buildLayers() no longer repeats it.
-    pagxWidth = document->width;
-    pagxHeight = document->height;
+    // after parsePAGX() to decide first-frame image quality. Resolve the declaration without
+    // building a scene so invalid views cannot masquerade as whole-canvas content.
+    updateOutputBounds();
     applyDocumentCustomData();
     auto paths = document->getExternalFilePaths();
     LOGI("[MemProbe] tag=parsePAGX.exit wasmHeap=%lld xmlBytes=%zu externalImageRefs=%zu",
@@ -731,8 +737,8 @@ tgfx::Rect PAGXView::computeViewportInRootCoords() const {
   // coordinate space, before the display zoomScale/contentOffset are applied. The effective
   // zoom/offset written to PAGDisplayOptions by applyMergedTransform() map that space onto the
   // canvas:
-  //   canvas_pixel = doc_coord * effectiveZoom + effectiveOffset
-  //   doc_coord    = (canvas_pixel - effectiveOffset) / effectiveZoom
+  //   canvas_pixel = (doc_coord - outputOrigin) * effectiveZoom + effectiveOffset
+  //   doc_coord    = outputOrigin + (canvas_pixel - effectiveOffset) / effectiveZoom
   // so inverting the display transform maps the canvas viewport back into the bounds' space.
   auto* options = scene->getDisplayOptions();
   float zoomScale = options->getZoomScale();
@@ -740,8 +746,9 @@ tgfx::Rect PAGXView::computeViewportInRootCoords() const {
     return tgfx::Rect::MakeEmpty();
   }
   auto offset = options->getContentOffset();
-  float left = (-offset.x) / zoomScale;
-  float top = (-offset.y) / zoomScale;
+  auto origin = outputOrigin();
+  float left = origin.x - offset.x / zoomScale;
+  float top = origin.y - offset.y / zoomScale;
   float width = static_cast<float>(canvasWidth) / zoomScale;
   float height = static_cast<float>(canvasHeight) / zoomScale;
   // 1.2x expansion around the viewport center absorbs fling-deceleration overshoot and small
@@ -826,12 +833,13 @@ tgfx::Rect PAGXView::rootLocalBounds(const std::shared_ptr<PAGLayer>& layer) con
     return tgfx::Rect::MakeEmpty();
   }
   // getGlobalBounds maps root-local bounds to surface space through a uniform-scale-plus-translate
-  // transform (surface = root * zoom + offset). That transform has no rotation/skew, so inverting
+  // transform (surface = (root - outputOrigin) * zoom + offset). It has no rotation/skew, so inverting
   // it recovers the exact axis-aligned root-local rect the removed getImageBounds returned (up to
   // negligible float round-trip error). getDisplayOptions' zoom/offset are the same values
   // getGlobalBounds folds in, so the inverse is consistent by construction.
-  float x = (surfaceBounds.x - offset.x) / zoom;
-  float y = (surfaceBounds.y - offset.y) / zoom;
+  auto origin = outputOrigin();
+  float x = origin.x + (surfaceBounds.x - offset.x) / zoom;
+  float y = origin.y + (surfaceBounds.y - offset.y) / zoom;
   float w = surfaceBounds.width / zoom;
   float h = surfaceBounds.height / zoom;
   return tgfx::Rect::MakeXYWH(x, y, w, h);
@@ -1047,6 +1055,8 @@ val PAGXView::getImageBounds(const val& filePathList) const {
   float centerOffsetY = (static_cast<float>(canvasHeight) - pagxHeight * fitScale) * 0.5f;
   tgfx::Matrix fitMatrix = tgfx::Matrix::MakeTrans(centerOffsetX, centerOffsetY);
   fitMatrix.preScale(fitScale, fitScale);
+  auto origin = outputOrigin();
+  fitMatrix.preTranslate(-origin.x, -origin.y);
 
   auto allBounds = collectRootLocalImageBounds();
   auto count = filePathList["length"].as<unsigned>();
@@ -1240,8 +1250,40 @@ val PAGXView::getImageMetadata() const {
   return result;
 }
 
+bool PAGXView::updateOutputBounds() {
+  outputBounds = std::nullopt;
+  pagxWidth = 0.0f;
+  pagxHeight = 0.0f;
+  if (document == nullptr) {
+    return false;
+  }
+  std::string error;
+  auto status = ResolveOutputView(document.get(), nullptr, &error);
+  if (status == OutputViewStatus::Invalid) {
+    LOGE("PAGXView: %s", error.c_str());
+    return false;
+  }
+  if (status == OutputViewStatus::Valid) {
+    outputBounds = document->outputBounds;
+  }
+  pagxWidth = outputBounds.has_value() ? outputBounds->width : document->width;
+  pagxHeight = outputBounds.has_value() ? outputBounds->height : document->height;
+  return true;
+}
+
+Point PAGXView::outputOrigin() const {
+  return outputBounds.has_value() ? Point{outputBounds->x, outputBounds->y} : Point{};
+}
+
 void PAGXView::buildLayers() {
-  if (!document) {
+  scene = nullptr;
+  defaultTimeline = nullptr;
+  lastAnimationTimeMs = -1.0;
+  fitSnapshot = nullptr;
+  fitSnapshotPixelScale = DEFAULT_PIXEL_SCALE;
+  zoomedOutFrameSettled = false;
+  hasRenderedFirstFrame = false;
+  if (!updateOutputBounds()) {
     return;
   }
   LOGI("[MemProbe] tag=buildLayers.enter wasmHeap=%lld imageCount=%u pixels=%llu (~%lluMB RGBA)",
@@ -1269,11 +1311,17 @@ void PAGXView::buildLayers() {
   // applyLayout(&fontConfig) above first to keep text measurement correct.
   scene = PAGScene::Make(document);
   if (!scene) {
+    outputBounds = std::nullopt;
+    pagxWidth = 0.0f;
+    pagxHeight = 0.0f;
     LogMemProbe("buildLayers.exit.noScene");
     return;
   }
   defaultTimeline = scene->getDefaultTimeline();
   lastAnimationTimeMs = -1.0;
+  outputBounds = scene->getOutputBounds();
+  pagxWidth = outputBounds.has_value() ? outputBounds->width : scene->width();
+  pagxHeight = outputBounds.has_value() ? outputBounds->height : scene->height();
 
   // Mirror the display-list tuning that previously lived in the constructor onto the scene's
   // options. Subtree cache: caches static layers as textures to avoid per-layer shape
@@ -1281,7 +1329,7 @@ void PAGXView::buildLayers() {
   // shapes). The background color resolved from the document (or opaque white by default) is set
   // on the scene so the display list paints it under the layer tree across the whole surface.
   auto* options = scene->getDisplayOptions();
-  options->setRenderMode(PAGRenderMode::Tiled);
+  options->setRenderMode(outputBounds.has_value() ? PAGRenderMode::Direct : PAGRenderMode::Tiled);
   options->setTileUpdateMode(PAGTileUpdateMode::Fast);
   options->setMaxTileCount(static_cast<int>(DEFAULT_MAX_TILE_COUNT));
   options->setMaxTilesRefinedPerFrame(currentMaxTilesRefinedPerFrame);
@@ -1445,8 +1493,9 @@ val PAGXView::getContentTransform() const {
     centerOffsetY = (static_cast<float>(canvasHeight) - pagxHeight * fitScale) * 0.5f;
   }
   val result = val::object();
-  result.set("boundsOriginX", boundsOriginX);
-  result.set("boundsOriginY", boundsOriginY);
+  auto origin = outputOrigin();
+  result.set("boundsOriginX", boundsOriginX + origin.x);
+  result.set("boundsOriginY", boundsOriginY + origin.y);
   result.set("fitScale", fitScale);
   result.set("centerOffsetX", centerOffsetX);
   result.set("centerOffsetY", centerOffsetY);

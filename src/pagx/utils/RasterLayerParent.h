@@ -65,6 +65,14 @@ class RasterLayerParent {
   bool isValid() const;
 
   /**
+   * Returns whether preparation released an external mask owner. Such a hookup must be restored
+   * between public scene queries because it changes the ancestors' aggregate bounds.
+   */
+  bool hasReleasedMask() const {
+    return maskReleased;
+  }
+
+  /**
    * Returns the identity wrapper, or null when no valid preparation exists.
    */
   const std::shared_ptr<tgfx::Layer>& layer() const {

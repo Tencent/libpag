@@ -139,8 +139,9 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
   /**
    * Renders the current content of this scene into the given surface. Does not advance animations;
    * callers must advance the scene (or its timelines) beforehand. When the document declares a
-   * default target view, only the target layer is rendered into the outputBounds rectangle; size
-   * the surface from getOutputBounds() so the window maps 1:1 to the surface.
+   * default target view, only the target layer is rendered into the outputBounds rectangle. Use
+   * getOutputBounds() together with the effective display zoom and content offset to size and
+   * position the output on the surface.
    * This method manages the surface device's context lock internally. Callers must not already
    * hold that lock; use pagx::Record() from pagx/tgfx.h to render with an explicitly locked context.
    * @param surface    the destination surface.
@@ -165,12 +166,17 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
   /**
    * Returns the output rectangle, in document-root coordinates, that draw() renders when the
    * document declares a valid default static output view (the paired `targetLayer` / `outputBounds`
-   * root attributes). Callers use it to size the destination surface. Size the surface from the
-   * same scale draw() applies: ceil(width * getDisplayOptions()->getZoomScale()) by
-   * ceil(height * getDisplayOptions()->getZoomScale()). The display list quantizes the requested
-   * zoom to getZoomScalePrecision(), so recomputing the pixel size from the unquantized requested
-   * scale can differ by up to one pixel at that precision. draw() clips to the output window, so
-   * any extra pixel stays transparent instead of showing neighboring content.
+   * root attributes). The scene subtracts this window's origin exactly once; hosts use its width
+   * and height for fitting and must not subtract the origin again in their content offset.
+   * After setting zoom and precision, read getDisplayOptions()->getZoomScale() for the effective
+   * drawing scale, which may differ from the requested value because of quantization. When that
+   * scale is positive and the content offset is zero, the natural output pixel size is
+   * ceil(bounds.width * effectiveScale) by ceil(bounds.height * effectiveScale). A non-positive
+   * scale cannot produce a drawable output. For a panned or centered viewport, also account for
+   * getDisplayOptions()->getContentOffset(): surfacePoint = offset + effectiveScale *
+   * (rootPoint - bounds.origin). width() and height() still report the original document canvas.
+   * draw() clips content to the output window; uncovered surface pixels retain the configured
+   * background when clearing, so they are transparent only when that background is transparent.
    * @return the output rectangle, or std::nullopt when the document has no target view and draw()
    *         renders the whole canvas, or when the declaration is invalid. Use
    *         getOutputViewStatus() to tell those two cases apart.
@@ -358,8 +364,9 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
   uint64_t outputViewValidationReuses = 0;
 
   // Reusable identity wrapper for the target view. Prepared on the first successful draw and
-  // released before any tree rebuild, node edit or image refresh. Keeping it across frames avoids
-  // re-walking the tree, allocating a wrapper and toggling mask ownership on every draw.
+  // released before any tree rebuild, node edit or image refresh. Ordinary targets keep the
+  // wrapper across frames; external mask targets restore their hookup after every draw so public
+  // aggregate bounds queries keep their original semantics.
   std::unique_ptr<OutputTargetState> outputTargetState = nullptr;
 
   std::unique_ptr<PAGDisplayOptions> displayOptions = nullptr;
