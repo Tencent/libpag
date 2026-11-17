@@ -23,6 +23,7 @@
 #include "pagx/nodes/ImagePattern.h"
 #include "pagx/types/TileMode.h"
 #include "pagx/utils/ImageFormatUtils.h"
+#include "pagx/utils/RasterLayerParent.h"
 #include "rendering/gpu/Devices.h"
 #include "tgfx/core/Bitmap.h"
 #include "tgfx/core/Canvas.h"
@@ -60,8 +61,9 @@ static std::shared_ptr<tgfx::Data> EncodeSurfaceToPNG(const std::shared_ptr<tgfx
 // encodes the surface as PNG. The encoded PNG is the scaled pixel size — the
 // caller is responsible for placing it at the original logical extent so that
 // the consumer stretches the higher-density bitmap back over the same visible
-// area. `Drawer` must be callable as `drawer(tgfx::Canvas*)`; named functors
-// defined below supply the actual draw logic (the project forbids lambdas).
+// area. `Drawer` must be callable as `bool drawer(tgfx::Canvas*)`, returning false when its
+// preparation failed so this helper reports failure instead of encoding a transparent PNG; named
+// functors defined below supply the actual draw logic (the project forbids lambdas).
 template <typename Drawer>
 static std::shared_ptr<tgfx::Data> RenderToPNG(tgfx::Context* context, int width, int height,
                                                float pixelScale, Drawer drawer) {
@@ -90,42 +92,13 @@ static std::shared_ptr<tgfx::Data> RenderToPNG(tgfx::Context* context, int width
   }
   auto* canvas = surface->getCanvas();
   canvas->scale(pixelScale, pixelScale);
-  drawer(canvas);
+  if (!drawer(canvas)) {
+    return nullptr;
+  }
   return EncodeSurfaceToPNG(surface, pixelWidth, pixelHeight);
 }
 
 namespace {
-
-// Inserts a content-free parent in the exporter-owned tree so normal child compositing applies
-// the target's transform, alpha, mask and scrollRect exactly once. The original tree is restored
-// before returning to the exporter.
-class RasterLayerParent {
- public:
-  explicit RasterLayerParent(const std::shared_ptr<tgfx::Layer>& target)
-      : target(target), parent(target->parent()), wrapper(tgfx::Layer::Make()) {
-    if (parent != nullptr) {
-      parent->replaceChild(target, wrapper);
-    }
-    wrapper->addChild(target);
-  }
-
-  ~RasterLayerParent() {
-    if (parent != nullptr) {
-      parent->replaceChild(wrapper, target);
-    } else {
-      target->removeFromParent();
-    }
-  }
-
-  std::shared_ptr<tgfx::Layer> layer() const {
-    return wrapper;
-  }
-
- private:
-  std::shared_ptr<tgfx::Layer> target;
-  tgfx::Layer* parent = nullptr;
-  std::shared_ptr<tgfx::Layer> wrapper;
-};
 
 struct MaskedLayerDrawer {
   const std::shared_ptr<tgfx::Layer>& root;
@@ -133,16 +106,22 @@ struct MaskedLayerDrawer {
   const tgfx::Layer* coordinateSpace;
   const tgfx::Rect& bounds;
 
-  void operator()(tgfx::Canvas* canvas) const {
+  // Returns false when the temporary parent could not be prepared, so RenderToPNG can report a
+  // failure instead of encoding a valid-looking transparent PNG.
+  bool operator()(tgfx::Canvas* canvas) const {
     canvas->translate(-bounds.left, -bounds.top);
     if (targetLayer == root) {
       root->draw(canvas);
-      return;
+      return true;
     }
-    RasterLayerParent parent(targetLayer);
-    auto wrapper = parent.layer();
+    RasterLayerParent parent;
+    if (!parent.prepare(root, targetLayer, false)) {
+      return false;
+    }
+    const auto& wrapper = parent.layer();
     canvas->concat(wrapper->getRelativeMatrix(coordinateSpace));
     wrapper->draw(canvas);
+    return true;
   }
 };
 
@@ -224,10 +203,11 @@ class BackdropSiblingMask {
 struct BackdropCompositeDrawer {
   const std::shared_ptr<tgfx::Layer>& root;
   const tgfx::Rect& globalBounds;
-  void operator()(tgfx::Canvas* canvas) const {
+  bool operator()(tgfx::Canvas* canvas) const {
     canvas->translate(-globalBounds.left, -globalBounds.top);
     canvas->clipRect(globalBounds);
     root->draw(canvas);
+    return true;
   }
 };
 
@@ -237,10 +217,11 @@ struct TiledPatternDrawer {
   std::shared_ptr<tgfx::Shader> shader;
   int width;
   int height;
-  void operator()(tgfx::Canvas* canvas) const {
+  bool operator()(tgfx::Canvas* canvas) const {
     tgfx::Paint paint;
     paint.setShader(shader);
     canvas->drawRect(tgfx::Rect::MakeWH(width, height), paint);
+    return true;
   }
 };
 
