@@ -27,7 +27,7 @@
 #include <type_traits>
 #include <vector>
 #include "base/PAGTest.h"
-#include "base/PAGXTestUtils.h"
+#include "base/PAGXTestCommon.h"
 #include "cli/CommandVerify.h"
 #include "pagx/FontConfig.h"
 #include "pagx/HTMLImporter.h"

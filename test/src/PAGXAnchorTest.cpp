@@ -19,7 +19,7 @@
 #include <string>
 #include <vector>
 #include "base/PAGTest.h"
-#include "base/PAGXTestUtils.h"
+#include "base/PAGXTestCommon.h"
 #include "pagx/PAGAnimation.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/PAGXExporter.h"

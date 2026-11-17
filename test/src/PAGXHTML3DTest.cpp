@@ -33,7 +33,7 @@
 #include <string>
 #include <vector>
 #include "base/PAGTest.h"
-#include "base/PAGXTestUtils.h"
+#include "base/PAGXTestCommon.h"
 #include "pagx/HTMLImporter.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/nodes/Animation.h"
