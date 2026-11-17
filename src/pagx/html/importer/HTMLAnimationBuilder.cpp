@@ -1426,6 +1426,10 @@ bool HTMLAnimationBuilder::buildForElement(
         if (!IsInvertibleMatrix3D(pose)) {
           pose = CollapseSingularPose(pose);
         }
+        // A single track may mix projected and unprojected stops. The projection only divides w by
+        // `1 - z / d`, so it is the identity on the z = 0 plane and a flat stop renders the same with
+        // or without it. The endpoints stay exact frame by frame and the runtime interpolates
+        // between them with PAGX semantics (pixel-identical to folding every stop).
         matrix3DKeys.push_back({ts.first, pose, interp, {}, {}});
       }
     }
