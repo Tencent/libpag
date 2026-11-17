@@ -34,6 +34,7 @@
 #include <cstring>
 #include <filesystem>
 #include <fstream>
+#include <iterator>
 #include <iostream>
 #include <sstream>
 #include <string>
@@ -115,6 +116,11 @@ static std::string CopyResourceToTemp(const std::string& resourceRelPath,
   auto dst = TempSubdir(subdir) + "/" + tempName;
   std::filesystem::copy_file(src, dst, std::filesystem::copy_options::overwrite_existing);
   return dst;
+}
+
+static std::string ReadFile(const std::string& path) {
+  std::ifstream in(path);
+  return {std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()};
 }
 
 static bool CompareRenderedImage(const std::string& imagePath, const std::string& key) {
