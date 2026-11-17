@@ -1553,8 +1553,13 @@ PAGX_TEST(PAGXRuntimeTest, OutputViewImageReplacementInvalidatesRenderedContent)
   EXPECT_EQ(pixels[sampleOffset + 2], 0u);
   EXPECT_EQ(pixels[sampleOffset + 3], 255u);
 
+  auto runsBeforeImage = scene->outputViewValidationRuns;
+  auto reusesBeforeImage = scene->outputViewValidationReuses;
   ASSERT_TRUE(doc->loadFileData("target.png", blueImage));
   EXPECT_TRUE(scene->hasContentChanged());
+  // An Image resource notification is a render-only leaf edit, so the declaration is not rescanned.
+  EXPECT_EQ(scene->outputViewValidationRuns, runsBeforeImage);
+  EXPECT_EQ(scene->outputViewValidationReuses, reusesBeforeImage + 1);
   ASSERT_TRUE(scene->draw(surface));
   EXPECT_FALSE(scene->hasContentChanged());
   ASSERT_TRUE(ReadSurfacePixels(surface, &pixels));
@@ -1600,6 +1605,165 @@ PAGX_TEST(PAGXRuntimeTest, InvalidOutputViewAfterEditRejectsDraw) {
   ASSERT_TRUE(scene->getOutputBounds().has_value());
   EXPECT_TRUE(scene->draw(surface));
   EXPECT_FALSE(scene->hasContentChanged());
+}
+
+// Returns the SolidColor node backing MakeTargetViewDocument()'s fill.
+static pagx::SolidColor* SolidColorOfTarget(pagx::Layer* targetNode) {
+  if (targetNode == nullptr || targetNode->contents.size() < 2) {
+    return nullptr;
+  }
+  auto* fill = static_cast<pagx::Fill*>(targetNode->contents.back());
+  return fill != nullptr ? static_cast<pagx::SolidColor*>(fill->color) : nullptr;
+}
+
+/**
+ * Test case: render-only leaf edits (color, roundness) reuse the last Valid output view validation
+ * instead of rescanning the document and the authored layer tree, while the frame is still marked
+ * dirty and redrawn with the new content.
+ */
+PAGX_TEST(PAGXRuntimeTest, OutputViewValidationReusesForRenderOnlyLeafEdits) {
+  auto doc = MakeTargetViewDocument();
+  auto* targetNode = doc->findNode<pagx::Layer>("target");
+  ASSERT_NE(targetNode, nullptr);
+  auto* solid = SolidColorOfTarget(targetNode);
+  ASSERT_NE(solid, nullptr);
+  auto* rect = targetNode->contents.empty()
+                   ? nullptr
+                   : static_cast<pagx::Rectangle*>(targetNode->contents.front());
+  ASSERT_NE(rect, nullptr);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_NE(scene, nullptr);
+  auto surface = pagx::PAGSurface::MakeOffscreen(20, 20);
+  ASSERT_NE(surface, nullptr);
+  ASSERT_TRUE(scene->draw(surface));
+  EXPECT_FALSE(scene->hasContentChanged());
+  auto runs = scene->outputViewValidationRuns;
+  auto reuses = scene->outputViewValidationReuses;
+
+  solid->color = {0.0f, 1.0f, 0.0f, 1.0f};
+  doc->notifyChange({solid}, false);
+  EXPECT_EQ(scene->getOutputViewStatus(), pagx::OutputViewStatus::Valid);
+  EXPECT_EQ(scene->outputViewValidationRuns, runs);
+  EXPECT_EQ(scene->outputViewValidationReuses, reuses + 1);
+  EXPECT_TRUE(scene->hasContentChanged());
+  ASSERT_TRUE(scene->draw(surface));
+  EXPECT_FALSE(scene->hasContentChanged());
+  std::vector<uint8_t> pixels = {};
+  ASSERT_TRUE(ReadSurfacePixels(surface, &pixels));
+  auto offset = (5 * surface->width() + 5) * 4;
+  EXPECT_EQ(pixels[offset], 0u);
+  EXPECT_EQ(pixels[offset + 1], 255u);
+  EXPECT_EQ(pixels[offset + 2], 0u);
+  EXPECT_EQ(pixels[offset + 3], 255u);
+
+  rect->roundness = 5;
+  doc->notifyChange({rect}, false);
+  EXPECT_EQ(scene->outputViewValidationRuns, runs);
+  EXPECT_EQ(scene->outputViewValidationReuses, reuses + 2);
+}
+
+/**
+ * Test case: edits that cannot be proven render-only fall back to the full resolver. A layout
+ * change and an ambiguous Layer notification both take the full path.
+ */
+PAGX_TEST(PAGXRuntimeTest, OutputViewValidationFallsBackForLayoutAndLayerEdits) {
+  auto doc = MakeTargetViewDocument();
+  auto* targetNode = doc->findNode<pagx::Layer>("target");
+  ASSERT_NE(targetNode, nullptr);
+  auto* solid = SolidColorOfTarget(targetNode);
+  ASSERT_NE(solid, nullptr);
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_NE(scene, nullptr);
+  auto surface = pagx::PAGSurface::MakeOffscreen(20, 20);
+  ASSERT_NE(surface, nullptr);
+  ASSERT_TRUE(scene->draw(surface));
+  auto runs = scene->outputViewValidationRuns;
+
+  doc->notifyChange({solid}, true);
+  EXPECT_EQ(scene->outputViewValidationRuns, runs + 1);
+
+  runs = scene->outputViewValidationRuns;
+  targetNode->alpha = 0.5f;
+  doc->notifyChange({targetNode}, false);
+  EXPECT_EQ(scene->outputViewValidationRuns, runs + 1);
+}
+
+/**
+ * Test case: a render leaf that directly carries the target id must invalidate the declaration even
+ * though the id index was not re-registered. Fixing the id restores the Valid state.
+ */
+PAGX_TEST(PAGXRuntimeTest, OutputViewValidationDetectsRenderLeafIdConflict) {
+  auto doc = MakeTargetViewDocument();
+  auto* targetNode = doc->findNode<pagx::Layer>("target");
+  ASSERT_NE(targetNode, nullptr);
+  auto* solid = SolidColorOfTarget(targetNode);
+  ASSERT_NE(solid, nullptr);
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_NE(scene, nullptr);
+  auto surface = pagx::PAGSurface::MakeOffscreen(20, 20);
+  ASSERT_NE(surface, nullptr);
+  ASSERT_TRUE(scene->draw(surface));
+  auto runs = scene->outputViewValidationRuns;
+
+  solid->id = "target";
+  doc->notifyChange({solid}, false);
+  EXPECT_EQ(scene->outputViewValidationRuns, runs + 1);
+  EXPECT_EQ(scene->getOutputViewStatus(), pagx::OutputViewStatus::Invalid);
+  EXPECT_FALSE(scene->getOutputViewError().empty());
+
+  solid->id.clear();
+  doc->notifyChange({solid}, false);
+  EXPECT_EQ(scene->getOutputViewStatus(), pagx::OutputViewStatus::Valid);
+  EXPECT_TRUE(scene->draw(surface));
+}
+
+/**
+ * Test case: creating a node bumps the registry version and forces the full resolver even when the
+ * new node has no owning Layer, so the collapsed dirty set is empty.
+ */
+PAGX_TEST(PAGXRuntimeTest, OutputViewValidationFallsBackForNewUnreferencedNode) {
+  auto doc = MakeTargetViewDocument();
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_NE(scene, nullptr);
+  auto surface = pagx::PAGSurface::MakeOffscreen(20, 20);
+  ASSERT_NE(surface, nullptr);
+  ASSERT_TRUE(scene->draw(surface));
+  auto runs = scene->outputViewValidationRuns;
+
+  auto* orphan = doc->makeNode<pagx::SolidColor>();
+  ASSERT_NE(orphan, nullptr);
+  doc->notifyChange({orphan}, false);
+  EXPECT_EQ(scene->getOutputViewStatus(), pagx::OutputViewStatus::Valid);
+  EXPECT_EQ(scene->outputViewValidationRuns, runs + 1);
+  EXPECT_TRUE(scene->hasContentChanged());
+}
+
+/**
+ * Test case: each scene owns its validation snapshot, so one scene reusing a result does not starve
+ * another scene of the same notification.
+ */
+PAGX_TEST(PAGXRuntimeTest, OutputViewValidationIsPerScene) {
+  auto doc = MakeTargetViewDocument();
+  auto* targetNode = doc->findNode<pagx::Layer>("target");
+  ASSERT_NE(targetNode, nullptr);
+  auto* solid = SolidColorOfTarget(targetNode);
+  ASSERT_NE(solid, nullptr);
+  auto sceneA = pagx::PAGScene::Make(doc);
+  auto sceneB = pagx::PAGScene::Make(doc);
+  ASSERT_NE(sceneA, nullptr);
+  ASSERT_NE(sceneB, nullptr);
+  auto surface = pagx::PAGSurface::MakeOffscreen(20, 20);
+  ASSERT_NE(surface, nullptr);
+  ASSERT_TRUE(sceneA->draw(surface));
+  ASSERT_TRUE(sceneB->draw(surface));
+  auto reusesA = sceneA->outputViewValidationReuses;
+  auto reusesB = sceneB->outputViewValidationReuses;
+
+  solid->color = {0.0f, 0.0f, 1.0f, 1.0f};
+  doc->notifyChange({solid}, false);
+  EXPECT_EQ(sceneA->outputViewValidationReuses, reusesA + 1);
+  EXPECT_EQ(sceneB->outputViewValidationReuses, reusesB + 1);
 }
 
 // Hands back the runtime tgfx layer bound to the authored target, plus its parent pointer in the

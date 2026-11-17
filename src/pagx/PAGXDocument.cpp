@@ -306,6 +306,9 @@ Node* PAGXDocument::findNode(const std::string& id) const {
 }
 
 void PAGXDocument::registerNode(Node* node, const std::string& id) {
+  // Increment before the empty-id early return so a makeNode() call without an id is still
+  // observed: the caller may assign an id to the new node directly afterwards.
+  ++nodeRegistryVersion;
   if (id.empty()) {
     return;
   }
@@ -318,9 +321,11 @@ void PAGXDocument::registerNode(Node* node, const std::string& id) {
 }
 
 void PAGXDocument::removeNodes(const std::unordered_set<Node*>& toRemove) {
+  bool removed = false;
   for (auto it = nodeMap.begin(); it != nodeMap.end();) {
     if (toRemove.count(it->second) > 0) {
       it = nodeMap.erase(it);
+      removed = true;
     } else {
       ++it;
     }
@@ -331,9 +336,13 @@ void PAGXDocument::removeNodes(const std::unordered_set<Node*>& toRemove) {
       nodes[writeIdx++] = std::move(nodes[readIdx]);
     } else {
       nodeSet.erase(nodes[readIdx].get());
+      removed = true;
     }
   }
   nodes.resize(writeIdx);
+  if (removed) {
+    ++nodeRegistryVersion;
+  }
 }
 
 void PAGXDocument::setNodeId(Node* node, const std::string& id) {
@@ -672,6 +681,10 @@ void PAGXDocument::notifyChange(const std::vector<Node*>& dirtyNodes, bool layou
       changedImages.push_back(static_cast<Image*>(node));
     }
   }
+  // Keep the pre-collapse owned change set. PAGScene needs the original nodes (render leaves,
+  // timelines, Document) to decide whether an output view declaration can skip re-validation; the
+  // collapsed Layer list cannot be used to reconstruct them.
+  const std::vector<Node*> reportedDirty = ownedDirty;
   {
     std::vector<Node*> layerDirty = {};
     for (auto* node : ownedDirty) {
@@ -707,9 +720,6 @@ void PAGXDocument::notifyChange(const std::vector<Node*>& dirtyNodes, bool layou
     std::sort(layerDirty.begin(), layerDirty.end());
     layerDirty.erase(std::unique(layerDirty.begin(), layerDirty.end()), layerDirty.end());
     ownedDirty = std::move(layerDirty);
-    if (ownedDirty.empty() && changedImages.empty()) {
-      return;
-    }
   }
   PruneExpiredScenes(&liveScenes);
   // Layout-affecting edits (size, constraints, padding, fonts, text, geometry) and structural child
@@ -736,8 +746,10 @@ void PAGXDocument::notifyChange(const std::vector<Node*>& dirtyNodes, bool layou
   for (auto& weakScene : liveScenes) {
     auto scene = weakScene.lock();
     if (scene != nullptr) {
-      if (!ownedDirty.empty()) {
-        scene->onNodesChanged(ownedDirty);
+      // Notify even when the collapsed set is empty: an owned node that has no owning Layer still
+      // has to reach the scene so the output view declaration can be re-validated.
+      if (!ownedDirty.empty() || !reportedDirty.empty()) {
+        scene->onNodesChanged(ownedDirty, reportedDirty, layoutChanged);
       }
       if (!changedImages.empty()) {
         scene->onImageResourcesChanged(changedImages);

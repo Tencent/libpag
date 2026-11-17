@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <cstdint>
 #include <memory>
 #include <optional>
 #include <string>
@@ -55,6 +56,7 @@ class ViewModel;
 class Image;
 class OutputTargetState;
 struct Matrix;
+struct OutputViewValidationSnapshot;
 struct RuntimeBinding;
 
 /**
@@ -239,8 +241,11 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
 
   // Dispatch target for PAGXDocument::notifyChange. Refreshes the runtime tree in place for edits to
   // this document's own nodes; rebuilds the whole tree when the edit comes from an embedded external
-  // document (its nodes are not owned by this scene's document).
-  void onNodesChanged(const std::vector<Node*>& dirtyNodes);
+  // document (its nodes are not owned by this scene's document). `dirtyNodes` is the collapsed
+  // Layer set used for the runtime refresh; `reportedDirty` is the pre-collapse owned set used to
+  // decide whether the output view declaration still has to be re-validated.
+  void onNodesChanged(const std::vector<Node*>& dirtyNodes,
+                      const std::vector<Node*>& reportedDirty, bool layoutChanged);
 
   // Dispatch target for PAGXDocument::notifyChange when <Image> resource nodes change (e.g. host
   // loadFileData). Re-decodes any ViewModel image value built from a changed Image node, unless the
@@ -257,6 +262,10 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
   // Resolves and caches the document's default output view state and target layer after a tree
   // build or edit. Cached so renderTo() does not walk the authored layer tree on every frame.
   void resolveOutputTarget();
+  // Returns true when the notification cannot change the output view declaration, so the cached
+  // Valid status and target are reused instead of running ResolveOutputView() again.
+  bool canReuseOutputViewValidation(const std::vector<Node*>& reportedDirty,
+                                    bool layoutChanged) const;
   // Lazily prepares and validates the reusable target-view wrapper for this scene. Returns false
   // when no target is bound, a stored preparation no longer matches the binding, or the wrapper
   // could not be prepared. A failed preparation is never left cached as a successful one.
@@ -333,6 +342,15 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
   // wrapper is kept separately in outputTargetState; repreparing it is not itself a content change.
   // Consume this flag only after a successful target draw.
   bool outputViewDirty = true;
+
+  // Snapshot captured by the last successful full validation. Compared against each notification
+  // to skip repeated resolver scans for render-only leaf edits.
+  std::unique_ptr<OutputViewValidationSnapshot> outputViewValidation = nullptr;
+
+  // Number of full resolver runs and fast-path reuses since construction. Tests read these to
+  // assert that a notification took the intended path without relying on machine-dependent timing.
+  uint64_t outputViewValidationRuns = 0;
+  uint64_t outputViewValidationReuses = 0;
 
   // Reusable identity wrapper for the target view. Prepared on the first successful draw and
   // released before any tree rebuild, node edit or image refresh. Keeping it across frames avoids

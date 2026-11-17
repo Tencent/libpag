@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <cstdint>
 #include <memory>
 #include <optional>
 #include <string>
@@ -407,7 +408,13 @@ class PAGXDocument : public Node {
   std::optional<std::string> declaredTargetLayer = std::nullopt;
   std::optional<std::string> declaredOutputBounds = std::nullopt;
 
+  // Incremented whenever the node registry changes shape: a node is created, actually removed, or
+  // re-indexed under a new id. PAGScene compares it with its output view validation snapshot to
+  // prove that a notification cannot have changed which ids exist in this document.
+  uint64_t nodeRegistryVersion = 0;
+
   friend class OutputViewDeclarationAccess;
+  friend class OutputViewValidationAccess;
   friend class PAGXImporter;
   friend class PAGXExporter;
   friend class TextLayoutContext;

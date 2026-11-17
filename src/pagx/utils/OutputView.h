@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <cstdint>
 #include <memory>
 #include <optional>
 #include <string>
@@ -67,6 +68,62 @@ OutputViewStatus ResolveOutputView(const PAGXDocument* document, const Layer** t
  * @param document the document to inspect.
  */
 bool HasDeclaredOutputView(const PAGXDocument& document);
+
+/**
+ * Grants internal validation helpers read access to the node registration version kept on
+ * PAGXDocument.
+ */
+class OutputViewValidationAccess {
+ public:
+  static uint64_t RegistryVersion(const PAGXDocument& document);
+};
+
+/**
+ * Captures everything in a document that can affect a Valid output view declaration. PAGScene keeps
+ * one after each successful full validation and compares it against a later notification to decide
+ * whether the declaration has to be resolved again.
+ */
+struct OutputViewValidationSnapshot {
+  std::string targetId = {};
+  std::optional<Rect> bounds = std::nullopt;
+  std::optional<std::string> declaredTargetLayer = std::nullopt;
+  std::optional<std::string> declaredBounds = std::nullopt;
+  std::vector<const Layer*> layers = {};
+  std::vector<const Node*> animations = {};
+  std::vector<const DataBind*> dataBinds = {};
+  const Layer* targetLayer = nullptr;
+  uint64_t registryVersion = 0;
+};
+
+/**
+ * Captures a validation snapshot for an already Valid declaration.
+ * @param document the document that was validated.
+ * @param targetLayer the resolved source target layer.
+ * @param snapshot receives the captured state; must not be null.
+ * @return true when the snapshot was captured.
+ */
+bool CaptureOutputViewValidation(const PAGXDocument& document, const Layer* targetLayer,
+                                 OutputViewValidationSnapshot* snapshot);
+
+/**
+ * Returns true when the notification provably cannot change the declaration semantics, so the
+ * previously validated status and target can be reused without running ResolveOutputView(). The
+ * caller must still mark the scene dirty and refresh its runtime tree; only the extra declaration
+ * scans are skipped.
+ *
+ * The proof requires a render-only edit batch: every reported node is a document-owned
+ * SolidColor/Rectangle/Image leaf, the batch does not affect layout, no reported node now carries
+ * the target id, the node registry and declaration fields are unchanged, the top-level layer,
+ * animation and data bind lists are unchanged, and the validated target is still owned by the
+ * document under the same id.
+ * @param document the document being edited.
+ * @param reportedDirty the pre-collapse owned dirty nodes from the notification.
+ * @param layoutChanged whether the notification reported a layout-affecting edit.
+ * @param snapshot the snapshot captured by the last successful validation.
+ */
+bool CanReuseOutputViewValidation(const PAGXDocument& document,
+                                  const std::vector<Node*>& reportedDirty, bool layoutChanged,
+                                  const OutputViewValidationSnapshot& snapshot);
 
 /**
  * Owns the prepared target-view wrapper across draws for a single PAGScene. It keeps the shared

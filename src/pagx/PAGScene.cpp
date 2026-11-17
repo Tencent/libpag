@@ -154,14 +154,35 @@ void PAGScene::buildRuntimeTree() {
   // Cache the flat TextHolder list so flushTextHolders / hasContentChanged iterate it directly
   // instead of walking the composition tree every frame.
   collectTextHolders();
+  outputViewDirty = true;
   resolveOutputTarget();
 }
 
 void PAGScene::resolveOutputTarget() {
-  outputViewDirty = true;
   outputTargetNode = nullptr;
   outputViewError.clear();
   outputViewStatus = ResolveOutputView(document.get(), &outputTargetNode, &outputViewError);
+  ++outputViewValidationRuns;
+  if (outputViewStatus != OutputViewStatus::Valid || document == nullptr) {
+    outputViewValidation.reset();
+    return;
+  }
+  if (outputViewValidation == nullptr) {
+    outputViewValidation = std::make_unique<OutputViewValidationSnapshot>();
+  }
+  if (!CaptureOutputViewValidation(*document, outputTargetNode, outputViewValidation.get())) {
+    outputViewValidation.reset();
+  }
+}
+
+bool PAGScene::canReuseOutputViewValidation(const std::vector<Node*>& reportedDirty,
+                                            bool layoutChanged) const {
+  if (outputViewStatus != OutputViewStatus::Valid || outputViewValidation == nullptr ||
+      document == nullptr) {
+    return false;
+  }
+  return CanReuseOutputViewValidation(*document, reportedDirty, layoutChanged,
+                                      *outputViewValidation);
 }
 
 bool PAGScene::ensureOutputTargetState() {
@@ -949,11 +970,15 @@ bool PAGScene::rootToSurfaceMatrix(Matrix* out) const {
   return true;
 }
 
-void PAGScene::onNodesChanged(const std::vector<Node*>& dirtyNodes) {
+void PAGScene::onNodesChanged(const std::vector<Node*>& dirtyNodes,
+                              const std::vector<Node*>& reportedDirty, bool layoutChanged) {
   // Restore and drop the wrapper before any tree edit. refreshNodes() and buildRuntimeTree() can
   // reorder or replace layers, so the prepared hookup cannot survive this entry point. The next
   // valid draw lazily prepares against the refreshed tree.
   outputTargetState.reset();
+  // Every content, layout or resource notification invalidates the rendered frame, including the
+  // render-only edits that skip declaration validation below.
+  outputViewDirty = true;
   // The dirty nodes belong either to this scene's own document or to an external (child) document
   // this scene embeds. A child document dispatches to this scene through its own notifyChange; in
   // that case the nodes are not owned here, and an external composition is built into the runtime
@@ -979,7 +1004,7 @@ void PAGScene::onNodesChanged(const std::vector<Node*>& dirtyNodes) {
       return;
     }
   }
-  if (_rootComposition != nullptr) {
+  if (!dirtyNodes.empty() && _rootComposition != nullptr) {
     // The root composition has no source Composition node (it represents the document body), so the
     // ancestor path begins empty. refreshNodes pushes each child composition's source as it
     // descends.
@@ -992,9 +1017,6 @@ void PAGScene::onNodesChanged(const std::vector<Node*>& dirtyNodes) {
     // from the current tree so flushTextHolders / hasContentChanged stay consistent with the
     // binding state.
     collectTextHolders();
-    // In-place refreshes can also change the layer tree shape, so the cached default output target
-    // must be resolved again instead of leaving a stale or dangling pointer behind.
-    resolveOutputTarget();
     // An incremental refresh adds or removes layers, changing binding membership in place without
     // recreating the reused timelines or their binding. Mark every timeline's resolved target cache
     // stale so the next apply() re-resolves; no other signal covers this case. Top-level
@@ -1011,6 +1033,15 @@ void PAGScene::onNodesChanged(const std::vector<Node*>& dirtyNodes) {
         static_cast<PAGStateMachine*>(entry.second.get())->markInternalTargetsDirty();
       }
     }
+  }
+  // Declaration validation applies to every semantic notification, even when the collapsed Layer
+  // set is empty (for example an Image used only by a ViewModel default has no owning Layer). A
+  // render-only leaf batch reuses the last Valid result instead of scanning the document and the
+  // whole authored layer tree again.
+  if (canReuseOutputViewValidation(reportedDirty, layoutChanged)) {
+    ++outputViewValidationReuses;
+  } else {
+    resolveOutputTarget();
   }
   // Reset every timeline only when a timeline node changed. Timelines (Animation drivers and the
   // state machines that play them) can share targets and cross-reference, so the whole timeline

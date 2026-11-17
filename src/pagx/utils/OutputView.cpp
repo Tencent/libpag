@@ -245,6 +245,90 @@ bool HasDeclaredOutputView(const PAGXDocument& document) {
          OutputViewDeclarationAccess::DeclaredBounds(document).has_value();
 }
 
+uint64_t OutputViewValidationAccess::RegistryVersion(const PAGXDocument& document) {
+  return document.nodeRegistryVersion;
+}
+
+namespace {
+
+bool IsRenderOnlyLeaf(NodeType type) {
+  return type == NodeType::SolidColor || type == NodeType::Rectangle || type == NodeType::Image;
+}
+
+template <typename T>
+bool SamePointerList(const std::vector<T*>& current, const std::vector<const T*>& snapshot) {
+  if (current.size() != snapshot.size()) {
+    return false;
+  }
+  for (size_t i = 0; i < current.size(); i++) {
+    if (current[i] != snapshot[i]) {
+      return false;
+    }
+  }
+  return true;
+}
+
+}  // namespace
+
+bool CaptureOutputViewValidation(const PAGXDocument& document, const Layer* targetLayer,
+                                 OutputViewValidationSnapshot* snapshot) {
+  if (snapshot == nullptr || targetLayer == nullptr) {
+    return false;
+  }
+  snapshot->targetId = document.targetLayerId;
+  snapshot->bounds = document.outputBounds;
+  snapshot->declaredTargetLayer = OutputViewDeclarationAccess::DeclaredTargetLayer(document);
+  snapshot->declaredBounds = OutputViewDeclarationAccess::DeclaredBounds(document);
+  snapshot->layers.assign(document.layers.begin(), document.layers.end());
+  snapshot->animations.assign(document.animations.begin(), document.animations.end());
+  snapshot->dataBinds.assign(document.dataBinds.begin(), document.dataBinds.end());
+  snapshot->targetLayer = targetLayer;
+  snapshot->registryVersion = OutputViewValidationAccess::RegistryVersion(document);
+  return true;
+}
+
+bool CanReuseOutputViewValidation(const PAGXDocument& document,
+                                  const std::vector<Node*>& reportedDirty, bool layoutChanged,
+                                  const OutputViewValidationSnapshot& snapshot) {
+  if (layoutChanged || snapshot.targetLayer == nullptr) {
+    return false;
+  }
+  for (auto* node : reportedDirty) {
+    if (node == nullptr || !document.ownsNode(node) || !IsRenderOnlyLeaf(node->nodeType())) {
+      return false;
+    }
+    // A render-only leaf that now carries the target id would make the reference ambiguous even
+    // though the node id index was not re-registered.
+    if (!node->id.empty() && node->id == snapshot.targetId) {
+      return false;
+    }
+  }
+  if (OutputViewValidationAccess::RegistryVersion(document) != snapshot.registryVersion) {
+    return false;
+  }
+  if (document.targetLayerId != snapshot.targetId || document.outputBounds != snapshot.bounds) {
+    return false;
+  }
+  if (OutputViewDeclarationAccess::DeclaredTargetLayer(document) != snapshot.declaredTargetLayer ||
+      OutputViewDeclarationAccess::DeclaredBounds(document) != snapshot.declaredBounds) {
+    return false;
+  }
+  if (!SamePointerList(document.layers, snapshot.layers) ||
+      !SamePointerList(document.animations, snapshot.animations) ||
+      !SamePointerList(document.dataBinds, snapshot.dataBinds)) {
+    return false;
+  }
+  // Check ownership before reading the validated target: a removed node would otherwise be
+  // dereferenced through a stale pointer.
+  if (!document.ownsNode(snapshot.targetLayer)) {
+    return false;
+  }
+  if (snapshot.targetLayer->id != snapshot.targetId) {
+    return false;
+  }
+  return document.findNode(snapshot.targetId) == snapshot.targetLayer;
+}
+
 bool OutputTargetState::prepare(const std::shared_ptr<tgfx::Layer>& root,
                                 const std::shared_ptr<tgfx::Layer>& target) {
   reset();
