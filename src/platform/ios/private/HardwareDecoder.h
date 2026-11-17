@@ -63,7 +63,7 @@ class HardwareDecoder : public VideoDecoder {
  private:
   bool isInitialized = false;
   VTDecompressionSessionRef session = nullptr;
-  std::mutex sessionLocker = {};
+  std::timed_mutex sessionLocker = {};
   std::timed_mutex decodeLocker = {};
   CMFormatDescriptionRef videoFormatDescription = nullptr;
   tgfx::YUVColorSpace sourceColorSpace = tgfx::YUVColorSpace::BT601_LIMITED;

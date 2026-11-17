@@ -31,21 +31,22 @@ namespace pag {
  * callback.
  *
  * VideoToolbox's VTDecompressionSession.h documents that when neither
- * kVTDecodeFrame_EnableAsynchronousDecompression nor kVTDecodeFrame_EnableTemporalProcessing is
- * set (this decoder passes decodeFlags = 0), the output callback is invoked before
+ * kVTDecodeFrame_EnableAsynchronousDecompression nor kVTDecodeFrame_EnableTemporalProcessing is set
+ * (this decoder passes decodeFlags = 0), the output callback is invoked before
  * VTDecompressionSessionDecodeFrame returns. The late-delivery window this class guards against
- * comes from a different path: VTDecompressionSessionWaitForAsynchronousFrames /
- * FinishDelayedFrames may emit frames the session held back, and issue #3780 measured eight such
- * late deliveries on affected devices. A late callback writing the CVPixelBufferRef into a stack
- * slot of the already-returned decode frame was the original crash, so the buffer lives in this
- * heap context instead. The infoFlags out-parameter stays a plain stack variable because
- * VideoToolbox fills it synchronously before the decode call returns, unlike the refcon buffer
- * that the callback writes.
+ * comes from a different path: a frame the session held back is emitted by
+ * VTDecompressionSessionFinishDelayedFrames, and issue #3780 measured eight such late deliveries on
+ * affected devices. Because decodeFlags = 0 does not opt into kVTDecodeFrame_EnableTemporalProcessing,
+ * VideoToolbox may not delay such a frame indefinitely, so a pending callback is bounded, not
+ * unbounded. A late callback writing the CVPixelBufferRef into a stack slot of the already-returned
+ * decode frame was the original crash, so the buffer lives in this heap context instead. The
+ * infoFlags out-parameter stays a plain stack variable because VideoToolbox fills it synchronously
+ * before the decode call returns, unlike the refcon buffer that the callback writes.
  *
- * The decoder owns every context through VTDecodeContextPool and never lets a callback delete one.
- * A context is reclaimed once both sides are done (the common synchronous frame); delayed or
- * dropped frames that never resolve are reclaimed after the teardown barrier
- * (VTDecompressionSessionWaitForAsynchronousFrames) guarantees no further callback can arrive.
+ * The decoder owns every context through VTDecodeContextPool and never lets a callback delete one. A
+ * context is reclaimed once resolved(); a context still pending at teardown is moved to a shared
+ * graveyard rather than deleted or waited on, so a late callback can still land safely and a later
+ * sweep reclaims it.
  */
 class VTDecodeOutputContext {
  public:
@@ -54,7 +55,7 @@ class VTDecodeOutputContext {
   /**
    * Called by the VideoToolbox output callback to hand over the delivered pixel buffer, whose
    * ownership transfers into this context. Only records the buffer and marks the callback done; the
-   * owning pool, not the callback, releases the context.
+   * owning pool or graveyard, not the callback, releases the context.
    */
   void deliverBuffer(CVPixelBufferRef buffer);
 
@@ -66,8 +67,15 @@ class VTDecodeOutputContext {
   CVPixelBufferRef takeBuffer();
 
   /**
-   * Returns true once both the callback and the decode thread have finished with this context, so
-   * the owning pool may delete it.
+   * Called by the decode thread when VTDecompressionSessionDecodeFrame reported an error, so
+   * VideoToolbox will not invoke the callback for this frame. The context then needs no callback to
+   * become resolved() and is reclaimed on the next sweep instead of lingering forever.
+   */
+  void abandon();
+
+  /**
+   * Returns true once the decode thread is done and either the callback has run or no callback will
+   * come, so the owning pool or graveyard may delete it.
    */
   bool resolved();
 
@@ -76,12 +84,17 @@ class VTDecodeOutputContext {
   CVPixelBufferRef outputPixelBuffer = nullptr;
   bool callbackDone = false;
   bool consumerDone = false;
+  bool callbackNotExpected = false;
 };
 
 /**
- * VTDecodeContextPool owns every VTDecodeOutputContext a decoder creates. The decode thread
- * reclaims resolved contexts after each decode, and reclaims all of them once the session teardown
- * barrier guarantees no further callback can arrive.
+ * VTDecodeContextPool owns every VTDecodeOutputContext a decoder creates. The decode thread reclaims
+ * resolved contexts after each decode; at session teardown it drains the pool, deleting resolved
+ * contexts and handing any still-pending one to a process-wide graveyard. The graveyard lets a
+ * bounded late callback land on a context whose decoder is already gone, without blocking teardown
+ * on VideoToolbox; the next decoder's reclaim sweep deletes it once it resolves. Only frames the
+ * session genuinely dropped would never resolve, and those are abandon()ed on the decode error path
+ * rather than reaching the graveyard, so it stays self-draining.
  */
 class VTDecodeContextPool {
  public:
@@ -94,16 +107,17 @@ class VTDecodeContextPool {
   VTDecodeOutputContext* create();
 
   /**
-   * Deletes the contexts whose callback and decode thread are both done, bounding the pool to the
+   * Deletes this pool's resolved contexts and sweeps the shared graveyard, bounding both to the
    * frames still in flight.
    */
   void reclaimResolved();
 
   /**
-   * Deletes every context. Call only after the session barrier so no VideoToolbox callback can
-   * still reference a context.
+   * Deletes this pool's resolved contexts and moves any still-pending one to the shared graveyard.
+   * Call at session teardown, after the session is invalidated, so pending callbacks land in the
+   * graveyard instead of on a freed context.
    */
-  void reclaimAll();
+  void drain();
 
  private:
   std::vector<VTDecodeOutputContext*> contexts = {};

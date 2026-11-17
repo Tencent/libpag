@@ -124,11 +124,16 @@ void HardwareDecoder::invalidateSession(std::chrono::steady_clock::time_point de
   // shared deadline to return first, and only invalidate underneath it once it is really stuck,
   // because unblocking a stuck decode is what this method exists for.
   const bool hasDecodeLocker = decodeLocker.try_lock_until(deadline);
-  {
-    std::lock_guard<std::mutex> lock(sessionLocker);
+  // sessionLocker is only ever held briefly now that teardown uses the non-blocking
+  // FinishDelayedFrames, but bound it with the same deadline so the observer's whole batch stays
+  // capped rather than blocking here if another thread is mid session swap.
+  if (sessionLocker.try_lock_until(deadline)) {
     if (session) {
       VTDecompressionSessionInvalidate(session);
     }
+    sessionLocker.unlock();
+  } else {
+    LOGI("HardwareDecoder: skipped invalidate because the session stayed busy past the deadline");
   }
   if (hasDecodeLocker) {
     decodeLocker.unlock();
@@ -175,9 +180,12 @@ HardwareDecoder::~HardwareDecoder() {
     }
   }
   {
-    std::lock_guard<std::mutex> lock(sessionLocker);
+    std::lock_guard<std::timed_mutex> lock(sessionLocker);
     if (session) {
-      VTDecompressionSessionWaitForAsynchronousFrames(session);
+      // Non-blocking: asks VideoToolbox to emit any delayed frame but may return before it does,
+      // so this never stalls the ANR-sensitive teardown path the way a wait-for-frames barrier
+      // would. A still-pending context is handed to the graveyard below instead of waited on.
+      VTDecompressionSessionFinishDelayedFrames(session);
       VTDecompressionSessionInvalidate(session);
       CFRelease(session);
       session = nullptr;
@@ -190,9 +198,9 @@ HardwareDecoder::~HardwareDecoder() {
   }
 
   cleanResources();
-  // Reclaimed only after the barrier above guaranteed VideoToolbox emitted every pending callback
-  // and the session is gone, so no callback can still reference a context.
-  contextPool.reclaimAll();
+  // Resolved contexts are deleted; a context still pending (a bounded late callback not yet landed)
+  // moves to the graveyard so the callback has a live object to write into.
+  contextPool.drain();
 }
 
 void HardwareDecoder::cleanResources() {
@@ -266,19 +274,21 @@ bool HardwareDecoder::resetVideoToolBox() {
   // pointer that's mid-CFRelease. The new session is built into a local first and assigned to
   // the member only after creation succeeds, again under the lock.
   {
-    std::lock_guard<std::mutex> lock(sessionLocker);
+    std::lock_guard<std::timed_mutex> lock(sessionLocker);
     if (session) {
       auto old = session;
       session = nullptr;
-      VTDecompressionSessionWaitForAsynchronousFrames(old);
+      // Non-blocking emit of any delayed frame, then tear down; a still-pending context is handed
+      // to the graveyard by drain() rather than waited on here.
+      VTDecompressionSessionFinishDelayedFrames(old);
       VTDecompressionSessionInvalidate(old);
       CFRelease(old);
     }
   }
 
-  // The barrier above guaranteed the old session emitted every pending callback, so the contexts it
-  // owned can no longer be written and are safe to reclaim.
-  contextPool.reclaimAll();
+  // Resolved contexts of the old session are deleted; a context still pending moves to the
+  // graveyard so a bounded late callback can still land safely.
+  contextPool.drain();
 
   // create decompression session
   CFDictionaryRef attrs = NULL;
@@ -362,7 +372,7 @@ bool HardwareDecoder::resetVideoToolBox() {
   }
 
   {
-    std::lock_guard<std::mutex> lock(sessionLocker);
+    std::lock_guard<std::timed_mutex> lock(sessionLocker);
     session = newSession;
   }
   return true;
@@ -436,8 +446,11 @@ pag::DecodingResult HardwareDecoder::onDecodeFrame() {
     }
 
     outputPixelBuffer = context->takeBuffer();
-    // A context whose callback never arrived (failed or dropped frame) stays in the pool until the
-    // next reset or teardown barrier reclaims it; resolved ones are freed here to bound the pool.
+    if (status != noErr) {
+      // VideoToolbox will not call back for a rejected frame, so the context needs no callback to
+      // become resolved and is reclaimed below instead of lingering in the graveyard.
+      context->abandon();
+    }
     contextPool.reclaimResolved();
 
     if (status != noErr && !outputPixelBuffer) {

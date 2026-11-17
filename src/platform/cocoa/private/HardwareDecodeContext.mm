@@ -20,6 +20,33 @@
 
 namespace pag {
 
+namespace {
+// Process-wide holder for contexts still pending when their decoder tears down its session. A late
+// VideoToolbox callback can land on such a context safely because it is never deleted while
+// pending; any decoder's reclaim sweep deletes the ones that have since resolved.
+std::mutex& GraveyardMutex() {
+  static std::mutex mutex;
+  return mutex;
+}
+
+std::vector<VTDecodeOutputContext*>& Graveyard() {
+  static std::vector<VTDecodeOutputContext*> graveyard;
+  return graveyard;
+}
+
+void SweepGraveyardLocked() {
+  auto& graveyard = Graveyard();
+  for (auto item = graveyard.begin(); item != graveyard.end();) {
+    if ((*item)->resolved()) {
+      delete *item;
+      item = graveyard.erase(item);
+    } else {
+      ++item;
+    }
+  }
+}
+}  // namespace
+
 VTDecodeOutputContext::~VTDecodeOutputContext() {
   if (outputPixelBuffer != nullptr) {
     CVPixelBufferRelease(outputPixelBuffer);
@@ -40,13 +67,18 @@ CVPixelBufferRef VTDecodeOutputContext::takeBuffer() {
   return result;
 }
 
+void VTDecodeOutputContext::abandon() {
+  std::lock_guard<std::mutex> lock(locker);
+  callbackNotExpected = true;
+}
+
 bool VTDecodeOutputContext::resolved() {
   std::lock_guard<std::mutex> lock(locker);
-  return callbackDone && consumerDone;
+  return consumerDone && (callbackDone || callbackNotExpected);
 }
 
 VTDecodeContextPool::~VTDecodeContextPool() {
-  reclaimAll();
+  drain();
 }
 
 VTDecodeOutputContext* VTDecodeContextPool::create() {
@@ -64,11 +96,19 @@ void VTDecodeContextPool::reclaimResolved() {
       ++item;
     }
   }
+  std::lock_guard<std::mutex> lock(GraveyardMutex());
+  SweepGraveyardLocked();
 }
 
-void VTDecodeContextPool::reclaimAll() {
+void VTDecodeContextPool::drain() {
+  std::lock_guard<std::mutex> lock(GraveyardMutex());
+  SweepGraveyardLocked();
   for (auto* context : contexts) {
-    delete context;
+    if (context->resolved()) {
+      delete context;
+    } else {
+      Graveyard().push_back(context);
+    }
   }
   contexts.clear();
 }
