@@ -204,6 +204,15 @@ float CssDirectionToAngle(const std::string& kw);
 // "linear-gradient(a, b, c)" -> "a, b, c".
 std::string ExtractParenArgs(const std::string& value);
 
+// Locates the CSS function call that starts at `start` in `value`: the first '(' at or after
+// `start` opens it, and the paren balancing that one closes it, so an argument may carry parentheses
+// of its own (`translateX(calc(100% - 10px))`, `rotate3d(var(--x), 0, 0, 45deg)`). Returns false
+// when `start` is at or past the end, there is no '(', or the parentheses never balance. Everything
+// outside the parens is left to the caller: the transform-list splitter and the single-call parser
+// disagree on the name (case, spaces) and on what may follow the closing paren.
+bool LocateCssFunctionCall(const std::string& value, size_t start, size_t& outOpenParen,
+                           size_t& outCloseParen);
+
 // Parse a single-call CSS function expression. `trimmed` is expected to be already
 // whitespace-trimmed. On success `outName` receives the lower-cased function name and
 // `outArgs` receives the trimmed argument body. The closing paren is matched by depth, so an argument

@@ -614,44 +614,40 @@ float CssDirectionToAngle(const std::string& kw) {
   return 180.0f;
 }
 
-std::string ExtractParenArgs(const std::string& value) {
-  // Match the first '(' to its corresponding ')' by tracking nesting depth, instead of
-  // using rfind(')'). When the input contains multiple top-level groups such as
-  // `radial-gradient(...), radial-gradient(...)`, rfind would jump to the very last ')'
-  // and treat all groups as one, producing nonsensical args.
-  auto open = value.find('(');
-  if (open == std::string::npos) return {};
-  int depth = 0;
-  for (size_t i = open; i < value.size(); ++i) {
-    char c = value[i];
-    if (c == '(') {
-      ++depth;
-    } else if (c == ')') {
-      --depth;
-      if (depth == 0) {
-        return value.substr(open + 1, i - open - 1);
-      }
-    }
-  }
-  return {};
-}
-
-bool ParseCssFunctionCall(const std::string& trimmed, std::string& outName, std::string& outArgs) {
-  size_t openParen = trimmed.find('(');
-  if (openParen == std::string::npos || openParen == 0) return false;
+bool LocateCssFunctionCall(const std::string& value, size_t start, size_t& outOpenParen,
+                           size_t& outCloseParen) {
+  if (start >= value.size()) return false;
+  const size_t openParen = value.find('(', start);
+  if (openParen == std::string::npos) return false;
   // The argument may carry parentheses of its own (`calc(100% - 10px)`, `var(--x)`), so the closing
   // paren is the one that balances the opening paren, not the first or last one in the string.
   int depth = 0;
-  size_t closeParen = trimmed.size();
-  for (size_t i = openParen; i < trimmed.size(); ++i) {
-    if (trimmed[i] == '(') {
+  for (size_t i = openParen; i < value.size(); ++i) {
+    if (value[i] == '(') {
       ++depth;
-    } else if (trimmed[i] == ')' && --depth == 0) {
-      closeParen = i;
-      break;
+    } else if (value[i] == ')' && --depth == 0) {
+      outOpenParen = openParen;
+      outCloseParen = i;
+      return true;
     }
   }
-  if (closeParen >= trimmed.size()) return false;
+  return false;
+}
+
+std::string ExtractParenArgs(const std::string& value) {
+  // Match the first '(' to its balancing ')' instead of using rfind(')'), which would jump to the
+  // last ')' and treat `radial-gradient(...), radial-gradient(...)` as one group.
+  size_t openParen = 0;
+  size_t closeParen = 0;
+  if (!LocateCssFunctionCall(value, 0, openParen, closeParen)) return {};
+  return value.substr(openParen + 1, closeParen - openParen - 1);
+}
+
+bool ParseCssFunctionCall(const std::string& trimmed, std::string& outName, std::string& outArgs) {
+  size_t openParen = 0;
+  size_t closeParen = 0;
+  if (!LocateCssFunctionCall(trimmed, 0, openParen, closeParen)) return false;
+  if (openParen == 0) return false;
   if (!Trim(trimmed.substr(closeParen + 1)).empty()) return false;
   std::string name = ToLower(Trim(trimmed.substr(0, openParen)));
   if (name.empty()) return false;

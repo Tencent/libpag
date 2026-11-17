@@ -602,30 +602,18 @@ bool SplitTransformFunctions(const std::string& value, std::vector<std::string>*
     if (index >= size) {
       break;
     }
-    const size_t nameStart = index;
-    while (index < size && value[index] != '(' &&
-           !std::isspace(static_cast<unsigned char>(value[index]))) {
-      ++index;
-    }
-    if (index >= size || value[index] != '(') {
-      return false;
-    }
     // `<transform-list>` is `<transform-function>+`, so `rotate(45deg)scale(2)` is legal and needs no
-    // separator. The closing paren is matched by depth, so an argument may carry parentheses of its
-    // own (`translateX(calc(100% - 10px))`).
-    int depth = 0;
-    size_t closeParen = index;
-    for (; closeParen < size; ++closeParen) {
-      if (value[closeParen] == '(') {
-        ++depth;
-      } else if (value[closeParen] == ')' && --depth == 0) {
-        break;
-      }
-    }
-    if (closeParen >= size) {
+    // separator, while a space between the name and the opening paren is not: the name span has to
+    // stay whitespace free.
+    size_t openParen = 0;
+    size_t closeParen = 0;
+    if (!LocateCssFunctionCall(value, index, openParen, closeParen)) {
       return false;
     }
-    out->push_back(Trim(value.substr(nameStart, closeParen - nameStart + 1)));
+    if (value.find_first_of(" \t\n\v\f\r", index) < openParen) {
+      return false;
+    }
+    out->push_back(Trim(value.substr(index, closeParen - index + 1)));
     index = closeParen + 1;
   }
   return !out->empty();
