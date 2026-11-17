@@ -383,7 +383,8 @@ PAGX_TEST(PAGXVideoExporterTest, MakeWithSurfaceAcceptsExplicitOutputDimensions)
   options.renderMode = pagx::PAGRenderMode::Direct;
   auto surface = MakeHostSurface(100, 80);
   ASSERT_TRUE(surface != nullptr);
-  auto exporter = pagx::VideoExporter::MakeWithSurface(MakeStaticDocument(), std::move(surface), options);
+  auto exporter =
+      pagx::VideoExporter::MakeWithSurface(MakeStaticDocument(), std::move(surface), options);
   ASSERT_TRUE(exporter != nullptr);
   EXPECT_EQ(exporter->width(), 100);
   EXPECT_EQ(exporter->height(), 80);
