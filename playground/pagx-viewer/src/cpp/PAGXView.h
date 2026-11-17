@@ -109,7 +109,14 @@ class PAGXView {
   void applySceneDisplayOptions();
   bool ensureWindow();
   void resetScene();
+  // Draws the static paths: a cleared canvas before any scene exists, or the default output view
+  // through its intermediate surface. Participates in the scene's dirty gate so document resource
+  // updates repaint without the host setting presentImmediately.
+  void drawStaticFrame();
   bool drawOutputView(tgfx::Context* context);
+  // Applies per-frame performance tracking and zoom/tile-refinement scheduling for the animated
+  // path, which the static paths must not run.
+  void updateFrameScheduling(double frameStartMs);
   void syncSurfaceSize(int canvasWidth, int canvasHeight);
   void advanceTimelines(double frameStartMs);
   void onZoomEnd();

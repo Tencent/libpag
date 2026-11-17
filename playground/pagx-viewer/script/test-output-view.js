@@ -88,6 +88,10 @@ function Pixel(image, x, y) {
   return image.pixels.slice(offset, offset + 4);
 }
 
+function CloseColor(actual, expected) {
+  return actual.every((value, index) => Math.abs(value - expected[index]) <= 2);
+}
+
 function Hash(image) {
   return createHash('sha256').update(Buffer.from(image.pixels)).digest('hex');
 }
@@ -235,6 +239,70 @@ try {
     const after = await Render(page, plain);
     assert.equal(Hash(after), controls.plain.hash, '切回无字段文档恢复原渲染');
     passed++;
+
+    // Replacing an external image must repaint through the scene's own dirty state, without a
+    // host present flag, zoom or resize call between the swap and the next draw.
+    const refresh = await page.evaluate(async () => {
+      function MakePng(fill) {
+        const source = document.createElement('canvas');
+        source.width = 2;
+        source.height = 2;
+        const context = source.getContext('2d');
+        context.fillStyle = fill;
+        context.fillRect(0, 0, 2, 2);
+        return new Promise(resolve => source.toBlob(async blob => {
+          resolve(new Uint8Array(await blob.arrayBuffer()));
+        }, 'image/png'));
+      }
+      const sample = image => {
+        const offset = ((image.height - 1 - 120) * image.width + 150) * 4;
+        return Array.from(image.pixels.slice(offset, offset + 4));
+      };
+      const xml = `<pagx width="1000" height="1000" targetLayer="@target" outputBounds="90,110,100,60">
+        <Layer id="target" x="100" y="120" width="80" height="40">
+          <Rectangle width="100%" height="100%"/>
+          <Fill><ImagePattern image="probe.png" scaleMode="stretch"/></Fill>
+        </Layer></pagx>`;
+      view.pause();
+      canvas.width = 300;
+      canvas.height = 240;
+      view.updateSize();
+      view.clearBackgroundColor();
+      view.loadPAGX(new TextEncoder().encode(xml));
+      view.pause();
+      view.updateZoomScaleAndOffset(1, 0, 0);
+      if (!view.loadFileData('probe.png', await MakePng('#FF0000'))) {
+        throw new Error('first loadFileData failed');
+      }
+      for (let frame = 0; frame < 8; frame++) view.draw();
+      const first = sample(capture());
+
+      if (!view.loadFileData('probe.png', await MakePng('#0000FF'))) {
+        throw new Error('second loadFileData failed');
+      }
+      view.draw();
+      const second = sample(capture());
+
+      const before = gpuCalls;
+      for (let index = 0; index < 20; index++) view.draw();
+      const idle = gpuCalls - before;
+
+      if (!view.loadFileData('probe.png', await MakePng('#00FF00'))) {
+        throw new Error('third loadFileData failed');
+      }
+      view.draw();
+      const third = sample(capture());
+      return {first, second, third, idle};
+    });
+    assert.ok(CloseColor(refresh.first, [255, 0, 0, 255]),
+              `首次绘制应为红色，实际=${refresh.first}`);
+    assert.ok(CloseColor(refresh.second, [0, 0, 255, 255]),
+              `替换图片后应重绘为蓝色，实际=${refresh.second}`);
+    assert.equal(refresh.idle, 0, '资源替换后的空闲帧不应继续提交 GPU');
+    assert.ok(CloseColor(refresh.third, [0, 255, 0, 255]),
+              `连续替换应再次刷新，实际=${refresh.third}`);
+    passed += 4;
+
     console.log(`输出视图浏览器回归：${passed} 项通过，WebGL2 / Chromium。`);
   }
 } finally {

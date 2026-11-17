@@ -399,10 +399,9 @@ bool PAGXView::drawOutputView(tgfx::Context* context) {
     return false;
   }
   auto surface = pagx::MakeFrom(window->getDevice(), outputSurface);
-  auto outputCanvas = outputSurface->getCanvas();
-  auto outputSaveCount = outputCanvas->save();
+  // PAGScene::renderTo() scopes its canvas transform with AutoCanvasRestore, so the shared
+  // outputSurface canvas needs no extra save/restore here.
   auto recording = pagx::Record(context, scene, surface, true);
-  outputCanvas->restoreToCount(outputSaveCount);
   if (recording == nullptr) {
     return false;
   }
@@ -432,37 +431,82 @@ bool PAGXView::drawOutputView(tgfx::Context* context) {
   return true;
 }
 
+void PAGXView::drawStaticFrame() {
+  updateSize();
+  if (tgfxSurface == nullptr) {
+    return;
+  }
+  // A loaded or edited output view is dirty even when no host action set presentImmediately:
+  // loadFileData() notifies the document and the scene marks itself dirty. A scene-less canvas
+  // still needs the explicit flag because there is no content to query.
+  bool hasPendingContent = scene != nullptr && scene->hasContentChanged();
+  if (!presentImmediately && !hasPendingContent) {
+    return;
+  }
+  auto device = window->getDevice();
+  auto context = device->lockContext();
+  if (context == nullptr) {
+    return;
+  }
+  // Mark the frame pending before the first Record. Record consumes the scene's dirty flag, so a
+  // later snapshot or flush failure must still leave the host a reason to retry this frame.
+  presentImmediately = true;
+  bool drawn = false;
+  if (scene == nullptr) {
+    tgfxSurface->getCanvas()->clear(useCustomBackgroundColor ? ToTGFX(customBackgroundColor)
+                                                             : tgfx::Color::Transparent());
+    auto recording = context->flush();
+    if (recording != nullptr) {
+      context->submit(std::move(recording));
+      drawn = true;
+    }
+  } else {
+    drawn = drawOutputView(context);
+  }
+  if (drawn) {
+    presentImmediately = false;
+    lastRecording = nullptr;
+  }
+  device->unlock();
+}
+
+void PAGXView::updateFrameScheduling(double frameStartMs) {
+  double frameEndMs = emscripten_get_now();
+  double frameDurationMs = frameEndMs - frameStartMs;
+  updatePerformanceState(frameDurationMs);
+
+  if (isZooming && lastZoomUpdateTimestampMs > 0.0) {
+    double currentTimeoutMs = isZoomingIn ? ZoomInEndTimeoutMs : ZoomOutEndTimeoutMs;
+    double timeSinceLastUpdate = frameStartMs - lastZoomUpdateTimestampMs;
+    if (timeSinceLastUpdate >= currentTimeoutMs) {
+      onZoomEnd();
+    }
+  }
+
+  if (!isZooming && tryUpgradeTimestampMs > 0.0) {
+    if (frameStartMs >= tryUpgradeTimestampMs) {
+      if (!lastFrameSlow) {
+        int targetCount = calculateTargetTileRefinement(lastZoom);
+        currentMaxTilesRefinedPerFrame = targetCount;
+        if (scene != nullptr) {
+          scene->getDisplayOptions()->setMaxTilesRefinedPerFrame(targetCount);
+        }
+        tryUpgradeTimestampMs = 0.0;
+      } else {
+        tryUpgradeTimestampMs = frameStartMs + UpgradeRetryDelayMs;
+      }
+    }
+  } else if (!isZooming) {
+    updateAdaptiveTileRefinement();
+  }
+}
+
 void PAGXView::draw() {
   if (!ensureWindow()) {
     return;
   }
   if (scene == nullptr || hasOutputView) {
-    updateSize();
-    if (!presentImmediately || tgfxSurface == nullptr) {
-      return;
-    }
-    auto device = window->getDevice();
-    auto context = device->lockContext();
-    if (context == nullptr) {
-      return;
-    }
-    bool drawn = false;
-    if (scene == nullptr) {
-      tgfxSurface->getCanvas()->clear(useCustomBackgroundColor ? ToTGFX(customBackgroundColor)
-                                                               : tgfx::Color::Transparent());
-      auto recording = context->flush();
-      if (recording != nullptr) {
-        context->submit(std::move(recording));
-        drawn = true;
-      }
-    } else {
-      drawn = drawOutputView(context);
-    }
-    if (drawn) {
-      presentImmediately = false;
-      lastRecording = nullptr;
-    }
-    device->unlock();
+    drawStaticFrame();
     return;
   }
   double frameStartMs = emscripten_get_now();
@@ -511,35 +555,7 @@ void PAGXView::draw() {
     }
     device->unlock();
   }
-
-  double frameEndMs = emscripten_get_now();
-  double frameDurationMs = frameEndMs - frameStartMs;
-  updatePerformanceState(frameDurationMs);
-
-  if (isZooming && lastZoomUpdateTimestampMs > 0.0) {
-    double currentTimeoutMs = isZoomingIn ? ZoomInEndTimeoutMs : ZoomOutEndTimeoutMs;
-    double timeSinceLastUpdate = frameStartMs - lastZoomUpdateTimestampMs;
-    if (timeSinceLastUpdate >= currentTimeoutMs) {
-      onZoomEnd();
-    }
-  }
-
-  if (!isZooming && tryUpgradeTimestampMs > 0.0) {
-    if (frameStartMs >= tryUpgradeTimestampMs) {
-      if (!lastFrameSlow) {
-        int targetCount = calculateTargetTileRefinement(lastZoom);
-        currentMaxTilesRefinedPerFrame = targetCount;
-        if (scene != nullptr) {
-          scene->getDisplayOptions()->setMaxTilesRefinedPerFrame(targetCount);
-        }
-        tryUpgradeTimestampMs = 0.0;
-      } else {
-        tryUpgradeTimestampMs = frameStartMs + UpgradeRetryDelayMs;
-      }
-    }
-  } else if (!isZooming) {
-    updateAdaptiveTileRefinement();
-  }
+  updateFrameScheduling(frameStartMs);
 }
 
 void PAGXView::onZoomEnd() {
