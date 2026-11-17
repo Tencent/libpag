@@ -21,6 +21,7 @@
 #include <cmath>
 #include <string>
 #include <vector>
+#include "pagx/html/importer/HTMLTransform3D.h"
 #include "pagx/types/Color.h"
 #include "pagx/types/ColorSpace.h"
 #include "pagx/types/Matrix.h"
@@ -143,19 +144,24 @@ struct HTMLInheritedStyle {
 
 /**
  * Resolved CSS `transform` for a single HTML element: the whole function list composed in CSS order
- * into a 4x4 pose, plus the resolved `transform-origin`. The pivot is never folded into `pose`;
- * `applyBoxTransform` writes it onto `Layer.anchor` so matrix / matrix3D keyframes stay un-pivoted.
+ * into a 4x4 pose, plus the inputs the pivot is resolved from. The pivot is never folded into `pose`;
+ * `applyBoxTransform` writes it onto `Layer.anchor` so matrix / matrix3D keyframes stay un-pivoted,
+ * and it resolves that pivot through `ResolveElementAnchor` — the same chain the keyframe path uses,
+ * so an element's static and animated pivots cannot disagree.
  *
  * `valid` is false when the declaration is absent, `none`, or was rejected by the parser (which
- * reports the reason). `originResolved` is false when a percentage / keyword origin could not be
- * resolved because the reference box has no absolute size; the caller then pivots at the top-left.
+ * reports the reason).
  */
 struct HTMLTransform {
   bool valid = false;
   Matrix3D pose = {};
-  Point origin = {};
+  // Pivot depth resolved against the reference size. Read by `attachParentCamera`'s "does the parent
+  // camera affect this pose" test, which runs before the layer (and thus the final pivot) exists.
   float originZ = 0.0f;
-  bool originResolved = false;
+  // Authored `transform-origin` plus the box size the cascade resolved it against. Kept unresolved so
+  // the layer builder can finish the shared fallback chain once the final layer size is known.
+  std::string originValue = {};
+  HTMLTransformReference reference = {};
 };
 
 /**

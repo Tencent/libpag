@@ -694,16 +694,32 @@ void HTMLLayerBuilder::applyBackdropFilter(Layer* layer, const HTMLBoxAttributes
   }
 }
 
-void HTMLLayerBuilder::applyBoxTransform(Layer* layer, const HTMLBoxAttributes& box) {
+void HTMLLayerBuilder::applyBoxTransform(Layer* layer, const HTMLBoxAttributes& box,
+                                         const std::string& elementName) {
   if (!box.transform.valid) {
     applyBareParentCamera(layer, box);
     return;
+  }
+  // The pivot uses the same size fallback chain as the keyframe path, with this layer's final size as
+  // the last step; resolving it here (rather than in the cascade) is what makes the static and the
+  // animated pivot the same point (see `ResolveElementAnchor`).
+  const HTMLElementAnchor anchor =
+      ResolveElementAnchor(box.transform.originValue, box.transform.reference, layer, _valueParser);
+  // The pivot only matters for a pose with a non-identity linear part: a pure translation or a pure
+  // projection is unchanged by it, so an unresolved origin is not worth a diagnostic there.
+  if (!anchor.resolved && !IsLinearIdentity(box.transform.pose)) {
+    const std::string authored = box.transform.originValue.empty()
+                                     ? std::string("50% 50% (default)")
+                                     : box.transform.originValue;
+    _diagnostics.warn("html: transform-origin '" + authored + "' on <" + elementName +
+                      "> cannot be resolved against the box size; pivoting at the top-left "
+                      "corner");
   }
   // A `perspective` declared on the parent projects this element's pose; `PlacePose` folds it in and
   // classifies the result the same way the keyframe path does. The pivot depth takes part in that
   // decision, because a flat pose pivoted off the layer plane does leave it.
   const PosePlacement placement =
-      PlacePose(box.transform.pose, box.parentPerspectivePx, box.transform.originZ,
+      PlacePose(box.transform.pose, box.parentPerspectivePx, anchor.depth,
                 box.localPerspectiveOriginX, box.localPerspectiveOriginY);
   if (!placement.valid) {
     _diagnostics.warn(
@@ -714,22 +730,22 @@ void HTMLLayerBuilder::applyBoxTransform(Layer* layer, const HTMLBoxAttributes& 
   // pure translation, so the runtime can apply `T(anchor) * pose * T(-anchor)` once, after the
   // keyframes have been interpolated. A pose whose linear part is the identity (pure translation or
   // pure projection) is unaffected by the pivot, so it keeps the legacy matrix-only form.
-  const bool needsAnchor = box.transform.originResolved && !placement.linearIsIdentity;
+  const bool needsAnchor = anchor.resolved && !placement.linearIsIdentity;
   if (placement.flat) {
     const Matrix affine = ToAffine2D(placement.pose);
     if (affine.isIdentity()) {
       return;
     }
     if (needsAnchor) {
-      layer->anchor = box.transform.origin;
-      layer->anchorZ = box.transform.originZ;
+      layer->anchor = anchor.point;
+      layer->anchorZ = anchor.depth;
     }
     layer->matrix = affine;
     return;
   }
   if (needsAnchor) {
-    layer->anchor = box.transform.origin;
-    layer->anchorZ = box.transform.originZ;
+    layer->anchor = anchor.point;
+    layer->anchorZ = anchor.depth;
   }
   layer->matrix3D = placement.pose;
 }

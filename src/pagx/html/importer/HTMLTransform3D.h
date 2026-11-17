@@ -29,6 +29,7 @@ namespace pagx {
 
 class HTMLValueParser;
 class HTMLDiagnosticSink;
+class Layer;
 
 /**
  * The box size `transform-origin` resolves percentages and keywords against. It equals the CSS box
@@ -74,6 +75,40 @@ bool SplitTransformFunctions(const std::string& value, std::vector<std::string>*
  */
 HTMLTransformOrigin ResolveTransformOrigin(const std::string& value, float width, float height,
                                            HTMLValueParser& valueParser);
+
+/**
+ * The pivot of one element's local transform: `transform-origin` in layer-local pixels plus its
+ * depth. `resolved` is false when the value needs a box size that no step of the chain supplied; the
+ * pivot then falls back to the layer's top-left corner. `valid` mirrors the declaration itself: false
+ * means the authored value is not a CSS `<position>` at all, so `point` carries the initial
+ * `50% 50%` instead.
+ */
+struct HTMLElementAnchor {
+  Point point = {};
+  float depth = 0.0f;
+  bool resolved = false;
+  bool valid = true;
+};
+
+/**
+ * Resolves one element's `transform-origin`. The static box path and the keyframe path must arrive at
+ * the same pivot, and they used to answer this separately, so the size fallback chain lives here and
+ * nowhere else:
+ *
+ *  1. `reference` — the element's resolved `width` / `height` in px, including an `<svg>`'s
+ *     `width` / `height` attributes (see `HTMLStyleCascade::getTransformReferenceSize`). This is the
+ *     same data the keyframe path used to re-parse out of the element's own declarations.
+ *  2. `layer` — the final layer size. A percentage / intrinsic / content-sized box only carries a px
+ *     size once the layer exists; skipping this step is why the animated pivot could resolve while
+ *     the static one silently fell back to the top-left corner.
+ *
+ * Both steps are tried in that order; the first one that resolves a percentage / keyword origin wins.
+ * `layer` may be null when the caller runs before the layer exists (the cascade does, for the
+ * declaration-validity diagnostic).
+ */
+HTMLElementAnchor ResolveElementAnchor(const std::string& originValue,
+                                       const HTMLTransformReference& reference, const Layer* layer,
+                                       HTMLValueParser& valueParser);
 
 /**
  * Parses a CSS `transform` value (a whitespace-separated function list) into a 4x4 pose, composed

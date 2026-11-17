@@ -9143,6 +9143,60 @@ PAG_TEST(PAGXHTMLImporterTest, RawTransformOnElementWithoutSizeWarnsForOrigin) {
   EXPECT_TRUE(HasDiagnosticContaining(doc, "cannot be resolved against the box size"));
 }
 
+// Depth-first lookup of the layer the cascade assigned to a DOM `id`.
+static pagx::Layer* FindPivotTestLayer(pagx::Layer* layer, const std::string& id) {
+  if (layer == nullptr) return nullptr;
+  if (layer->id == id) return layer;
+  for (auto* child : layer->children) {
+    if (auto* match = FindPivotTestLayer(child, id)) return match;
+  }
+  return nullptr;
+}
+
+static pagx::Layer* FindPivotTestLayer(const std::shared_ptr<pagx::PAGXDocument>& document,
+                                       const std::string& id) {
+  if (document == nullptr) return nullptr;
+  for (auto* layer : document->layers) {
+    if (auto* match = FindPivotTestLayer(layer, id)) return match;
+  }
+  return nullptr;
+}
+
+PAG_TEST(PAGXHTMLImporterTest, StaticAndAnimatedPivotsAgreeOnPercentageBox) {
+  // The static pose and the keyframes must pivot at the same point. A percentage box carries no px
+  // size in the cascade's reference box, so neither path can resolve `50% 50%`; before both paths
+  // shared one resolution chain the keyframe path alone consulted the layer size, which let an
+  // element pivot at two different points depending on whether its transform was animated.
+  auto doc = ParseRaw(R"HTML(
+    <html><head><style>
+      @keyframes turn {
+        0%   { transform: rotate(0deg); }
+        100% { transform: rotate(90deg); }
+      }
+    </style></head>
+    <body style="width:200px;height:160px">
+      <div id="staticCard" style="position:absolute;left:0px;top:0px;width:50%;height:40px;
+           background-color:#38BDF8;transform:rotate(45deg);transform-origin:50% 50%"></div>
+      <div id="animatedCard" style="position:absolute;left:0px;top:80px;width:50%;height:40px;
+           background-color:#38BDF8;transform-origin:50% 50%;
+           animation:turn 1s linear infinite"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* staticCard = FindPivotTestLayer(doc, "staticCard");
+  auto* animatedCard = FindPivotTestLayer(doc, "animatedCard");
+  ASSERT_NE(staticCard, nullptr);
+  ASSERT_NE(animatedCard, nullptr);
+  EXPECT_TRUE(NearlyEqual(staticCard->anchor.x, animatedCard->anchor.x));
+  EXPECT_TRUE(NearlyEqual(staticCard->anchor.y, animatedCard->anchor.y));
+  EXPECT_TRUE(NearlyEqual(staticCard->anchorZ, animatedCard->anchorZ));
+  // Neither path can size a percentage box, so both fall back to the same top-left pivot.
+  EXPECT_TRUE(NearlyEqual(staticCard->anchor.x, 0.0f));
+  EXPECT_TRUE(NearlyEqual(staticCard->anchor.y, 0.0f));
+  EXPECT_TRUE(NearlyEqual(animatedCard->anchor.x, 0.0f));
+  EXPECT_TRUE(NearlyEqual(animatedCard->anchor.y, 0.0f));
+}
+
 //==================================================================================================
 // HTMLCssCascade — tokenizer edge cases
 //==================================================================================================

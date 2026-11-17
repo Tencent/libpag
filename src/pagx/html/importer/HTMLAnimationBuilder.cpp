@@ -418,29 +418,6 @@ bool ParseTransformPose(const std::string& value, HTMLValueParser& parser,
                                reference.heightPx);
 }
 
-// Resolves the pivot the animation keeps on the layer: the element's `transform-origin` in
-// layer-local pixels, including its optional depth. Returns false when the origin cannot be
-// resolved because the box has no absolute size, in which case the caller pivots at the top-left
-// and warns.
-bool ResolveAnchor(const std::unordered_map<std::string, std::string>& style, const Layer* layer,
-                   const HTMLTransformReference& reference, HTMLValueParser& parser, Point& point,
-                   float& depth) {
-  float width = reference.widthPx;
-  float height = reference.heightPx;
-  if (std::isnan(width)) width = parser.parseAbsoluteLengthPx(GetTrimmed(style, "width"));
-  if (std::isnan(height)) height = parser.parseAbsoluteLengthPx(GetTrimmed(style, "height"));
-  if (std::isnan(width) && layer != nullptr) width = layer->width;
-  if (std::isnan(height) && layer != nullptr) height = layer->height;
-  const auto origin =
-      ResolveTransformOrigin(GetTrimmed(style, "transform-origin"), width, height, parser);
-  if (!origin.resolved) {
-    return false;
-  }
-  point = origin.point;
-  depth = origin.z;
-  return true;
-}
-
 // Resolves the pivot the inline SVG resolver hands to the generated group. The shape's own box size
 // is unknown here, so only absolute px values resolve; the caller warns when an authored origin is
 // dropped.
@@ -1237,11 +1214,10 @@ bool HTMLAnimationBuilder::buildForElement(
 
   // The pivot's depth decides whether the parent camera reaches a flat keyframe pose (see
   // `PlacePose`), so it is resolved once up front rather than after the stops have been parsed. The
-  // same values are written to the layer below when the stops actually need the pivot.
-  Point keyframeAnchor = {};
-  float keyframeAnchorZ = 0.0f;
-  const bool keyframeAnchorResolved =
-      ResolveAnchor(resolvedStyle, layer, reference, _valueParser, keyframeAnchor, keyframeAnchorZ);
+  // same values are written to the layer below when the stops actually need the pivot. This is the
+  // same resolution `applyBoxTransform` runs for the static pose, so the two pivots cannot disagree.
+  const HTMLElementAnchor keyframeAnchor = ResolveElementAnchor(
+      GetTrimmed(resolvedStyle, "transform-origin"), reference, layer, _valueParser);
 
   for (const auto& stop : stops) {
     Frame time = static_cast<Frame>(
@@ -1270,7 +1246,7 @@ bool HTMLAnimationBuilder::buildForElement(
           // depth here; `PlacePose` re-classifies it, and an invalid pose only drops this stop. A
           // pose that stays flat keeps itself instead, so `scale(0)` survives as a pop-in start.
           const PosePlacement placement =
-              PlacePose(pose, parentPerspectivePx, keyframeAnchorZ, localPerspectiveOriginX,
+              PlacePose(pose, parentPerspectivePx, keyframeAnchor.depth, localPerspectiveOriginX,
                         localPerspectiveOriginY);
           if (!placement.valid) {
             if (!warnedTransform) {
@@ -1390,9 +1366,9 @@ bool HTMLAnimationBuilder::buildForElement(
       }
     }
     if (needsAnchor) {
-      if (keyframeAnchorResolved) {
-        layer->anchor = keyframeAnchor;
-        layer->anchorZ = keyframeAnchorZ;
+      if (keyframeAnchor.resolved) {
+        layer->anchor = keyframeAnchor.point;
+        layer->anchorZ = keyframeAnchor.depth;
       } else {
         _diagnostics.warn(
             "html: transform animation without resolvable transform-origin; pivoting at "

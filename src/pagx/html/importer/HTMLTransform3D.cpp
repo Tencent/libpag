@@ -24,6 +24,7 @@
 #include "pagx/html/importer/HTMLDetail.h"
 #include "pagx/html/importer/HTMLDiagnosticSink.h"
 #include "pagx/html/importer/HTMLValueParser.h"
+#include "pagx/nodes/Layer.h"
 #include "pagx/runtime/Matrix3DDecompose.h"
 #include "pagx/utils/LayerTransformUtils.h"
 
@@ -758,6 +759,25 @@ HTMLTransformOrigin ResolveTransformOrigin(const std::string& value, float width
   origin.z = z;
   origin.resolved = true;
   return origin;
+}
+
+HTMLElementAnchor ResolveElementAnchor(const std::string& originValue,
+                                       const HTMLTransformReference& reference, const Layer* layer,
+                                       HTMLValueParser& valueParser) {
+  HTMLTransformReference size = reference;
+  if (std::isnan(size.widthPx) && layer != nullptr) {
+    size.widthPx = layer->width;
+  }
+  if (std::isnan(size.heightPx) && layer != nullptr) {
+    size.heightPx = layer->height;
+  }
+  const auto origin = ResolveTransformOrigin(originValue, size.widthPx, size.heightPx, valueParser);
+  HTMLElementAnchor anchor = {};
+  anchor.point = origin.point;
+  anchor.depth = origin.z;
+  anchor.resolved = origin.resolved;
+  anchor.valid = origin.valid;
+  return anchor;
 }
 
 bool ParseCssTransformList(const std::string& value, HTMLValueParser& valueParser,
