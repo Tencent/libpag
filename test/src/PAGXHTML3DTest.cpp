@@ -1023,11 +1023,14 @@ PAG_TEST(PAGXHTML3DTest, Preserve3DWithOwnFlatTransformKeepsTheExistingRoute) {
 /**
  * Test case: a `preserve-3d` layer whose transform resolves to the exact identity declares no pose
  * of its own, so it carries the parent camera exactly like a layer that omits `transform`. `none`, a
- * computed `matrix(1, 0, 0, 1, 0, 0)` and `rotate(0deg)` all land on that identity; a flat but
- * non-identity pose (`scale(0)`, `translateX(10px)`) does not, and keeps the route above.
+ * computed `matrix(1, 0, 0, 1, 0, 0)`, `rotate(0deg)` and `translateZ(0px)` all compose to that
+ * exact identity, so they are indistinguishable from each other and from `none`; special-casing the
+ * authored function name would split a computed `matrix(...)` from a hand-written component list
+ * into two behaviours. A flat but non-identity pose (`scale(0)`, `translateX(10px)`) does not, and
+ * keeps the route above.
  */
 PAG_TEST(PAGXHTML3DTest, IdentityTransformKeepsTheBarePreserve3DCamera) {
-  const char* values[] = {"none", "matrix(1,0,0,1,0,0)", "rotate(0deg)"};
+  const char* values[] = {"none", "matrix(1,0,0,1,0,0)", "rotate(0deg)", "translateZ(0px)"};
   for (const char* value : values) {
     std::string html = R"HTML(
       <html><body style="width:200px;height:120px">
