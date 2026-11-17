@@ -116,6 +116,25 @@ describe('rewritePerspectiveKeyframes', () => {
     expect(stripped).not.toContain('-0.000833');
     expect(stripped).toContain('@keyframes pagxAnim0');
     expect(rewritten).toContain('@keyframes pagxAnim0__pagxCam {');
+    // The clone only earns its place if it still carries the projection: read the matrix's 4th column
+    // entries (indices 3 / 11 hold the -1/d terms) and require them non-zero. Asserting only that the
+    // block exists would still pass if the implementation wrote the affine remainder into it, which
+    // would render orthographically and make the clone pointless.
+    const matrixValues = (text) => {
+      const m = /matrix3d\(([^)]*)\)/.exec(text);
+      expect(m).not.toBeNull();
+      return m[1].split(',').map((v) => parseFloat(v));
+    };
+    const clone = rewritten.slice(rewritten.indexOf('@keyframes pagxAnim0__pagxCam'));
+    expect(clone).toContain(ROTATE_Y_45_PROJECTED);
+    const strippedMatrix = matrixValues(stripped);
+    const cloneMatrix = matrixValues(clone);
+    expect(strippedMatrix).toHaveLength(16);
+    expect(cloneMatrix).toHaveLength(16);
+    expect(strippedMatrix[3]).toBe(0);
+    expect(strippedMatrix[11]).toBe(0);
+    expect(cloneMatrix[3]).not.toBe(0);
+    expect(cloneMatrix[11]).not.toBe(0);
     expect(globalThis.__pagxAnimCameras['pagxAnim0']).toBeCloseTo(600, 2);
   });
 
@@ -291,8 +310,14 @@ describe('one element never mixes two camera modes', () => {
     const html =
       '<div style="position: absolute; left: 0px; top: 0px; width: 80px; height: 40px">x</div>';
     // Without the guard this element would get a wrapper on top of the projection it already carries.
-    const result = withPerspectiveCamera(html, {}, { animationName: 'mixed' }, null);
+    // A real camera distance is required for the guard to run at all (the element-level check sits
+    // behind the distance early-return), so pass one instead of relying on the block-level record.
+    const result = withPerspectiveCamera(html, {}, { animationName: 'mixed' }, { distance: 600 });
     expect(result).toBe(html);
-    expect(pagxCameraSkips()['keyframes-mixed']).toBeGreaterThanOrEqual(1);
+    // The two units are counted under distinct keys: the block kept its projection once, and the one
+    // element that had to fall back is counted separately, so the eval report no longer reads a
+    // block + its element as two affected elements.
+    expect(pagxCameraSkips()['keyframes-mixed']).toBe(1);
+    expect(pagxCameraSkips()['element-keyframes-mixed']).toBe(1);
   });
 });

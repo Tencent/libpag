@@ -2052,64 +2052,44 @@ function liftBoxOntoCameraWrapper(html, distance, origin) {
          html.slice(match[0].length) + '</div>';
 }
 
-// Distance of the camera a captured animation carries, keyed by animation name. Kept on `window`
-// because the helpers below are stringified into the page payload, where module state does not
-// exist.
+// Lazy global registry shared by the perspective bookkeeping below. These helpers are stringified
+// into the page payload, where module state does not exist, so each registry lives on `globalThis`
+// and is created on first use; `key` is its `globalThis` property name.
+function cameraRegistry(key) {
+  const scope = typeof globalThis === 'undefined' ? null : globalThis;
+  if (!scope) return {};
+  if (!scope[key]) scope[key] = {};
+  return scope[key];
+}
+
 // Why the snapshot kept the function form of a `perspective()` transform instead of rewriting it
 // into a camera wrapper. Counted per reason and surfaced in the eval report, so "this page has 12
 // perspective elements, 5 of them fell back" is visible instead of silent.
 function recordCameraSkip(reason) {
-  const scope = typeof globalThis === 'undefined' ? null : globalThis;
-  if (!scope) {
-    return;
-  }
-  if (!scope.__pagxCameraSkips) {
-    scope.__pagxCameraSkips = {};
-  }
-  scope.__pagxCameraSkips[reason] = (scope.__pagxCameraSkips[reason] || 0) + 1;
+  const skips = cameraRegistry('__pagxCameraSkips');
+  skips[reason] = (skips[reason] || 0) + 1;
 }
 
 function pagxCameraSkips() {
-  const scope = typeof globalThis === 'undefined' ? null : globalThis;
-  return scope && scope.__pagxCameraSkips ? scope.__pagxCameraSkips : {};
+  return cameraRegistry('__pagxCameraSkips');
+}
+
+// Distance of the camera a captured animation carries, keyed by animation name.
+function pagxAnimCameras() {
+  return cameraRegistry('__pagxAnimCameras');
 }
 
 // Animation names whose keyframes still carry their own `perspective()` because the stops disagreed
 // on the distance. An element playing one of them must not also get a camera wrapper: the pose would
 // be projected twice.
 function pagxAnimProjectedNames() {
-  const scope = typeof globalThis === 'undefined' ? null : globalThis;
-  if (!scope) {
-    return {};
-  }
-  if (!scope.__pagxAnimProjected) {
-    scope.__pagxAnimProjected = {};
-  }
-  return scope.__pagxAnimProjected;
+  return cameraRegistry('__pagxAnimProjected');
 }
 
 // Animation names whose keyframes were also emitted un-stripped (suffix `__pagxCam`), for elements
 // whose camera wrapper is declined at render time.
 function pagxAnimCameraClones() {
-  const scope = typeof globalThis === 'undefined' ? null : globalThis;
-  if (!scope) {
-    return {};
-  }
-  if (!scope.__pagxAnimCameraClones) {
-    scope.__pagxAnimCameraClones = {};
-  }
-  return scope.__pagxAnimCameraClones;
-}
-
-function pagxAnimCameras() {
-  const scope = typeof globalThis === 'undefined' ? null : globalThis;
-  if (!scope) {
-    return {};
-  }
-  if (!scope.__pagxAnimCameras) {
-    scope.__pagxAnimCameras = {};
-  }
-  return scope.__pagxAnimCameras;
+  return cameraRegistry('__pagxAnimCameraClones');
 }
 
 // Rewrites every `matrix3d` keyframe that carries its own projection into its affine part and
@@ -2184,6 +2164,8 @@ function rewritePerspectiveKeyframes(cssText) {
       }
     } else {
       if (distance > 0) {
+        // Block-level reason: recorded once per `@keyframes` block, not once per element using it.
+        // Elements declined because of this block are counted separately ('element-keyframes-mixed').
         recordCameraSkip('keyframes-mixed');
         if (name) projected[name] = true;
       }
@@ -4853,7 +4835,9 @@ function withPerspectiveCamera(html, opts, computed, staticCamera) {
   // any keyframe set that kept its own `perspective()`, so decline instead of mixing the two modes.
   const projected = pagxAnimProjectedNames();
   if (animationNamesFor(computed).some((name) => projected[name])) {
-    return declined('keyframes-mixed');
+    // Element-level key, distinct from the per-block 'keyframes-mixed' so the eval report does not
+    // read one block plus one element as two affected elements.
+    return declined('element-keyframes-mixed');
   }
   const wrapped = liftBoxOntoCameraWrapper(html, distance, perspectiveOriginXY(computed));
   if (!wrapped) {
@@ -5590,6 +5574,7 @@ const KIND_DISPATCH = { svg: renderSvg, img: renderImg, canvas: renderCanvas, te
 // helpers' source text appears below the constants in the concatenated
 // payload.
 const HELPER_FNS = [
+  cameraRegistry,
   recordCameraSkip,
   animationNamesFor,
   pagxCameraSkips,

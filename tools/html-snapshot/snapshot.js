@@ -98,9 +98,18 @@ async function main() {
 
     // Report how many `perspective()` elements kept their function form instead of the exact camera
     // wrapper, so a page that silently fell back is visible in the eval report.
+    //
+    // `cameraSkips` mixes two units: per-element entries and per-`@keyframes`-block causes (the
+    // block kept its own projection, which is *why* some elements fell back). Only the element
+    // entries are affected elements, so the reported total excludes the block-level reasons while
+    // the detail breakdown still lists them.
+    const CAMERA_SKIP_BLOCK_LEVEL_REASONS = new Set(['keyframes-mixed']);
     const cameraSkips = result.cameraSkips || {};
-    const skipTotal = Object.values(cameraSkips).reduce((sum, n) => sum + n, 0);
-    if (skipTotal > 0) {
+    const skipReasons = Object.keys(cameraSkips);
+    const skipTotal = skipReasons
+      .filter((reason) => !CAMERA_SKIP_BLOCK_LEVEL_REASONS.has(reason))
+      .reduce((sum, reason) => sum + cameraSkips[reason], 0);
+    if (skipReasons.length > 0) {
       const detail = Object.entries(cameraSkips)
         .map(([reason, count]) => `${reason}:${count}`)
         .join(' ');

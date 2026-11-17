@@ -198,14 +198,17 @@ function countAnimationsCaptured(stderrPath) {
 }
 
 // Perspective elements whose `perspective()` form the snapshot kept instead of rewriting it into a
-// camera wrapper (`depth-pivot`, `not-a-sized-div`, `keyframes-mixed`).
+// camera wrapper (`depth-pivot`, `not-a-sized-div`, `element-keyframes-mixed`). The `camera-skips`
+// total already excludes block-level reasons such as `keyframes-mixed`, which are reported once per
+// `@keyframes` block rather than per element (see the tally in snapshot.js).
 function countCameraSkips(stderrPath) {
   if (!fs.existsSync(stderrPath)) return 0;
   const m = fs.readFileSync(stderrPath, 'utf8').match(/camera-skips: (\d+)/);
   return m ? parseInt(m[1], 10) : 0;
 }
 
-// Per-reason breakdown of the skipped perspective rewrites, e.g. `depth-pivot:1`.
+// Per-reason breakdown of the skipped perspective rewrites, e.g. `depth-pivot:1 keyframes-mixed:1`
+// (element-level and block-level reasons alike).
 function cameraSkipReasons(stderrPath) {
   if (!fs.existsSync(stderrPath)) return '';
   const m = fs.readFileSync(stderrPath, 'utf8').match(/camera-skips: \d+ \(([^)]*)\)/);
