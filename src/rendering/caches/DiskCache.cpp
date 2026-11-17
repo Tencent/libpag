@@ -212,10 +212,12 @@ void DiskCache::resolvePendingClose(const OpenedFile& openedFile) {
   // The previous SequenceFile is already released, but its handle may still be waiting to be closed
   // on the DiskIOWorker. Finish that close before the file is reopened: otherwise the reopen would
   // read the data that has not been flushed yet, and the pending close would also drop the
-  // registration added afterwards. The flush and the close therefore run on the calling thread
-  // while the cache lock is held, which is bounded by one stdio buffer and is the accepted cost of
-  // not reading an unflushed file. This cannot deadlock because CloseFileTask() releases the handle
-  // before it acquires DiskCache::locker.
+  // registration added afterwards. The flush and the close therefore run synchronously on the
+  // calling thread while the cache lock is held, so the wait is bounded neither by the amount of
+  // buffered data nor by a fixed time: it also waits for a close that is already running on the
+  // worker and may stall on slow storage. That is the accepted cost of not reading an unflushed
+  // file. It cannot deadlock because CloseFileTask() releases the handle before it acquires
+  // DiskCache::locker.
   auto& handle = openedFile.handle;
   if (handle != nullptr) {
     handle->close();
