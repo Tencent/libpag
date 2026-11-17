@@ -62,6 +62,19 @@ OutputViewStatus ResolveOutputView(const PAGXDocument* document, const Layer** t
                                    std::string* error);
 
 /**
+ * Resolves the Layer referenced by the document's parsed `targetLayerId` without checking whether
+ * the whole output view is supported at runtime. Reference validity covers only the ID syntax,
+ * node existence, id uniqueness, Layer type and unique reachability from the document layer tree;
+ * outputBounds, animations, state machines and data binds are deliberately ignored so consumers
+ * such as the optimizer can keep the declared target even when the view itself is unsupported.
+ * @param document the document to inspect. May be null.
+ * @param error optional out parameter that receives a diagnostic when resolution fails.
+ * @return the resolved Layer owned by the document, or nullptr when the id is missing or cannot be
+ *         resolved unambiguously.
+ */
+const Layer* ResolveOutputTargetLayer(const PAGXDocument* document, std::string* error);
+
+/**
  * Returns true when the document declares target view fields at all, including invalid ones. Used
  * by consumers that cannot honor the view to reject the document explicitly instead of silently
  * exporting the whole canvas.

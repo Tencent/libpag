@@ -126,6 +126,13 @@ OutputViewStatus ReportInvalid(std::string* error, const std::string& message) {
   return OutputViewStatus::Invalid;
 }
 
+const Layer* ReportTargetError(std::string* error, const std::string& message) {
+  if (error != nullptr) {
+    *error = message;
+  }
+  return nullptr;
+}
+
 }  // namespace
 
 std::optional<std::string> OutputViewDeclarationAccess::DeclaredTargetLayer(
@@ -146,6 +153,54 @@ void OutputViewDeclarationAccess::SetDeclared(PAGXDocument* document,
   }
   document->declaredTargetLayer = std::move(targetLayer);
   document->declaredOutputBounds = std::move(bounds);
+}
+
+const Layer* ResolveOutputTargetLayer(const PAGXDocument* document, std::string* error) {
+  if (error != nullptr) {
+    error->clear();
+  }
+  if (document == nullptr || document->targetLayerId.empty()) {
+    return nullptr;
+  }
+  if (!IsValidTargetId(document->targetLayerId)) {
+    return ReportTargetError(error, "Invalid 'targetLayer' value '" + document->targetLayerId +
+                                        "': the id must be non-empty and contain no whitespace.");
+  }
+  if (document->findNode(document->targetLayerId) == nullptr) {
+    return ReportTargetError(error, "The 'targetLayer' reference '@" + document->targetLayerId +
+                                        "' does not match any node in the document.");
+  }
+  int matchingNodes = 0;
+  for (const auto& node : document->nodes) {
+    if (node != nullptr && node->id == document->targetLayerId) {
+      matchingNodes++;
+    }
+  }
+  if (matchingNodes != 1) {
+    return ReportTargetError(error, "The 'targetLayer' reference '@" + document->targetLayerId +
+                                        "' is ambiguous: the id is used by multiple nodes.");
+  }
+  auto* node = document->findNode(document->targetLayerId);
+  if (node->nodeType() != NodeType::Layer) {
+    return ReportTargetError(error, "The 'targetLayer' reference '@" + document->targetLayerId +
+                                        "' does not resolve to a Layer.");
+  }
+  TargetSearch search = {document->targetLayerId};
+  SearchLayers(document->layers, &search);
+  if (search.ambiguousPath) {
+    return ReportTargetError(error,
+                             "The 'targetLayer' reference '@" + document->targetLayerId +
+                                 "' is not uniquely reachable from the document layer tree.");
+  }
+  if (search.matches == 0) {
+    return ReportTargetError(error, "The 'targetLayer' reference '@" + document->targetLayerId +
+                                        "' is not reachable from the document layer tree.");
+  }
+  if (search.matches > 1) {
+    return ReportTargetError(error, "The 'targetLayer' reference '@" + document->targetLayerId +
+                                        "' is reachable through multiple paths.");
+  }
+  return search.found;
 }
 
 OutputViewStatus ResolveOutputView(const PAGXDocument* document, const Layer** targetLayer,
@@ -188,6 +243,8 @@ OutputViewStatus ResolveOutputView(const PAGXDocument* document, const Layer** t
                    "components and positive width/height.");
   }
   if (!IsValidTargetId(document->targetLayerId)) {
+    // Kept before the bounds and dynamic checks to preserve the existing diagnostic priority;
+    // ResolveOutputTargetLayer() repeats the same lightweight check when called on its own.
     return ReportInvalid(error, "Invalid 'targetLayer' value '" + document->targetLayerId +
                                     "': the id must be non-empty and contain no whitespace.");
   }
@@ -202,41 +259,13 @@ OutputViewStatus ResolveOutputView(const PAGXDocument* document, const Layer** t
         "Target view documents with animations, state machines or data binds are not "
         "supported.");
   }
-  if (document->findNode(document->targetLayerId) == nullptr) {
-    return ReportInvalid(error, "The 'targetLayer' reference '@" + document->targetLayerId +
-                                    "' does not match any node in the document.");
-  }
-  int matchingNodes = 0;
-  for (const auto& node : document->nodes) {
-    if (node != nullptr && node->id == document->targetLayerId) {
-      matchingNodes++;
-    }
-  }
-  if (matchingNodes != 1) {
-    return ReportInvalid(error, "The 'targetLayer' reference '@" + document->targetLayerId +
-                                    "' is ambiguous: the id is used by multiple nodes.");
-  }
-  auto* node = document->findNode(document->targetLayerId);
-  if (node->nodeType() != NodeType::Layer) {
-    return ReportInvalid(error, "The 'targetLayer' reference '@" + document->targetLayerId +
-                                    "' does not resolve to a Layer.");
-  }
-  TargetSearch search = {document->targetLayerId};
-  SearchLayers(document->layers, &search);
-  if (search.ambiguousPath) {
-    return ReportInvalid(error, "The 'targetLayer' reference '@" + document->targetLayerId +
-                                    "' is not uniquely reachable from the document layer tree.");
-  }
-  if (search.matches == 0) {
-    return ReportInvalid(error, "The 'targetLayer' reference '@" + document->targetLayerId +
-                                    "' is not reachable from the document layer tree.");
-  }
-  if (search.matches > 1) {
-    return ReportInvalid(error, "The 'targetLayer' reference '@" + document->targetLayerId +
-                                    "' is reachable through multiple paths.");
+  std::string targetError;
+  auto* target = ResolveOutputTargetLayer(document, &targetError);
+  if (target == nullptr) {
+    return ReportInvalid(error, targetError);
   }
   if (targetLayer != nullptr) {
-    *targetLayer = search.found;
+    *targetLayer = target;
   }
   return OutputViewStatus::Valid;
 }

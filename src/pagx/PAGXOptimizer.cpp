@@ -168,11 +168,13 @@ bool HasUnresolvedImport(const Layer* layer) {
 
 // Keeps the document's default output target out of the prune/merge keep-set's blind spot: an
 // empty or shell-like target layer is still semantically required, so it must survive every
-// optimization pass that otherwise drops unreferenced layers.
+// optimization pass that otherwise drops unreferenced layers. Only the reference is resolved here:
+// a document whose view is unsupported at runtime (animations, data binds or missing/illegal
+// bounds) must still keep the declared target instead of degrading its diagnostic into a missing
+// reference after export.
 void PreserveOutputTarget(PAGXDocument* doc, std::unordered_set<const Layer*>& keepSet) {
-  const Layer* target = nullptr;
-  std::string error;
-  if (ResolveOutputView(doc, &target, &error) == OutputViewStatus::Valid && target != nullptr) {
+  auto* target = ResolveOutputTargetLayer(doc, nullptr);
+  if (target != nullptr) {
     keepSet.insert(target);
   }
 }
