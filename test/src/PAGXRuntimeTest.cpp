@@ -641,6 +641,33 @@ PAGX_TEST(PAGXRuntimeTest, PerspectiveZeroIsTheInfiniteDistanceEnd) {
 }
 
 /**
+ * Test case: a negative distance is not a projection, so a keyframe holding one reads as "no
+ * projection" at an endpoint and in a hold segment too, not only inside a blended segment. Without
+ * that, the renderer would reject the raw negative value and freeze the pose for that frame.
+ */
+PAGX_TEST(PAGXRuntimeTest, PerspectiveFoldsANegativeKeyIntoNoProjection) {
+  std::vector<pagx::Keyframe<float>> leading;
+  leading.push_back({0, -45.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  leading.push_back({60, 45.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  // The first frame reads as no projection, continuous with the segment that follows rather than a
+  // value the renderer drops.
+  EXPECT_FLOAT_EQ(pagx::EvaluatePerspectiveSequence(leading, 0.0), 0.0f);
+  EXPECT_NEAR(pagx::EvaluatePerspectiveSequence(leading, 1.0), 2700.0f, 1.0f);
+  EXPECT_FLOAT_EQ(pagx::EvaluatePerspectiveSequence(leading, 60.0), 45.0f);
+
+  std::vector<pagx::Keyframe<float>> trailing;
+  trailing.push_back({0, 45.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  trailing.push_back({60, -45.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  EXPECT_FLOAT_EQ(pagx::EvaluatePerspectiveSequence(trailing, 60.0), 0.0f);
+
+  // A hold segment returns the held value through the same normalization.
+  std::vector<pagx::Keyframe<float>> hold;
+  hold.push_back({0, -45.0f, pagx::KeyframeInterpolationType::Hold, {}, {}});
+  hold.push_back({60, 45.0f, pagx::KeyframeInterpolationType::Hold, {}, {}});
+  EXPECT_FLOAT_EQ(pagx::EvaluatePerspectiveSequence(hold, 30.0), 0.0f);
+}
+
+/**
  * Test case: a channel named "perspective" blends its keyframes through the projection coefficient
  * end to end, while the other channels of the same object keep blending their values.
  */

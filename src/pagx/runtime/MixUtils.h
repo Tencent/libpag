@@ -55,6 +55,16 @@ inline float MixPerspectiveDistance(float current, float target, float mix) {
   return static_cast<float>(1.0 / coefficient);
 }
 
+// Folds a negative perspective distance into "no projection". A negative distance is not a
+// projection and CSS rejects the declaration that carries one, falling back to the element's static
+// distance, which is "no projection" for a layer that does not set it. Keyframe endpoints take this
+// path so a segment's ends agree with its blend, which already treats such an end as no projection:
+// returning the raw negative value would hand the renderer a value it drops, freezing that frame
+// and jumping on the next.
+inline float SanitizePerspectiveDistance(float distance) {
+  return distance > 0.0f ? distance : 0.0f;
+}
+
 inline tgfx::Color MixTGFXColor(const tgfx::Color& current, const tgfx::Color& target, float mix) {
   tgfx::Color result = current;
   result.red = MixFloat(current.red, target.red, mix);

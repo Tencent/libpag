@@ -232,22 +232,25 @@ T EvaluateKeyframeSequence(const std::vector<Keyframe<T>>& keyframes, double fra
 // Evaluates a perspective distance sequence. Segment selection, easing and the clamp-to-end
 // boundary policy are EvaluateKeyframeSequence's; only the blend differs, because a perspective
 // distance has to mix its projection coefficient to stay in step with a browser's perspective().
+// Every value returned from a keyframe goes through SanitizePerspectiveDistance, so an invalid
+// negative key reads as "no projection" at the endpoints and in a hold segment just as it does
+// inside a blended segment.
 inline float EvaluatePerspectiveSequence(const std::vector<Keyframe<float>>& keyframes,
                                          double framePosition) {
   if (keyframes.empty()) {
     return 0.0f;
   }
   if (framePosition <= static_cast<double>(keyframes.front().time)) {
-    return keyframes.front().value;
+    return SanitizePerspectiveDistance(keyframes.front().value);
   }
   if (framePosition >= static_cast<double>(keyframes.back().time)) {
-    return keyframes.back().value;
+    return SanitizePerspectiveDistance(keyframes.back().value);
   }
   const Keyframe<float>* left = nullptr;
   const Keyframe<float>* right = nullptr;
   double fraction = 0.0;
   if (!ResolveKeyframeSegment(keyframes, framePosition, &left, &right, &fraction)) {
-    return left->value;
+    return SanitizePerspectiveDistance(left->value);
   }
   return MixPerspectiveDistance(left->value, right->value, static_cast<float>(fraction));
 }
