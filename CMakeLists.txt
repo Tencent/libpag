@@ -1214,7 +1214,10 @@ if (PAG_BUILD_TESTS)
     file(GLOB_RECURSE SRC_FILES test/src/*.*)
     list(FILTER SRC_FILES EXCLUDE REGEX "/MetalTestSupport\\.(cpp|h)$")
     if (NOT APPLE OR NOT USE_NATIVE_PLATFORM)
-        list(FILTER SRC_FILES EXCLUDE REGEX "PAG(Metal(Surface|Texture|Atlas)|CocoaSurface(Header)?)Test\\.mm$")
+        # VTDecodeContextPoolTest links the VideoToolbox decode-context pool, which only the native
+        # Apple platforms compile; the swiftshader/non-native builds omit src/platform/cocoa.
+        list(FILTER SRC_FILES EXCLUDE REGEX
+                "PAG(Metal(Surface|Texture|Atlas)|CocoaSurface(Header)?)Test\\.mm$|VTDecodeContextPoolTest\\.cpp$")
     else ()
         set_source_files_properties(test/src/PAGCocoaSurfaceTest.mm test/src/PAGCocoaSurfaceHeaderTest.mm
                 PROPERTIES COMPILE_OPTIONS "-fobjc-arc")
