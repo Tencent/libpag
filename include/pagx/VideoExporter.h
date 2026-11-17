@@ -151,17 +151,43 @@ struct VideoExportOptions {
 
 /** Result of attempting to start an asynchronous frame. */
 enum class VideoExportStartStatus {
+  /** A new frame was started and carried in the result. */
   FrameStarted,
+  /** The previously started frame is not consumed yet; the result carries no frame. */
   Busy,
+  /** Every frame of the sequence was consumed; the result carries no frame. */
   End,
+  /** A failure ended the sequence; the result describes it with a message and a code. */
   Failed,
 };
 
 /** Current state of an asynchronous export frame. */
 enum class VideoExportFrameStatus {
+  /** The pixels are not available yet; poll again later. */
   Pending,
+  /** The pixels are available, or the frame was already consumed. */
   Ready,
+  /** The frame will never become readable. */
   Failed,
+};
+
+/**
+ * Stable reason code for a failed export, independent of the human-readable message. Hosts map
+ * these values onto their own user-facing errors instead of parsing text.
+ */
+enum class VideoExportError {
+  None,
+  InvalidArgument,
+  NoDuration,
+  StateMachineRequiresDuration,
+  MixedFrameRates,
+  TooLong,
+  OutOfMemory,
+  RenderFailed,
+  ReadbackFailed,
+  DeviceLost,
+  MixedMode,
+  Cancelled,
 };
 
 class VideoExportFrameImpl;
@@ -187,10 +213,20 @@ class VideoExportFrame {
   /** Returns the failure reason, or an empty string when the frame has not failed. */
   std::string error() const;
 
+  /** Returns the stable failure code of this frame, or None when it has not failed. */
+  VideoExportError errorCode() const;
+
   /**
-   * Copies premultiplied RGBA_8888 pixels to the caller's buffer. dstRowBytes must be at least
-   * width * 4. The first successful call consumes the frame and commits its index to the exporter.
-   * Returns false while Pending, after consumption, or on failure. No index is committed twice.
+   * Copies premultiplied RGBA_8888 pixels into the caller's buffer.
+   *
+   * @param dstPixels the destination buffer, which must hold at least height * dstRowBytes bytes.
+   * @param dstRowBytes the byte distance between consecutive destination rows; must be at least
+   *                    width * 4 and may be larger, so containers with a fixed stride need no
+   *                    repacking before a copy.
+   * @return true when the pixels were copied. The first successful call consumes the frame and
+   *         commits its index to the exporter. Returns false while Pending, after consumption,
+   *         when a parameter is invalid, or when the frame has failed; no index is committed
+   *         twice and a failed read does not skip the frame.
    */
   bool readPixels(void* dstPixels, size_t dstRowBytes);
 
@@ -204,9 +240,14 @@ class VideoExportFrame {
 
 /** The explicit result of VideoExporter::startNextFrame(). */
 struct VideoExportStartResult {
+  /** Outcome of the start attempt. Only FrameStarted carries a frame. */
   VideoExportStartStatus status = VideoExportStartStatus::Failed;
+  /** The started frame, or null for Busy, End and Failed. */
   std::shared_ptr<VideoExportFrame> frame = nullptr;
+  /** Human-readable failure description for Failed, empty otherwise. */
   std::string error = {};
+  /** Stable failure code for Failed, None otherwise. */
+  VideoExportError errorCode = VideoExportError::None;
 };
 
 /**
@@ -226,9 +267,15 @@ struct VideoExportStartResult {
  * Frames are premultiplied RGBA8888. Containers that carry alpha need the host to unpremultiply;
  * opaque output can pass the pixels through unchanged.
  *
- * Thread safety: an instance is not thread-safe. Make() must run on a thread that owns a GPU
- * context. Callers must not hold the same device's context lock while calling nextFrame(), since
- * draw() and readPixels() acquire it internally.
+ * Thread safety: an instance is not thread-safe. Every entry point must run on the thread that
+ * owns the exporter's GPU device. Make(), MakeWithSurface(), nextFrame(), startNextFrame(),
+ * cancel(), destruction and every VideoExportFrame call acquire the device context lock internally,
+ * so callers must not already hold that lock: lockContext() is not recursive, and a nested call
+ * blocks forever instead of reporting an error.
+ *
+ * The caller drives asynchronous readback. The exporter starts no thread and no timer, so a frame
+ * only becomes readable while the host keeps polling VideoExportFrame::status() on the device
+ * thread.
  *
  * Layout: PAGScene::Make() applies layout automatically when the document has not applied it yet,
  * so callers only need to register fonts on PAGXDocument::fontConfig() beforehand when the
@@ -257,25 +304,40 @@ class VideoExporter {
    *                 exporter. Must be non-null.
    * @param options sampling frame rate, duration, scale and background.
    * @param errorMsg optional pointer that receives a human-readable description on failure.
+   * @param errorCode optional pointer that receives the stable failure code on failure.
    * @return a new exporter, or nullptr when the document or options are invalid, an animation has
    *         no duration and none was supplied, the computed frame range or dimensions overflow, or
    *         the offscreen surface cannot be created.
    */
   static std::shared_ptr<VideoExporter> Make(std::shared_ptr<PAGXDocument> document,
-                                             const Options& options = {},
-                                             std::string* errorMsg = nullptr);
+                                            const Options& options = {},
+                                            std::string* errorMsg = nullptr,
+                                            VideoExportError* errorCode = nullptr);
 
   /**
    * Creates an exporter that renders into a host-provided surface. The surface dimensions must
-   * exactly match the output dimensions derived from document and options. The host must ensure
-   * that the surface is suitable for offscreen rendering, remains exclusively used by the exporter,
-   * and shares a compatible device with the document's GPU resources. Readback capability is
-   * validated when a frame is started, not by a speculative readback during construction.
+   * exactly match the output dimensions derived from document and options; a mismatch is reported
+   * instead of being resized silently. The host must ensure that the surface is suitable for
+   * offscreen rendering, remains exclusively used by the exporter, and shares a compatible device
+   * with the document's GPU resources. Readback capability is validated when a frame is started,
+   * not by a speculative readback during construction.
+   *
+   * @param document the source document, which is retained for the lifetime of the returned
+   *                 exporter. Must be non-null.
+   * @param surface the host surface to render into; retained for the lifetime of the exporter and
+   *                required to match the resolved output dimensions exactly. Must be non-null.
+   * @param options sampling frame rate, duration, scale, background and explicit output size.
+   * @param errorMsg optional pointer that receives a human-readable description on failure.
+   * @param errorCode optional pointer that receives the stable failure code on failure.
+   * @return a new exporter, or nullptr when the document, surface or options are invalid, the
+   *         surface dimensions do not match the resolved output size, the surface has no valid GPU
+   *         device or context, or the document playback plan cannot be resolved.
    */
   static std::shared_ptr<VideoExporter> MakeWithSurface(std::shared_ptr<PAGXDocument> document,
-                                                        std::shared_ptr<PAGSurface> surface,
-                                                        const Options& options = {},
-                                                        std::string* errorMsg = nullptr);
+                                                       std::shared_ptr<PAGSurface> surface,
+                                                       const Options& options = {},
+                                                       std::string* errorMsg = nullptr,
+                                                       VideoExportError* errorCode = nullptr);
 
   ~VideoExporter();
 
@@ -321,36 +383,55 @@ class VideoExporter {
    *                 failure reason. Normal end of sequence leaves it empty.
    * @return true when a frame was rendered; false at the end of the sequence or on failure. Use
    *         `currentFrame() < frameCount()` to tell the two apart: a failure leaves the index
-   *         unadvanced.
+   *         unadvanced and sets errorCode() to the stable failure reason.
    */
   bool nextFrame(std::string* errorMsg = nullptr);
 
   /**
    * Advances, draws and starts reading the next frame without waiting for GPU readback. The first
    * successful use of nextFrame() or startNextFrame() fixes the exporter's mode; mixing modes is
-   * a terminal usage error. Only one uncommitted frame may exist at a time.
+   * a terminal usage error reported as Failed with VideoExportError::MixedMode.
+   *
+   * Only one uncommitted frame may exist at a time. While the previously started frame is
+   * unconsumed the result is Busy and carries no frame: the exporter keeps the pending frame
+   * internally, so dropping the caller's reference does not release the sequence. The caller must
+   * keep its own reference and either read the frame or call cancel(); a dropped frame otherwise
+   * leaves every later start Busy forever.
+   *
+   * @return the start result. FrameStarted carries the new frame, whose status() must be polled on
+   *         this thread until Ready or Failed before the next start is allowed.
    */
   VideoExportStartResult startNextFrame();
 
   /**
    * Cancels the sequence and abandons any pending frame. This is terminal: later asynchronous
-   * starts return Failed with "cancelled". Must run on the device-owning thread.
+   * starts return Failed with VideoExportError::Cancelled. A pending frame that was not consumed
+   * is marked Failed with the same code. Cancelling an already failed exporter keeps the original
+   * failure code and message. Must run on the device-owning thread.
    */
   void cancel();
 
   /** Returns the terminal error or the last synchronous read error, if any. */
   std::string error() const;
 
+  /** Returns the stable code matching error(), or None when the exporter has not failed. */
+  VideoExportError errorCode() const;
+
   /**
    * Returns the pixels of the most recently rendered frame as RGBA8888, premultiplied. The buffer
    * is owned by the exporter and stays valid only until the next nextFrame() call, so the host
    * must consume it (write to a pipe, wrap in a VideoFrame) before advancing.
+   *
+   * Only synchronous frames are exposed here. After startNextFrame() has been used the exporter
+   * renders asynchronously and this returns nullptr, because the pixels are read through
+   * VideoExportFrame::readPixels() into the host buffer instead.
    */
   const uint8_t* pixels() const;
 
   /**
    * Returns the number of bytes between the start of consecutive pixel rows. May be larger than
-   * `width() * 4`, in which case raw frame sinks must repack the rows.
+   * `width() * 4`, in which case raw frame sinks must repack the rows. Returns 0 after
+   * startNextFrame() has been used, since asynchronous frames do not use the internal buffer.
    */
   size_t rowBytes() const;
 
@@ -368,19 +449,21 @@ class VideoExporter {
 
   static bool ResolvePlaybackPlan(const std::shared_ptr<PAGScene>& scene,
                                   const std::shared_ptr<PAGXDocument>& document, PlaybackPlan* plan,
-                                  std::string* errorMsg);
+                                  std::string* errorMsg, VideoExportError* errorCode);
   static bool AddAnimation(const std::shared_ptr<PAGAnimation>& animation, int64_t offsetUs,
-                           bool includeInFrameRate, PlaybackPlan* plan, std::string* errorMsg);
+                           bool includeInFrameRate, PlaybackPlan* plan, std::string* errorMsg,
+                           VideoExportError* errorCode);
   static bool CollectNestedPlayback(PAGComposition* composition, PlaybackPlan* plan,
-                                    std::string* errorMsg);
+                                    std::string* errorMsg, VideoExportError* errorCode);
   static bool ResolveSampling(const Options& options, const PlaybackPlan& plan,
                               VideoFrameRate* frameRate, int64_t* frameCount,
-                              std::string* errorMsg);
+                              std::string* errorMsg, VideoExportError* errorCode);
   static std::shared_ptr<VideoExporter> MakeInternal(std::shared_ptr<PAGXDocument> document,
                                                      std::shared_ptr<PAGSurface> surface,
-                                                     const Options& options, std::string* errorMsg);
+                                                     const Options& options, std::string* errorMsg,
+                                                     VideoExportError* errorCode);
 
-  bool drawNextFrame(std::string* errorMsg);
+  bool drawNextFrame(std::string* errorMsg, VideoExportError* errorCode);
 
   std::shared_ptr<VideoExportState> state = {};
   std::shared_ptr<VideoExportFrame> pendingFrame = {};

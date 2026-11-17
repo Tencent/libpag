@@ -21,6 +21,7 @@
 #include "pagx/VideoExporter.h"
 
 namespace tgfx {
+class Context;
 class Device;
 class Pixmap;
 class SurfaceReadback;
@@ -40,6 +41,7 @@ struct VideoExportState {
   int64_t currentFrame = 0;
   bool failed = false;
   bool cancelled = false;
+  VideoExportError errorCode = VideoExportError::None;
   std::string error = {};
 };
 
@@ -49,7 +51,8 @@ class VideoExportFrameImpl {
                                                        int64_t index,
                                                        std::shared_ptr<PAGSurface> surface,
                                                        std::shared_ptr<tgfx::Pixmap> staticCache,
-                                                       std::string* errorMsg);
+                                                       std::string* errorMsg,
+                                                       VideoExportError* errorCode);
   static std::shared_ptr<VideoExportFrameImpl> MakeCPU(std::shared_ptr<VideoExportState> state,
                                                        int64_t index,
                                                        std::shared_ptr<tgfx::Pixmap> pixels);
@@ -62,14 +65,20 @@ class VideoExportFrameImpl {
   const std::string& error() const {
     return errorMessage;
   }
+  VideoExportError errorCode() const {
+    return failureCode;
+  }
   VideoExportFrameStatus status();
   bool readPixels(void* dstPixels, size_t dstRowBytes);
-  void fail(const std::string& message);
+  void fail(VideoExportError code, const std::string& message);
 
   bool consumed = false;
 
  private:
-  bool readGPUPixels(void* dstPixels, size_t dstRowBytes);
+  VideoExportFrameStatus pollLocked(tgfx::Context* context);
+  bool copyGPUPixelsLocked(tgfx::Context* context, void* dstPixels, size_t dstRowBytes);
+  void absorbSharedFailure();
+  void commit();
 
   std::shared_ptr<VideoExportState> state = nullptr;
   int64_t frameIndex = -1;
@@ -80,6 +89,7 @@ class VideoExportFrameImpl {
   std::shared_ptr<tgfx::Pixmap> staticCache = nullptr;
   bool flipY = false;
   bool failed = false;
+  VideoExportError failureCode = VideoExportError::None;
   std::string errorMessage = {};
 };
 

@@ -26,13 +26,16 @@ namespace pagx {
 
 std::shared_ptr<VideoExportFrameImpl> VideoExportFrameImpl::MakeGPU(
     std::shared_ptr<VideoExportState> state, int64_t index, std::shared_ptr<PAGSurface> surface,
-    std::shared_ptr<tgfx::Pixmap> staticCache, std::string* errorMsg) {
+    std::shared_ptr<tgfx::Pixmap> staticCache, std::string* errorMsg, VideoExportError* errorCode) {
   auto impl = std::make_shared<VideoExportFrameImpl>(std::move(state), index);
   impl->surface = std::move(surface);
   impl->staticCache = std::move(staticCache);
   if (impl->surface == nullptr || impl->surface->drawable == nullptr) {
     if (errorMsg != nullptr) {
       *errorMsg = "the export surface is null";
+    }
+    if (errorCode != nullptr) {
+      *errorCode = VideoExportError::InvalidArgument;
     }
     return nullptr;
   }
@@ -41,12 +44,18 @@ std::shared_ptr<VideoExportFrameImpl> VideoExportFrameImpl::MakeGPU(
     if (errorMsg != nullptr) {
       *errorMsg = "the export surface has no GPU device";
     }
+    if (errorCode != nullptr) {
+      *errorCode = VideoExportError::DeviceLost;
+    }
     return nullptr;
   }
   auto* context = impl->device->lockContext();
   if (context == nullptr) {
     if (errorMsg != nullptr) {
       *errorMsg = "failed to lock the export device";
+    }
+    if (errorCode != nullptr) {
+      *errorCode = VideoExportError::DeviceLost;
     }
     return nullptr;
   }
@@ -56,6 +65,9 @@ std::shared_ptr<VideoExportFrameImpl> VideoExportFrameImpl::MakeGPU(
   if (impl->readback == nullptr) {
     if (errorMsg != nullptr) {
       *errorMsg = "failed to start asynchronous surface readback";
+    }
+    if (errorCode != nullptr) {
+      *errorCode = VideoExportError::ReadbackFailed;
     }
     return nullptr;
   }
@@ -73,16 +85,54 @@ VideoExportFrameImpl::VideoExportFrameImpl(std::shared_ptr<VideoExportState> sta
     : state(std::move(state)), frameIndex(index) {
 }
 
-void VideoExportFrameImpl::fail(const std::string& message) {
+void VideoExportFrameImpl::fail(VideoExportError code, const std::string& message) {
   if (consumed) {
     return;
   }
   failed = true;
+  failureCode = code;
   errorMessage = message;
   if (!state->cancelled) {
     state->failed = true;
+    state->errorCode = code;
     state->error = message;
   }
+}
+
+void VideoExportFrameImpl::absorbSharedFailure() {
+  auto code = state->errorCode;
+  if (code == VideoExportError::None) {
+    code = VideoExportError::Cancelled;
+  }
+  fail(code, state->error.empty() ? "the export sequence has failed" : state->error);
+}
+
+VideoExportFrameStatus VideoExportFrameImpl::pollLocked(tgfx::Context* context) {
+  if (failed) {
+    return VideoExportFrameStatus::Failed;
+  }
+  if (consumed) {
+    return VideoExportFrameStatus::Ready;
+  }
+  if (state->failed || state->cancelled) {
+    absorbSharedFailure();
+    return VideoExportFrameStatus::Failed;
+  }
+  if (readback == nullptr) {
+    fail(VideoExportError::ReadbackFailed, "the frame has no readback session");
+    return VideoExportFrameStatus::Failed;
+  }
+  switch (pag::PollAsyncReadback(context, readback)) {
+    case tgfx::ReadbackStatus::Pending:
+      return VideoExportFrameStatus::Pending;
+    case tgfx::ReadbackStatus::Ready:
+      return VideoExportFrameStatus::Ready;
+    case tgfx::ReadbackStatus::Failed:
+      fail(VideoExportError::ReadbackFailed, "asynchronous surface readback failed");
+      return VideoExportFrameStatus::Failed;
+  }
+  fail(VideoExportError::ReadbackFailed, "asynchronous surface readback returned an unknown state");
+  return VideoExportFrameStatus::Failed;
 }
 
 VideoExportFrameStatus VideoExportFrameImpl::status() {
@@ -92,88 +142,102 @@ VideoExportFrameStatus VideoExportFrameImpl::status() {
   if (consumed) {
     return VideoExportFrameStatus::Ready;
   }
-  if (state->failed || state->cancelled) {
-    fail(state->error.empty() ? "the export sequence has failed" : state->error);
-    return VideoExportFrameStatus::Failed;
-  }
   if (cpuPixels != nullptr) {
+    if (state->failed || state->cancelled) {
+      absorbSharedFailure();
+      return VideoExportFrameStatus::Failed;
+    }
     return VideoExportFrameStatus::Ready;
   }
   if (device == nullptr || readback == nullptr) {
-    fail("the frame has no readback session");
+    fail(VideoExportError::ReadbackFailed, "the frame has no readback session");
     return VideoExportFrameStatus::Failed;
   }
   auto* context = device->lockContext();
   if (context == nullptr) {
-    fail("failed to lock the export device");
+    fail(VideoExportError::DeviceLost, "failed to lock the export device");
     return VideoExportFrameStatus::Failed;
   }
-  auto result = pag::PollAsyncReadback(context, readback);
+  auto result = pollLocked(context);
   device->unlock();
-  switch (result) {
-    case tgfx::ReadbackStatus::Pending:
-      return VideoExportFrameStatus::Pending;
-    case tgfx::ReadbackStatus::Ready:
-      return VideoExportFrameStatus::Ready;
-    case tgfx::ReadbackStatus::Failed:
-      fail("asynchronous surface readback failed");
-      return VideoExportFrameStatus::Failed;
-  }
-  fail("asynchronous surface readback returned an unknown state");
-  return VideoExportFrameStatus::Failed;
+  return result;
 }
 
-bool VideoExportFrameImpl::readGPUPixels(void* dstPixels, size_t dstRowBytes) {
-  auto* context = device->lockContext();
-  if (context == nullptr) {
+bool VideoExportFrameImpl::copyGPUPixelsLocked(tgfx::Context* context, void* dstPixels,
+                                               size_t dstRowBytes) {
+  if (!readback->isReady(context)) {
     return false;
   }
-  auto success = false;
-  if (readback->isReady(context)) {
-    auto pixels = readback->lockPixels(context, flipY);
-    if (pixels != nullptr) {
-      tgfx::Pixmap source(readback->info(), pixels);
-      auto destination =
-          tgfx::ImageInfo::Make(source.width(), source.height(), tgfx::ColorType::RGBA_8888,
-                                tgfx::AlphaType::Premultiplied, dstRowBytes);
-      success = !destination.isEmpty() && source.readPixels(destination, dstPixels);
-      if (success && staticCache != nullptr) {
-        success = source.readPixels(staticCache->info(), staticCache->writablePixels());
-      }
-      readback->unlockPixels(context);
-    }
+  auto pixels = readback->lockPixels(context, flipY);
+  if (pixels == nullptr) {
+    return false;
   }
-  device->unlock();
+  tgfx::Pixmap source(readback->info(), pixels);
+  auto destination =
+      tgfx::ImageInfo::Make(source.width(), source.height(), tgfx::ColorType::RGBA_8888,
+                            tgfx::AlphaType::Premultiplied, dstRowBytes);
+  auto success = !destination.isEmpty() && source.readPixels(destination, dstPixels);
+  if (success && staticCache != nullptr) {
+    success = source.readPixels(staticCache->info(), staticCache->writablePixels());
+  }
+  readback->unlockPixels(context);
   return success;
+}
+
+void VideoExportFrameImpl::commit() {
+  consumed = true;
+  state->currentFrame = frameIndex + 1;
 }
 
 bool VideoExportFrameImpl::readPixels(void* dstPixels, size_t dstRowBytes) {
   if (failed || consumed || dstPixels == nullptr) {
     return false;
   }
-  if (status() != VideoExportFrameStatus::Ready) {
-    return false;
-  }
-  auto width = cpuPixels != nullptr ? cpuPixels->width() : readback->info().width();
-  if (width <= 0 || dstRowBytes < static_cast<size_t>(width) * 4) {
-    fail("invalid destination row bytes");
-    return false;
-  }
-  auto success = false;
   if (cpuPixels != nullptr) {
+    if (state->failed || state->cancelled) {
+      absorbSharedFailure();
+      return false;
+    }
+    auto width = cpuPixels->width();
+    if (width <= 0 || dstRowBytes < static_cast<size_t>(width) * 4) {
+      fail(VideoExportError::InvalidArgument, "invalid destination row bytes");
+      return false;
+    }
     auto destination =
         tgfx::ImageInfo::Make(cpuPixels->width(), cpuPixels->height(), tgfx::ColorType::RGBA_8888,
                               tgfx::AlphaType::Premultiplied, dstRowBytes);
-    success = !destination.isEmpty() && cpuPixels->readPixels(destination, dstPixels);
-  } else {
-    success = readGPUPixels(dstPixels, dstRowBytes);
+    if (destination.isEmpty() || !cpuPixels->readPixels(destination, dstPixels)) {
+      fail(VideoExportError::ReadbackFailed, "failed to copy the export frame pixels");
+      return false;
+    }
+    commit();
+    return true;
   }
-  if (!success) {
-    fail("failed to copy the export frame pixels");
+  if (device == nullptr || readback == nullptr) {
+    fail(VideoExportError::ReadbackFailed, "the frame has no readback session");
     return false;
   }
-  consumed = true;
-  state->currentFrame = frameIndex + 1;
+  auto* context = device->lockContext();
+  if (context == nullptr) {
+    fail(VideoExportError::DeviceLost, "failed to lock the export device");
+    return false;
+  }
+  auto success = false;
+  if (pollLocked(context) == VideoExportFrameStatus::Ready) {
+    auto width = readback->info().width();
+    if (width <= 0 || dstRowBytes < static_cast<size_t>(width) * 4) {
+      fail(VideoExportError::InvalidArgument, "invalid destination row bytes");
+    } else if (copyGPUPixelsLocked(context, dstPixels, dstRowBytes)) {
+      success = true;
+    } else {
+      fail(VideoExportError::ReadbackFailed, "failed to copy the export frame pixels");
+    }
+  }
+  device->unlock();
+  if (!success) {
+    return false;
+  }
+  commit();
   return true;
 }
 
@@ -193,6 +257,10 @@ VideoExportFrameStatus VideoExportFrame::status() {
 
 std::string VideoExportFrame::error() const {
   return impl != nullptr ? impl->error() : "the export frame is null";
+}
+
+VideoExportError VideoExportFrame::errorCode() const {
+  return impl != nullptr ? impl->errorCode() : VideoExportError::InvalidArgument;
 }
 
 bool VideoExportFrame::readPixels(void* dstPixels, size_t dstRowBytes) {

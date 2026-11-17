@@ -43,9 +43,13 @@ namespace {
 
 constexpr int DefaultFrameRate = 60;
 
-void SetError(std::string* errorMsg, const std::string& text) {
+void SetError(std::string* errorMsg, VideoExportError* errorCode, VideoExportError code,
+              const std::string& text) {
   if (errorMsg != nullptr) {
     *errorMsg = text;
+  }
+  if (errorCode != nullptr) {
+    *errorCode = code;
   }
 }
 
@@ -63,7 +67,8 @@ bool ComputeOutputDimension(float documentSize, float scale, bool padToEvenSize,
   return true;
 }
 
-bool ValidateDocumentAnimations(const PAGXDocument& document, std::string* errorMsg) {
+bool ValidateDocumentAnimations(const PAGXDocument& document, std::string* errorMsg,
+                                VideoExportError* errorCode) {
   std::unordered_set<std::string> timelineIds = {};
   for (const auto* node : document.animations) {
     if (node == nullptr ||
@@ -71,12 +76,14 @@ bool ValidateDocumentAnimations(const PAGXDocument& document, std::string* error
       continue;
     }
     if (node->id.empty()) {
-      SetError(errorMsg, "top-level animations and state machines must have non-empty ids");
+      SetError(errorMsg, errorCode, VideoExportError::InvalidArgument,
+               "top-level animations and state machines must have non-empty ids");
       return false;
     }
     if (!timelineIds.insert(node->id).second) {
       auto typeName = node->nodeType() == NodeType::Animation ? "animation" : "state machine";
-      SetError(errorMsg, "duplicate top-level " + std::string(typeName) + " id '" + node->id + "'");
+      SetError(errorMsg, errorCode, VideoExportError::InvalidArgument,
+               "duplicate top-level " + std::string(typeName) + " id '" + node->id + "'");
       return false;
     }
   }
@@ -84,49 +91,56 @@ bool ValidateDocumentAnimations(const PAGXDocument& document, std::string* error
 }
 
 bool ValidateOptions(const std::shared_ptr<PAGXDocument>& document,
-                     const VideoExportOptions& options, std::string* errorMsg) {
+                     const VideoExportOptions& options, std::string* errorMsg,
+                     VideoExportError* errorCode) {
   if (document == nullptr) {
-    SetError(errorMsg, "the document is null");
+    SetError(errorMsg, errorCode, VideoExportError::InvalidArgument, "the document is null");
     return false;
   }
   const auto& rate = options.frameRate;
   auto automaticFrameRate = rate.frameRateNumerator == 0 && rate.frameRateDenominator == 1;
   if (!automaticFrameRate &&
       !rate.isWithin(VideoExporter::MIN_FRAME_RATE, VideoExporter::MAX_FRAME_RATE)) {
-    SetError(errorMsg, "the frame rate must be auto {0, 1} or within " +
-                           std::to_string(VideoExporter::MIN_FRAME_RATE) + "-" +
-                           std::to_string(VideoExporter::MAX_FRAME_RATE) + ", got " +
-                           std::to_string(rate.frameRateNumerator) + "/" +
-                           std::to_string(rate.frameRateDenominator));
+    SetError(errorMsg, errorCode, VideoExportError::InvalidArgument,
+             "the frame rate must be auto {0, 1} or within " +
+                 std::to_string(VideoExporter::MIN_FRAME_RATE) + "-" +
+                 std::to_string(VideoExporter::MAX_FRAME_RATE) + ", got " +
+                 std::to_string(rate.frameRateNumerator) + "/" +
+                 std::to_string(rate.frameRateDenominator));
     return false;
   }
   if (!std::isfinite(options.duration)) {
-    SetError(errorMsg, "the duration must be finite");
+    SetError(errorMsg, errorCode, VideoExportError::InvalidArgument, "the duration must be finite");
     return false;
   }
   if (!(options.scale > 0.0f) || !std::isfinite(options.scale)) {
-    SetError(errorMsg, "the scale must be finite and positive");
+    SetError(errorMsg, errorCode, VideoExportError::InvalidArgument,
+             "the scale must be finite and positive");
     return false;
   }
   if (!(document->width > 0.0f) || !(document->height > 0.0f) || !std::isfinite(document->width) ||
       !std::isfinite(document->height)) {
-    SetError(errorMsg, "the document dimensions must be finite and positive");
+    SetError(errorMsg, errorCode, VideoExportError::InvalidArgument,
+             "the document dimensions must be finite and positive");
     return false;
   }
-  return ValidateDocumentAnimations(*document, errorMsg);
+  return ValidateDocumentAnimations(*document, errorMsg, errorCode);
 }
 
 bool CreateResources(int width, int height, std::shared_ptr<PAGSurface>* surface,
-                     std::shared_ptr<tgfx::Bitmap>* bitmap, std::string* errorMsg) {
+                     std::shared_ptr<tgfx::Bitmap>* bitmap, std::string* errorMsg,
+                     VideoExportError* errorCode) {
   *surface = PAGSurface::MakeOffscreen(width, height);
   if (*surface == nullptr) {
-    SetError(errorMsg, "failed to create an offscreen surface of " + std::to_string(width) + "x" +
-                           std::to_string(height));
+    SetError(errorMsg, errorCode, VideoExportError::RenderFailed,
+             "failed to create an offscreen surface of " + std::to_string(width) + "x" +
+                 std::to_string(height));
     return false;
   }
   *bitmap = std::make_shared<tgfx::Bitmap>(width, height, false, false);
   if ((*bitmap)->isEmpty()) {
-    SetError(errorMsg, "failed to allocate the frame bitmap");
+    SetError(errorMsg, errorCode, VideoExportError::OutOfMemory,
+             "failed to allocate the frame bitmap");
     return false;
   }
   return true;
@@ -155,17 +169,19 @@ bool ComputeVideoOutputDimensions(float documentWidth, float documentHeight, flo
 }
 
 bool VideoExporter::AddAnimation(const std::shared_ptr<PAGAnimation>& animation, int64_t offsetUs,
-                                 bool includeInFrameRate, PlaybackPlan* plan,
-                                 std::string* errorMsg) {
+                                 bool includeInFrameRate, PlaybackPlan* plan, std::string* errorMsg,
+                                 VideoExportError* errorCode) {
   if (animation == nullptr || animation->animation == nullptr) {
-    SetError(errorMsg, "failed to instantiate an animation");
+    SetError(errorMsg, errorCode, VideoExportError::InvalidArgument,
+             "failed to instantiate an animation");
     return false;
   }
   const auto* definition = animation->animation;
   auto animationFrameRate = definition->frameRate;
   if (!std::isfinite(animationFrameRate) || animationFrameRate < 0.0f) {
-    SetError(errorMsg, "animation '" + definition->id +
-                           "' has an invalid frame rate; expected a finite non-negative value");
+    SetError(errorMsg, errorCode, VideoExportError::InvalidArgument,
+             "animation '" + definition->id +
+                 "' has an invalid frame rate; expected a finite non-negative value");
     return false;
   }
   int64_t periodUs = 0;
@@ -173,13 +189,15 @@ bool VideoExporter::AddAnimation(const std::shared_ptr<PAGAnimation>& animation,
     auto basePeriodUs = static_cast<double>(definition->duration) / animationFrameRate * 1000000.0;
     if (!std::isfinite(basePeriodUs) ||
         basePeriodUs >= static_cast<double>(std::numeric_limits<int64_t>::max())) {
-      SetError(errorMsg, "animation '" + definition->id + "' has an overflowing playback period");
+      SetError(errorMsg, errorCode, VideoExportError::TooLong,
+               "animation '" + definition->id + "' has an overflowing playback period");
       return false;
     }
     periodUs = static_cast<int64_t>(basePeriodUs);
     if (definition->loop == LoopMode::PingPong) {
       if (periodUs > std::numeric_limits<int64_t>::max() / 2) {
-        SetError(errorMsg, "animation '" + definition->id + "' has an overflowing playback period");
+        SetError(errorMsg, errorCode, VideoExportError::TooLong,
+                 "animation '" + definition->id + "' has an overflowing playback period");
         return false;
       }
       periodUs *= 2;
@@ -191,7 +209,8 @@ bool VideoExporter::AddAnimation(const std::shared_ptr<PAGAnimation>& animation,
   }
   if (!std::isfinite(effectivePeriodUs) ||
       effectivePeriodUs >= static_cast<double>(std::numeric_limits<int64_t>::max())) {
-    SetError(errorMsg, "animation '" + definition->id + "' has an overflowing playback period");
+    SetError(errorMsg, errorCode, VideoExportError::TooLong,
+             "animation '" + definition->id + "' has an overflowing playback period");
     return false;
   }
   if (effectivePeriodUs > 0.0) {
@@ -210,7 +229,7 @@ bool VideoExporter::AddAnimation(const std::shared_ptr<PAGAnimation>& animation,
 }
 
 bool VideoExporter::CollectNestedPlayback(PAGComposition* composition, PlaybackPlan* plan,
-                                          std::string* errorMsg) {
+                                          std::string* errorMsg, VideoExportError* errorCode) {
   if (composition == nullptr) {
     return true;
   }
@@ -227,14 +246,14 @@ bool VideoExporter::CollectNestedPlayback(PAGComposition* composition, PlaybackP
       continue;
     }
     auto animation = std::static_pointer_cast<PAGAnimation>(timeline);
-    if (!AddAnimation(animation, animation->evaluationOffsetUs, false, plan, errorMsg)) {
+    if (!AddAnimation(animation, animation->evaluationOffsetUs, false, plan, errorMsg, errorCode)) {
       return false;
     }
   }
   std::vector<PAGComposition*> childCompositions = {};
   PAGComposition::CollectChildCompositions(composition, childCompositions);
   for (auto* child : childCompositions) {
-    if (!CollectNestedPlayback(child, plan, errorMsg)) {
+    if (!CollectNestedPlayback(child, plan, errorMsg, errorCode)) {
       return false;
     }
   }
@@ -243,21 +262,23 @@ bool VideoExporter::CollectNestedPlayback(PAGComposition* composition, PlaybackP
 
 bool VideoExporter::ResolvePlaybackPlan(const std::shared_ptr<PAGScene>& scene,
                                         const std::shared_ptr<PAGXDocument>& document,
-                                        PlaybackPlan* plan, std::string* errorMsg) {
+                                        PlaybackPlan* plan, std::string* errorMsg,
+                                        VideoExportError* errorCode) {
   for (auto* node : document->animations) {
     if (node == nullptr) {
       continue;
     }
     if (node->nodeType() == NodeType::Animation) {
       auto animation = scene->getAnimation(node->id);
-      if (!AddAnimation(animation, 0, true, plan, errorMsg)) {
+      if (!AddAnimation(animation, 0, true, plan, errorMsg, errorCode)) {
         return false;
       }
       plan->timelines.emplace_back(std::move(animation));
     } else if (node->nodeType() == NodeType::StateMachine) {
       auto stateMachine = scene->getStateMachineTimeline(node->id);
       if (stateMachine == nullptr) {
-        SetError(errorMsg, "failed to instantiate state machine '" + node->id + "'");
+        SetError(errorMsg, errorCode, VideoExportError::RenderFailed,
+                 "failed to instantiate state machine '" + node->id + "'");
         return false;
       }
       if (std::find(plan->timelines.begin(), plan->timelines.end(), stateMachine) ==
@@ -268,26 +289,28 @@ bool VideoExporter::ResolvePlaybackPlan(const std::shared_ptr<PAGScene>& scene,
       plan->hasDynamicContent = true;
     }
   }
-  return CollectNestedPlayback(scene->rootComposition().get(), plan, errorMsg);
+  return CollectNestedPlayback(scene->rootComposition().get(), plan, errorMsg, errorCode);
 }
 
 bool VideoExporter::ResolveSampling(const Options& options, const PlaybackPlan& plan,
                                     VideoFrameRate* frameRate, int64_t* frameCount,
-                                    std::string* errorMsg) {
+                                    std::string* errorMsg, VideoExportError* errorCode) {
   auto automaticFrameRate = options.frameRate.frameRateNumerator == 0;
   if (automaticFrameRate && plan.hasMixedFrameRates) {
-    SetError(errorMsg, "animations have mixed frame rates; set an explicit sampling frame rate");
+    SetError(errorMsg, errorCode, VideoExportError::MixedFrameRates,
+             "animations have mixed frame rates; set an explicit sampling frame rate");
     return false;
   }
   *frameRate = options.frameRate;
   if (automaticFrameRate && plan.documentFrameRate > 0.0f) {
     if (plan.documentFrameRate > MAX_FRAME_RATE) {
-      SetError(errorMsg, "the document frame rate must be finite and no greater than " +
-                             std::to_string(MAX_FRAME_RATE));
+      SetError(errorMsg, errorCode, VideoExportError::InvalidArgument,
+               "the document frame rate must be finite and no greater than " +
+                   std::to_string(MAX_FRAME_RATE));
       return false;
     }
     if (std::floor(plan.documentFrameRate) != plan.documentFrameRate) {
-      SetError(errorMsg,
+      SetError(errorMsg, errorCode, VideoExportError::InvalidArgument,
                "the document frame rate must be an integer in automatic mode; set "
                "an explicit sampling frame rate");
       return false;
@@ -302,14 +325,16 @@ bool VideoExporter::ResolveSampling(const Options& options, const PlaybackPlan& 
   float durationSeconds = options.duration;
   if (durationSeconds <= 0.0f) {
     if (plan.hasStateMachine) {
-      SetError(errorMsg, "documents with state machines require an explicit duration");
+      SetError(errorMsg, errorCode, VideoExportError::StateMachineRequiresDuration,
+               "documents with state machines require an explicit duration");
       return false;
     }
     if (!plan.hasDynamicContent) {
       durationSeconds = 1.0f / static_cast<float>(samplingRate);
     } else {
       if (plan.longestDurationUs <= 0) {
-        SetError(errorMsg, "the document's animations have no duration, pass a duration");
+        SetError(errorMsg, errorCode, VideoExportError::NoDuration,
+                 "the document's animations have no duration, pass a duration");
         return false;
       }
       durationSeconds = static_cast<float>(static_cast<double>(plan.longestDurationUs) / 1000000.0);
@@ -318,102 +343,114 @@ bool VideoExporter::ResolveSampling(const Options& options, const PlaybackPlan& 
   auto frameCountValue = static_cast<double>(durationSeconds) * samplingRate;
   if (!std::isfinite(frameCountValue) ||
       frameCountValue >= static_cast<double>(std::numeric_limits<int64_t>::max())) {
-    SetError(errorMsg, "the requested frame count is too large");
+    SetError(errorMsg, errorCode, VideoExportError::TooLong,
+             "the requested frame count is too large");
     return false;
   }
   *frameCount = static_cast<int64_t>(std::llround(frameCountValue));
   if (*frameCount <= 0) {
-    SetError(errorMsg, "the requested sequence is empty");
+    SetError(errorMsg, errorCode, VideoExportError::InvalidArgument,
+             "the requested sequence is empty");
     return false;
   }
   auto lastFrameTimeUs = static_cast<double>(*frameCount - 1) * 1000000.0 / samplingRate;
   if (lastFrameTimeUs >= static_cast<double>(std::numeric_limits<int64_t>::max())) {
-    SetError(errorMsg, "the requested sequence is too long");
+    SetError(errorMsg, errorCode, VideoExportError::TooLong, "the requested sequence is too long");
     return false;
   }
   return true;
 }
 
 std::shared_ptr<VideoExporter> VideoExporter::Make(std::shared_ptr<PAGXDocument> document,
-                                                   const Options& options, std::string* errorMsg) {
-  return MakeInternal(std::move(document), nullptr, options, errorMsg);
+                                                   const Options& options, std::string* errorMsg,
+                                                   VideoExportError* errorCode) {
+  return MakeInternal(std::move(document), nullptr, options, errorMsg, errorCode);
 }
 
 std::shared_ptr<VideoExporter> VideoExporter::MakeWithSurface(
     std::shared_ptr<PAGXDocument> document, std::shared_ptr<PAGSurface> surface,
-    const Options& options, std::string* errorMsg) {
+    const Options& options, std::string* errorMsg, VideoExportError* errorCode) {
   if (surface == nullptr) {
-    SetError(errorMsg, "the export surface is null");
+    SetError(errorMsg, errorCode, VideoExportError::InvalidArgument, "the export surface is null");
     return nullptr;
   }
-  return MakeInternal(std::move(document), std::move(surface), options, errorMsg);
+  return MakeInternal(std::move(document), std::move(surface), options, errorMsg, errorCode);
 }
 
 std::shared_ptr<VideoExporter> VideoExporter::MakeInternal(std::shared_ptr<PAGXDocument> document,
                                                            std::shared_ptr<PAGSurface> surface,
                                                            const Options& options,
-                                                           std::string* errorMsg) {
-  if (!ValidateOptions(document, options, errorMsg)) {
+                                                           std::string* errorMsg,
+                                                           VideoExportError* errorCode) {
+  if (!ValidateOptions(document, options, errorMsg, errorCode)) {
     return nullptr;
   }
   auto scene = PAGScene::Make(document);
   if (scene == nullptr) {
-    SetError(errorMsg, "failed to build the animation scene");
+    SetError(errorMsg, errorCode, VideoExportError::RenderFailed,
+             "failed to build the animation scene");
     return nullptr;
   }
   PlaybackPlan plan = {};
-  if (!ResolvePlaybackPlan(scene, document, &plan, errorMsg)) {
+  if (!ResolvePlaybackPlan(scene, document, &plan, errorMsg, errorCode)) {
     return nullptr;
   }
   VideoFrameRate frameRate = {};
   int64_t frameCount = 0;
-  if (!ResolveSampling(options, plan, &frameRate, &frameCount, errorMsg)) {
+  if (!ResolveSampling(options, plan, &frameRate, &frameCount, errorMsg, errorCode)) {
     return nullptr;
   }
   int width = options.outputWidth;
   int height = options.outputHeight;
   const bool hasExplicitSize = width > 0 && height > 0;
   if ((width == 0) != (height == 0) || width < 0 || height < 0) {
-    SetError(errorMsg, "explicit output dimensions must both be positive or both be zero");
+    SetError(errorMsg, errorCode, VideoExportError::InvalidArgument,
+             "explicit output dimensions must both be positive or both be zero");
     return nullptr;
   }
   if (!hasExplicitSize &&
       !ComputeVideoOutputDimensions(document->width, document->height, options.scale,
                                     options.padToEvenSize, &width, &height)) {
-    SetError(errorMsg, "the output dimensions must be finite, positive, and fit in an int");
+    SetError(errorMsg, errorCode, VideoExportError::InvalidArgument,
+             "the output dimensions must be finite, positive, and fit in an int");
     return nullptr;
   }
   std::shared_ptr<tgfx::Bitmap> bitmap = {};
   if (surface == nullptr) {
-    if (!CreateResources(width, height, &surface, &bitmap, errorMsg)) {
+    if (!CreateResources(width, height, &surface, &bitmap, errorMsg, errorCode)) {
       return nullptr;
     }
   } else {
     if (surface->width() != width || surface->height() != height) {
-      SetError(errorMsg, "the export surface dimensions do not match the expected output of " +
-                             std::to_string(width) + "x" + std::to_string(height));
+      SetError(errorMsg, errorCode, VideoExportError::InvalidArgument,
+               "the export surface dimensions do not match the expected output of " +
+                   std::to_string(width) + "x" + std::to_string(height));
       return nullptr;
     }
     auto device = surface->drawable->getDevice();
     if (device == nullptr) {
-      SetError(errorMsg, "the export surface has no GPU device");
+      SetError(errorMsg, errorCode, VideoExportError::DeviceLost,
+               "the export surface has no GPU device");
       return nullptr;
     }
     auto* context = device->lockContext();
     if (context == nullptr) {
-      SetError(errorMsg, "failed to lock the export surface device");
+      SetError(errorMsg, errorCode, VideoExportError::DeviceLost,
+               "failed to lock the export surface device");
       return nullptr;
     }
     auto tgfxSurface = surface->drawable->getSurface(context);
     auto validContext = tgfxSurface != nullptr && tgfxSurface->getContext() == context;
     device->unlock();
     if (!validContext) {
-      SetError(errorMsg, "the export surface has no valid GPU context");
+      SetError(errorMsg, errorCode, VideoExportError::DeviceLost,
+               "the export surface has no valid GPU context");
       return nullptr;
     }
     bitmap = std::make_shared<tgfx::Bitmap>(width, height, false, false);
     if (bitmap->isEmpty()) {
-      SetError(errorMsg, "failed to allocate the frame bitmap");
+      SetError(errorMsg, errorCode, VideoExportError::OutOfMemory,
+               "failed to allocate the frame bitmap");
       return nullptr;
     }
   }
@@ -469,7 +506,11 @@ std::string VideoExporter::error() const {
   return state != nullptr ? state->error : "";
 }
 
-bool VideoExporter::drawNextFrame(std::string* errorMsg) {
+VideoExportError VideoExporter::errorCode() const {
+  return state != nullptr ? state->errorCode : VideoExportError::None;
+}
+
+bool VideoExporter::drawNextFrame(std::string* errorMsg, VideoExportError* errorCode) {
   auto frameIndex = state->currentFrame;
   auto timeUs = static_cast<int64_t>(std::llround(static_cast<double>(frameIndex) * 1000000.0 /
                                                   samplingFrameRate.framesPerSecond()));
@@ -489,7 +530,8 @@ bool VideoExporter::drawNextFrame(std::string* errorMsg) {
   scene->advanceAndApply(deltaUs);
   previousFrameTimeUs = timeUs;
   if (!scene->draw(surface)) {
-    SetError(errorMsg, "failed to draw frame " + std::to_string(frameIndex));
+    SetError(errorMsg, errorCode, VideoExportError::RenderFailed,
+             "failed to draw frame " + std::to_string(frameIndex));
     return false;
   }
   return true;
@@ -504,10 +546,10 @@ bool VideoExporter::nextFrame(std::string* errorMsg) {
   }
   if (state->mode == VideoExportMode::Async) {
     state->failed = true;
+    SetError(errorMsg, &state->errorCode, VideoExportError::MixedMode, "mixed_mode");
     state->error = "mixed_mode";
-    SetError(errorMsg, state->error);
     if (pendingFrame != nullptr) {
-      pendingFrame->impl->fail(state->error);
+      pendingFrame->impl->fail(VideoExportError::MixedMode, state->error);
     }
     return false;
   }
@@ -517,44 +559,48 @@ bool VideoExporter::nextFrame(std::string* errorMsg) {
   if (reuseStaticFrame && state->currentFrame > 0) {
     state->currentFrame++;
     state->mode = VideoExportMode::Sync;
+    state->errorCode = VideoExportError::None;
     state->error.clear();
     return true;
   }
   std::string renderError = {};
-  if (!drawNextFrame(&renderError)) {
+  if (!drawNextFrame(&renderError, &state->errorCode)) {
     state->error = renderError;
-    SetError(errorMsg, renderError);
+    SetError(errorMsg, nullptr, VideoExportError::None, renderError);
     return false;
   }
   if (!surface->readPixels(pixmap->writablePixels(), pixmap->rowBytes())) {
+    SetError(errorMsg, &state->errorCode, VideoExportError::ReadbackFailed,
+             "failed to read pixels for frame " + std::to_string(state->currentFrame));
     state->error = "failed to read pixels for frame " + std::to_string(state->currentFrame);
-    SetError(errorMsg, state->error);
     return false;
   }
   state->currentFrame++;
   state->mode = VideoExportMode::Sync;
+  state->errorCode = VideoExportError::None;
   state->error.clear();
   return true;
 }
 
 VideoExportStartResult VideoExporter::startNextFrame() {
   if (state->failed || state->cancelled) {
-    return {VideoExportStartStatus::Failed, nullptr, state->error};
+    return {VideoExportStartStatus::Failed, nullptr, state->error, state->errorCode};
   }
   if (state->mode == VideoExportMode::Sync) {
     state->failed = true;
+    state->errorCode = VideoExportError::MixedMode;
     state->error = "mixed_mode";
-    return {VideoExportStartStatus::Failed, nullptr, state->error};
+    return {VideoExportStartStatus::Failed, nullptr, state->error, state->errorCode};
   }
   if (pendingFrame != nullptr) {
     if (pendingFrame->impl->consumed) {
       pendingFrame = nullptr;
     } else {
-      return {VideoExportStartStatus::Busy, nullptr, ""};
+      return {VideoExportStartStatus::Busy, nullptr, "", VideoExportError::None};
     }
   }
   if (state->currentFrame >= totalFrames) {
-    return {VideoExportStartStatus::End, nullptr, ""};
+    return {VideoExportStartStatus::End, nullptr, "", VideoExportError::None};
   }
   auto frameIndex = state->currentFrame;
   std::shared_ptr<VideoExportFrameImpl> impl = nullptr;
@@ -562,24 +608,25 @@ VideoExportStartResult VideoExporter::startNextFrame() {
     impl = VideoExportFrameImpl::MakeCPU(state, frameIndex, pixmap);
   } else {
     std::string renderError = {};
-    if (!drawNextFrame(&renderError)) {
-      state->failed = true;
-      state->error = renderError;
-      return {VideoExportStartStatus::Failed, nullptr, renderError};
+    auto renderErrorCode = VideoExportError::None;
+    if (drawNextFrame(&renderError, &renderErrorCode)) {
+      impl = VideoExportFrameImpl::MakeGPU(state, frameIndex, surface,
+                                           reuseStaticFrame ? pixmap : nullptr, &renderError,
+                                           &renderErrorCode);
     }
-    impl = VideoExportFrameImpl::MakeGPU(state, frameIndex, surface,
-                                         reuseStaticFrame ? pixmap : nullptr, &renderError);
     if (impl == nullptr) {
       state->failed = true;
       state->error = renderError;
-      return {VideoExportStartStatus::Failed, nullptr, renderError};
+      state->errorCode = renderErrorCode;
+      return {VideoExportStartStatus::Failed, nullptr, renderError, renderErrorCode};
     }
   }
   auto frame = std::shared_ptr<VideoExportFrame>(new VideoExportFrame(std::move(impl)));
   pendingFrame = frame;
   state->mode = VideoExportMode::Async;
+  state->errorCode = VideoExportError::None;
   state->error.clear();
-  return {VideoExportStartStatus::FrameStarted, std::move(frame), ""};
+  return {VideoExportStartStatus::FrameStarted, std::move(frame), "", VideoExportError::None};
 }
 
 void VideoExporter::cancel() {
@@ -590,18 +637,25 @@ void VideoExporter::cancel() {
   state->cancelled = true;
   if (!wasFailed) {
     state->error = "cancelled";
+    state->errorCode = VideoExportError::Cancelled;
     if (pendingFrame != nullptr && !pendingFrame->impl->consumed) {
-      pendingFrame->impl->fail(state->error);
+      pendingFrame->impl->fail(VideoExportError::Cancelled, state->error);
     }
   }
   pendingFrame = nullptr;
 }
 
 const uint8_t* VideoExporter::pixels() const {
+  if (state != nullptr && state->mode == VideoExportMode::Async) {
+    return nullptr;
+  }
   return static_cast<const uint8_t*>(pixmap->pixels());
 }
 
 size_t VideoExporter::rowBytes() const {
+  if (state != nullptr && state->mode == VideoExportMode::Async) {
+    return 0;
+  }
   return pixmap->rowBytes();
 }
 

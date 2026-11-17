@@ -394,15 +394,21 @@ PAGX_TEST(PAGXVideoExporterTest, MakeWithSurfaceAcceptsExplicitOutputDimensions)
 PAGX_TEST(PAGXVideoExporterTest, MakeWithSurfaceRejectsInvalidInput) {
   auto document = MakeStaticDocument();
   std::string errorMsg = {};
-  EXPECT_EQ(pagx::VideoExporter::MakeWithSurface(document, nullptr, {}, &errorMsg), nullptr);
+  auto errorCode = pagx::VideoExportError::None;
+  EXPECT_EQ(pagx::VideoExporter::MakeWithSurface(document, nullptr, {}, &errorMsg, &errorCode),
+            nullptr);
   EXPECT_NE(errorMsg.find("surface is null"), std::string::npos);
+  EXPECT_EQ(errorCode, pagx::VideoExportError::InvalidArgument);
 
   auto surface = MakeHostSurface(100, 100);
   ASSERT_TRUE(surface != nullptr);
   errorMsg.clear();
-  EXPECT_EQ(pagx::VideoExporter::MakeWithSurface(document, surface, {}, &errorMsg), nullptr);
+  errorCode = pagx::VideoExportError::None;
+  EXPECT_EQ(pagx::VideoExporter::MakeWithSurface(document, surface, {}, &errorMsg, &errorCode),
+            nullptr);
   EXPECT_NE(errorMsg.find("dimensions"), std::string::npos);
   EXPECT_NE(errorMsg.find("200x200"), std::string::npos);
+  EXPECT_EQ(errorCode, pagx::VideoExportError::InvalidArgument);
 }
 
 PAGX_TEST(PAGXVideoExporterTest, MakeWithSurfaceKeepsTheHostSurfaceAlive) {
@@ -674,6 +680,7 @@ PAGX_TEST(PAGXVideoExporterTest, ReadbackCreationFailureDoesNotCommit) {
   EXPECT_EQ(started.status, pagx::VideoExportStartStatus::Failed);
   EXPECT_EQ(started.frame, nullptr);
   EXPECT_NE(started.error.find("readback"), std::string::npos);
+  EXPECT_EQ(started.errorCode, pagx::VideoExportError::ReadbackFailed);
   EXPECT_EQ(exporter->currentFrame(), 0);
   EXPECT_EQ(*calls, 3);
   EXPECT_EQ(exporter->startNextFrame().status, pagx::VideoExportStartStatus::Failed);
@@ -769,6 +776,29 @@ PAGX_TEST(PAGXVideoExporterTest, AsyncStaticFramesReuseCPUPixels) {
   EXPECT_EQ(exporter->startNextFrame().status, pagx::VideoExportStartStatus::End);
 }
 
+PAGX_TEST(PAGXVideoExporterTest, MakeReportsStableErrorCodes) {
+  pagx::VideoExportOptions options = {};
+  options.scale = 0;
+  std::string errorMsg = {};
+  auto errorCode = pagx::VideoExportError::None;
+  auto exporter = pagx::VideoExporter::Make(MakeStaticDocument(), options, &errorMsg, &errorCode);
+  EXPECT_EQ(exporter, nullptr);
+  EXPECT_FALSE(errorMsg.empty());
+  EXPECT_EQ(errorCode, pagx::VideoExportError::InvalidArgument);
+
+  options = {};
+  errorCode = pagx::VideoExportError::None;
+  exporter = pagx::VideoExporter::Make(MakeStateMachineDocument(), options, nullptr, &errorCode);
+  EXPECT_EQ(exporter, nullptr);
+  EXPECT_EQ(errorCode, pagx::VideoExportError::StateMachineRequiresDuration);
+
+  errorCode = pagx::VideoExportError::None;
+  exporter = pagx::VideoExporter::MakeWithSurface(MakeStaticDocument(), nullptr, options, nullptr,
+                                                  &errorCode);
+  EXPECT_EQ(exporter, nullptr);
+  EXPECT_EQ(errorCode, pagx::VideoExportError::InvalidArgument);
+}
+
 PAGX_TEST(PAGXVideoExporterTest, AsyncAndSyncModesCannotBeMixed) {
 #ifdef TGFX_USE_WEBGPU
   GTEST_SKIP() << "Native test does not pump the WebGPU event loop";
@@ -778,15 +808,18 @@ PAGX_TEST(PAGXVideoExporterTest, AsyncAndSyncModesCannotBeMixed) {
   auto mixed = synchronous->startNextFrame();
   EXPECT_EQ(mixed.status, pagx::VideoExportStartStatus::Failed);
   EXPECT_EQ(mixed.error, "mixed_mode");
+  EXPECT_EQ(mixed.errorCode, pagx::VideoExportError::MixedMode);
 
   auto asynchronous = pagx::VideoExporter::Make(MakeAnimatedDocument("once"));
   auto started = asynchronous->startNextFrame();
   ASSERT_EQ(started.status, pagx::VideoExportStartStatus::FrameStarted);
   EXPECT_FALSE(asynchronous->nextFrame());
   EXPECT_EQ(asynchronous->error(), "mixed_mode");
+  EXPECT_EQ(asynchronous->errorCode(), pagx::VideoExportError::MixedMode);
   EXPECT_EQ(asynchronous->currentFrame(), 0);
   EXPECT_EQ(started.frame->status(), pagx::VideoExportFrameStatus::Failed);
   EXPECT_EQ(started.frame->error(), "mixed_mode");
+  EXPECT_EQ(started.frame->errorCode(), pagx::VideoExportError::MixedMode);
 }
 
 PAGX_TEST(PAGXVideoExporterTest, FailedSynchronousFrameDoesNotLockMode) {
@@ -826,6 +859,8 @@ PAGX_TEST(PAGXVideoExporterTest, ReleasingAsyncFrameDoesNotConsumeIt) {
   auto cancelled = exporter->startNextFrame();
   EXPECT_EQ(cancelled.status, pagx::VideoExportStartStatus::Failed);
   EXPECT_EQ(cancelled.error, "cancelled");
+  EXPECT_EQ(cancelled.errorCode, pagx::VideoExportError::Cancelled);
+  EXPECT_EQ(exporter->errorCode(), pagx::VideoExportError::Cancelled);
   EXPECT_EQ(exporter->currentFrame(), 0);
 }
 
@@ -842,9 +877,12 @@ PAGX_TEST(PAGXVideoExporterTest, AsyncCopyFailureIsTerminalAndDoesNotCommit) {
   EXPECT_FALSE(started.frame->readPixels(pixels.data(), 0));
   EXPECT_EQ(pixels, std::vector<uint8_t>(16, 0xCD));
   EXPECT_EQ(started.frame->status(), pagx::VideoExportFrameStatus::Failed);
+  EXPECT_EQ(started.frame->errorCode(), pagx::VideoExportError::InvalidArgument);
+  EXPECT_EQ(exporter->errorCode(), pagx::VideoExportError::InvalidArgument);
   EXPECT_EQ(exporter->currentFrame(), 0);
   auto failed = exporter->startNextFrame();
   EXPECT_EQ(failed.status, pagx::VideoExportStartStatus::Failed);
+  EXPECT_EQ(failed.errorCode, pagx::VideoExportError::InvalidArgument);
   EXPECT_EQ(failed.frame, nullptr);
   EXPECT_EQ(exporter->currentFrame(), 0);
 }
@@ -873,6 +911,46 @@ PAGX_TEST(PAGXVideoExporterTest, CancelAfterFailureReleasesPendingAndPreservesEr
   EXPECT_EQ(failed.status, pagx::VideoExportStartStatus::Failed);
   EXPECT_EQ(failed.error, originalError);
   EXPECT_EQ(exporter->currentFrame(), 0);
+}
+
+PAGX_TEST(PAGXVideoExporterTest, AsyncFramesMatchSynchronousOutput) {
+#ifdef TGFX_USE_WEBGPU
+  GTEST_SKIP() << "Native test does not pump the WebGPU event loop";
+#endif
+  auto synchronous = pagx::VideoExporter::Make(MakeAnimatedDocument("once"));
+  auto asynchronous = pagx::VideoExporter::Make(MakeAnimatedDocument("once"));
+  ASSERT_TRUE(synchronous != nullptr);
+  ASSERT_TRUE(asynchronous != nullptr);
+  ASSERT_EQ(synchronous->frameCount(), asynchronous->frameCount());
+  ASSERT_GT(synchronous->frameCount(), 1);
+  auto width = synchronous->width();
+  auto height = synchronous->height();
+  ASSERT_EQ(asynchronous->width(), width);
+  ASSERT_EQ(asynchronous->height(), height);
+  auto rowBytes = static_cast<size_t>(width) * 4;
+  auto asyncRowBytes = rowBytes + 16;
+  auto frameBytes = rowBytes * static_cast<size_t>(height);
+  std::vector<uint8_t> syncPixels = {};
+  std::vector<uint8_t> asyncPixels = {};
+  while (synchronous->currentFrame() < synchronous->frameCount()) {
+    ASSERT_TRUE(synchronous->nextFrame());
+    ASSERT_TRUE(synchronous->pixels() != nullptr);
+    syncPixels.assign(synchronous->pixels(), synchronous->pixels() + frameBytes);
+    auto started = asynchronous->startNextFrame();
+    ASSERT_EQ(started.status, pagx::VideoExportStartStatus::FrameStarted) << started.error;
+    ASSERT_EQ(started.frame->index(), synchronous->currentFrame() - 1);
+    ASSERT_TRUE(ConsumeAsyncFrame(started.frame, width, height, &asyncPixels));
+    for (int row = 0; row < height; row++) {
+      auto syncOffset = static_cast<size_t>(row) * rowBytes;
+      auto asyncOffset = static_cast<size_t>(row) * asyncRowBytes;
+      ASSERT_EQ(
+          std::memcmp(syncPixels.data() + syncOffset, asyncPixels.data() + asyncOffset, rowBytes),
+          0)
+          << "row " << row << " of frame " << started.frame->index();
+    }
+  }
+  EXPECT_EQ(asynchronous->currentFrame(), asynchronous->frameCount());
+  EXPECT_EQ(asynchronous->startNextFrame().status, pagx::VideoExportStartStatus::End);
 }
 
 PAGX_TEST(PAGXVideoExporterTest, AsyncDynamicSequenceEndsAfterLastFrameIsConsumed) {
