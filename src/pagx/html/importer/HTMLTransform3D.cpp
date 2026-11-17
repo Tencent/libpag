@@ -20,7 +20,6 @@
 #include <cctype>
 #include <cmath>
 #include <cstdlib>
-#include <unordered_set>
 #include "pagx/html/importer/HTMLDetail.h"
 #include "pagx/html/importer/HTMLDiagnosticSink.h"
 #include "pagx/html/importer/HTMLValueParser.h"
@@ -210,28 +209,6 @@ bool ResolveOriginAxis(const std::string& token, float dimension, HTMLValueParse
   return std::isfinite(out);
 }
 
-// One arity diagnostic per function family, shared by the "wrong number of arguments" and the
-// "argument failed to parse" exits so both describe the same contract.
-std::string TranslateArityMessage(const std::string& label, const std::string& token) {
-  if (label == "translate") {
-    return "html: translate expects 1 or 2 length arguments; got '" + token + "'";
-  }
-  if (label == "translate3d") {
-    return "html: translate3d expects 3 length arguments; got '" + token + "'";
-  }
-  return "html: " + label + " expects 1 length argument; got '" + token + "'";
-}
-
-std::string ScaleArityMessage(const std::string& label, const std::string& token) {
-  if (label == "scale") {
-    return "html: scale expects 1 or 2 numeric arguments; got '" + token + "'";
-  }
-  if (label == "scale3d") {
-    return "html: scale3d expects 3 numeric arguments; got '" + token + "'";
-  }
-  return "html: " + label + " expects 1 numeric argument; got '" + token + "'";
-}
-
 // Resolves one length argument: a plain px value or a percentage of `referencePx`. `referencePx` is
 // NaN when the axis has no percentage basis (the Z axis) or the box size is unknown, in which case a
 // percentage is reported as unsupported. `calc()` is deliberately out of scope: it needs CSS type
@@ -299,6 +276,318 @@ bool IsFinite(const Matrix3D& matrix) {
   return true;
 }
 
+// One transform function's arguments together with everything its family handler needs for parsing
+// and for the diagnostics: the authored token and spelling, the comma-split arguments and the pose
+// to fill in.
+struct TransformCall {
+  const std::string& token;
+  const std::string& name;
+  const std::string& label;
+  const TransformArgs& args;
+  HTMLDiagnosticSink& diagnostics;
+  Matrix3D* out;
+};
+
+using TransformFamilyHandler = bool (*)(const TransformCall& call);
+
+// Argument count shared by the `translate` / `scale` families: the two-argument form takes one or
+// two, the `3d` form exactly three, and the single-axis forms exactly one.
+bool AcceptsFamilyArity(size_t count, bool twoArgumentForm, bool threeArgumentForm) {
+  if (threeArgumentForm) {
+    return count == 3u;
+  }
+  if (twoArgumentForm) {
+    return count == 1u || count == 2u;
+  }
+  return count == 1u;
+}
+
+bool ParseTranslate(const TransformCall& call) {
+  const auto& parts = call.args.parts;
+  if (!AcceptsFamilyArity(parts.size(), call.name == "translate", call.name == "translate3d")) {
+    if (call.name == "translate") {
+      call.diagnostics.warn("html: translate expects 1 or 2 length arguments; got '" + call.token +
+                            "'");
+    } else if (call.name == "translate3d") {
+      call.diagnostics.warn("html: translate3d expects 3 length arguments; got '" + call.token +
+                            "'");
+    } else {
+      call.diagnostics.warn("html: " + call.label + " expects 1 length argument; got '" +
+                            call.token + "'");
+    }
+    return false;
+  }
+  float x = 0.0f;
+  float y = 0.0f;
+  float z = 0.0f;
+  if (call.name == "translate" || call.name == "translate3d") {
+    // `translate` stops at two lengths, so only `translate3d` reaches the depth axis.
+    if (!call.args.LengthAt(0, x, TransformAxis::X)) {
+      call.diagnostics.warn("html: translate first argument '" + parts[0] +
+                            "' is not a px length; ignored");
+      return false;
+    }
+    if (parts.size() > 1 && !call.args.LengthAt(1, y, TransformAxis::Y)) {
+      call.diagnostics.warn("html: translate second argument '" + parts[1] +
+                            "' is not a px length; ignored");
+      return false;
+    }
+    if (parts.size() > 2 && !call.args.LengthAt(2, z, TransformAxis::Z)) {
+      call.diagnostics.warn("html: translate third argument '" + parts[2] +
+                            "' is not a px length; ignored");
+      return false;
+    }
+  } else {
+    float& only = call.name == "translatex" ? x : (call.name == "translatey" ? y : z);
+    const TransformAxis onlyAxis = call.name == "translatex"   ? TransformAxis::X
+                                   : call.name == "translatey" ? TransformAxis::Y
+                                                               : TransformAxis::Z;
+    if (!call.args.LengthAt(0, only, onlyAxis)) {
+      call.diagnostics.warn("html: " + call.label + " argument '" + parts[0] +
+                            "' is not a px length; ignored");
+      return false;
+    }
+  }
+  *call.out = MakeTranslation(x, y, z);
+  return true;
+}
+
+bool ParseScale(const TransformCall& call) {
+  const auto& parts = call.args.parts;
+  // The wrong-arity exit and every argument that fails to parse share this text: a numeric scale
+  // argument has no per-argument wording of its own.
+  std::string arityMessage;
+  if (call.name == "scale") {
+    arityMessage = "html: scale expects 1 or 2 numeric arguments; got '" + call.token + "'";
+  } else if (call.name == "scale3d") {
+    arityMessage = "html: scale3d expects 3 numeric arguments; got '" + call.token + "'";
+  } else {
+    arityMessage = "html: " + call.label + " expects 1 numeric argument; got '" + call.token + "'";
+  }
+  if (!AcceptsFamilyArity(parts.size(), call.name == "scale", call.name == "scale3d")) {
+    call.diagnostics.warn(arityMessage);
+    return false;
+  }
+  float x = 1.0f;
+  float y = 1.0f;
+  float z = 1.0f;
+  if (call.name == "scale" || call.name == "scale3d") {
+    // A single argument scales both axes uniformly before the optional Y / Z values apply.
+    if (!call.args.NumberAt(0, x)) {
+      call.diagnostics.warn(arityMessage);
+      return false;
+    }
+    y = x;
+    if (parts.size() > 1 && !call.args.NumberAt(1, y)) {
+      call.diagnostics.warn(arityMessage);
+      return false;
+    }
+    if (parts.size() > 2 && !call.args.NumberAt(2, z)) {
+      call.diagnostics.warn(arityMessage);
+      return false;
+    }
+  } else {
+    float& only = call.name == "scalex" ? x : (call.name == "scaley" ? y : z);
+    if (!call.args.NumberAt(0, only)) {
+      call.diagnostics.warn(arityMessage);
+      return false;
+    }
+  }
+  *call.out = MakeScale(x, y, z);
+  return true;
+}
+
+bool ParseRotate(const TransformCall& call) {
+  const auto& parts = call.args.parts;
+  if (parts.size() != 1) {
+    call.diagnostics.warn("html: " + call.label + " expects 1 argument; got '" + call.token + "'");
+    return false;
+  }
+  float degrees = 0.0f;
+  if (!call.args.AngleAt(0, degrees)) {
+    call.diagnostics.warn("html: " + call.label + " angle '" + parts[0] +
+                          "' is not a valid angle (deg / grad / rad / turn); ignored");
+    return false;
+  }
+  if (call.name == "rotatex") {
+    *call.out = MakeRotationX(degrees);
+  } else if (call.name == "rotatey") {
+    *call.out = MakeRotationY(degrees);
+  } else {
+    *call.out = MakeRotationZ(degrees);
+  }
+  return true;
+}
+
+bool ParseRotate3D(const TransformCall& call) {
+  const auto& parts = call.args.parts;
+  float x = 0.0f;
+  float y = 0.0f;
+  float z = 0.0f;
+  float degrees = 0.0f;
+  if (parts.size() != 4 || !call.args.NumberAt(0, x) || !call.args.NumberAt(1, y) ||
+      !call.args.NumberAt(2, z) || !call.args.AngleAt(3, degrees)) {
+    call.diagnostics.warn("html: rotate3d expects 3 axis numbers and 1 angle; ignored");
+    return false;
+  }
+  // The axis is normalized in double precision: `rotate3d(1e20, 0, 0, 45deg)` squares to infinity
+  // in float, which used to slip past the zero-vector check and collapse the rotation to `cos * I`.
+  // Inputs beyond the float range never get here (the argument parser rejects them as non-numeric),
+  // so a zero-length vector is the only degenerate case left to catch.
+  const double axisX = static_cast<double>(x);
+  const double axisY = static_cast<double>(y);
+  const double axisZ = static_cast<double>(z);
+  const double length = std::sqrt(axisX * axisX + axisY * axisY + axisZ * axisZ);
+  if (!(length > 1e-6)) {
+    call.diagnostics.warn("html: rotate3d axis is a zero vector; ignored");
+    return false;
+  }
+  *call.out =
+      MakeRotationAxis(static_cast<float>(axisX / length), static_cast<float>(axisY / length),
+                       static_cast<float>(axisZ / length), degrees);
+  return true;
+}
+
+bool ParseSkew(const TransformCall& call) {
+  const auto& parts = call.args.parts;
+  if (call.name == "skew") {
+    float x = 0.0f;
+    float y = 0.0f;
+    if (parts.empty() || parts.size() > 2 || !call.args.AngleAt(0, x) ||
+        (parts.size() == 2 && !call.args.AngleAt(1, y))) {
+      call.diagnostics.warn("html: skew expects 1 or 2 angles; got '" + call.token + "'");
+      return false;
+    }
+    *call.out = MakeShear(x, y);
+    return true;
+  }
+  const bool vertical = call.name == "skewy";
+  const char* label = vertical ? "skewY" : "skewX";
+  if (parts.size() != 1) {
+    call.diagnostics.warn("html: " + std::string(label) + " expects 1 argument; got '" +
+                          call.token + "'");
+    return false;
+  }
+  float degrees = 0.0f;
+  if (!call.args.AngleAt(0, degrees)) {
+    call.diagnostics.warn("html: " + std::string(label) + " angle '" + parts[0] +
+                          "' is not a valid angle (deg / grad / rad / turn); ignored");
+    return false;
+  }
+  *call.out = vertical ? MakeShear(0.0f, degrees) : MakeShear(degrees, 0.0f);
+  return true;
+}
+
+// Shared by `matrix` and `matrix3d`: both spell their diagnostics with the function name and the
+// argument count, and both reject an argument that is not a number.
+bool ParseMatrixValues(const TransformCall& call, size_t count, float* values) {
+  const auto& parts = call.args.parts;
+  if (parts.size() != count) {
+    call.diagnostics.warn("html: " + call.name + " expects " + std::to_string(count) +
+                          " numeric arguments; got '" + call.token + "'");
+    return false;
+  }
+  for (size_t i = 0; i < count; ++i) {
+    if (!call.args.NumberAt(i, values[i])) {
+      call.diagnostics.warn("html: " + call.name + " argument '" + parts[i] +
+                            "' is not a number; ignored");
+      return false;
+    }
+  }
+  return true;
+}
+
+bool ParseMatrix(const TransformCall& call) {
+  float values[6] = {};
+  if (!ParseMatrixValues(call, 6, values)) {
+    return false;
+  }
+  Matrix affine = {};
+  affine.a = values[0];
+  affine.b = values[1];
+  affine.c = values[2];
+  affine.d = values[3];
+  affine.tx = values[4];
+  affine.ty = values[5];
+  *call.out = LiftMatrixToMatrix3D(affine, 0.0f);
+  return true;
+}
+
+bool ParseMatrix3D(const TransformCall& call) {
+  Matrix3D matrix = {};
+  if (!ParseMatrixValues(call, 16, matrix.values)) {
+    return false;
+  }
+  *call.out = matrix;
+  return true;
+}
+
+bool ParsePerspective(const TransformCall& call) {
+  const auto& parts = call.args.parts;
+  if (parts.size() != 1) {
+    call.diagnostics.warn("html: perspective expects 1 length; got '" + call.token + "'");
+    return false;
+  }
+  if (ToLower(Trim(parts[0])) == "none") {
+    *call.out = {};
+    return true;
+  }
+  float distance = 0.0f;
+  if (!call.args.LengthAt(0, distance, TransformAxis::Z) || !std::isfinite(distance) ||
+      distance < 0.0f) {
+    call.diagnostics.warn("html: perspective distance must be a non-negative length; got '" +
+                          call.token + "'; ignored");
+    return false;
+  }
+  // CSS Transforms 2 clamps a distance below 1px to 1px. `perspective(0)` would otherwise be
+  // rejected and take the rest of the function list down with it, losing a sibling
+  // `translateX(10px)` that the browser still applies.
+  const float clamped = distance < 1.0f ? 1.0f : distance;
+  *call.out = MakePerspective(clamped);
+  return true;
+}
+
+// The single list of supported transform functions: the parser dispatches on it and
+// `IsSupportedTransformFunction` answers from it, so a name cannot be known to one and unknown to the
+// other.
+struct TransformFamilyEntry {
+  const char* name;
+  TransformFamilyHandler handler;
+};
+
+constexpr TransformFamilyEntry TRANSFORM_FAMILIES[] = {
+    {"translate", ParseTranslate},
+    {"translatex", ParseTranslate},
+    {"translatey", ParseTranslate},
+    {"translatez", ParseTranslate},
+    {"translate3d", ParseTranslate},
+    {"scale", ParseScale},
+    {"scalex", ParseScale},
+    {"scaley", ParseScale},
+    {"scalez", ParseScale},
+    {"scale3d", ParseScale},
+    {"rotate", ParseRotate},
+    {"rotatex", ParseRotate},
+    {"rotatey", ParseRotate},
+    {"rotatez", ParseRotate},
+    {"rotate3d", ParseRotate3D},
+    {"skewx", ParseSkew},
+    {"skewy", ParseSkew},
+    {"skew", ParseSkew},
+    {"matrix", ParseMatrix},
+    {"matrix3d", ParseMatrix3D},
+    {"perspective", ParsePerspective},
+};
+
+TransformFamilyHandler FindTransformHandler(const std::string& name) {
+  for (const auto& family : TRANSFORM_FAMILIES) {
+    if (name == family.name) {
+      return family.handler;
+    }
+  }
+  return nullptr;
+}
+
 // Parses one `fn(args)` token. Returns false after emitting a diagnostic.
 bool ParseFunction(const std::string& token, HTMLValueParser& valueParser,
                    HTMLDiagnosticSink& diagnostics, Matrix3D* out, float referenceWidthPx,
@@ -309,7 +598,8 @@ bool ParseFunction(const std::string& token, HTMLValueParser& valueParser,
     diagnostics.warn("html: transform '" + token + "' is malformed; ignored");
     return false;
   }
-  if (!IsSupportedTransformFunction(name)) {
+  const TransformFamilyHandler handler = FindTransformHandler(name);
+  if (handler == nullptr) {
     diagnostics.warn("html: transform function '" + name +
                      "' is not in the supported subset; ignored");
     return false;
@@ -318,244 +608,9 @@ bool ParseFunction(const std::string& token, HTMLValueParser& valueParser,
   // exactly the token the author wrote.
   const std::string label = Trim(token.substr(0, token.find('(')));
   const auto parts = SplitTopLevelCommas(args);
-
   const TransformArgs transformArgs = {parts, valueParser, referenceWidthPx, referenceHeightPx};
-
-  if (name == "translate" || name == "translate3d" || name == "translatex" ||
-      name == "translatey" || name == "translatez") {
-    const bool countOk = name == "translate3d" ? parts.size() == 3u
-                         : name == "translate" ? parts.size() == 1u || parts.size() == 2u
-                                               : parts.size() == 1u;
-    if (!countOk) {
-      diagnostics.warn(TranslateArityMessage(label, token));
-      return false;
-    }
-    float x = 0.0f;
-    float y = 0.0f;
-    float z = 0.0f;
-    if (name == "translate" || name == "translate3d") {
-      // `translate` stops at two lengths, so only `translate3d` reaches the depth axis.
-      if (!transformArgs.LengthAt(0, x, TransformAxis::X)) {
-        diagnostics.warn("html: translate first argument '" + parts[0] +
-                         "' is not a px length; ignored");
-        return false;
-      }
-      if (parts.size() > 1 && !transformArgs.LengthAt(1, y, TransformAxis::Y)) {
-        diagnostics.warn("html: translate second argument '" + parts[1] +
-                         "' is not a px length; ignored");
-        return false;
-      }
-      if (parts.size() > 2 && !transformArgs.LengthAt(2, z, TransformAxis::Z)) {
-        diagnostics.warn("html: translate third argument '" + parts[2] +
-                         "' is not a px length; ignored");
-        return false;
-      }
-    } else {
-      float& only = name == "translatex" ? x : (name == "translatey" ? y : z);
-      const TransformAxis onlyAxis = name == "translatex"   ? TransformAxis::X
-                                     : name == "translatey" ? TransformAxis::Y
-                                                            : TransformAxis::Z;
-      if (!transformArgs.LengthAt(0, only, onlyAxis)) {
-        diagnostics.warn("html: " + label + " argument '" + parts[0] +
-                         "' is not a px length; ignored");
-        return false;
-      }
-    }
-    *out = MakeTranslation(x, y, z);
-    return true;
-  }
-
-  if (name == "scale" || name == "scale3d" || name == "scalex" || name == "scaley" ||
-      name == "scalez") {
-    const bool countOk = name == "scale3d" ? parts.size() == 3u
-                         : name == "scale" ? parts.size() == 1u || parts.size() == 2u
-                                           : parts.size() == 1u;
-    if (!countOk) {
-      diagnostics.warn(ScaleArityMessage(label, token));
-      return false;
-    }
-    float x = 1.0f;
-    float y = 1.0f;
-    float z = 1.0f;
-    if (name == "scale" || name == "scale3d") {
-      // A single argument scales both axes uniformly before the optional Y / Z values apply.
-      if (!transformArgs.NumberAt(0, x)) {
-        diagnostics.warn(ScaleArityMessage(label, token));
-        return false;
-      }
-      y = x;
-      if (parts.size() > 1 && !transformArgs.NumberAt(1, y)) {
-        diagnostics.warn(ScaleArityMessage(label, token));
-        return false;
-      }
-      if (parts.size() > 2 && !transformArgs.NumberAt(2, z)) {
-        diagnostics.warn(ScaleArityMessage(label, token));
-        return false;
-      }
-    } else {
-      float& only = name == "scalex" ? x : (name == "scaley" ? y : z);
-      if (!transformArgs.NumberAt(0, only)) {
-        diagnostics.warn(ScaleArityMessage(label, token));
-        return false;
-      }
-    }
-    *out = MakeScale(x, y, z);
-    return true;
-  }
-
-  if (name == "rotate" || name == "rotatex" || name == "rotatey" || name == "rotatez") {
-    float degrees = 0.0f;
-    if (parts.size() != 1) {
-      diagnostics.warn("html: " + label + " expects 1 argument; got '" + token + "'");
-      return false;
-    }
-    if (!transformArgs.AngleAt(0, degrees)) {
-      diagnostics.warn("html: " + label + " angle '" + parts[0] +
-                       "' is not a valid angle (deg / grad / rad / turn); ignored");
-      return false;
-    }
-    if (name == "rotatex") {
-      *out = MakeRotationX(degrees);
-    } else if (name == "rotatey") {
-      *out = MakeRotationY(degrees);
-    } else {
-      *out = MakeRotationZ(degrees);
-    }
-    return true;
-  }
-
-  if (name == "rotate3d") {
-    float x = 0.0f;
-    float y = 0.0f;
-    float z = 0.0f;
-    float degrees = 0.0f;
-    if (parts.size() != 4 || !transformArgs.NumberAt(0, x) || !transformArgs.NumberAt(1, y) ||
-        !transformArgs.NumberAt(2, z) || !transformArgs.AngleAt(3, degrees)) {
-      diagnostics.warn("html: rotate3d expects 3 axis numbers and 1 angle; ignored");
-      return false;
-    }
-    // The axis is normalized in double precision: `rotate3d(1e20, 0, 0, 45deg)` squares to infinity
-    // in float, which used to slip past the zero-vector check and collapse the rotation to `cos * I`.
-    // Inputs beyond the float range never get here (the argument parser rejects them as non-numeric),
-    // so a zero-length vector is the only degenerate case left to catch.
-    const double axisX = static_cast<double>(x);
-    const double axisY = static_cast<double>(y);
-    const double axisZ = static_cast<double>(z);
-    const double length = std::sqrt(axisX * axisX + axisY * axisY + axisZ * axisZ);
-    if (!(length > 1e-6)) {
-      diagnostics.warn("html: rotate3d axis is a zero vector; ignored");
-      return false;
-    }
-    *out = MakeRotationAxis(static_cast<float>(axisX / length), static_cast<float>(axisY / length),
-                            static_cast<float>(axisZ / length), degrees);
-    return true;
-  }
-
-  if (name == "skewx") {
-    float degrees = 0.0f;
-    if (parts.size() != 1) {
-      diagnostics.warn("html: skewX expects 1 argument; got '" + token + "'");
-      return false;
-    }
-    if (!transformArgs.AngleAt(0, degrees)) {
-      diagnostics.warn("html: skewX angle '" + parts[0] +
-                       "' is not a valid angle (deg / grad / rad / turn); ignored");
-      return false;
-    }
-    *out = MakeShear(degrees, 0.0f);
-    return true;
-  }
-  if (name == "skewy") {
-    float degrees = 0.0f;
-    if (parts.size() != 1) {
-      diagnostics.warn("html: skewY expects 1 argument; got '" + token + "'");
-      return false;
-    }
-    if (!transformArgs.AngleAt(0, degrees)) {
-      diagnostics.warn("html: skewY angle '" + parts[0] +
-                       "' is not a valid angle (deg / grad / rad / turn); ignored");
-      return false;
-    }
-    *out = MakeShear(0.0f, degrees);
-    return true;
-  }
-  if (name == "skew") {
-    float x = 0.0f;
-    float y = 0.0f;
-    if (parts.empty() || parts.size() > 2 || !transformArgs.AngleAt(0, x) ||
-        (parts.size() == 2 && !transformArgs.AngleAt(1, y))) {
-      diagnostics.warn("html: skew expects 1 or 2 angles; got '" + token + "'");
-      return false;
-    }
-    *out = MakeShear(x, y);
-    return true;
-  }
-
-  if (name == "matrix") {
-    float values[6] = {};
-    if (parts.size() != 6) {
-      diagnostics.warn("html: matrix expects 6 numeric arguments; got '" + token + "'");
-      return false;
-    }
-    for (size_t i = 0; i < 6; ++i) {
-      if (!transformArgs.NumberAt(i, values[i])) {
-        diagnostics.warn("html: matrix argument '" + parts[i] + "' is not a number; ignored");
-        return false;
-      }
-    }
-    Matrix affine = {};
-    affine.a = values[0];
-    affine.b = values[1];
-    affine.c = values[2];
-    affine.d = values[3];
-    affine.tx = values[4];
-    affine.ty = values[5];
-    *out = LiftMatrixToMatrix3D(affine, 0.0f);
-    return true;
-  }
-
-  if (name == "matrix3d") {
-    if (parts.size() != 16) {
-      diagnostics.warn("html: matrix3d expects 16 numeric arguments; got '" + token + "'");
-      return false;
-    }
-    Matrix3D matrix = {};
-    for (size_t i = 0; i < 16; ++i) {
-      if (!transformArgs.NumberAt(i, matrix.values[i])) {
-        diagnostics.warn("html: matrix3d argument '" + parts[i] + "' is not a number; ignored");
-        return false;
-      }
-    }
-    *out = matrix;
-    return true;
-  }
-
-  if (name == "perspective") {
-    if (parts.size() != 1) {
-      diagnostics.warn("html: perspective expects 1 length; got '" + token + "'");
-      return false;
-    }
-    if (ToLower(Trim(parts[0])) == "none") {
-      *out = {};
-      return true;
-    }
-    float distance = 0.0f;
-    if (!transformArgs.LengthAt(0, distance, TransformAxis::Z) || !std::isfinite(distance) ||
-        distance < 0.0f) {
-      diagnostics.warn("html: perspective distance must be a non-negative length; got '" + token +
-                       "'; ignored");
-      return false;
-    }
-    // CSS Transforms 2 clamps a distance below 1px to 1px. `perspective(0)` would otherwise be
-    // rejected and take the rest of the function list down with it, losing a sibling
-    // `translateX(10px)` that the browser still applies.
-    const float clamped = distance < 1.0f ? 1.0f : distance;
-    *out = MakePerspective(clamped);
-    return true;
-  }
-
-  diagnostics.warn("html: transform function '" + name + "' is not supported; ignored");
-  return false;
+  const TransformCall call = {token, name, label, transformArgs, diagnostics, out};
+  return handler(call);
 }
 
 // Which axis a `transform-origin` token may occupy. `left` / `right` are horizontal, `top` /
@@ -580,12 +635,7 @@ bool IsOriginKeyword(const std::string& token) {
 }  // namespace
 
 bool IsSupportedTransformFunction(const std::string& name) {
-  static const std::unordered_set<std::string> SUPPORTED_FUNCTIONS = {
-      "translate", "translatex", "translatey", "translatez", "translate3d", "scale",
-      "scalex",    "scaley",     "scalez",     "scale3d",    "rotate",      "rotatex",
-      "rotatey",   "rotatez",    "rotate3d",   "skewx",      "skewy",       "skew",
-      "matrix",    "matrix3d",   "perspective"};
-  return SUPPORTED_FUNCTIONS.find(name) != SUPPORTED_FUNCTIONS.end();
+  return FindTransformHandler(name) != nullptr;
 }
 
 bool SplitTransformFunctions(const std::string& value, std::vector<std::string>* out) {
