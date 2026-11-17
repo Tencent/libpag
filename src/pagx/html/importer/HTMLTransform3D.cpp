@@ -750,11 +750,18 @@ Matrix3D PushPerspective(const Matrix3D& pose, float distance, float originX, fl
   return Multiply(Multiply(toOrigin, projection), Multiply(fromOrigin, pose));
 }
 
-PosePlacement PlacePose(const Matrix3D& pose, float parentPerspectivePx,
+PosePlacement PlacePose(const Matrix3D& pose, float parentPerspectivePx, float anchorZ,
                         float localPerspectiveOriginX, float localPerspectiveOriginY) {
   PosePlacement placement = {};
-  placement.pose =
-      PushPerspective(pose, parentPerspectivePx, localPerspectiveOriginX, localPerspectiveOriginY);
+  // The projection only divides by `1 - z / distance`, so it is the identity on the z = 0 plane.
+  // A flat pose whose pivot also sits on that plane is therefore unaffected by the parent camera;
+  // folding it in anyway would only add a projection row that makes a legal flat pose (`scale(0)`)
+  // non-invertible and gets the whole transform dropped.
+  const bool cameraAffectsPose = !IsFlatTransform(pose) || std::fabs(anchorZ) > 0.0f;
+  placement.pose = cameraAffectsPose
+                       ? PushPerspective(pose, parentPerspectivePx, localPerspectiveOriginX,
+                                         localPerspectiveOriginY)
+                       : pose;
   placement.flat = IsFlatTransform(placement.pose);
   // PAGX requires a 3D pose to be invertible; a flat pose has no such constraint, because a zero
   // scale is a valid (if empty) 2D transform.

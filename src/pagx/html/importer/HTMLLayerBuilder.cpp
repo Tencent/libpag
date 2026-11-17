@@ -699,10 +699,11 @@ void HTMLLayerBuilder::applyBoxTransform(Layer* layer, const HTMLBoxAttributes& 
     return;
   }
   // A `perspective` declared on the parent projects this element's pose; `PlacePose` folds it in and
-  // classifies the result the same way the keyframe path does.
+  // classifies the result the same way the keyframe path does. The pivot depth takes part in that
+  // decision, because a flat pose pivoted off the layer plane does leave it.
   const PosePlacement placement =
-      PlacePose(box.transform.pose, box.parentPerspectivePx, box.localPerspectiveOriginX,
-                box.localPerspectiveOriginY);
+      PlacePose(box.transform.pose, box.parentPerspectivePx, box.transform.originZ,
+                box.localPerspectiveOriginX, box.localPerspectiveOriginY);
   if (!placement.valid) {
     _diagnostics.warn(
         "html: transform becomes non-invertible under the parent perspective; ignored");

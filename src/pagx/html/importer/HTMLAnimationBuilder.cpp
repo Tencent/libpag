@@ -461,6 +461,22 @@ bool ResolveShapePivot(const std::unordered_map<std::string, std::string>& style
   return true;
 }
 
+// A singular pose (`scale(0)`) cannot travel on the `matrix3D` channel: PAGX rejects a
+// non-invertible keyframe, and an all-zero matrix would come back as the identity on re-import.
+// Collapsing the linear block to a tiny uniform scale keeps the element as invisible as `scale(0)`
+// renders while staying valid; the translation column is preserved.
+Matrix3D CollapseSingularPose(const Matrix3D& pose) {
+  static constexpr float COLLAPSED_SCALE = 1e-4f;
+  Matrix3D collapsed = {};
+  collapsed.setRowColumn(0, 0, COLLAPSED_SCALE);
+  collapsed.setRowColumn(1, 1, COLLAPSED_SCALE);
+  collapsed.setRowColumn(2, 2, COLLAPSED_SCALE);
+  for (int row = 0; row < 3; ++row) {
+    collapsed.setRowColumn(row, 3, pose.getRowColumn(row, 3));
+  }
+  return collapsed;
+}
+
 // Ordering predicate for keyframe stops by ascending offset.
 bool KeyframeStopLess(const CssKeyframeStop& a, const CssKeyframeStop& b) {
   return a.percent < b.percent;
@@ -1221,6 +1237,14 @@ bool HTMLAnimationBuilder::buildForElement(
   size_t clipPointCount = 0;
   bool clipStructureConsistent = true;
 
+  // The pivot's depth decides whether the parent camera reaches a flat keyframe pose (see
+  // `PlacePose`), so it is resolved once up front rather than after the stops have been parsed. The
+  // same values are written to the layer below when the stops actually need the pivot.
+  Point keyframeAnchor = {};
+  float keyframeAnchorZ = 0.0f;
+  const bool keyframeAnchorResolved =
+      ResolveAnchor(resolvedStyle, layer, reference, _valueParser, keyframeAnchor, keyframeAnchorZ);
+
   for (const auto& stop : stops) {
     Frame time = static_cast<Frame>(
         delayFrames + std::llround(stop.percent / 100.0f * static_cast<float>(durationFrames)));
@@ -1245,9 +1269,11 @@ bool HTMLAnimationBuilder::buildForElement(
         Matrix3D pose = {};
         if (ParseTransformPose(val, _valueParser, _diagnostics, pose, reference)) {
           // The parent camera is folded in after parsing, so a pose that parsed as flat can gain
-          // depth here; `PlacePose` re-classifies it, and an invalid pose only drops this stop.
-          const PosePlacement placement = PlacePose(
-              pose, parentPerspectivePx, localPerspectiveOriginX, localPerspectiveOriginY);
+          // depth here; `PlacePose` re-classifies it, and an invalid pose only drops this stop. A
+          // pose that stays flat keeps itself instead, so `scale(0)` survives as a pop-in start.
+          const PosePlacement placement =
+              PlacePose(pose, parentPerspectivePx, keyframeAnchorZ, localPerspectiveOriginX,
+                        localPerspectiveOriginY);
           if (!placement.valid) {
             if (!warnedTransform) {
               _diagnostics.warn(
@@ -1366,11 +1392,9 @@ bool HTMLAnimationBuilder::buildForElement(
       }
     }
     if (needsAnchor) {
-      Point anchor = {};
-      float anchorZ = 0.0f;
-      if (ResolveAnchor(resolvedStyle, layer, reference, _valueParser, anchor, anchorZ)) {
-        layer->anchor = anchor;
-        layer->anchorZ = anchorZ;
+      if (keyframeAnchorResolved) {
+        layer->anchor = keyframeAnchor;
+        layer->anchorZ = keyframeAnchorZ;
       } else {
         _diagnostics.warn(
             "html: transform animation without resolvable transform-origin; pivoting at "
@@ -1392,22 +1416,15 @@ bool HTMLAnimationBuilder::buildForElement(
         matrixKeys.push_back({ts.first, ToAffine2D(ts.second), interp, {}, {}});
       }
     } else {
-      bool warnedSingularStop = false;
       for (const auto& ts : transformStops) {
-        const Matrix3D pose = IsFlatTransform(ts.second)
-                                  ? LiftMatrixToMatrix3D(ToAffine2D(ts.second), 0.0f)
-                                  : ts.second;
+        Matrix3D pose = IsFlatTransform(ts.second)
+                            ? LiftMatrixToMatrix3D(ToAffine2D(ts.second), 0.0f)
+                            : ts.second;
         // PAGX requires every `matrix3D` keyframe to be invertible, and a flat stop that is singular
-        // (e.g. `scale(0)`) becomes one as soon as it is lifted, so it is dropped instead of written
-        // as an invalid key that a re-import would reject.
+        // (e.g. `scale(0)`) becomes one as soon as it is lifted. Collapsing it instead of dropping it
+        // keeps the stop on the timeline, so a pop-in start does not disappear.
         if (!IsInvertibleMatrix3D(pose)) {
-          if (!warnedSingularStop) {
-            _diagnostics.warn(
-                "html: a @keyframes stop is not invertible once lifted to matrix3D; dropped "
-                "[subset:animation-unsupported-property]");
-            warnedSingularStop = true;
-          }
-          continue;
+          pose = CollapseSingularPose(pose);
         }
         matrix3DKeys.push_back({ts.first, pose, interp, {}, {}});
       }
@@ -1499,19 +1516,7 @@ bool HTMLAnimationBuilder::buildForElement(
   const Matrix matrixChannelBaseline = baselineMatrix;
   Matrix3D matrix3DChannelBaseline = ComposeLayerTransform3DWithoutAnchor(layer);
   if (!IsInvertibleMatrix3D(matrix3DChannelBaseline)) {
-    // A singular static pose (`scale(0)`) cannot travel on the `matrix3D` channel: PAGX rejects a
-    // non-invertible keyframe, and an all-zero matrix would come back as the identity on re-import.
-    // Collapsing the linear block to a tiny uniform scale keeps the element as invisible as
-    // `scale(0)` renders while staying valid; the translation column is preserved.
-    constexpr float collapsedScale = 1e-4f;
-    Matrix3D collapsed = {};
-    collapsed.setRowColumn(0, 0, collapsedScale);
-    collapsed.setRowColumn(1, 1, collapsedScale);
-    collapsed.setRowColumn(2, 2, collapsedScale);
-    for (int row = 0; row < 3; ++row) {
-      collapsed.setRowColumn(row, 3, matrix3DChannelBaseline.getRowColumn(row, 3));
-    }
-    matrix3DChannelBaseline = collapsed;
+    matrix3DChannelBaseline = CollapseSingularPose(matrix3DChannelBaseline);
   }
   Color baselineColor = {};
   SolidColor* baselineSolid = nullptr;

@@ -625,7 +625,8 @@ PAG_TEST(PAGXHTML3DTest, AuthoredPerspectiveOriginMovesTheVanishingPoint) {
 
 /**
  * Test case: the parent `perspective` also projects animated keyframes, and the pivot stays on the
- * child layer so the interpolation never carries a pivot translation.
+ * child layer so the interpolation never carries a pivot translation. Only the stops that leave the
+ * z = 0 plane are projected; a flat stop keeps its own pose.
  */
 PAG_TEST(PAGXHTML3DTest, ParentPerspectiveProjectsAnimatedKeyframes) {
   auto doc = ParseHtml(R"HTML(
@@ -650,8 +651,8 @@ PAG_TEST(PAGXHTML3DTest, ParentPerspectiveProjectsAnimatedKeyframes) {
   ASSERT_NE(channel, nullptr);
   ASSERT_EQ(channel->keyframes.size(), 2u);
   const auto& start = channel->keyframes.front().value;
-  EXPECT_TRUE(NearlyEqual(start.getRowColumn(3, 2), -0.001667f, 1e-5f))
-      << "the projection row comes from the parent perspective, not from the keyframe";
+  EXPECT_TRUE(NearlyEqual(start.getRowColumn(3, 2), 0.0f, 1e-5f))
+      << "the flat `0%` stop must keep its own pose, not gain the parent projection";
   EXPECT_TRUE(NearlyEqual(start.getRowColumn(0, 3), 0.0f, 1e-5f));
   EXPECT_TRUE(NearlyEqual(start.getRowColumn(2, 3), 0.0f, 1e-5f));
   const auto& end = channel->keyframes.back().value;
@@ -686,11 +687,12 @@ PAG_TEST(PAGXHTML3DTest, ReferenceBoxResolutionDoesNotDuplicateDiagnostics) {
 }
 
 /**
- * Test case: a tiny uniform scale under a perspective parent stays invertible. A fixed determinant
- * threshold would read `scale(0.001)` as singular (det ~ 1e-6) and drop the whole transform, while
- * PAGX's own validator accepts it.
+ * Test case: a tiny uniform scale under a perspective parent stays on the flat path. The pose never
+ * leaves the z = 0 plane, so the camera cannot change it and the authored scale reaches the 2D
+ * `matrix` untouched; a fixed determinant threshold would read `scale(0.001)` as singular and drop
+ * the whole transform.
  */
-PAG_TEST(PAGXHTML3DTest, TinyScaleUnderPerspectiveStaysInvertible) {
+PAG_TEST(PAGXHTML3DTest, TinyScaleUnderPerspectiveStaysOnTheFlatPath) {
   auto doc = ParseHtml(R"HTML(
     <html><body style="width:200px;height:120px">
       <div style="position:absolute;left:0;top:0;width:200px;height:120px;perspective:600px">
@@ -703,8 +705,9 @@ PAG_TEST(PAGXHTML3DTest, TinyScaleUnderPerspectiveStaysInvertible) {
   EXPECT_FALSE(HasDiagnosticContaining(doc, "non-invertible"));
   auto* tiny = FindLayerById(doc, "tiny");
   ASSERT_NE(tiny, nullptr);
-  EXPECT_FALSE(tiny->matrix3D.isIdentity()) << "the transform must survive the sanity check";
-  EXPECT_TRUE(NearlyEqual(tiny->matrix3D.getRowColumn(0, 0), 0.001f, 1e-6f));
+  EXPECT_TRUE(tiny->matrix3D.isIdentity()) << "a flat pose must not become 3D";
+  EXPECT_TRUE(NearlyEqual(tiny->matrix.a, 0.001f, 1e-6f));
+  EXPECT_TRUE(NearlyEqual(tiny->matrix.d, 0.001f, 1e-6f));
 }
 
 /**
@@ -810,11 +813,12 @@ PAG_TEST(PAGXHTML3DTest, PAGXTextHostKeepsParentPerspective) {
 }
 
 /**
- * Test case: `scale(0)` under a perspective parent only becomes non-invertible after the camera is
- * folded in. PAGX requires a 3D pose to be invertible, so it has to be rejected with a diagnostic
- * rather than written out.
+ * Test case: `scale(0)` under a perspective parent is a legal flat pose. The camera cannot change a
+ * pose that stays on the z = 0 plane, so the pose keeps its 2D matrix (a zero linear block, i.e. the
+ * element renders invisible) instead of being folded into a non-invertible 3D pose and dropped,
+ * which would restore it to full size.
  */
-PAG_TEST(PAGXHTML3DTest, ScaleZeroUnderPerspectiveIsRejected) {
+PAG_TEST(PAGXHTML3DTest, ScaleZeroUnderPerspectiveStaysInvisible) {
   auto doc = ParseHtml(R"HTML(
     <html><body style="width:200px;height:160px">
       <div style="position:absolute;left:0;top:0;width:200px;height:160px;perspective:600px">
@@ -824,10 +828,14 @@ PAG_TEST(PAGXHTML3DTest, ScaleZeroUnderPerspectiveIsRejected) {
     </body></html>
   )HTML");
   ASSERT_NE(doc, nullptr);
-  EXPECT_TRUE(HasDiagnosticContaining(doc, "non-invertible"));
+  EXPECT_FALSE(HasDiagnosticContaining(doc, "non-invertible"));
   auto* card = FindLayerById(doc, "card");
   ASSERT_NE(card, nullptr);
-  EXPECT_TRUE(card->matrix3D.isIdentity()) << "an invalid 3D pose must not be written";
+  EXPECT_TRUE(card->matrix3D.isIdentity()) << "a flat pose must not become 3D";
+  EXPECT_TRUE(NearlyEqual(card->matrix.a, 0.0f, 1e-6f));
+  EXPECT_TRUE(NearlyEqual(card->matrix.b, 0.0f, 1e-6f));
+  EXPECT_TRUE(NearlyEqual(card->matrix.c, 0.0f, 1e-6f));
+  EXPECT_TRUE(NearlyEqual(card->matrix.d, 0.0f, 1e-6f));
 }
 
 /**
@@ -1221,13 +1229,15 @@ PAG_TEST(PAGXHTML3DTest, AnimatedFlowChildUnderPerspectiveWarns) {
     }
   }
   EXPECT_EQ(warnings, 1) << "the transform animation must be reported, the opacity one must not";
-  // The warning is not theoretical: the keyframes really do carry the projection.
+  // The warning is not theoretical: the `100%` stop leaves the plane and really does carry the
+  // projection. The flat `0%` stop keeps its own pose.
   auto* animation = FirstAnimation(doc);
   ASSERT_NE(animation, nullptr);
   auto* channel = FindMatrix3DChannel(animation);
   ASSERT_NE(channel, nullptr);
-  ASSERT_FALSE(channel->keyframes.empty());
-  EXPECT_GT(std::fabs(channel->keyframes.front().value.getRowColumn(3, 2)), 1e-6f);
+  ASSERT_GE(channel->keyframes.size(), 2u);
+  EXPECT_TRUE(NearlyEqual(channel->keyframes.front().value.getRowColumn(3, 2), 0.0f, 1e-6f));
+  EXPECT_GT(std::fabs(channel->keyframes.back().value.getRowColumn(3, 2)), 1e-6f);
 }
 
 /**
@@ -1290,32 +1300,66 @@ PAG_TEST(PAGXHTML3DTest, BodyPerspectiveReachesItsChildren) {
 }
 
 /**
- * Test case: a flat stop that is singular (`scale(0)`) cannot be lifted onto the `matrix3D` channel
- * when another stop of the same animation is 3D. PAGX requires every `matrix3D` keyframe to be
- * invertible, so the stop is dropped with one diagnostic instead of being written out invalid.
+ * Test case: a singular flat stop (`scale(0)`) under a perspective parent, on a track whose other
+ * stop is 3D so the whole track rides the `matrix3D` channel. PAGX rejects a non-invertible key, so
+ * the stop collapses to a tiny uniform scale: the element stays invisible at the pop-in instead of
+ * losing that stop (which would start the animation at the rotated pose).
  */
-PAG_TEST(PAGXHTML3DTest, SingularFlatStopIsNotLiftedIntoMatrix3D) {
+PAG_TEST(PAGXHTML3DTest, SingularFlatStopKeepsThePopInOnMatrix3D) {
   auto doc = ParseHtml(R"HTML(
     <html><head><style>
       @keyframes k { 0% { transform: scale(0); } 100% { transform: rotateY(45deg); } }
     </style></head>
     <body style="width:200px;height:120px">
-      <div id="card" style="position:absolute;left:20px;top:20px;width:80px;height:60px;
-           background-color:#38BDF8;animation:k 1s linear infinite"></div>
+      <div style="position:absolute;left:0;top:0;width:200px;height:120px;perspective:600px">
+        <div id="card" style="position:absolute;left:20px;top:20px;width:80px;height:60px;
+             background-color:#38BDF8;animation:k 1s linear infinite"></div>
+      </div>
     </body></html>
   )HTML");
   ASSERT_NE(doc, nullptr);
-  EXPECT_TRUE(HasDiagnosticContaining(doc, "not invertible"));
+  EXPECT_FALSE(HasDiagnosticContaining(doc, "not invertible"));
   auto* animation = FirstAnimation(doc);
   ASSERT_NE(animation, nullptr);
   auto* channel = FindMatrix3DChannel(animation);
   ASSERT_NE(channel, nullptr);
-  ASSERT_FALSE(channel->keyframes.empty());
+  ASSERT_EQ(channel->keyframes.size(), 2u) << "the scale(0) start must not be dropped";
   for (const auto& key : channel->keyframes) {
-    // The dropped stop would lift to an all-zero linear block.
-    EXPECT_GT(std::fabs(key.value.getRowColumn(0, 0)), 1e-6f) << "time " << key.time;
-    EXPECT_GT(std::fabs(key.value.getRowColumn(1, 1)), 1e-6f) << "time " << key.time;
+    EXPECT_TRUE(pagx::IsInvertibleMatrix3D(key.value)) << "time " << key.time;
   }
+  // `scale(0)` renders nothing; the collapsed linear block keeps that while staying invertible.
+  EXPECT_LT(std::fabs(channel->keyframes.front().value.getRowColumn(0, 0)), 1e-3f);
+  EXPECT_GT(std::fabs(channel->keyframes.front().value.getRowColumn(0, 0)), 1e-6f);
+  EXPECT_GT(std::fabs(channel->keyframes.back().value.getRowColumn(3, 2)), 1e-6f)
+      << "the 3D stop still carries the parent projection";
+}
+
+/**
+ * Test case: a `scale(0)` → `scale(1)` pop-in under a perspective parent stays entirely flat, so it
+ * keeps the cheap `matrix` channel and the `0%` stop survives as a zero linear block.
+ */
+PAG_TEST(PAGXHTML3DTest, ScaleZeroPopInUnderPerspectiveKeepsItsStart) {
+  auto doc = ParseHtml(R"HTML(
+    <html><head><style>
+      @keyframes pop { 0% { transform: scale(0); } 100% { transform: scale(1); } }
+    </style></head>
+    <body style="width:200px;height:120px">
+      <div style="position:absolute;left:0;top:0;width:200px;height:120px;perspective:600px">
+        <div id="card" style="position:absolute;left:20px;top:20px;width:80px;height:60px;
+             background-color:#38BDF8;animation:pop 1s linear infinite"></div>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* animation = FirstAnimation(doc);
+  ASSERT_NE(animation, nullptr);
+  EXPECT_EQ(FindMatrix3DChannel(animation), nullptr) << "a flat track must stay on the 2D channel";
+  auto* channel = FindMatrixChannel(animation);
+  ASSERT_NE(channel, nullptr);
+  ASSERT_EQ(channel->keyframes.size(), 2u) << "the scale(0) start must not be dropped";
+  EXPECT_TRUE(NearlyEqual(channel->keyframes.front().value.a, 0.0f, 1e-6f));
+  EXPECT_TRUE(NearlyEqual(channel->keyframes.front().value.d, 0.0f, 1e-6f));
+  EXPECT_TRUE(NearlyEqual(channel->keyframes.back().value.a, 1.0f, 1e-6f));
 }
 
 /**

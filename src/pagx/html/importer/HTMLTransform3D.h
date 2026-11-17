@@ -105,6 +105,12 @@ Matrix3D PushPerspective(const Matrix3D& pose, float distance, float originX, fl
  *                `anchor` is needed.
  *  - `pose`    — the pushed pose itself. It never carries the pivot: `anchor` is applied by the
  *                runtime after interpolation.
+ *
+ * The camera is folded in only when it can change the result. A pose that stays on the z = 0 plane
+ * is untouched by the projection as long as its pivot depth `anchorZ` is zero too — the projection
+ * only divides by `1 - z / distance`, and z is zero across that whole plane. Skipping the fold keeps
+ * such a pose on the legal flat path instead of turning it (e.g. `scale(0)`) into a non-invertible
+ * 3D pose.
  */
 struct PosePlacement {
   bool valid = false;
@@ -113,7 +119,7 @@ struct PosePlacement {
   Matrix3D pose = {};
 };
 
-PosePlacement PlacePose(const Matrix3D& pose, float parentPerspectivePx,
+PosePlacement PlacePose(const Matrix3D& pose, float parentPerspectivePx, float anchorZ,
                         float localPerspectiveOriginX, float localPerspectiveOriginY);
 
 /**
