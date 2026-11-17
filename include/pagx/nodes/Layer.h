@@ -252,6 +252,9 @@ class Layer : public Node, public LayoutNode {
 
   /**
    * A reference to a composition used as the layer content.
+   *
+   * For a mounted import this may point at a synthesized wrapper that is not part of the
+   * authored resources; call PAGXDocument::isMountedComposition() before treating it as one.
    */
   Composition* composition = nullptr;
 
@@ -266,12 +269,6 @@ class Layer : public Node, public LayoutNode {
    * Externally loaded PAGX document used as this layer's composition content. When set, the
    * composition's layers and animations point into this document, and runtime timeline target lookup
    * is resolved against this document instead of the owner document.
-   *
-   * The sub-document is a separate domain, not a subtree of the owner: editing it reaches the owner
-   * only through a full runtime rebuild, which resets state machines, ViewModel values and every
-   * layer/timeline handle, and structural edits (adding, removing or reordering its layers) do not
-   * take effect at all because the wrapper holds a snapshot taken at mount time. It is therefore
-   * read-only — flatten it with `pagx resolve` before editing.
    */
   std::shared_ptr<PAGXDocument> externalDoc = nullptr;
 
@@ -379,9 +376,6 @@ class Layer : public Node, public LayoutNode {
     /**
      * Raw XML text of inline import content (e.g., `<svg>...</svg>`). Populated by the parser
      * when inline content such as `<svg>` is found inside the Layer.
-     *
-     * Once mounted, this text is a serialization anchor rather than editable source: writing to it
-     * takes effect on the next parse, never on the mounted sub-document.
      */
     std::string content = {};
 

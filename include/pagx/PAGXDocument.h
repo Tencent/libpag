@@ -139,6 +139,10 @@ class PAGXDocument : public Node {
    * All nodes in the document (owned by the document). Do not push into this vector directly:
    * use makeNode() for new nodes and adoptNodes() to take over nodes from another document — a
    * direct push leaves the node invisible to ownsNode().
+   *
+   * Some entries are synthesized wrappers for mounted imports (see isMountedComposition()):
+   * they are runtime adapters, not authored resources, and must be skipped when enumerating
+   * or serializing resources.
    */
   std::vector<std::unique_ptr<Node>> nodes = {};
 
