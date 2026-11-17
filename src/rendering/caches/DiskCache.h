@@ -19,7 +19,6 @@
 #pragma once
 
 #include <atomic>
-#include <cstdio>
 #include <list>
 #include <memory>
 #include <mutex>
@@ -30,37 +29,6 @@
 
 namespace pag {
 class FileInfo;
-
-/**
- * Owns the file handle of a SequenceFile so that it may outlive the SequenceFile object. The actual
- * fclose() can therefore run asynchronously on the DiskIOWorker, while a caller that wants to open
- * the same cache file again can still make sure the pending close has flushed the file.
- */
-class SequenceFileHandle {
- public:
-  explicit SequenceFileHandle(FILE* file) : file(file) {
-  }
-
-  ~SequenceFileHandle() {
-    closeOnce();
-  }
-
-  /**
-   * Closes the file if it is still open, otherwise waits for the close in progress to finish.
-   * Returns only after the file has been closed.
-   */
-  void closeOnce() {
-    std::lock_guard<std::mutex> autoLock(locker);
-    if (file != nullptr) {
-      fclose(file);
-      file = nullptr;
-    }
-  }
-
- private:
-  std::mutex locker = {};
-  FILE* file = nullptr;
-};
 
 class DiskCache {
  public:
@@ -89,9 +57,8 @@ class DiskCache {
   static constexpr uint32_t InitialFileID = 1;
 
   /**
-   * An entry of openedFiles. The handle is registered when the file is opened and keeps the file
-   * handle alive after the SequenceFile has been released, so that a reopen of the same file can
-   * complete the pending close before reading the file.
+   * An entry of openedFiles. The handle is registered together with the SequenceFile and outlives
+   * it, so that a reopen of the same file can complete the pending close before reading the file.
    */
   struct OpenedFile {
     std::weak_ptr<SequenceFile> sequenceFile = {};
@@ -108,6 +75,13 @@ class DiskCache {
   std::unordered_map<std::string, uint32_t> cachedFileIDs = {};
   std::unordered_map<uint32_t, std::shared_ptr<FileInfo>> cachedFileInfos = {};
   std::list<std::shared_ptr<FileInfo>> cachedFiles = {};
+  /**
+   * The files that must not be deleted nor evicted. An entry is added when a file is opened and is
+   * removed only by notifyFileClosed(), so an entry whose sequenceFile has already expired still
+   * keeps its file alive while the close is pending on the DiskIOWorker: removeAll() and
+   * checkDiskSpace() must treat such an entry as in use, and openSequence() closes the pending
+   * handle before reopening the same file.
+   */
   std::unordered_map<uint32_t, OpenedFile> openedFiles = {};
 
   static DiskCache* GetInstance();
@@ -122,6 +96,8 @@ class DiskCache {
   std::shared_ptr<SequenceFile> openSequence(const std::string& key, const tgfx::ImageInfo& info,
                                              int frameCount, float frameRate,
                                              const std::vector<TimeRange>& staticTimeRanges);
+  void resolvePendingClose(const OpenedFile& openedFile);
+  void registerOpened(uint32_t fileID, const std::shared_ptr<SequenceFile>& sequenceFile);
   std::shared_ptr<tgfx::Data> readFile(const std::string& key);
   bool writeFile(const std::string& key, std::shared_ptr<tgfx::Data> data);
 

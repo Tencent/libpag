@@ -105,7 +105,10 @@ static void ClearDiskCacheAndWait() {
 /**
  * Occupies the single DiskIOWorker thread with a blocking task, so that every task submitted
  * afterwards (e.g. the asynchronous close of a SequenceFile) stays queued until release() is
- * called. This makes close/reopen orderings reproducible instead of timing dependent.
+ * called. This makes close/reopen orderings reproducible instead of timing dependent. A case built
+ * on it covers the "close has been queued but has not started yet" ordering only: the
+ * "close is already running on the IO thread" ordering cannot be paused deterministically without
+ * instrumenting the worker.
  */
 class ScopedDiskIOWorkerBlock {
  public:
@@ -433,6 +436,14 @@ PAG_TEST(PAGDiskCacheTest, ReopenWhileCloseTaskPending) {
   ASSERT_NO_FATAL_FAILURE(CheckSequenceFilePixels(reopened, info, FrameCount))
       << "After removing the disk cache";
   reopened = nullptr;
+  DiskIOWorker::GetInstance()->waitAll();
+  // The cache was cleared while the file was still registered, so this close notification is what
+  // finally deletes the file and releases the entry.
+  EXPECT_FALSE(std::filesystem::exists(filePath));
+  {
+    std::lock_guard<std::mutex> lock(diskCache->locker);
+    EXPECT_TRUE(diskCache->openedFiles.empty());
+  }
 }
 
 namespace {

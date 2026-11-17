@@ -87,7 +87,7 @@ SequenceFile::SequenceFile(const std::string& filePath, const tgfx::ImageInfo& i
     cachedFrames = 0;
     memset(frames.data(), 0, sizeof(FrameLocation) * frames.size());
     _fileSize = 0;
-    handle->closeOnce();
+    handle->close();
     file = fopen(filePath.c_str(), "wb+");
     handle = file == nullptr ? nullptr : std::make_shared<SequenceFileHandle>(file);
     LOGE("The existing sequence file has been reset, which may be corrupted!");

@@ -18,10 +18,12 @@
 
 #pragma once
 
+#include <cstdio>
 #include <memory>
 #include <mutex>
 #include <string>
 #include <vector>
+#include "base/utils/Log.h"
 #include "pag/types.h"
 #include "rendering/utils/BitmapBuffer.h"
 #include "rendering/utils/LZ4Decoder.h"
@@ -31,7 +33,40 @@
 
 namespace pag {
 class DiskCache;
-class SequenceFileHandle;
+
+/**
+ * Owns the file handle of a SequenceFile so that it may outlive the SequenceFile object. The actual
+ * fclose() can therefore run asynchronously on the DiskIOWorker, while a caller that wants to open
+ * the same cache file again can still make sure the pending close has flushed the file.
+ */
+class SequenceFileHandle {
+ public:
+  explicit SequenceFileHandle(FILE* file) : file(file) {
+  }
+
+  ~SequenceFileHandle() {
+    close();
+  }
+
+  /**
+   * Closes the file if it is still open, otherwise waits for the close that is already running to
+   * finish. Returns only after the file has been closed.
+   */
+  void close() {
+    std::lock_guard<std::mutex> autoLock(locker);
+    if (file == nullptr) {
+      return;
+    }
+    if (fclose(file) != 0) {
+      LOGE("SequenceFileHandle::close() failed to flush the sequence file to disk!");
+    }
+    file = nullptr;
+  }
+
+ private:
+  std::mutex locker = {};
+  FILE* file = nullptr;
+};
 
 struct FrameLocation {
   size_t offset = 0;
@@ -118,6 +153,10 @@ class SequenceFile {
   std::mutex locker = {};
   DiskCache* diskCache = nullptr;
   uint32_t fileID = 0;
+  // `handle` owns the FILE*, while `file` is a non-owning alias of handle->file used by all IO
+  // under `locker`. The alias is invalidated only in the constructor right after handle->close(),
+  // and the handle is otherwise closed after this object is destroyed, so `file` is valid for the
+  // whole lifetime of this object. Never close the handle while this object may still use `file`.
   FILE* file = nullptr;
   std::shared_ptr<SequenceFileHandle> handle = nullptr;
   size_t _fileSize = 0;

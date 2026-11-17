@@ -182,15 +182,7 @@ std::shared_ptr<SequenceFile> DiskCache::openSequence(
       changeToTemporary(fileID);
       fileID = getFileID(key);
     } else {
-      // The previous SequenceFile is already released, but its handle may still be waiting to be
-      // closed on the DiskIOWorker. Finish that close before reopening the file: otherwise this
-      // open would read the data that has not been flushed yet, and the pending close would also
-      // drop the registration added below. No deadlock risk here because the close task acquires
-      // DiskCache::locker only after it has released the handle.
-      auto& handle = result->second.handle;
-      if (handle != nullptr) {
-        handle->closeOnce();
-      }
+      resolvePendingClose(result->second);
     }
   }
   auto filePath = fileIDToPath(fileID);
@@ -200,9 +192,7 @@ std::shared_ptr<SequenceFile> DiskCache::openSequence(
   }
   sequenceFile->diskCache = this;
   sequenceFile->fileID = fileID;
-  auto& openedFile = openedFiles[fileID];
-  openedFile.sequenceFile = sequenceFile;
-  openedFile.handle = sequenceFile->handle;
+  registerOpened(fileID, sequenceFile);
   if (!key.empty()) {
     auto oldFileInfo = cachedFileInfos[fileID];
     if (oldFileInfo) {
@@ -216,6 +206,26 @@ std::shared_ptr<SequenceFile> DiskCache::openSequence(
     }
   }
   return sequenceFile;
+}
+
+void DiskCache::resolvePendingClose(const OpenedFile& openedFile) {
+  // The previous SequenceFile is already released, but its handle may still be waiting to be closed
+  // on the DiskIOWorker. Finish that close before the file is reopened: otherwise the reopen would
+  // read the data that has not been flushed yet, and the pending close would also drop the
+  // registration added afterwards. The flush and the close therefore run on the calling thread
+  // while the cache lock is held, which is bounded by one stdio buffer and is the accepted cost of
+  // not reading an unflushed file. This cannot deadlock because CloseFileTask() releases the handle
+  // before it acquires DiskCache::locker.
+  auto& handle = openedFile.handle;
+  if (handle != nullptr) {
+    handle->close();
+  }
+}
+
+void DiskCache::registerOpened(uint32_t fileID, const std::shared_ptr<SequenceFile>& sequenceFile) {
+  auto& openedFile = openedFiles[fileID];
+  openedFile.sequenceFile = sequenceFile;
+  openedFile.handle = sequenceFile->handle;
 }
 
 std::shared_ptr<tgfx::Data> DiskCache::readFile(const std::string& key) {
@@ -453,7 +463,7 @@ void DiskCache::WriteConfigTask(const std::string& path, const std::string& temp
 void DiskCache::CloseFileTask(std::shared_ptr<SequenceFileHandle> handle, DiskCache* cache,
                               uint32_t id) {
   if (handle != nullptr) {
-    handle->closeOnce();
+    handle->close();
   }
   if (cache != nullptr) {
     cache->notifyFileClosed(id, handle);
