@@ -35,6 +35,7 @@
 #include "pagx/runtime/KeyframeEvaluatorImpl.h"
 #include "pagx/runtime/MixUtils.h"
 #include "pagx/tgfx.h"
+#include "renderer/LayerBuilder.h"
 #include "tgfx/gpu/Context.h"
 #include "utils/Baseline.h"
 #include "utils/TestUtils.h"
@@ -615,6 +616,9 @@ PAGX_TEST(PAGXRuntimeTest, PerspectiveKeyframesBlendTheProjectionCoefficient) {
   // keyframe blend at the same fraction.
   EXPECT_NEAR(pagx::MixPerspectiveDistance(1000.0f, 200.0f, 0.5f), 333.3333f, 0.001f);
   EXPECT_FLOAT_EQ(pagx::MixPerspectiveDistance(500.0f, 500.0f, 0.25f), 500.0f);
+  // An easing that overshoots past the no-projection end has no coefficient to continue into, so it
+  // stops there instead of returning a negative, behind-the-camera distance.
+  EXPECT_FLOAT_EQ(pagx::MixPerspectiveDistance(0.0f, 200.0f, -1.0f), 0.0f);
 }
 
 /**
@@ -680,6 +684,40 @@ PAGX_TEST(PAGXRuntimeTest, PerspectiveChannelBlendsThroughEvaluation) {
   ASSERT_NE(alpha, nullptr);
   EXPECT_NEAR(std::get<float>(perspective->evaluateAt(pagx::Frame{30})), 333.3333f, 0.001f);
   EXPECT_FLOAT_EQ(std::get<float>(alpha->evaluateAt(pagx::Frame{30})), 0.5f);
+}
+
+/**
+ * Test case: a weighted write to the perspective channel — the path a timeline crossfade and a
+ * weighted data bind take — mixes the projection coefficient like a keyframe blend does. A write
+ * that starts at no perspective lands on twice the target distance halfway, and one that starts at
+ * 1000 lands on 333.33. A negative distance is rejected and leaves the pose untouched.
+ */
+PAGX_TEST(PAGXRuntimeTest, PerspectiveComponentWriteMixesTheProjectionCoefficient) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto* layer = doc->makeNode<pagx::Layer>("L");
+  doc->layers.push_back(layer);
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_NE(scene, nullptr);
+  auto* binding = scene->mutableBinding();
+  pagx::KeyValue value;
+
+  // Half of the target coefficient from no perspective: 1 / (0.5 / 200) = 400.
+  ASSERT_TRUE(binding->apply(layer, "perspective", pagx::KeyValue{200.0f}, 0.5f));
+  ASSERT_TRUE(binding->read(layer, "perspective", &value));
+  EXPECT_NEAR(std::get<float>(value), 400.0f, 0.01f);
+
+  // A full write replaces the distance, then half of the new coefficient reads back as 333.33.
+  ASSERT_TRUE(binding->apply(layer, "perspective", pagx::KeyValue{1000.0f}, 1.0f));
+  ASSERT_TRUE(binding->apply(layer, "perspective", pagx::KeyValue{200.0f}, 0.5f));
+  ASSERT_TRUE(binding->read(layer, "perspective", &value));
+  EXPECT_NEAR(std::get<float>(value), 333.3333f, 0.01f);
+
+  // A negative distance is not a projection, so the write is rejected and the distance stays.
+  ASSERT_TRUE(binding->read(layer, "perspective", &value));
+  auto unchanged = std::get<float>(value);
+  EXPECT_FALSE(binding->apply(layer, "perspective", pagx::KeyValue{-1.0f}, 1.0f));
+  ASSERT_TRUE(binding->read(layer, "perspective", &value));
+  EXPECT_FLOAT_EQ(std::get<float>(value), unchanged);
 }
 
 /**

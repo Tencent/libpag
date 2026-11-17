@@ -299,6 +299,7 @@ struct LayerRuntimeTarget : RuntimeTarget {
   float anchorZ = 0.0f;
   bool rejectedMaskedWriteLogged = false;
   bool rejectedComponentWriteLogged = false;
+  bool rejectedValueLogged = false;
 
   static int TranslationAxis(const std::string& channel) {
     return channel == "x" ? 0 : (channel == "y" ? 1 : 2);
@@ -460,6 +461,10 @@ struct LayerRuntimeTarget : RuntimeTarget {
     // A negative distance is not a projection. The perspective blend folds it into "no projection"
     // along with the d -> infinity end, so reject it here rather than write a cleared projection.
     if (component == Matrix3DComponent::PerspectiveDistance && *v < 0.0f) {
+      if (!rejectedValueLogged) {
+        LOGE("LayerRuntimeTarget: rejected a negative perspective distance.");
+        rejectedValueLogged = true;
+      }
       return false;
     }
     if (hasStaticMatrix || hasStaticMatrix3D) {
