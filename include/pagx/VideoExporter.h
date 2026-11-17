@@ -41,15 +41,24 @@ class PAGXDocument;
 
 /** A rational sampling rate in frames per second. Zero numerator with denominator 1 means auto. */
 struct VideoFrameRate {
-  /** Creates a frame rate from a numerator and denominator. */
-  constexpr VideoFrameRate(int64_t numeratorValue = 0, int64_t denominatorValue = 1)
-      : numerator(numeratorValue), denominator(denominatorValue) {
+  /** Creates a frame rate from an exact numerator and denominator. */
+  constexpr VideoFrameRate(int64_t frameRateNumerator = 0, int64_t frameRateDenominator = 1)
+      : frameRateNumerator(frameRateNumerator), frameRateDenominator(frameRateDenominator) {
   }
+
+  /** Creates an integer frame rate without ambiguity with the deleted floating-point overload. */
+  constexpr VideoFrameRate(int frameRateNumerator)
+      : VideoFrameRate(static_cast<int64_t>(frameRateNumerator)) {
+  }
+
+  /** Floating-point frame rates must be converted to an exact rational explicitly. */
+  VideoFrameRate(double) = delete;
 
   /** Returns the numeric frame rate, or zero when the denominator is zero. */
   double framesPerSecond() const {
-    return denominator == 0 ? 0.0
-                            : static_cast<double>(numerator) / static_cast<double>(denominator);
+    return frameRateDenominator == 0
+               ? 0.0
+               : static_cast<double>(frameRateNumerator) / static_cast<double>(frameRateDenominator);
   }
 
   /**
@@ -57,20 +66,20 @@ struct VideoFrameRate {
    * overflow.
    */
   bool isWithin(int minValue, int maxValue) const {
-    if (numerator <= 0 || denominator <= 0) {
+    if (frameRateNumerator <= 0 || frameRateDenominator <= 0) {
       return false;
     }
-    auto quotient = numerator / denominator;
-    auto remainder = numerator % denominator;
+    auto quotient = frameRateNumerator / frameRateDenominator;
+    auto remainder = frameRateNumerator % frameRateDenominator;
     return quotient >= minValue && quotient <= maxValue &&
            (quotient != maxValue || remainder == 0);
   }
 
-  /** Frame-rate numerator. Zero is the automatic sentinel only when denominator is 1. */
-  int64_t numerator = 0;
+  /** Frame-rate numerator. Zero is the automatic sentinel only when the denominator is 1. */
+  int64_t frameRateNumerator = 0;
 
   /** Frame-rate denominator. Explicit rates must use a positive denominator. */
-  int64_t denominator = 1;
+  int64_t frameRateDenominator = 1;
 };
 
 /**

@@ -88,13 +88,14 @@ bool ValidateOptions(const std::shared_ptr<PAGXDocument>& document,
     return false;
   }
   const auto& rate = options.frameRate;
-  auto automaticFrameRate = rate.numerator == 0 && rate.denominator == 1;
+  auto automaticFrameRate = rate.frameRateNumerator == 0 && rate.frameRateDenominator == 1;
   if (!automaticFrameRate &&
       !rate.isWithin(VideoExporter::MIN_FRAME_RATE, VideoExporter::MAX_FRAME_RATE)) {
     SetError(errorMsg, "the frame rate must be auto {0, 1} or within " +
                            std::to_string(VideoExporter::MIN_FRAME_RATE) + "-" +
                            std::to_string(VideoExporter::MAX_FRAME_RATE) + ", got " +
-                           std::to_string(rate.numerator) + "/" + std::to_string(rate.denominator));
+                           std::to_string(rate.frameRateNumerator) + "/" +
+                           std::to_string(rate.frameRateDenominator));
     return false;
   }
   if (!std::isfinite(options.duration)) {
@@ -271,7 +272,7 @@ bool VideoExporter::ResolvePlaybackPlan(const std::shared_ptr<PAGScene>& scene,
 bool VideoExporter::ResolveSampling(const Options& options, const PlaybackPlan& plan,
                                     VideoFrameRate* frameRate, int64_t* frameCount,
                                     std::string* errorMsg) {
-  auto automaticFrameRate = options.frameRate.numerator == 0;
+  auto automaticFrameRate = options.frameRate.frameRateNumerator == 0;
   if (automaticFrameRate && plan.hasMixedFrameRates) {
     SetError(errorMsg, "animations have mixed frame rates; set an explicit sampling frame rate");
     return false;

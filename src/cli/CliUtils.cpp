@@ -79,18 +79,19 @@ bool ParseVideoFrameRate(const char* text, VideoFrameRate* frameRate) {
 }
 
 VideoFrameRate NormalizeVideoFrameRate(const VideoFrameRate& frameRate) {
-  auto divisor = std::gcd(frameRate.numerator, frameRate.denominator);
+  auto divisor = std::gcd(frameRate.frameRateNumerator, frameRate.frameRateDenominator);
   if (divisor == 0) {
     return frameRate;
   }
-  return {frameRate.numerator / divisor, frameRate.denominator / divisor};
+  return {frameRate.frameRateNumerator / divisor, frameRate.frameRateDenominator / divisor};
 }
 
 std::string FormatVideoFrameRate(const VideoFrameRate& frameRate) {
-  if (frameRate.denominator == 1) {
-    return std::to_string(frameRate.numerator);
+  if (frameRate.frameRateDenominator == 1) {
+    return std::to_string(frameRate.frameRateNumerator);
   }
-  return std::to_string(frameRate.numerator) + "/" + std::to_string(frameRate.denominator);
+  return std::to_string(frameRate.frameRateNumerator) + "/" +
+         std::to_string(frameRate.frameRateDenominator);
 }
 
 #ifdef _WIN32

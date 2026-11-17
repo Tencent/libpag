@@ -39,6 +39,9 @@ static_assert(!std::is_copy_constructible_v<pagx::VideoExporter>);
 static_assert(!std::is_copy_assignable_v<pagx::VideoExporter>);
 static_assert(!std::is_move_constructible_v<pagx::VideoExporter>);
 static_assert(!std::is_move_assignable_v<pagx::VideoExporter>);
+static_assert(std::is_constructible_v<pagx::VideoFrameRate, int>);
+static_assert(!std::is_constructible_v<pagx::VideoFrameRate, double>);
+static_assert(!std::is_assignable_v<pagx::VideoFrameRate, double>);
 
 namespace pag {
 namespace {
@@ -234,8 +237,8 @@ PAGX_TEST(PAGXVideoExporterTest, MakeSupportsFractionalFrameRate) {
   options.frameRate = {30000, 1001};
   auto exporter = pagx::VideoExporter::Make(MakeAnimatedDocument("once"), options);
   ASSERT_TRUE(exporter != nullptr);
-  EXPECT_EQ(exporter->frameRate().numerator, 30000);
-  EXPECT_EQ(exporter->frameRate().denominator, 1001);
+  EXPECT_EQ(exporter->frameRate().frameRateNumerator, 30000);
+  EXPECT_EQ(exporter->frameRate().frameRateDenominator, 1001);
   EXPECT_EQ(exporter->frameCount(), 30);
   ASSERT_TRUE(exporter->nextFrame());
   ASSERT_TRUE(exporter->nextFrame());
@@ -248,7 +251,7 @@ PAGX_TEST(PAGXVideoExporterTest, MakeExportsStaticDocumentAsSingleFrameByDefault
 #endif
   auto exporter = pagx::VideoExporter::Make(MakeStaticDocument());
   ASSERT_TRUE(exporter != nullptr);
-  EXPECT_EQ(exporter->frameRate().numerator, 60);
+  EXPECT_EQ(exporter->frameRate().frameRateNumerator, 60);
   EXPECT_EQ(exporter->frameCount(), 1);
   ASSERT_TRUE(exporter->nextFrame());
   EXPECT_NE(exporter->pixels(), nullptr);
@@ -265,7 +268,7 @@ PAGX_TEST(PAGXVideoExporterTest, MakeRepeatsStaticDocumentForExplicitDuration) {
   options.duration = 2.0f;
   auto exporter = pagx::VideoExporter::Make(MakeStaticDocument(), options);
   ASSERT_TRUE(exporter != nullptr);
-  EXPECT_EQ(exporter->frameRate().numerator, 30);
+  EXPECT_EQ(exporter->frameRate().frameRateNumerator, 30);
   ASSERT_EQ(exporter->frameCount(), 60);
   ASSERT_TRUE(exporter->nextFrame());
   auto frameBytes = exporter->rowBytes() * static_cast<size_t>(exporter->height());
@@ -322,7 +325,7 @@ PAGX_TEST(PAGXVideoExporterTest, DoesNotReuseFramesForNestedAnimations) {
 PAGX_TEST(PAGXVideoExporterTest, MakeUsesNestedAnimationPeriodByDefault) {
   auto exporter = pagx::VideoExporter::Make(MakeNestedAnimationDocument());
   ASSERT_TRUE(exporter != nullptr);
-  EXPECT_EQ(exporter->frameRate().numerator, 60);
+  EXPECT_EQ(exporter->frameRate().frameRateNumerator, 60);
   EXPECT_EQ(exporter->frameCount(), 20);
 }
 
@@ -352,7 +355,7 @@ PAGX_TEST(PAGXVideoExporterTest, MakeAdjustsOncePeriodForNestedEvaluationOffsets
 PAGX_TEST(PAGXVideoExporterTest, NestedAnimationDoesNotChangeTopLevelSamplingRate) {
   auto exporter = pagx::VideoExporter::Make(MakeNestedAnimationDocument("30"));
   ASSERT_TRUE(exporter != nullptr);
-  EXPECT_EQ(exporter->frameRate().numerator, 60);
+  EXPECT_EQ(exporter->frameRate().frameRateNumerator, 60);
   EXPECT_EQ(exporter->frameCount(), 40);
 }
 
@@ -388,9 +391,9 @@ PAGX_TEST(PAGXVideoExporterTest, MakeUsesTheFullPingPongPeriod) {
   auto pingPong = pagx::VideoExporter::Make(MakeAnimatedDocument("pingPong"));
   ASSERT_TRUE(once != nullptr);
   ASSERT_TRUE(pingPong != nullptr);
-  EXPECT_EQ(once->frameRate().numerator, 10);
+  EXPECT_EQ(once->frameRate().frameRateNumerator, 10);
   EXPECT_EQ(once->frameCount(), 10);
-  EXPECT_EQ(pingPong->frameRate().numerator, 10);
+  EXPECT_EQ(pingPong->frameRate().frameRateNumerator, 10);
   EXPECT_EQ(pingPong->frameCount(), 20);
 }
 
@@ -407,13 +410,13 @@ PAGX_TEST(PAGXVideoExporterTest, MakeRejectsNonIntegerDocumentFrameRateByDefault
   options.frameRate = 30;
   auto exporter = pagx::VideoExporter::Make(MakeAnimatedDocument("once", "29.97"), options);
   ASSERT_TRUE(exporter != nullptr);
-  EXPECT_EQ(exporter->frameRate().numerator, 30);
+  EXPECT_EQ(exporter->frameRate().frameRateNumerator, 30);
 }
 
 PAGX_TEST(PAGXVideoExporterTest, MakeRequiresConsistentDocumentFrameRatesByDefault) {
   auto consistent = pagx::VideoExporter::Make(MakeMultiAnimationDocument("60", "60"));
   ASSERT_TRUE(consistent != nullptr);
-  EXPECT_EQ(consistent->frameRate().numerator, 60);
+  EXPECT_EQ(consistent->frameRate().frameRateNumerator, 60);
 
   for (const auto& secondFrameRate : {"29.97", "30"}) {
     std::string errorMsg = {};
@@ -427,7 +430,7 @@ PAGX_TEST(PAGXVideoExporterTest, MakeRequiresConsistentDocumentFrameRatesByDefau
   options.frameRate = 30;
   auto overridden = pagx::VideoExporter::Make(MakeMultiAnimationDocument("60", "29.97"), options);
   ASSERT_TRUE(overridden != nullptr);
-  EXPECT_EQ(overridden->frameRate().numerator, 30);
+  EXPECT_EQ(overridden->frameRate().frameRateNumerator, 30);
 }
 
 PAGX_TEST(PAGXVideoExporterTest, MakeRejectsEmptyAndDuplicateAnimationIds) {

@@ -270,7 +270,7 @@ static int ParseRenderOptions(int argc, char* argv[], RenderOptions* options) {
                                      "--output\n";
       return 1;
     }
-  } else if (options->frameRate.numerator != 0 || options->duration > 0.0f) {
+  } else if (options->frameRate.frameRateNumerator != 0 || options->duration > 0.0f) {
     CommandError("pagx render") << "--fps and --duration require --frames-dir\n";
     return 1;
   }

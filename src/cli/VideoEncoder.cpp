@@ -385,13 +385,13 @@ bool BuildFFmpegCommandLine(const std::string& ffmpegPath, const VideoFormatSpec
                            std::to_string(options.height));
     return false;
   }
-  if (options.frameRate.numerator <= 0 || options.frameRate.denominator <= 0) {
+  if (options.frameRate.frameRateNumerator <= 0 || options.frameRate.frameRateDenominator <= 0) {
     SetError(errorMsg, "the frame rate must be positive");
     return false;
   }
   auto frameRate = NormalizeVideoFrameRate(options.frameRate);
-  if (frameRate.numerator > std::numeric_limits<int>::max() ||
-      frameRate.denominator > std::numeric_limits<int>::max()) {
+  if (frameRate.frameRateNumerator > std::numeric_limits<int>::max() ||
+      frameRate.frameRateDenominator > std::numeric_limits<int>::max()) {
     SetError(errorMsg, "the frame rate is not representable by ffmpeg");
     return false;
   }

@@ -321,8 +321,8 @@ CLI_TEST(PAGXCliTest, VideoFormat_OnlyMp4IsSupported) {
 CLI_TEST(PAGXCliTest, VideoFrameRateParsing_ChecksExactRationalLimits) {
   pagx::VideoFrameRate frameRate = {};
   ASSERT_TRUE(pagx::cli::ParseVideoFrameRate("30000/1001", &frameRate));
-  EXPECT_EQ(frameRate.numerator, 30000);
-  EXPECT_EQ(frameRate.denominator, 1001);
+  EXPECT_EQ(frameRate.frameRateNumerator, 30000);
+  EXPECT_EQ(frameRate.frameRateDenominator, 1001);
   EXPECT_FALSE(
       pagx::cli::ParseVideoFrameRate("999999999999999999/1000000000000000000", &frameRate));
   EXPECT_FALSE(pagx::cli::ParseVideoFrameRate("120000000000000001/1000000000000000", &frameRate));
