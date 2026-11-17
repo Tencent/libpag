@@ -1829,6 +1829,18 @@ BundleChannelSet CollectBundleChannels(
       }
     }
   }
+  if (result.layerPerspectiveCh != nullptr) {
+    // Blink blends `perspective()` in 1/depth, not in depth, so a linear depth ramp plays as
+    // 1/lerp(1/d0, 1/d1) and drifts up to 1.8x from the runtime mid-ramp (layer/12). Sampling every
+    // few frames keeps each segment short enough that the two curves coincide; the residual is
+    // (relative step)^2 / 8, well under 0.2% here.
+    constexpr Frame kPerspectiveStep = 4;
+    Frame first = *result.keyTimes.begin();
+    Frame last = *result.keyTimes.rbegin();
+    for (Frame t = first; t <= last; t += kPerspectiveStep) {
+      result.keyTimes.insert(t);
+    }
+  }
   if (result.starOuterRoundnessCh != nullptr || result.starInnerRoundnessCh != nullptr) {
     // Roundness bends the outline through bezier handles, so the path coordinates are not linear in
     // it; sampling every few frames keeps each segment straight enough to interpolate.
