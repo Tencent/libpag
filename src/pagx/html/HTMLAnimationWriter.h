@@ -85,6 +85,11 @@ class HTMLAnimationSession {
     std::unordered_map<std::string, bool> needsZeroOrigin = {};
     std::unordered_map<std::string, bool> liftsSvgClip = {};
     std::unordered_map<std::string, std::vector<bool>> playStates = {};
+    // Elements whose animated `filter` would otherwise carry a residual SVG reference (a blend, an
+    // inner shadow). Value is the ready-made `url(#id)` reference that goes on the wrapper. Chromium
+    // treats a filter list containing a `url()` as non-interpolable and steps the whole list, so the
+    // reference is emitted on one extra wrapper div around the element instead.
+    std::unordered_map<std::string, std::string> residualFilterWrappers = {};
   };
 
   // `tagRanges` maps an element id to the byte range of its opening tag in `bodyHtml`.
