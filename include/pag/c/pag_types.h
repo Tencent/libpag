@@ -105,6 +105,15 @@ typedef struct pag_mtl_texture_info {
   void* texture = nullptr;
 } pag_mtl_texture_info;
 
+/**
+ * Non-owning description of an external typed 2D D3D12 texture. The pointer is an
+ * ID3D12Resource; PAG never releases it and the caller must keep it valid for the lifetime of
+ * every object created from this description and until its submitted GPU work completes.
+ */
+typedef struct pag_d3d12_texture_info {
+  void* resource;
+} pag_d3d12_texture_info;
+
 typedef struct pag_point {
   float x;
   float y;

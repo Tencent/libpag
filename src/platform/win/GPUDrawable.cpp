@@ -19,7 +19,11 @@
 #include "GPUDrawable.h"
 #include <windows.h>
 #include "base/utils/Log.h"
-#ifdef PAG_USE_ANGLE
+#ifdef TGFX_USE_D3D12
+#include "rendering/gpu/Devices.h"
+#include "tgfx/gpu/d3d12/D3D12Device.h"
+#include "tgfx/gpu/d3d12/D3D12Window.h"
+#elif defined(PAG_USE_ANGLE)
 #include "tgfx/gpu/opengl/egl/EGLWindow.h"
 #else
 #include "tgfx/gpu/opengl/wgl/WGLWindow.h"
@@ -42,7 +46,14 @@ GPUDrawable::GPUDrawable(void* nativeWindow, void* sharedContext)
 void GPUDrawable::updateSize() {
   if (nativeWindow != nullptr) {
     RECT rect = {};
-    if (GetWindowRect(static_cast<HWND>(nativeWindow), &rect)) {
+#ifdef TGFX_USE_D3D12
+    // The D3D12 swap chain sizes its back buffers from the client area. Report the same size so
+    // the PAGSurface and the render target cannot drift apart.
+    auto result = GetClientRect(static_cast<HWND>(nativeWindow), &rect);
+#else
+    auto result = GetWindowRect(static_cast<HWND>(nativeWindow), &rect);
+#endif
+    if (result != 0) {
       _width = rect.right - rect.left;
       _height = rect.bottom - rect.top;
     } else {
@@ -57,7 +68,15 @@ std::shared_ptr<tgfx::Device> GPUDrawable::getDevice() {
     return nullptr;
   }
   if (window == nullptr) {
-#ifdef PAG_USE_ANGLE
+#ifdef TGFX_USE_D3D12
+    // Devices::MakeDefault() is guaranteed to return a D3D12Device in a D3D12 build, and the
+    // registry keeps that exact device alive through the returned shared ownership.
+    auto device = std::static_pointer_cast<tgfx::D3D12Device>(Devices::MakeDefault());
+    if (device == nullptr) {
+      return nullptr;
+    }
+    window = tgfx::D3D12Window::MakeForHwnd(static_cast<HWND>(nativeWindow), device, nullptr, true);
+#elif defined(PAG_USE_ANGLE)
     window = tgfx::EGLWindow::MakeFrom(reinterpret_cast<EGLNativeWindowType>(nativeWindow),
                                        sharedContext);
 #else

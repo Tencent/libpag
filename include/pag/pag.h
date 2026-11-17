@@ -194,6 +194,8 @@ class PAGImageLayer;
 
 class PAGStage;
 
+class PAG_API PAGDecoder;
+
 class PAG_API PAGFont {
  public:
   /**
@@ -1272,6 +1274,15 @@ class PAG_API PAGSurface {
    * row bytes. Returns true if pixels are copied to dstPixels.
    */
   bool readPixels(ColorType colorType, AlphaType alphaType, void* dstPixels, size_t dstRowBytes);
+
+  /**
+   * Submits pending commands and blocks until this surface's device queue finishes prior work.
+   * Does not advance playback or draw another frame. The method manages the device lock
+   * internally; callers must not already hold the same device's context lock.
+   * @return true after completion and a successful device-health check; false if the device
+   *         cannot be locked, has been lost, or completion cannot be established.
+   */
+  bool waitUntilCompleted();
 
  protected:
   explicit PAGSurface(std::shared_ptr<Drawable> drawable, bool externalContext = false);

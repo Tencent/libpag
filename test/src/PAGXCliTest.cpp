@@ -68,6 +68,26 @@
 #include "utils/TestDir.h"
 
 namespace pag {
+
+namespace {
+
+void SetTestEnv(const char* name, const char* value) {
+#ifdef _WIN32
+  _putenv_s(name, value);
+#else
+  setenv(name, value, 1);
+#endif
+}
+
+void UnsetTestEnv(const char* name) {
+#ifdef _WIN32
+  _putenv_s(name, "");
+#else
+  unsetenv(name);
+#endif
+}
+
+}  // namespace
 using namespace tgfx;
 
 static std::string CopyToTemp(const std::string& resourceName, const std::string& tempName) {
@@ -1741,12 +1761,12 @@ CLI_TEST(PAGXCliTest, ImportFile_HtmExtensionNormalizedNoSnapshot) {
   }
   const char* previous = std::getenv("PAGX_HTML_SNAPSHOT");
   std::string saved = previous ? previous : "";
-  setenv("PAGX_HTML_SNAPSHOT", "0", 1);
+  SetTestEnv("PAGX_HTML_SNAPSHOT", "0");
   auto result = pagx::cli::ImportFile(htmPath, "", {});
   if (previous) {
-    setenv("PAGX_HTML_SNAPSHOT", saved.c_str(), 1);
+    SetTestEnv("PAGX_HTML_SNAPSHOT", saved.c_str());
   } else {
-    unsetenv("PAGX_HTML_SNAPSHOT");
+    UnsetTestEnv("PAGX_HTML_SNAPSHOT");
   }
   EXPECT_TRUE(result.error.empty());
   ASSERT_NE(result.document, nullptr);
@@ -1764,18 +1784,18 @@ CLI_TEST(PAGXCliTest, ImportFile_InvalidSnapshotBinRejected) {
   const char* previousBin = std::getenv("PAGX_HTML_SNAPSHOT_BIN");
   std::string savedEnabled = previousEnabled ? previousEnabled : "";
   std::string savedBin = previousBin ? previousBin : "";
-  setenv("PAGX_HTML_SNAPSHOT", "1", 1);
-  setenv("PAGX_HTML_SNAPSHOT_BIN", "/definitely/not/a/snapshot-driver.js", 1);
+  SetTestEnv("PAGX_HTML_SNAPSHOT", "1");
+  SetTestEnv("PAGX_HTML_SNAPSHOT_BIN", "/definitely/not/a/snapshot-driver.js");
   auto result = pagx::cli::ImportFile(htmlPath, "", {});
   if (previousEnabled) {
-    setenv("PAGX_HTML_SNAPSHOT", savedEnabled.c_str(), 1);
+    SetTestEnv("PAGX_HTML_SNAPSHOT", savedEnabled.c_str());
   } else {
-    unsetenv("PAGX_HTML_SNAPSHOT");
+    UnsetTestEnv("PAGX_HTML_SNAPSHOT");
   }
   if (previousBin) {
-    setenv("PAGX_HTML_SNAPSHOT_BIN", savedBin.c_str(), 1);
+    SetTestEnv("PAGX_HTML_SNAPSHOT_BIN", savedBin.c_str());
   } else {
-    unsetenv("PAGX_HTML_SNAPSHOT_BIN");
+    UnsetTestEnv("PAGX_HTML_SNAPSHOT_BIN");
   }
   EXPECT_NE(result.error.find("html-snapshot script not found"), std::string::npos);
   EXPECT_EQ(result.document, nullptr);
@@ -1786,12 +1806,12 @@ CLI_TEST(PAGXCliTest, ImportFile_InvalidSnapshotBinRejected) {
 CLI_TEST(PAGXCliTest, ImportFile_UrlWithoutSnapshotRejected) {
   const char* previous = std::getenv("PAGX_HTML_SNAPSHOT");
   std::string saved = previous ? previous : "";
-  setenv("PAGX_HTML_SNAPSHOT", "off", 1);
+  SetTestEnv("PAGX_HTML_SNAPSHOT", "off");
   auto result = pagx::cli::ImportFile("https://example.com/demo", "", {});
   if (previous) {
-    setenv("PAGX_HTML_SNAPSHOT", saved.c_str(), 1);
+    SetTestEnv("PAGX_HTML_SNAPSHOT", saved.c_str());
   } else {
-    unsetenv("PAGX_HTML_SNAPSHOT");
+    UnsetTestEnv("PAGX_HTML_SNAPSHOT");
   }
   EXPECT_FALSE(result.error.empty());
   EXPECT_EQ(result.document, nullptr);

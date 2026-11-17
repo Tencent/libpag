@@ -47,7 +47,8 @@ std::shared_ptr<PAGSurface> PAGSurface::MakeFrom(const BackendRenderTarget& rend
 std::shared_ptr<PAGSurface> PAGSurface::MakeFrom(const BackendTexture& texture, ImageOrigin origin,
                                                  bool forAsyncThread) {
   auto tgfxTexture = ToTGFX(texture);
-  auto adopted = Devices::ResolveForExternalResource(tgfxTexture, forAsyncThread);
+  auto adopted = Devices::ResolveForExternalResource(tgfxTexture, forAsyncThread,
+                                                     ExternalResourceUsage::SampledRenderTarget);
   auto drawable = TextureDrawable::MakeFrom(adopted.device, tgfxTexture, ToTGFX(origin));
   if (drawable == nullptr) {
     return nullptr;

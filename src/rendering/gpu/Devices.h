@@ -63,6 +63,16 @@ class ExternalDeviceRef {
 };
 
 /**
+ * Declares how an external resource will be used, so backends with explicit resource usage flags
+ * can reject a description before it is imported instead of failing at draw time.
+ */
+enum class ExternalResourceUsage {
+  Sampled,
+  RenderTarget,
+  SampledRenderTarget,
+};
+
+/**
  * Backend glue for libpag. CMake selects the implementation from the corresponding backend
  * directory, while callers only see the tgfx::Device base class. Adding a backend requires its
  * device implementation and platform integration without changing shared rendering code.
@@ -138,18 +148,32 @@ class Devices {
   static std::shared_ptr<tgfx::Device> MakeForSharedContext(void* sharedContext);
 
   /**
+   * Returns true when the description carries this build's backend tag and all native
+   * constraints for the requested usage are satisfied. Backends without a native description
+   * only check the tag.
+   */
+  static bool ValidateExternalResource(const tgfx::BackendTexture& texture,
+                                       ExternalResourceUsage usage);
+
+  /**
+   * Returns true when the render target carries this build's backend tag and all native
+   * constraints for use as a render target are satisfied.
+   */
+  static bool ValidateExternalResource(const tgfx::BackendRenderTarget& renderTarget);
+
+  /**
    * Validates a caller-owned GPU texture and resolves the device libpag must render it with.
-   * Returns an empty AdoptedDevice when the description is invalid or carries the tag of a
-   * backend this build was not compiled with; both cases are logged, so resource factories only
-   * have to map a null device onto a null resource instead of returning an object that can never
-   * be drawn. Otherwise the device is resolved as:
-   *   forAsyncThread == true:  MakeForAsyncThread(texture), falling back to MakeDefault().
+   * Returns an empty AdoptedDevice when the description is invalid, fails the requested usage
+   * constraints, or carries the tag of a backend this build was not compiled with; both cases
+   * are logged, so resource factories only have to map a null device onto a null resource
+   * instead of returning an object that can never be drawn. Otherwise the device is resolved as:
+   *   forAsyncThread == true:  MakeForAsyncThread(texture); no default-device fallback.
    *   forAsyncThread == false: AdoptCurrent() — which sets externalContext on the backends that
    *                            have a thread-local current context — falling back to
    *                            MakeForTexture(texture) on the ones that do not.
    */
   static AdoptedDevice ResolveForExternalResource(const tgfx::BackendTexture& texture,
-                                                  bool forAsyncThread);
+                                                  bool forAsyncThread, ExternalResourceUsage usage);
 
   /**
    * Same as ResolveForExternalResource(BackendTexture, bool) for a caller-owned render target.
@@ -228,6 +252,13 @@ class Devices {
    * by that context and the caller must reject drawing.
    */
   static bool CanSampleFrom(tgfx::Context* context, const ExternalDeviceRef* deviceRef);
+
+  /**
+   * Returns true when the context's GPU device is still usable for new work. The context must
+   * already be locked by the caller. Backends without a native device-health query return true
+   * for a non-null context; D3D12 checks the registered native device for removal.
+   */
+  static bool IsDeviceHealthy(tgfx::Context* context);
 
   /**
    * Creates a per-PAGSurface guard that protects the host GPU state around libpag rendering.

@@ -29,6 +29,9 @@
 #include "tgfx/core/Clock.h"
 #include "tgfx/core/Pixmap.h"
 #include "tgfx/core/SurfaceReadback.h"
+#include "tgfx/gpu/CommandQueue.h"
+#include "tgfx/gpu/Context.h"
+#include "tgfx/gpu/GPU.h"
 #include "tgfx/gpu/GPUBuffer.h"
 
 namespace pag {
@@ -429,6 +432,27 @@ bool PAGSurface::hitTest(RenderCache* cache, std::shared_ptr<Graphic> graphic, f
   cache->detachFromContext();
   unlockContext();
   return result;
+}
+
+bool PAGSurface::waitUntilCompleted() {
+  LockGuard autoLock(rootLocker);
+  auto context = lockContext();
+  if (context == nullptr) {
+    return false;
+  }
+  context->flushAndSubmit();
+  auto healthy = Devices::IsDeviceHealthy(context);
+  context->gpu()->queue()->waitUntilCompleted();
+  unlockContext();
+  if (!healthy) {
+    return false;
+  }
+  auto relockedContext = lockContext();
+  if (relockedContext == nullptr) {
+    return false;
+  }
+  unlockContext();
+  return true;
 }
 
 tgfx::Context* PAGSurface::lockContext() {

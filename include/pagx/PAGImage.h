@@ -28,6 +28,7 @@ enum class ImageOrigin;
 }
 
 namespace tgfx {
+class Device;
 class Image;
 }
 
@@ -82,7 +83,11 @@ class PAGImage {
   const std::string& source() const;
 
  private:
-  PAGImage(std::shared_ptr<tgfx::Image> image, std::string source);
+  PAGImage(std::shared_ptr<tgfx::Image> image, std::shared_ptr<tgfx::Device> device,
+           std::string source);
+  // Declared before the image so the image (and its device-bound GPU resources) is destroyed
+  // before the device that owns those resources.
+  std::shared_ptr<tgfx::Device> _device = nullptr;
   std::shared_ptr<tgfx::Image> _tgfxImage = nullptr;
   std::string _source = {};
 

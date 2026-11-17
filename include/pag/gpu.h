@@ -60,6 +60,7 @@ enum class Backend {
   METAL,
   VULKAN,
   WEBGPU,
+  D3D12,
 };
 
 /**
@@ -127,6 +128,19 @@ struct MtlTextureInfo {
 };
 
 /**
+ * Non-owning description of an external typed 2D D3D12 texture. The caller must keep the
+ * resource valid until every object using it is released and its submitted GPU work completes.
+ * The resource must be a single-sample, single-plane 2D texture whose format has an unambiguous
+ * view interpretation; typeless, array, multisampled and multi-plane resources are rejected.
+ */
+struct D3D12TextureInfo {
+  /**
+   * Pointer to a live ID3D12Resource. Null resources are invalid. PAG never releases it.
+   */
+  void* resource = nullptr;
+};
+
+/**
  * Types for interacting with Vulkan resources created externally to PAG. Holds the VkImage as a
  * void*.
  */
@@ -175,6 +189,15 @@ class PAG_API BackendTexture {
    * Creates a Metal backend texture.
    */
   BackendTexture(const MtlTextureInfo& mtlInfo, int width, int height);
+
+  /**
+   * Creates a D3D12 backend texture. The native resource is not adopted; the caller keeps
+   * ownership and must keep it valid for the lifetime of every object that uses this description.
+   * @param d3d12Info the external texture description.
+   * @param width the logical width in pixels, greater than zero and no larger than the resource.
+   * @param height the logical height in pixels, greater than zero and no larger than the resource.
+   */
+  BackendTexture(const D3D12TextureInfo& d3d12Info, int width, int height);
 
   /**
    * Creates a Vulkan backend texture.
@@ -231,6 +254,12 @@ class PAG_API BackendTexture {
   bool getMtlTextureInfo(MtlTextureInfo* mtlTextureInfo) const;
 
   /**
+   * If the backend API is D3D12, copies the non-owning D3D12 description into the passed in
+   * pointer and returns true. Otherwise returns false.
+   */
+  bool getD3D12TextureInfo(D3D12TextureInfo* d3d12TextureInfo) const;
+
+  /**
    * If the backend API is Vulkan, copies a snapshot of the VkImageInfo struct into the passed
    * in pointer and returns true. Otherwise, returns false if the backend API is not Vulkan.
    */
@@ -253,6 +282,7 @@ class PAG_API BackendTexture {
     MtlTextureInfo mtlInfo;
     VkImageInfo vkInfo;
     WebGPUTextureInfo webGPUInfo;
+    D3D12TextureInfo d3d12Info;
   };
 };
 
@@ -273,6 +303,15 @@ class PAG_API BackendRenderTarget {
    * Creates an Metal backend render target.
    */
   BackendRenderTarget(const MtlTextureInfo& mtlInfo, int width, int height);
+
+  /**
+   * Creates a D3D12 backend render target. The native resource is not adopted; the caller keeps
+   * ownership and must keep it valid for the lifetime of every object that uses this description.
+   * @param d3d12Info the external render target description.
+   * @param width the logical width in pixels, greater than zero and no larger than the resource.
+   * @param height the logical height in pixels, greater than zero and no larger than the resource.
+   */
+  BackendRenderTarget(const D3D12TextureInfo& d3d12Info, int width, int height);
 
   /**
    * Creates a Vulkan backend render target.
@@ -324,6 +363,12 @@ class PAG_API BackendRenderTarget {
   bool getMtlTextureInfo(MtlTextureInfo* mtlTextureInfo) const;
 
   /**
+   * If the backend API is D3D12, copies the non-owning D3D12 description into the passed in
+   * pointer and returns true. Otherwise returns false.
+   */
+  bool getD3D12TextureInfo(D3D12TextureInfo* d3d12TextureInfo) const;
+
+  /**
    * If the backend API is Vulkan, copies a snapshot of the VkImageInfo struct into the passed
    * in pointer and returns true. Otherwise, returns false if the backend API is not Vulkan.
    */
@@ -337,6 +382,7 @@ class PAG_API BackendRenderTarget {
     GLFrameBufferInfo glInfo;
     MtlTextureInfo mtlInfo;
     VkImageInfo vkInfo;
+    D3D12TextureInfo d3d12Info;
   };
 };
 

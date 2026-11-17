@@ -1,0 +1,253 @@
+/////////////////////////////////////////////////////////////////////////////////////////////////
+//
+//  Tencent is pleased to support the open source community by making libpag available.
+//
+//  Copyright (C) 2026 Tencent. All rights reserved.
+//
+//  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
+//  except in compliance with the License. You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+//  Unless required by applicable law or agreed to in writing, software distributed under the
+//  License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
+//  either express or implied. See the License for the specific language governing permissions
+//  and limitations under the License.
+//
+/////////////////////////////////////////////////////////////////////////////////////////////////
+
+#include "base/PAGTest.h"
+
+#if defined(TGFX_USE_D3D12)
+
+#include <d3d12.h>
+#include <dxgiformat.h>
+#include <cstdint>
+#include <vector>
+#include "base/utils/TGFXCast.h"
+#include "pag/pag.h"
+#include "pagx/PAGImage.h"
+#include "pagx/PAGSurface.h"
+#include "rendering/gpu/Devices.h"
+#include "tgfx/gpu/Context.h"
+#include "tgfx/gpu/GPU.h"
+#include "tgfx/gpu/Texture.h"
+
+namespace pag {
+
+static std::shared_ptr<tgfx::Texture> MakeTexture(tgfx::Context* context, int width, int height,
+                                                  uint32_t usage) {
+  tgfx::TextureDescriptor descriptor(width, height, tgfx::PixelFormat::RGBA_8888, false, 1, usage);
+  return context->gpu()->createTexture(descriptor);
+}
+
+static ID3D12Resource* GetNativeResource(const tgfx::BackendTexture& texture) {
+  tgfx::D3D12TextureInfo info = {};
+  if (!texture.getD3D12TextureInfo(&info)) {
+    return nullptr;
+  }
+  return const_cast<ID3D12Resource*>(static_cast<const ID3D12Resource*>(info.resource));
+}
+
+static ID3D12Device* GetNativeDevice(ID3D12Resource* resource) {
+  if (resource == nullptr) {
+    return nullptr;
+  }
+  ID3D12Device* device = nullptr;
+  if (FAILED(resource->GetDevice(IID_PPV_ARGS(&device)))) {
+    return nullptr;
+  }
+  return device;
+}
+
+static ID3D12Resource* CreateNativeResource(ID3D12Device* device, DXGI_FORMAT format,
+                                            D3D12_RESOURCE_FLAGS flags, int width, int height) {
+  if (device == nullptr) {
+    return nullptr;
+  }
+  D3D12_HEAP_PROPERTIES heap = {};
+  heap.Type = D3D12_HEAP_TYPE_DEFAULT;
+  D3D12_RESOURCE_DESC desc = {};
+  desc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+  desc.Width = static_cast<UINT64>(width);
+  desc.Height = static_cast<UINT>(height);
+  desc.DepthOrArraySize = 1;
+  desc.MipLevels = 1;
+  desc.Format = format;
+  desc.SampleDesc.Count = 1;
+  desc.Flags = flags;
+  ID3D12Resource* resource = nullptr;
+  if (FAILED(device->CreateCommittedResource(&heap, D3D12_HEAP_FLAG_NONE, &desc,
+                                             D3D12_RESOURCE_STATE_COMMON, nullptr,
+                                             IID_PPV_ARGS(&resource)))) {
+    return nullptr;
+  }
+  return resource;
+}
+
+PAG_TEST(D3D12Test, BackendTextureRoundTrip) {
+  D3D12TextureInfo info = {};
+  BackendTexture texture(info, 16, 16);
+  EXPECT_EQ(texture.backend(), Backend::D3D12);
+  EXPECT_TRUE(texture.isValid());
+  D3D12TextureInfo result = {};
+  EXPECT_TRUE(texture.getD3D12TextureInfo(&result));
+  EXPECT_EQ(result.resource, nullptr);
+  MtlTextureInfo metalInfo = {};
+  EXPECT_FALSE(texture.getMtlTextureInfo(&metalInfo));
+}
+
+PAG_TEST(D3D12Test, SameNativeDeviceReturnsSameDevice) {
+  DeviceLockScope scope;
+  ASSERT_TRUE(static_cast<bool>(scope));
+  auto context = scope.context();
+  auto first = MakeTexture(context, 8, 8, tgfx::TextureUsage::TEXTURE_BINDING);
+  auto second = MakeTexture(context, 8, 8, tgfx::TextureUsage::TEXTURE_BINDING);
+  ASSERT_TRUE(first != nullptr);
+  ASSERT_TRUE(second != nullptr);
+  auto firstDevice = Devices::MakeForTexture(first->getBackendTexture());
+  auto secondDevice = Devices::MakeForTexture(second->getBackendTexture());
+  ASSERT_TRUE(firstDevice != nullptr);
+  ASSERT_TRUE(secondDevice != nullptr);
+  EXPECT_EQ(firstDevice.get(), secondDevice.get());
+  EXPECT_EQ(firstDevice->uniqueID(), secondDevice->uniqueID());
+  auto defaultDevice = Devices::MakeDefault();
+  ASSERT_TRUE(defaultDevice != nullptr);
+  EXPECT_EQ(defaultDevice.get(), firstDevice.get());
+}
+
+PAG_TEST(D3D12Test, ResourceUsageValidation) {
+  DeviceLockScope scope;
+  ASSERT_TRUE(static_cast<bool>(scope));
+  auto context = scope.context();
+  auto sampled = MakeTexture(context, 8, 8, tgfx::TextureUsage::TEXTURE_BINDING);
+  ASSERT_TRUE(sampled != nullptr);
+  auto sampledTexture = sampled->getBackendTexture();
+  EXPECT_TRUE(Devices::ValidateExternalResource(sampledTexture, ExternalResourceUsage::Sampled));
+  // tgfx enables ALLOW_RENDER_TARGET for every renderable colour texture, so a PAG texture
+  // created for sampling is still a valid render target from the native flags' point of view.
+
+  auto nativeDevice = GetNativeDevice(GetNativeResource(sampledTexture));
+  ASSERT_TRUE(nativeDevice != nullptr);
+  auto sampledOnly = CreateNativeResource(nativeDevice, DXGI_FORMAT_R8G8B8A8_UNORM,
+                                          D3D12_RESOURCE_FLAG_NONE, 8, 8);
+  ASSERT_TRUE(sampledOnly != nullptr);
+  D3D12TextureInfo sampledOnlyInfo = {};
+  sampledOnlyInfo.resource = sampledOnly;
+  BackendTexture sampledOnlyTexture(sampledOnlyInfo, 8, 8);
+  EXPECT_TRUE(Devices::ValidateExternalResource(ToTGFX(sampledOnlyTexture),
+                                                ExternalResourceUsage::Sampled));
+  EXPECT_FALSE(Devices::ValidateExternalResource(ToTGFX(sampledOnlyTexture),
+                                                 ExternalResourceUsage::RenderTarget));
+  sampledOnly->Release();
+  nativeDevice->Release();
+
+  auto renderTarget = MakeTexture(
+      context, 8, 8, tgfx::TextureUsage::TEXTURE_BINDING | tgfx::TextureUsage::RENDER_ATTACHMENT);
+  ASSERT_TRUE(renderTarget != nullptr);
+  auto renderTargetTexture = renderTarget->getBackendTexture();
+  EXPECT_TRUE(
+      Devices::ValidateExternalResource(renderTargetTexture, ExternalResourceUsage::Sampled));
+  EXPECT_TRUE(Devices::ValidateExternalResource(renderTarget->getBackendRenderTarget()));
+
+  D3D12TextureInfo renderTargetInfo = {};
+  ASSERT_TRUE(ToPAG(renderTargetTexture).getD3D12TextureInfo(&renderTargetInfo));
+  BackendTexture oversized(renderTargetInfo, 64, 64);
+  EXPECT_FALSE(Devices::ValidateExternalResource(ToTGFX(oversized),
+                                                 ExternalResourceUsage::SampledRenderTarget));
+}
+
+PAG_TEST(D3D12Test, TypelessResourceRejected) {
+  DeviceLockScope scope;
+  ASSERT_TRUE(static_cast<bool>(scope));
+  auto context = scope.context();
+  auto source = MakeTexture(context, 8, 8, tgfx::TextureUsage::TEXTURE_BINDING);
+  ASSERT_TRUE(source != nullptr);
+  auto resource = GetNativeResource(source->getBackendTexture());
+  ASSERT_TRUE(resource != nullptr);
+  ID3D12Device* device = nullptr;
+  ASSERT_TRUE(SUCCEEDED(resource->GetDevice(IID_PPV_ARGS(&device))));
+  D3D12_HEAP_PROPERTIES heap = {};
+  heap.Type = D3D12_HEAP_TYPE_DEFAULT;
+  D3D12_RESOURCE_DESC desc = {};
+  desc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+  desc.Width = 8;
+  desc.Height = 8;
+  desc.DepthOrArraySize = 1;
+  desc.MipLevels = 1;
+  desc.Format = DXGI_FORMAT_R8G8B8A8_TYPELESS;
+  desc.SampleDesc.Count = 1;
+  ID3D12Resource* typeless = nullptr;
+  auto hr = device->CreateCommittedResource(&heap, D3D12_HEAP_FLAG_NONE, &desc,
+                                            D3D12_RESOURCE_STATE_COMMON, nullptr,
+                                            IID_PPV_ARGS(&typeless));
+  ASSERT_TRUE(SUCCEEDED(hr));
+  D3D12TextureInfo info = {};
+  info.resource = typeless;
+  BackendTexture texture(info, 8, 8);
+  EXPECT_FALSE(Devices::ValidateExternalResource(ToTGFX(texture), ExternalResourceUsage::Sampled));
+  typeless->Release();
+  device->Release();
+}
+
+PAG_TEST(D3D12Test, SurfaceFromTextureAndCompletion) {
+  auto device = Devices::MakeDefault();
+  ASSERT_TRUE(device != nullptr);
+  std::shared_ptr<tgfx::Texture> texture = nullptr;
+  {
+    DeviceLockScope scope(device);
+    ASSERT_TRUE(static_cast<bool>(scope));
+    texture =
+        MakeTexture(scope.context(), 32, 32,
+                    tgfx::TextureUsage::TEXTURE_BINDING | tgfx::TextureUsage::RENDER_ATTACHMENT);
+  }
+  ASSERT_TRUE(texture != nullptr);
+  auto tgfxTexture = texture->getBackendTexture();
+  tgfx::D3D12TextureInfo rawInfo = {};
+  ASSERT_TRUE(tgfxTexture.getD3D12TextureInfo(&rawInfo));
+  ASSERT_NE(rawInfo.resource, nullptr);
+  EXPECT_NE(rawInfo.format, 0u);
+  auto pagTexture = ToPAG(tgfxTexture);
+  ASSERT_TRUE(pagTexture.isValid());
+  EXPECT_EQ(pagTexture.backend(), Backend::D3D12);
+  auto roundTrip = ToTGFX(pagTexture);
+  ASSERT_TRUE(roundTrip.isValid());
+  auto surface = PAGSurface::MakeFrom(pagTexture, ImageOrigin::TopLeft);
+  ASSERT_TRUE(surface != nullptr);
+  EXPECT_TRUE(surface->clearAll());
+  EXPECT_TRUE(surface->waitUntilCompleted());
+  std::vector<uint8_t> pixels(32 * 32 * 4, 0);
+  EXPECT_TRUE(
+      surface->readPixels(ColorType::RGBA_8888, AlphaType::Premultiplied, pixels.data(), 32 * 4));
+  EXPECT_EQ(pixels[3], 0);
+}
+
+PAG_TEST(D3D12Test, PAGXImageKeepsDeviceAlive) {
+  auto device = Devices::MakeDefault();
+  ASSERT_TRUE(device != nullptr);
+  std::shared_ptr<tgfx::Texture> texture = nullptr;
+  {
+    DeviceLockScope scope(device);
+    ASSERT_TRUE(static_cast<bool>(scope));
+    texture =
+        MakeTexture(scope.context(), 16, 16,
+                    tgfx::TextureUsage::TEXTURE_BINDING | tgfx::TextureUsage::RENDER_ATTACHMENT);
+  }
+  ASSERT_TRUE(texture != nullptr);
+  auto pagTexture = ToPAG(texture->getBackendTexture());
+  auto image = pagx::PAGImage::MakeFromTexture(pagTexture, ImageOrigin::TopLeft);
+  ASSERT_TRUE(image != nullptr);
+  auto target = pagx::PAGSurface::MakeFrom(pagTexture, ImageOrigin::TopLeft);
+  ASSERT_TRUE(target != nullptr);
+  EXPECT_TRUE(target->waitUntilCompleted());
+}
+
+PAG_TEST(D3D12Test, OffscreenCompletion) {
+  auto surface = PAGSurface::MakeOffscreen(16, 16);
+  ASSERT_TRUE(surface != nullptr);
+  EXPECT_TRUE(surface->waitUntilCompleted());
+}
+
+}  // namespace pag
+
+#endif  // TGFX_USE_D3D12

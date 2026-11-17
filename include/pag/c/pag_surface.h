@@ -31,4 +31,10 @@ PAG_EXPORT pag_surface* pag_surface_make_offscreen(int width, int height);
 PAG_EXPORT bool pag_surface_read_pixels(pag_surface* surface, pag_color_type colorType,
                                      pag_alpha_type alphaType, void* dstPixels, size_t dstRowBytes);
 
+/**
+ * Submits pending commands and blocks until the surface's device queue finishes prior work.
+ * Returns true after completion and a successful device-health check.
+ */
+PAG_EXPORT bool pag_surface_wait_until_completed(pag_surface* surface);
+
 PAG_C_PLUS_PLUS_END_GUARD

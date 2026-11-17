@@ -62,10 +62,20 @@ std::shared_ptr<tgfx::Device> Devices::MakeForSharedContext(void* sharedContext)
   return tgfx::GLDevice::Make(sharedContext);
 }
 
+bool Devices::ValidateExternalResource(const tgfx::BackendTexture& texture, ExternalResourceUsage) {
+  return SupportsBackend(texture.backend());
+}
+
+bool Devices::ValidateExternalResource(const tgfx::BackendRenderTarget& renderTarget) {
+  return SupportsBackend(renderTarget.backend());
+}
+
 std::shared_ptr<tgfx::Device> Devices::MakeForAsyncThread(const tgfx::BackendTexture&) {
   // GL cannot walk from a texture id back to its owning context, so the worker device is still
-  // derived from the calling thread's current context (same as the no-texture overload).
-  return MakeForAsyncThread();
+  // derived from the calling thread's current context (same as the no-texture overload). Keep
+  // the historical default-device fallback for texture workers on this backend only.
+  auto device = MakeForAsyncThread();
+  return device != nullptr ? device : MakeDefault();
 }
 
 Devices::AdoptedDevice Devices::AdoptCurrent() {
@@ -100,6 +110,10 @@ std::shared_ptr<ExternalDeviceRef> Devices::CaptureFromTexture(const tgfx::Backe
 
 bool Devices::RequiresCapturedIdentity() {
   return true;
+}
+
+bool Devices::IsDeviceHealthy(tgfx::Context* context) {
+  return context != nullptr;
 }
 
 bool Devices::CanSampleFrom(tgfx::Context* context, const ExternalDeviceRef* deviceRef) {

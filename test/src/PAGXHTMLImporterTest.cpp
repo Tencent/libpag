@@ -13172,8 +13172,8 @@ PAG_TEST(PAGXHTMLImporterTest, BasePathResolvesBodyBackgroundImage) {
   // to the image registry. Putting the url() directly on <body> also exercises the body-specific
   // image-pattern path in HTMLParserContext::convertBody.
   pagx::HTMLImporter::Options opts;
-  auto basePath = (std::filesystem::temp_directory_path() / "pagx-html-base").string() +
-                  std::filesystem::path::preferred_separator;
+  auto basePath = (std::filesystem::temp_directory_path() / "pagx-html-base").string();
+  basePath += static_cast<char>(std::filesystem::path::preferred_separator);
   opts.basePath = basePath;
   auto doc = pagx::HTMLImporter::ParseString(R"HTML(
     <html><body style="width:80px;height:80px;background-image:url(body.png)"></body></html>
