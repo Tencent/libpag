@@ -165,10 +165,15 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
   /**
    * Returns the output rectangle, in document-root coordinates, that draw() renders when the
    * document declares a valid default static output view (the paired `targetLayer` / `outputBounds`
-   * root attributes). Returns std::nullopt when the document has no target view and draw() renders
-   * the whole canvas, or when the declaration is invalid; use getOutputViewStatus() to tell those
-   * two cases apart. Callers use this to size the destination surface: the pixel size is
-   * ceil(width * scale) by ceil(height * scale) with the same rounding rules as other exporters.
+   * root attributes). Callers use it to size the destination surface. Size the surface from the
+   * same scale draw() applies: ceil(width * getDisplayOptions()->getZoomScale()) by
+   * ceil(height * getDisplayOptions()->getZoomScale()). The display list quantizes the requested
+   * zoom to getZoomScalePrecision(), so recomputing the pixel size from the unquantized requested
+   * scale can differ by up to one pixel at that precision. draw() clips to the output window, so
+   * any extra pixel stays transparent instead of showing neighboring content.
+   * @return the output rectangle, or std::nullopt when the document has no target view and draw()
+   *         renders the whole canvas, or when the declaration is invalid. Use
+   *         getOutputViewStatus() to tell those two cases apart.
    */
   std::optional<Rect> getOutputBounds() const;
 
