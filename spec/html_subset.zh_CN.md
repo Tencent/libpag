@@ -625,3 +625,12 @@ PAGX 把投影留在 `anchor` 之外（`M = P · T(anchor) · L · T(-anchor)`�
 * `perspective-origin` 无法相对声明盒解析（没有绝对尺寸）时告警一次，并退化为图层原点而非盒中心。
 * inline-SVG 形状的动画不带父级相机。这不是信息丢失：形状的位姿被限制在 z = 0 平面上
   （3D 形状位姿会被告警拒绝），而平面位姿投影后仍是自身（`w = 1`），把相机折进去不会改变任何像素。
+
+### 13.8 评测入口
+
+`resources/html/animations/css` 下的 `43`–`51` 这 9 个用例钉住上面这些支点 / 3D 语义（2D 支点路由、
+`matrix3D` 关键帧、深度支点的相机跳过、父级相机折进子层位姿）。它们是**可选**目标，不属于默认的
+`HTMLTest`：构建 `pagx` 后运行 `test/run_html_anim_eval.sh`，或用
+`HTML_ANIM_EVAL=1 test/run_html_eval.sh` 与静态语料一起跑。每个用例的预期 `ssimMean` 与容差记录在
+`resources/html/animations/css/expected.json`：低于台账 `tolerance` 以上脚本失败，高于台账只做提示。
+只有在语义被**有意**改变后才更新该文件（例如补上深度支点的 `camera-skips` 缺口），不要用它掩盖回归。
