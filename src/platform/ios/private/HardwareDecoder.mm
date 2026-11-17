@@ -35,17 +35,6 @@
 
 namespace pag {
 
-namespace {
-// VTDecompressionSessionInvalidate may crash inside VideoToolbox when it runs while
-// VTDecompressionSessionDecodeFrame is still executing on the same session, so an in-flight decode
-// gets this long to return before the session is torn down underneath it.
-static constexpr int MAX_INVALIDATE_WAIT_TIME_MS = 200;
-
-std::mutex& GetActiveDecodersMutex() {
-  static std::mutex m;
-  return m;
-}
-
 // A per-decoder liveness token held by shared_ptr. The decoder owns the only strong reference; the
 // registry keeps weak references so the willResignActive observer can take a snapshot under
 // GetActiveDecodersMutex, release it, and then invalidate each session off the mutex. mutex guards
@@ -56,6 +45,17 @@ struct DecoderToken {
   std::mutex mutex = {};
   HardwareDecoder* decoder = nullptr;
 };
+
+namespace {
+// VTDecompressionSessionInvalidate may crash inside VideoToolbox when it runs while
+// VTDecompressionSessionDecodeFrame is still executing on the same session, so an in-flight decode
+// gets this long to return before the session is torn down underneath it.
+static constexpr int MAX_INVALIDATE_WAIT_TIME_MS = 200;
+
+std::mutex& GetActiveDecodersMutex() {
+  static std::mutex m;
+  return m;
+}
 
 std::vector<std::weak_ptr<DecoderToken>>& GetActiveDecoders() {
   static std::vector<std::weak_ptr<DecoderToken>> list;
