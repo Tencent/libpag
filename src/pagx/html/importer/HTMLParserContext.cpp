@@ -44,25 +44,13 @@ using namespace pagx::html;
 
 namespace {
 
-// True when a `transform` value leaves the z = 0 plane. A pure translation, 2D rotation, scale or
-// skew stays on the plane, and the parent camera is the identity for it, so those values must not
-// trigger the "approximate vanishing point" diagnostic.
-bool TransformMovesOffPlane(const std::string& value) {
-  const std::string lower = ToLower(value);
-  return lower.find("matrix3d") != std::string::npos ||
-         lower.find("rotate3d") != std::string::npos ||
-         lower.find("rotatex") != std::string::npos || lower.find("rotatey") != std::string::npos ||
-         lower.find("translatez") != std::string::npos ||
-         lower.find("translate3d") != std::string::npos ||
-         lower.find("perspective(") != std::string::npos;
-}
-
 // True when one of the element's own `@keyframes` animates `transform` off the layer plane: such a
 // child only reaches 3D through the animation, so the static pose cannot decide whether the parent
-// camera matters. Declarations are parsed rather than scanned by hand so `TRANSFORM : rotateY()`
-// counts too.
+// camera matters. The stops go through the same parser and the same flatness test as the poses
+// themselves, so this can never classify a transform differently from the layer it describes.
 bool Animates3DTransform(const std::unordered_map<std::string, html::CssKeyframesRule>& rules,
-                         const HTMLStyleCascade::PropertyMap& style) {
+                         const HTMLStyleCascade::PropertyMap& style, HTMLValueParser& valueParser,
+                         const HTMLTransformReference& reference, float pivotZ) {
   std::vector<std::string> names = {};
   for (const char* property : {"animation-name", "animation"}) {
     const std::string value = LookupProperty(style, property);
@@ -79,6 +67,10 @@ bool Animates3DTransform(const std::unordered_map<std::string, html::CssKeyframe
       }
     }
   }
+  bool animatesTransform = false;
+  // Unbound local sink: parsing only answers a yes / no question here, so a stop that fails to parse
+  // means "cannot decide" instead of adding a diagnostic the conversion never produced.
+  HTMLDiagnosticSink silentDiagnostics(false);
   for (const auto& name : names) {
     const auto rule = rules.find(name);
     if (rule == rules.end()) {
@@ -86,14 +78,22 @@ bool Animates3DTransform(const std::unordered_map<std::string, html::CssKeyframe
     }
     for (const auto& stop : rule->second.stops) {
       for (const auto& declaration : ParseStyleDeclarations(stop.declarations)) {
-        if (ToLower(declaration.first) == "transform" &&
-            TransformMovesOffPlane(declaration.second)) {
+        if (ToLower(declaration.first) != "transform") {
+          continue;
+        }
+        animatesTransform = true;
+        Matrix3D pose = {};
+        if (ParseCssTransformList(declaration.second, valueParser, silentDiagnostics, &pose,
+                                  reference.widthPx, reference.heightPx) &&
+            !IsFlatTransform(pose)) {
           return true;
         }
       }
     }
   }
-  return false;
+  // A pivot in front of the layer plane leaves it even for a flat pose, exactly as `PlacePose` does
+  // for the keyframe it converts.
+  return animatesTransform && std::fabs(pivotZ) > 0.0f;
 }
 
 // Folds a CSS `perspective` declared on the parent into `box`: stores the camera distance and
@@ -780,7 +780,9 @@ void HTMLParserContext::attachParentCamera(HTMLBoxAttributes& box,
       box, inherited.parentPerspectivePx, inherited.parentPerspectiveOriginX,
       inherited.parentPerspectiveOriginY, inherited.parentBorderWidthPx,
       inherited.parentPerspectivePx > 0.0f &&
-          Animates3DTransform(_styleCascade->keyframes(), _styleCascade->getResolvedStyle(element)),
+          Animates3DTransform(_styleCascade->keyframes(), _styleCascade->getResolvedStyle(element),
+                              *_valueParser, _styleCascade->getTransformReferenceSize(element),
+                              box.transform.originZ),
       element->name, *_diagnostics, _flowChildPerspectiveWarned);
 }
 
@@ -820,10 +822,7 @@ Layer* HTMLParserContext::convertElement(const std::shared_ptr<DOMNode>& element
     HTMLBoxAttributes box = _styleCascade->computeBoxAttributes(element);
     attachParentCamera(box, element, inherited);
     return _layerBuilder->wrapForMargin(
-        _textFragmentBuilder->convertPAGXTextHost(element, inherited, box.parentPerspectivePx,
-                                                  box.localPerspectiveOriginX,
-                                                  box.localPerspectiveOriginY),
-        box);
+        _textFragmentBuilder->convertPAGXTextHost(element, inherited, box), box);
   }
 
   if (tag == "br") {

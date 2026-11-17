@@ -120,10 +120,12 @@ class HTMLTextFragmentBuilder {
 
   /** Converts a data-pagx-text container host (per-glyph / TextModifier / TextPath WOFF2
    *  export output) into a single semantic Text layer, restoring the original text and font
-   *  semantics from the data-pagx-* attributes instead of the PUA glyph spans. */
+   *  semantics from the data-pagx-* attributes instead of the PUA glyph spans. `containerBox` is
+   *  the caller's already-resolved box for `element`, parent camera included; resolving it here a
+   *  second time would repeat every box-level diagnostic for the same element. */
   Layer* convertPAGXTextHost(const std::shared_ptr<DOMNode>& element,
-                             const HTMLInheritedStyle& inherited, float parentPerspectivePx,
-                             float localPerspectiveOriginX, float localPerspectiveOriginY);
+                             const HTMLInheritedStyle& inherited,
+                             const HTMLBoxAttributes& containerBox);
 
   /** Builds a `Text` element from a fragment. Exposed so the synthetic anonymous-text-leaf
    *  path in `HTMLParserContext` can reuse it. */

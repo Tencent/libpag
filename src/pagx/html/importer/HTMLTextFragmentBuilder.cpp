@@ -182,9 +182,7 @@ Layer* HTMLTextFragmentBuilder::buildPAGXTextHost(const std::shared_ptr<DOMNode>
 
 Layer* HTMLTextFragmentBuilder::convertPAGXTextHost(const std::shared_ptr<DOMNode>& element,
                                                     const HTMLInheritedStyle& inherited,
-                                                    float parentPerspectivePx,
-                                                    float localPerspectiveOriginX,
-                                                    float localPerspectiveOriginY) {
+                                                    const HTMLBoxAttributes& containerBox) {
   // The generator emits glyph <span>s as direct children of the host container; the first one
   // carries the style (font size / colour) of the first rendered glyph.
   std::shared_ptr<DOMNode> firstSpan;
@@ -218,23 +216,27 @@ Layer* HTMLTextFragmentBuilder::convertPAGXTextHost(const std::shared_ptr<DOMNod
   // Child span offsets are relative to the positioned container; recover the absolute position
   // as container + first-child offset. Only left/top are honoured — per-glyph transforms
   // (rotation / scale / skew) belong to individual glyphs and cannot apply to the whole run.
-  HTMLBoxAttributes containerBox = _styleCascade.computeBoxAttributes(element);
-  // The host is converted without going through `convertElement`, so the parent camera has to be
-  // folded in here; otherwise a 3D transform on a restored text host loses its projection.
-  // The values already arrive in this element's local coordinates (the caller resolved them), so
-  // they are assigned verbatim instead of being offset again.
-  containerBox.parentPerspectivePx = parentPerspectivePx;
-  containerBox.localPerspectiveOriginX = localPerspectiveOriginX;
-  containerBox.localPerspectiveOriginY = localPerspectiveOriginY;
+  // `containerBox` comes from the caller, which already folded in the parent camera: the host is
+  // converted without going through `convertElement`, and resolving the box a second time here
+  // would report every box-level diagnostic for the same element twice.
   HTMLBoxAttributes box = containerBox;
   if (firstSpan) {
-    HTMLBoxAttributes spanBox = _styleCascade.computeBoxAttributes(firstSpan);
-    float left = (std::isnan(containerBox.leftPx) ? 0.0f : containerBox.leftPx) +
-                 (std::isnan(spanBox.leftPx) ? 0.0f : spanBox.leftPx);
-    float top = (std::isnan(containerBox.topPx) ? 0.0f : containerBox.topPx) +
-                (std::isnan(spanBox.topPx) ? 0.0f : spanBox.topPx);
-    box.leftPx = left;
-    box.topPx = top;
+    const HTMLBoxAttributes spanBox = _styleCascade.computeBoxAttributes(firstSpan);
+    const float spanLeft = std::isnan(spanBox.leftPx) ? 0.0f : spanBox.leftPx;
+    const float spanTop = std::isnan(spanBox.topPx) ? 0.0f : spanBox.topPx;
+    box.leftPx = (std::isnan(containerBox.leftPx) ? 0.0f : containerBox.leftPx) + spanLeft;
+    box.topPx = (std::isnan(containerBox.topPx) ? 0.0f : containerBox.topPx) + spanTop;
+    // The parent camera origin arrived in the container's local coordinates while the emitted
+    // layer now starts at the glyph offset, so the same camera point has to be re-expressed in the
+    // shifted coordinates. Only an absolutely positioned host is emitted at `left` / `top`.
+    if (box.absolute) {
+      if (std::isfinite(box.localPerspectiveOriginX)) {
+        box.localPerspectiveOriginX -= spanLeft;
+      }
+      if (std::isfinite(box.localPerspectiveOriginY)) {
+        box.localPerspectiveOriginY -= spanTop;
+      }
+    }
   }
   box.rightPx = NAN;
   box.bottomPx = NAN;
