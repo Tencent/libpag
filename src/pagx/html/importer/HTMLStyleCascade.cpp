@@ -261,9 +261,9 @@ HTMLInheritedStyle HTMLStyleCascade::resolveInheritedStyle(const std::shared_ptr
   HTMLInheritedStyle out = parent;
   // `perspective` applies to direct children only, so it never travels with the inherited bag; the
   // parent re-applies it on the bag it hands to its own children.
-  out.parentPerspectivePx = 0.0f;
-  out.parentPerspectiveOriginX = NAN;
-  out.parentPerspectiveOriginY = NAN;
+  out.parentCamera.distancePx = 0.0f;
+  out.parentCamera.localOrigin.x = NAN;
+  out.parentCamera.localOrigin.y = NAN;
   out.parentBorderWidthPx = 0.0f;
   const auto& props = getResolvedStyle(element);
   CopyProperty(props, "color", out.color);
@@ -792,13 +792,13 @@ void HTMLStyleCascade::parseBoxTransform(HTMLBoxAttributes& box, const PropertyM
       // CSS Transforms 2 §Perspective: values below 1px "must be treated as 1px for rendering
       // purposes", the same rule `perspective()` follows, so `perspective: 0` is a 1px camera and
       // only `none` disables the projection.
-      box.perspectivePx = distance < 1.0f ? 1.0f : distance;
+      box.camera.distancePx = distance < 1.0f ? 1.0f : distance;
     } else {
       _diagnostics.warn("html: perspective '" + perspective +
                         "' must be a non-negative length; ignored");
     }
   }
-  if (box.perspectivePx > 0.0f) {
+  if (box.camera.distancePx > 0.0f) {
     // CSS projects about `perspective-origin`, which defaults to the centre of the declaring box.
     const std::string authored = Trim(LookupProperty(props, "perspective-origin"));
     const std::string origin = authored.empty() ? std::string("50% 50%") : authored;
@@ -809,8 +809,8 @@ void HTMLStyleCascade::parseBoxTransform(HTMLBoxAttributes& box, const PropertyM
                         "> is not a valid CSS position; using the default 50% 50%");
     }
     if (resolved.resolved) {
-      box.perspectiveOriginX = resolved.point.x;
-      box.perspectiveOriginY = resolved.point.y;
+      box.camera.localOrigin.x = resolved.point.x;
+      box.camera.localOrigin.y = resolved.point.y;
     } else {
       // The default vanishing point is the box centre, which needs an absolute box size. Leaving the
       // value unknown makes the projection step fall back to the layer origin, so report it once

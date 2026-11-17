@@ -42,6 +42,33 @@ struct HTMLTransformReference {
 };
 
 /**
+ * A CSS `perspective` camera: the distance to the viewer plus its `perspective-origin` vanishing point,
+ * expressed in the coordinates of the layer the projection is folded into.
+ *
+ * Two frames exist and must not be merged: the inherited bag carries the camera in the *parent's*
+ * coordinates (the child has not been placed yet), while the box carries the same camera re-expressed
+ * in the element's own local coordinates. `ApplyParentPerspective` performs that one subtraction.
+ */
+struct HTMLParentCamera {
+  // Distance from the viewing plane in px; <= 0 means "no camera".
+  float distancePx = 0.0f;
+  // Vanishing point; NaN on either axis means the declaring box had no absolute size to resolve
+  // `perspective-origin` against.
+  Point localOrigin = {NAN, NAN};
+
+  // True when a projection exists at all, i.e. an author declared a positive `perspective`.
+  bool Has() const {
+    return distancePx > 0.0f && std::isfinite(distancePx);
+  }
+
+  // True when that projection also knows its vanishing point; without one it conjugates about the
+  // layer origin.
+  bool HasOrigin() const {
+    return Has() && std::isfinite(localOrigin.x) && std::isfinite(localOrigin.y);
+  }
+};
+
+/**
  * Resolved CSS `transform-origin` in layer-local pixels. `resolved` is false when the value uses a
  * percentage or keyword form whose reference box size is unknown; callers then fall back to the
  * top-left pivot and warn. A token that does not parse is not merely unresolvable: it invalidates
@@ -129,7 +156,7 @@ bool ParseCssTransformList(const std::string& value, HTMLValueParser& valueParse
  * `PlacePose` folds the camera into a child pose, and `HTMLLayerBuilder::applyBareParentCamera`
  * materialises it on a `preserve-3d` layer that has no pose of its own.
  */
-Matrix3D PushPerspective(const Matrix3D& pose, float distance, float originX, float originY);
+Matrix3D PushPerspective(const Matrix3D& pose, const HTMLParentCamera& camera);
 
 /**
  * Where a pose goes once its parent camera has been folded in. Both the static box path and the
@@ -159,8 +186,7 @@ struct PosePlacement {
   Matrix3D pose = {};
 };
 
-PosePlacement PlacePose(const Matrix3D& pose, float parentPerspectivePx, float anchorZ,
-                        float localPerspectiveOriginX, float localPerspectiveOriginY);
+PosePlacement PlacePose(const Matrix3D& pose, const HTMLParentCamera& camera, float anchorZ);
 
 /**
  * Returns true when the pose only acts on the z = 0 plane: no depth translation, no z-dependent

@@ -76,9 +76,7 @@ struct HTMLInheritedStyle {
   // inherited: `resolveInheritedStyle` resets it, and a parent sets it on the bag it hands to its
   // direct children only. The origin is the parent's `perspective-origin` in the parent's local
   // coordinates; the child subtracts its own offset to express it locally.
-  float parentPerspectivePx = 0.0f;
-  float parentPerspectiveOriginX = NAN;
-  float parentPerspectiveOriginY = NAN;
+  HTMLParentCamera parentCamera = {};
   // The parent's border width: `perspective-origin` is measured in the parent's border box, while an
   // absolutely positioned child's `left` / `top` start at its padding box, so the offset needs this.
   float parentBorderWidthPx = 0.0f;
@@ -321,20 +319,15 @@ struct HTMLBoxAttributes {
 
   // CSS `perspective` declared on the parent (px), folded into this element's pose. Stored on the box
   // so the transform write and the animation registration read the same value regardless of which
-  // element happens to be converting when they run. `localPerspectiveOrigin*` is the parent's
+  // element happens to be converting when they run. `parentCamera` is the parent's
   // `perspective-origin` re-expressed in this element's local coordinates.
-  float parentPerspectivePx = 0.0f;
-  float localPerspectiveOriginX = NAN;
-  float localPerspectiveOriginY = NAN;
+  HTMLParentCamera parentCamera = {};
 
   // CSS `perspective: <d>` on this element: a camera that projects its **children**. PAGX keeps the
   // projection on the layer that owns the pose, so the parent value is pushed into each child pose
   // as `P * pose`, where `P` is the identity with bottom row `(0, 0, -1/d, 1)`. 0 means "no
   // perspective".
-  float perspectivePx = 0.0f;
-  // CSS `perspective-origin` of the camera above, in this box's local pixels (default: the centre).
-  float perspectiveOriginX = NAN;
-  float perspectiveOriginY = NAN;
+  HTMLParentCamera camera = {};
 
   HTMLTransform transform = {};
 };

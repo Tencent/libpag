@@ -718,9 +718,7 @@ void HTMLLayerBuilder::applyBoxTransform(Layer* layer, const HTMLBoxAttributes& 
   // A `perspective` declared on the parent projects this element's pose; `PlacePose` folds it in and
   // classifies the result the same way the keyframe path does. The pivot depth takes part in that
   // decision, because a flat pose pivoted off the layer plane does leave it.
-  const PosePlacement placement =
-      PlacePose(box.transform.pose, box.parentPerspectivePx, anchor.depth,
-                box.localPerspectiveOriginX, box.localPerspectiveOriginY);
+  const PosePlacement placement = PlacePose(box.transform.pose, box.parentCamera, anchor.depth);
   if (!placement.valid) {
     _diagnostics.warn(
         "html: transform becomes non-invertible under the parent perspective; ignored");
@@ -756,13 +754,11 @@ void HTMLLayerBuilder::applyBareParentCamera(Layer* layer, const HTMLBoxAttribut
   // folds the projection into the layer that owns the pose, and a layer that never writes one ends
   // the camera chain, leaving every descendant pose orthographically rendered. The camera is not
   // forwarded past this layer — CSS applies a `perspective` to direct children only.
-  if (!box.preserve3D || !(box.parentPerspectivePx > 0.0f)) {
+  if (!box.preserve3D || !(box.parentCamera.distancePx > 0.0f)) {
     return;
   }
   // The bare projection, conjugated about `perspective-origin` the same way a pose is.
-  const Matrix3D projection =
-      PushPerspective(Matrix3D{}, box.parentPerspectivePx, box.localPerspectiveOriginX,
-                      box.localPerspectiveOriginY);
+  const Matrix3D projection = PushPerspective(Matrix3D{}, box.parentCamera);
   // A camera far enough away reads as flat (see `IsFlatTransform`), so it carries no visible
   // projection and stays off the 3D channel like every other flat pose.
   if (IsFlatTransform(projection)) {

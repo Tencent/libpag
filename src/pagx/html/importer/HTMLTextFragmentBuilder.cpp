@@ -230,11 +230,11 @@ Layer* HTMLTextFragmentBuilder::convertPAGXTextHost(const std::shared_ptr<DOMNod
     // layer now starts at the glyph offset, so the same camera point has to be re-expressed in the
     // shifted coordinates. Only an absolutely positioned host is emitted at `left` / `top`.
     if (box.absolute) {
-      if (std::isfinite(box.localPerspectiveOriginX)) {
-        box.localPerspectiveOriginX -= spanLeft;
+      if (std::isfinite(box.parentCamera.localOrigin.x)) {
+        box.parentCamera.localOrigin.x -= spanLeft;
       }
-      if (std::isfinite(box.localPerspectiveOriginY)) {
-        box.localPerspectiveOriginY -= spanTop;
+      if (std::isfinite(box.parentCamera.localOrigin.y)) {
+        box.parentCamera.localOrigin.y -= spanTop;
       }
     }
   }
