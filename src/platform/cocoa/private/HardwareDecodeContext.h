@@ -130,4 +130,10 @@ class VTDecodeContextPool {
 void DidDecompress(void* decompressionOutputRefCon, void* sourceFrameRefCon, OSStatus status,
                    VTDecodeInfoFlags infoFlags, CVImageBufferRef pixelBuffer,
                    CMTime presentationTimeStamp, CMTime presentationDuration);
+
+/**
+ * Diagnostic hook returning the number of contexts currently parked in the shared graveyard.
+ * Exposed so tests can assert the graveyard self-drains; production code does not rely on it.
+ */
+size_t VTDecodeGraveyardSize();
 }  // namespace pag

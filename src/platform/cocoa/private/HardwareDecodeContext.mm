@@ -113,6 +113,11 @@ void VTDecodeContextPool::drain() {
   contexts.clear();
 }
 
+size_t VTDecodeGraveyardSize() {
+  std::lock_guard<std::mutex> lock(GraveyardMutex());
+  return Graveyard().size();
+}
+
 void DidDecompress(void*, void* sourceFrameRefCon, OSStatus status, VTDecodeInfoFlags,
                    CVImageBufferRef pixelBuffer, CMTime, CMTime) {
   auto* context = static_cast<VTDecodeOutputContext*>(sourceFrameRefCon);
