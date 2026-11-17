@@ -947,6 +947,7 @@ async function processPagxCase(entry, outDir, opts) {
     skipExisting,
   });
   Object.assign(row, staticRow);
+  row.hasText = caseDrawsText(xml);
   gradePagxRow(row);
   return row;
 }
@@ -1235,6 +1236,13 @@ function pagxScoredRows(rows) {
 //   >= 0.999  complete    — pixel-identical to the reference
 //   >= 0.99   basic       — anti-aliasing / quantization level
 //   else      distorted   — needs a per-case attribution
+//
+// A case that draws text is graded on a looser curve - complete at 0.99, basic at 0.97 - because the
+// two renderers shape glyphs differently: PAGX fills a hinted outline and, for fauxBold, unions a
+// stroked one, while the browser rasterises its own face and (for fauxBold) strokes with
+// `-webkit-text-stroke`. Those outlines differ by a pixel or two at the edges whatever the animation
+// does, which caps a text case around 0.95-0.99; grading it on the shape-agnostic 0.999 curve would
+// report a rendering-strategy difference as a distortion of the export.
 // A case scores the stricter of animSSIM and staticSSIM. When the static ceiling sits below the
 // animSSIM tier, the residual error is the *static* path (browser font shape, layout) rather than
 // the animation writer, so the case is reported as static-limited and animLoss
@@ -1250,11 +1258,19 @@ const GRADE_DISTORTED = '失真';
 // font-shape ceiling the grade is about; it is a defect of the static path itself.
 const STATIC_ROUTE_DEFECT_GAP = 0.05;
 
-function gradeTier(ssim) {
+const TEXT_COMPLETE_SSIM = 0.99;
+const TEXT_BASIC_SSIM = 0.97;
+
+function gradeTier(ssim, hasText = false) {
   if (!isFinite(ssim)) return 0;
-  if (ssim >= 0.999) return 3;
-  if (ssim >= 0.99) return 2;
+  if (ssim >= (hasText ? TEXT_COMPLETE_SSIM : 0.999)) return 3;
+  if (ssim >= (hasText ? TEXT_BASIC_SSIM : 0.99)) return 2;
   return 1;
+}
+
+// A case draws text when its document declares a Text or TextBox node, wherever it sits in the tree.
+function caseDrawsText(xml) {
+  return /<Text(Box)?[\s/>]/.test(xml);
 }
 
 function gradeTierName(tier) {
@@ -1273,13 +1289,14 @@ function gradePagxRow(row) {
   // The animated metric is graded on two readings: the per-frame mean (overall fidelity) and the
   // worst frame (a single badly reproduced frame is a defect a mean would hide). The case takes the
   // stricter of the two, so both are reported separately.
-  const animTierMean = gradeTier(row.ssimMean);
-  const animTierMin = gradeTier(row.ssimMin);
+  const hasText = row.hasText === true;
+  const animTierMean = gradeTier(row.ssimMean, hasText);
+  const animTierMin = gradeTier(row.ssimMin, hasText);
   const animTier = Math.min(animTierMean, animTierMin);
   row.animGradeMean = gradeTierName(animTierMean);
   row.animGradeMin = gradeTierName(animTierMin);
   const staticValue = row.staticAvailable === 'yes' ? staticCeiling(row) : NaN;
-  const staticTier = gradeTier(staticValue);
+  const staticTier = gradeTier(staticValue, hasText);
   if (staticTier > 0) {
     // Same instant against same instant: subtracting a mean animSSIM from the worst staticSSIM (or
     // the other way round) mixes two different states and flips conclusions on small-loss cases.
@@ -1309,6 +1326,15 @@ function gradePagxRow(row) {
   row.grade = gradeTierName(Math.min(animTier, staticTier));
   if (row.grade !== GRADE_DISTORTED) {
     row.attribution = '';
+    return;
+  }
+  if (hasText && row.staticAvailable === 'yes' && isFinite(row.animLoss) &&
+      row.animLoss <= 0.01) {
+    // The animated route is as faithful as the static route on the very states it plays, so what is
+    // left is the glyph-outline difference the text curve already accounts for - a ceiling of the
+    // renderers, not a defect of the export (composite/09, text/06).
+    row.grade = GRADE_STATIC_LIMITED;
+    row.attribution = 'static';
     return;
   }
   if (row.expect === 'gap') {
@@ -1387,10 +1413,30 @@ function summarizePagx(rows) {
     animLossMean: mean(rows.filter((r) => r.staticAvailable === 'yes').map((r) => r.animLoss)),
     freezeMean: mean(rows.map((r) => Math.min(r.freezeSSIM0, r.freezeSSIMworst))),
   };
+  // The two families are graded on different curves (see gradeTier), so the summary keeps them
+  // apart: a text case at 0.98 is complete for its family and would read as "basic" in a combined
+  // bucket.
+  const summarizeFamily = (list) => ({
+    cases: list.length,
+    ssimMean: mean(list.map((r) => r.ssimMean)),
+    ssimMin: mean(list.map((r) => r.ssimMin)),
+    grades: Object.fromEntries(
+      [GRADE_COMPLETE, GRADE_BASIC, GRADE_STATIC_LIMITED, GRADE_DISTORTED].map((name) => [
+        name,
+        list.filter((r) => r.grade === name).length,
+      ])
+    ),
+  });
+  const gradedRows = rows.filter((r) => !r.error);
+  const textFamily = summarizeFamily(gradedRows.filter((r) => r.hasText === true));
+  const plainFamily = summarizeFamily(gradedRows.filter((r) => r.hasText !== true));
+
   const distorted = rows
     .filter((r) => !r.error && r.grade === GRADE_DISTORTED)
     .sort((a, b) => a.ssimMean - b.ssimMean);
   return {
+    text: textFamily,
+    nonText: plainFamily,
     cases: rows.length,
     errored: rows.filter((r) => r.error).length,
     scored: scored.length,
@@ -1413,7 +1459,7 @@ function writePagxCsv(rows, outPath) {
     'staticSSIM0', 'staticSSIMworst', 'animSSIM0', 'animSSIMworst', 'freezeSSIM0',
     'freezeSSIMworst', 'stateSSIM0', 'stateSSIMworst', 'staticAvailable', 'staticNote', 'animLoss0',
     'animLossWorst', 'animLoss',
-    'animGradeMean', 'animGradeMin', 'grade', 'attribution',
+    'hasText', 'animGradeMean', 'animGradeMin', 'grade', 'attribution',
   ];
   const lines = [headers.join(',')];
   for (const r of rows) {
@@ -1799,6 +1845,8 @@ function writeIndexHtml(rows, outDir, label) {
     const p = summarizePagx(rows);
     gradeSummaryItems = `
     <li>grade — complete <b>${p.grades[GRADE_COMPLETE]}</b>, basic <b>${p.grades[GRADE_BASIC]}</b>, static-limited <b>${p.grades[GRADE_STATIC_LIMITED]}</b>, distorted <b>${p.grades[GRADE_DISTORTED]}</b></li>
+    <li><b>without text</b> (complete 0.999 / basic 0.99) — ${p.nonText.cases} cases &middot; ssim mean <b>${fmt(p.nonText.ssimMean, 4)}</b> &middot; complete <b>${p.nonText.grades[GRADE_COMPLETE]}</b>, basic <b>${p.nonText.grades[GRADE_BASIC]}</b>, static-limited <b>${p.nonText.grades[GRADE_STATIC_LIMITED]}</b>, distorted <b>${p.nonText.grades[GRADE_DISTORTED]}</b></li>
+    <li><b>with text</b> (complete 0.99 / basic 0.97; glyph outlines differ between the renderers) — ${p.text.cases} cases &middot; ssim mean <b>${fmt(p.text.ssimMean, 4)}</b> &middot; complete <b>${p.text.grades[GRADE_COMPLETE]}</b>, basic <b>${p.text.grades[GRADE_BASIC]}</b>, static-limited <b>${p.text.grades[GRADE_STATIC_LIMITED]}</b>, distorted <b>${p.text.grades[GRADE_DISTORTED]}</b></li>
     <li>static baseline — <b>${p.staticStats.available}</b> available / <b>${p.staticStats.unavailable}</b> unavailable &middot; staticSSIM mean <b>${fmt(p.staticStats.ssimMean, 4)}</b> &middot; animLoss mean <b>${fmt(p.staticStats.animLossMean, 4)}</b> &middot; freeze self-check mean <b>${fmt(p.staticStats.freezeMean, 4)}</b></li>`;
   }
 
