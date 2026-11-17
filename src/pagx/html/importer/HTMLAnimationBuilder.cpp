@@ -1056,6 +1056,53 @@ void HTMLAnimationBuilder::addAnimation(Animation* animation, Frame originalDela
   }
 }
 
+// Routes the collected transform stops onto the narrowest channel the runtime can play. A pure
+// translation goes to `x` / `y`; an in-plane affine to `matrix`; anything with depth or perspective to
+// `matrix3D`. A static `matrix3D` outranks `matrix` in the runtime priority, so a flat keyframe route
+// has to be lifted in that case or the renderer never reads it. None of the channels carries the
+// pivot: `transform-origin` stays on the layer as `anchor`.
+void RouteTransformStops(const std::vector<std::pair<Frame, Matrix3D>>& stops,
+                         bool allPureTranslate, bool allFlat, const Layer& layer,
+                         KeyframeInterpolationType interp, std::vector<Keyframe<float>>* xKeys,
+                         std::vector<Keyframe<float>>* yKeys,
+                         std::vector<Keyframe<Matrix>>* matrixKeys,
+                         std::vector<Keyframe<Matrix3D>>* matrix3DKeys) {
+  if (stops.empty()) {
+    return;
+  }
+  const bool hasStaticPose = !layer.matrix.isIdentity() || !layer.matrix3D.isIdentity();
+  const bool staticPoseIs3D = !layer.matrix3D.isIdentity();
+  if (allPureTranslate && !hasStaticPose) {
+    for (const auto& stop : stops) {
+      const Matrix affine = ToAffine2D(stop.second);
+      xKeys->push_back({stop.first, affine.tx, interp, {}, {}});
+      yKeys->push_back({stop.first, affine.ty, interp, {}, {}});
+    }
+    return;
+  }
+  if (allFlat && !staticPoseIs3D) {
+    for (const auto& stop : stops) {
+      matrixKeys->push_back({stop.first, ToAffine2D(stop.second), interp, {}, {}});
+    }
+    return;
+  }
+  for (const auto& stop : stops) {
+    Matrix3D pose = IsFlatTransform(stop.second)
+                        ? LiftMatrixToMatrix3D(ToAffine2D(stop.second), 0.0f)
+                        : stop.second;
+    // PAGX requires every `matrix3D` keyframe to be invertible, and a flat stop that is singular
+    // (e.g. `scale(0)`) becomes one as soon as it is lifted. Collapsing it instead of dropping it
+    // keeps the stop on the timeline, so a pop-in start does not disappear.
+    if (!IsInvertibleMatrix3D(pose)) {
+      pose = CollapseSingularPose(pose);
+    }
+    // A single track may mix projected and unprojected stops: the projection only divides w by
+    // `1 - z / d`, so it is the identity on the z = 0 plane and a flat stop renders the same either
+    // way. The endpoints stay exact and the runtime interpolates between them.
+    matrix3DKeys->push_back({stop.first, pose, interp, {}, {}});
+  }
+}
+
 bool HTMLAnimationBuilder::buildForElement(
     const std::unordered_map<std::string, std::string>& resolvedStyle, Layer* layer,
     const HTMLTransformReference& reference, const HTMLParentCamera& parentCamera) {
@@ -1353,58 +1400,27 @@ bool HTMLAnimationBuilder::buildForElement(
   // None of the three carries the pivot: `transform-origin` stays on the layer as `anchor`, so the
   // runtime applies it once per frame, after the keyframes have been interpolated. Baking it in
   // would make the interpolator treat the pivot translation as an independent value and drift.
-  if (!transformStops.empty()) {
-    const bool hasStaticPose = !layer->matrix.isIdentity() || !layer->matrix3D.isIdentity();
-    bool needsAnchor = false;
-    for (const auto& stop : transformStops) {
-      if (!IsLinearIdentity(stop.second)) {
-        needsAnchor = true;
-        break;
-      }
-    }
-    if (needsAnchor) {
-      if (keyframeAnchor.resolved) {
-        layer->anchor = keyframeAnchor.point;
-        layer->anchorZ = keyframeAnchor.depth;
-      } else {
-        _diagnostics.warn(
-            "html: transform animation without resolvable transform-origin; pivoting at "
-            "top-left may differ from CSS [subset:animation-unsupported-property]");
-      }
-    }
-    // A static `matrix3D` outranks `matrix` in the runtime transform priority, so a flat keyframe
-    // route has to be lifted onto the matrix3D channel; otherwise the keyframes are written to a
-    // matrix the renderer never reads and the animation has no visible effect.
-    const bool staticPoseIs3D = !layer->matrix3D.isIdentity();
-    if (transformAllPureTranslate && !hasStaticPose) {
-      for (const auto& ts : transformStops) {
-        const Matrix affine = ToAffine2D(ts.second);
-        xKeys.push_back({ts.first, affine.tx, interp, {}, {}});
-        yKeys.push_back({ts.first, affine.ty, interp, {}, {}});
-      }
-    } else if (transformAllFlat && !staticPoseIs3D) {
-      for (const auto& ts : transformStops) {
-        matrixKeys.push_back({ts.first, ToAffine2D(ts.second), interp, {}, {}});
-      }
-    } else {
-      for (const auto& ts : transformStops) {
-        Matrix3D pose = IsFlatTransform(ts.second)
-                            ? LiftMatrixToMatrix3D(ToAffine2D(ts.second), 0.0f)
-                            : ts.second;
-        // PAGX requires every `matrix3D` keyframe to be invertible, and a flat stop that is singular
-        // (e.g. `scale(0)`) becomes one as soon as it is lifted. Collapsing it instead of dropping it
-        // keeps the stop on the timeline, so a pop-in start does not disappear.
-        if (!IsInvertibleMatrix3D(pose)) {
-          pose = CollapseSingularPose(pose);
-        }
-        // A single track may mix projected and unprojected stops. The projection only divides w by
-        // `1 - z / d`, so it is the identity on the z = 0 plane and a flat stop renders the same with
-        // or without it. The endpoints stay exact frame by frame and the runtime interpolates
-        // between them with PAGX semantics (pixel-identical to folding every stop).
-        matrix3DKeys.push_back({ts.first, pose, interp, {}, {}});
-      }
+  // The pivot is written before the routing so a non-identity keyframe can rely on it, exactly as
+  // the static path does; the channel choice itself lives in `RouteTransformStops`.
+  bool needsAnchor = false;
+  for (const auto& stop : transformStops) {
+    if (!IsLinearIdentity(stop.second)) {
+      needsAnchor = true;
+      break;
     }
   }
+  if (needsAnchor) {
+    if (keyframeAnchor.resolved) {
+      layer->anchor = keyframeAnchor.point;
+      layer->anchorZ = keyframeAnchor.depth;
+    } else {
+      _diagnostics.warn(
+          "html: transform animation without resolvable transform-origin; pivoting at top-left may "
+          "differ from CSS [subset:animation-unsupported-property]");
+    }
+  }
+  RouteTransformStops(transformStops, transformAllPureTranslate, transformAllFlat, *layer, interp,
+                      &xKeys, &yKeys, &matrixKeys, &matrix3DKeys);
 
   // Apply bezier handles between consecutive keyframes for each channel.
   ApplyBezierHandles(alphaKeys, interp, easing.x1, easing.y1, easing.x2, easing.y2);
