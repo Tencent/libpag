@@ -6,6 +6,7 @@ const {
   rewritePerspectiveKeyframes,
   transformOriginDepth,
   perspectiveOriginXY,
+  perspectiveOriginAtBoxCentre,
   recordCameraSkip,
   pagxCameraSkips,
   staticCameraFor,
@@ -148,6 +149,21 @@ describe('camera wrapper guards', () => {
     expect(perspectiveOriginXY({ transformOrigin: '0px 80px 30px' })).toBe('0px 80px');
     expect(perspectiveOriginXY({ transformOrigin: '10px 20px' })).toBe('10px 20px');
     expect(perspectiveOriginXY({})).toBe('50% 50%');
+  });
+});
+
+describe('perspective-origin default suppression', () => {
+  test('a centre-pointed camera counts as the initial value', () => {
+    // Chromium reports the computed origin in px (`100px 50px` for the centre of a 200x100 box), so
+    // the schema's `50% 50%` string compare never matches and every box would carry the declaration.
+    expect(perspectiveOriginAtBoxCentre('100px 50px', 200, 100)).toBe(true);
+    expect(perspectiveOriginAtBoxCentre('50% 50%', 200, 100)).toBe(true);
+    // An off-centre vanishing point has to survive the snapshot.
+    expect(perspectiveOriginAtBoxCentre('0px 0px', 200, 100)).toBe(false);
+    expect(perspectiveOriginAtBoxCentre('100px 60px', 200, 100)).toBe(false);
+    // Without a box there is no centre to compare against, so the authored value is kept.
+    expect(perspectiveOriginAtBoxCentre('50% 50%', 0, 0)).toBe(false);
+    expect(perspectiveOriginAtBoxCentre('', 200, 100)).toBe(false);
   });
 });
 

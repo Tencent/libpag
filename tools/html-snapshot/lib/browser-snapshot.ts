@@ -1206,6 +1206,34 @@ function classify(el, computed) {
 
 // ===== Style emission =====
 
+// Reports whether `value` (a computed `perspective-origin`) resolves to the centre of the box, i.e.
+// to what an omitted declaration — the CSS initial `50% 50%` — would produce. Chromium reports the
+// property in px (`100px 50px` for the centre of a 200×100 box), so the schema's string compare
+// against `50% 50%` never fires and every emitted box would carry the declaration. `boxWidth` /
+// `boxHeight` must be the size of the box the subset will have (the measured border box for a
+// rendered div, the canvas for `<body>`), because the emitted px value is read back in that box's
+// local coordinates; a mismatch there would move the vanishing point instead of just dropping noise.
+function perspectiveOriginAtBoxCentre(value, boxWidth, boxHeight) {
+  // Chromium resolves the percentages to LayoutUnit precision, so allow half a CSS pixel of rounding
+  // slack before calling the point off-centre.
+  const epsilon = 0.5;
+  if (!(boxWidth > 0) || !(boxHeight > 0)) return false;
+  const tokens = String(value || '').trim().split(/\s+/);
+  if (tokens.length !== 2) return false;
+  const axisPx = (token, axis) => {
+    if (token === 'center') return axis / 2;
+    if (token === 'left' || token === 'top') return 0;
+    if (token === 'right' || token === 'bottom') return axis;
+    const amount = parseFloat(token);
+    if (!isFinite(amount)) return NaN;
+    return token.endsWith('%') ? (amount / 100) * axis : amount;
+  };
+  const x = axisPx(tokens[0], boxWidth);
+  const y = axisPx(tokens[1], boxHeight);
+  if (!isFinite(x) || !isFinite(y)) return false;
+  return Math.abs(x - boxWidth / 2) <= epsilon && Math.abs(y - boxHeight / 2) <= epsilon;
+}
+
 // Append a single schema-driven CSS declaration to `parts` if its computed
 // value isn't a default and survives normalisation. `ctx.textColor` (when
 // provided) is consulted by entries flagged `skipIfEqualsTextColor`.
@@ -1221,6 +1249,10 @@ function appendStyleProp(parts, computed, entry, ctx) {
   const v = entry.normalize ? entry.normalize(raw) : raw;
   if (!v) return;
   if (entry.defaults && entry.defaults.includes(v)) return;
+  // Score a centre-pointed camera as the default: Chromium resolves `perspective-origin` to px, so
+  // the `50% 50%` entry above never matches its computed value (see perspectiveOriginAtBoxCentre).
+  if (entry.defaultsToBoxCentre && ctx &&
+      perspectiveOriginAtBoxCentre(v, ctx.boxWidth, ctx.boxHeight)) return;
   if (entry.skipIfEqualsTextColor && ctx && v === ctx.textColor) return;
   const outProp = entry.outProp || entry.prop;
   // Rewrite embedded double quotes as single quotes so the value embeds safely
@@ -1554,8 +1586,11 @@ function buildStyle(left, top, width, height, computed, opts) {
   }
 
   if (opts.box) {
+    // The box's own border-box size is what a computed `perspective-origin` resolves against, so the
+    // schema needs it to recognise the centre-pointed (initial) value.
+    const boxCtx = { boxWidth: width, boxHeight: height };
     for (const entry of STYLE_SCHEMA_BOX) {
-      appendStyleProp(parts, computed, entry);
+      appendStyleProp(parts, computed, entry, boxCtx);
     }
     // Geometric clip-path (inset/circle/ellipse/polygon/path) is not a plain
     // property copy — it needs the element's box size to resolve %/calc, so it
@@ -5319,7 +5354,12 @@ function snapshotMainImpl(opts) {
   if (bodyPerspective && bodyPerspective !== 'none') {
     bodyStyle.push(`perspective: ${bodyPerspective}`);
     const bodyPerspectiveOrigin = bodyComputed.getPropertyValue('perspective-origin').trim();
-    if (bodyPerspectiveOrigin) {
+    // A centre-pointed camera is the initial value, so it is left out to keep the subset clean. The
+    // reference box here is the emitted <body> (canvas-sized, see the width/height above), not the
+    // live body's own rect: a body that collapsed to zero height would otherwise look off-centre
+    // while its px value is in fact the live centre, and dropping it would move the vanishing point.
+    if (bodyPerspectiveOrigin &&
+        !perspectiveOriginAtBoxCentre(bodyPerspectiveOrigin, canvasWidth, canvasHeight)) {
       bodyStyle.push(`perspective-origin: ${bodyPerspectiveOrigin}`);
     }
   }
@@ -5518,8 +5558,9 @@ const STYLE_SCHEMA = [
   // it into each child pose, since PAGX keeps the projection on the layer that owns the pose.
   { prop: 'perspective',      scope: 'box',  defaults: ['none'] },
   // The vanishing point of the camera above; the importer resolves it into the child pose, so it
-  // must survive the snapshot for authored origins.
-  { prop: 'perspective-origin', scope: 'box', defaults: ['50% 50%'] },
+  // must survive the snapshot for authored origins. Chromium's computed value is in px, so the centre
+  // (the initial 50% 50%) is recognised by value against the element's own box, not by this string.
+  { prop: 'perspective-origin', scope: 'box', defaults: ['50% 50%'], defaultsToBoxCentre: true },
   { prop: 'color',                 scope: 'text', defaults: ['rgb(0, 0, 0)'] },
   { prop: 'font-family',           scope: 'text', normalize: normalizeFontFamily },
   { prop: 'font-size',             scope: 'text' },
@@ -5622,6 +5663,7 @@ const HELPER_FNS = [
   syntheticText,
   applyTextTransform,
   classify,
+  perspectiveOriginAtBoxCentre,
   appendStyleProp,
   appendBorder,
   appendBoxShadow,
@@ -6850,6 +6892,7 @@ export {
   pagxCameraSkips,
   transformOriginDepth,
   perspectiveOriginXY,
+  perspectiveOriginAtBoxCentre,
   splitProjectiveTransform,
   liftBoxOntoCameraWrapper,
   rewritePerspectiveKeyframes,
