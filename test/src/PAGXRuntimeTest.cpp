@@ -1602,6 +1602,127 @@ PAGX_TEST(PAGXRuntimeTest, InvalidOutputViewAfterEditRejectsDraw) {
   EXPECT_FALSE(scene->hasContentChanged());
 }
 
+// Hands back the runtime tgfx layer bound to the authored target, plus its parent pointer in the
+// runtime tree. Used to simulate a broken hookup without changing the authored declaration.
+static std::shared_ptr<tgfx::Layer> RuntimeTargetOf(pagx::PAGScene* scene,
+                                                    const pagx::Layer* targetNode,
+                                                    tgfx::Layer** outParent) {
+  auto composition = scene != nullptr ? scene->rootComposition() : nullptr;
+  auto* binding = composition != nullptr ? composition->binding.get() : nullptr;
+  if (binding == nullptr || targetNode == nullptr) {
+    return nullptr;
+  }
+  auto runtimeLayer = binding->get<tgfx::Layer>(targetNode);
+  if (outParent != nullptr) {
+    *outParent = runtimeLayer != nullptr ? runtimeLayer->parent() : nullptr;
+  }
+  return runtimeLayer;
+}
+
+// A prepared wrapper must be reused across frames: the target keeps the same parent layer between
+// draws, and the original tree is restored after an edit invalidates the state.
+PAGX_TEST(PAGXRuntimeTest, TargetViewReusesPreparedWrapper) {
+  auto doc = MakeTargetViewDocument();
+  auto* targetNode = doc->findNode<pagx::Layer>("target");
+  ASSERT_NE(targetNode, nullptr);
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_NE(scene, nullptr);
+  auto surface = pagx::PAGSurface::MakeOffscreen(20, 20);
+  ASSERT_NE(surface, nullptr);
+
+  // Capture the untouched tree before drawing: the prepared state has not been created yet.
+  tgfx::Layer* originalParent = nullptr;
+  auto runtimeTarget = RuntimeTargetOf(scene.get(), targetNode, &originalParent);
+  ASSERT_NE(runtimeTarget, nullptr);
+  ASSERT_NE(originalParent, nullptr);
+
+  ASSERT_TRUE(scene->draw(surface));
+  auto* preparedParent = runtimeTarget->parent();
+  ASSERT_NE(preparedParent, nullptr);
+  ASSERT_NE(preparedParent, originalParent);
+
+  // Repeating the draw reuses the same prepared wrapper instead of re-hooking the target.
+  ASSERT_TRUE(scene->draw(surface));
+  EXPECT_EQ(runtimeTarget->parent(), preparedParent);
+
+  // An edit invalidates the state and restores the target to its original parent. Re-fetch the
+  // runtime layer because an in-place refresh may replace it.
+  targetNode->alpha = 0.5f;
+  doc->notifyChange({targetNode}, false);
+  auto refreshedTarget = RuntimeTargetOf(scene.get(), targetNode, nullptr);
+  ASSERT_NE(refreshedTarget, nullptr);
+  EXPECT_EQ(refreshedTarget->parent(), originalParent);
+
+  // The next draw prepares a fresh wrapper and still renders correctly.
+  EXPECT_TRUE(scene->draw(surface));
+}
+
+// Detaching the runtime target before the first draw makes preparation fail. draw() must return
+// false without consuming the pending redraw, and re-attaching it must let a later draw succeed.
+PAGX_TEST(PAGXRuntimeTest, TargetViewDetachedBeforePrepareFailsDraw) {
+  auto doc = MakeTargetViewDocument();
+  auto* targetNode = doc->findNode<pagx::Layer>("target");
+  ASSERT_NE(targetNode, nullptr);
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_NE(scene, nullptr);
+  auto surface = pagx::PAGSurface::MakeOffscreen(20, 20);
+  ASSERT_NE(surface, nullptr);
+
+  tgfx::Layer* originalParent = nullptr;
+  auto runtimeTarget = RuntimeTargetOf(scene.get(), targetNode, &originalParent);
+  ASSERT_NE(runtimeTarget, nullptr);
+  ASSERT_NE(originalParent, nullptr);
+  runtimeTarget->removeFromParent();
+
+  EXPECT_TRUE(scene->hasContentChanged());
+  EXPECT_FALSE(scene->draw(surface));
+  EXPECT_TRUE(scene->hasContentChanged());
+
+  originalParent->addChild(runtimeTarget);
+  EXPECT_TRUE(scene->draw(surface));
+  EXPECT_FALSE(scene->hasContentChanged());
+}
+
+// Damaging the hookup after a successful preparation must fail without a silent re-hook, preserve
+// the pending redraw, and make pagx::Record() fail the same way. Re-attaching into the prepared
+// wrapper recovers the frame.
+PAGX_TEST(PAGXRuntimeTest, TargetViewDamagedAfterPrepareFailsDrawAndRecord) {
+  auto doc = MakeTargetViewDocument();
+  auto* targetNode = doc->findNode<pagx::Layer>("target");
+  ASSERT_NE(targetNode, nullptr);
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_NE(scene, nullptr);
+  auto surface = pagx::PAGSurface::MakeOffscreen(20, 20);
+  ASSERT_NE(surface, nullptr);
+
+  ASSERT_TRUE(scene->draw(surface));
+  auto runtimeTarget = RuntimeTargetOf(scene.get(), targetNode, nullptr);
+  ASSERT_NE(runtimeTarget, nullptr);
+  auto* wrapper = runtimeTarget->parent();
+  ASSERT_NE(wrapper, nullptr);
+  runtimeTarget->removeFromParent();
+  scene->getDisplayOptions()->setContentOffset(1, 1);
+  EXPECT_TRUE(scene->hasContentChanged());
+
+  EXPECT_FALSE(scene->draw(surface));
+  EXPECT_TRUE(scene->hasContentChanged());
+
+  auto device = Devices::MakeDefault();
+  ASSERT_NE(device, nullptr);
+  DeviceLockScope scope(device);
+  ASSERT_TRUE(static_cast<bool>(scope));
+  auto recordingSurface = tgfx::Surface::Make(scope.context(), 20, 20);
+  ASSERT_NE(recordingSurface, nullptr);
+  auto wrapped = pagx::MakeFrom(device, recordingSurface);
+  ASSERT_NE(wrapped, nullptr);
+  EXPECT_EQ(pagx::Record(scope.context(), scene, wrapped), nullptr);
+  EXPECT_TRUE(scene->hasContentChanged());
+
+  wrapper->addChild(runtimeTarget);
+  EXPECT_TRUE(scene->draw(surface));
+  EXPECT_FALSE(scene->hasContentChanged());
+}
+
 // Helper that builds a scene owning a single Animation with the given loop mode. The animation is
 // 60 frames at 60 fps so DurationMicros == 1_000_000 exactly, keeping the boundary math free of
 // rounding noise (an integer-only period is required for the period-boundary assertions below).

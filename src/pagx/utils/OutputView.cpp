@@ -115,82 +115,6 @@ bool HasDynamicContent(const PAGXDocument* document,
   return false;
 }
 
-// Returns the layer that uses `mask` as its mask. TGFX stores the relation only on the mask side
-// (Layer::maskOwner), so the owner has to be located from the tree. Owners inside the mask's own
-// subtree are not reported: they reference the target as a mask without making the target itself a
-// mask child, so the target still has to be drawn with that relationship intact.
-std::shared_ptr<tgfx::Layer> FindMaskOwner(const std::shared_ptr<tgfx::Layer>& layer,
-                                           const tgfx::Layer* mask) {
-  if (layer == nullptr || mask == nullptr || layer.get() == mask) {
-    return nullptr;
-  }
-  if (layer->mask().get() == mask) {
-    return layer;
-  }
-  for (const auto& child : layer->children()) {
-    auto owner = FindMaskOwner(child, mask);
-    if (owner != nullptr) {
-      return owner;
-    }
-  }
-  return nullptr;
-}
-
-// Temporarily replaces the target with an identity parent so that the normal child compositing
-// path applies the target's transform, alpha, visibility, mask and scrollRect exactly once. The
-// original tree is restored on destruction.
-class OutputTargetParent {
- public:
-  OutputTargetParent(const std::shared_ptr<tgfx::Layer>& root,
-                     const std::shared_ptr<tgfx::Layer>& target)
-      : target(target), parent(target != nullptr ? target->parent() : nullptr) {
-    if (target == nullptr || parent == nullptr) {
-      return;
-    }
-    maskOwner = FindMaskOwner(root, target.get());
-    wrapper = tgfx::Layer::Make();
-    if (wrapper == nullptr || !parent->replaceChild(target, wrapper)) {
-      wrapper = nullptr;
-      return;
-    }
-    // TGFX skips child layers that act as another layer's mask, so a target referenced by a
-    // `mask` attribute would never be drawn through the wrapper. The owner lives outside this
-    // wrapper, so releasing the mask only affects that skip check for the duration of the draw;
-    // the original relationship is restored in the destructor.
-    if (maskOwner != nullptr) {
-      maskOwner->setMask(nullptr);
-    }
-    wrapper->addChild(target);
-  }
-
-  ~OutputTargetParent() {
-    if (wrapper == nullptr) {
-      return;
-    }
-    parent->replaceChild(wrapper, target);
-    if (maskOwner != nullptr) {
-      maskOwner->setMask(target);
-    }
-  }
-
-  OutputTargetParent(const OutputTargetParent&) = delete;
-  OutputTargetParent& operator=(const OutputTargetParent&) = delete;
-
-  bool isValid() const {
-    return wrapper != nullptr;
-  }
-
-  const std::shared_ptr<tgfx::Layer>& layer() const {
-    return wrapper;
-  }
-
- private:
-  std::shared_ptr<tgfx::Layer> target = nullptr;
-  tgfx::Layer* parent = nullptr;
-  std::shared_ptr<tgfx::Layer> maskOwner = nullptr;
-  std::shared_ptr<tgfx::Layer> wrapper = nullptr;
-};
-
 OutputViewStatus ReportInvalid(std::string* error, const std::string& message) {
   if (error != nullptr) {
     *error = message;
@@ -321,25 +245,66 @@ bool HasDeclaredOutputView(const PAGXDocument& document) {
          OutputViewDeclarationAccess::DeclaredBounds(document).has_value();
 }
 
-void DrawOutputTarget(tgfx::Canvas* canvas, const std::shared_ptr<tgfx::Layer>& root,
-                      const std::shared_ptr<tgfx::Layer>& targetLayer) {
-  if (canvas == nullptr || root == nullptr || targetLayer == nullptr) {
-    return;
+bool OutputTargetState::prepare(const std::shared_ptr<tgfx::Layer>& root,
+                                const std::shared_ptr<tgfx::Layer>& target) {
+  reset();
+  if (root == nullptr || target == nullptr) {
+    return false;
   }
-  if (targetLayer == root) {
-    root->draw(canvas);
-    return;
+  if (root != target && !root->contains(target)) {
+    return false;
   }
-  OutputTargetParent parent(root, targetLayer);
-  if (!parent.isValid()) {
-    return;
+  // Enable external mask release only for an actual wrapper: when the target is the root there is
+  // no parent to insert into and Drawing handles that case directly.
+  bool releaseExternalMask = root != target;
+  if (!parent.prepare(root, target, releaseExternalMask)) {
+    return false;
   }
-  auto wrapper = parent.layer();
+  this->root = root;
+  this->target = target;
+  return true;
+}
+
+bool OutputTargetState::draw(tgfx::Canvas* canvas) {
+  if (canvas == nullptr || !parent.isValid()) {
+    return false;
+  }
+  if (root == nullptr || target == nullptr) {
+    return false;
+  }
+  const auto& wrapper = parent.layer();
   // Draw helpers must not leak the coordinate mapping into the caller's canvas state: surfaces
   // reuse one Canvas across frames.
   tgfx::AutoCanvasRestore canvasRestore(canvas);
   canvas->concat(wrapper->getRelativeMatrix(root.get()));
   wrapper->draw(canvas);
+  return true;
+}
+
+bool OutputTargetState::isPrepared() const {
+  return parent.isValid();
+}
+
+void OutputTargetState::reset() {
+  parent.reset();
+  root = nullptr;
+  target = nullptr;
+}
+
+bool DrawOutputTarget(tgfx::Canvas* canvas, const std::shared_ptr<tgfx::Layer>& root,
+                      const std::shared_ptr<tgfx::Layer>& targetLayer) {
+  if (canvas == nullptr || root == nullptr || targetLayer == nullptr) {
+    return false;
+  }
+  if (targetLayer == root) {
+    root->draw(canvas);
+    return true;
+  }
+  OutputTargetState state;
+  if (!state.prepare(root, targetLayer)) {
+    return false;
+  }
+  return state.draw(canvas);
 }
 
 }  // namespace pagx

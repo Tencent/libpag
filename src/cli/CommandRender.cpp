@@ -505,7 +505,11 @@ static tgfx::Bitmap RenderCore(const RenderOptions& options) {
     canvas->clear(displayList.backgroundColor());
     canvas->scale(options.scale, options.scale);
     canvas->translate(-offsetX, -offsetY);
-    pagx::DrawOutputTarget(canvas, rootLayer, targetTgfxLayer);
+    if (!pagx::DrawOutputTarget(canvas, rootLayer, targetTgfxLayer)) {
+      device->unlock();
+      std::cerr << "pagx render: failed to prepare target layer for rendering\n";
+      return {};
+    }
   } else {
     displayList.setZoomScale(options.scale);
     if (offsetX != 0.0f || offsetY != 0.0f) {

@@ -53,6 +53,7 @@ class PAGViewModelValue;
 class TextHolder;
 class ViewModel;
 class Image;
+class OutputTargetState;
 struct Matrix;
 struct RuntimeBinding;
 
@@ -256,6 +257,10 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
   // Resolves and caches the document's default output view state and target layer after a tree
   // build or edit. Cached so renderTo() does not walk the authored layer tree on every frame.
   void resolveOutputTarget();
+  // Lazily prepares and validates the reusable target-view wrapper for this scene. Returns false
+  // when no target is bound, a stored preparation no longer matches the binding, or the wrapper
+  // could not be prepared. A failed preparation is never left cached as a successful one.
+  bool ensureOutputTargetState();
   void buildViewModels();
   void buildNestedViewModels(PAGComposition* parentComp);
   static std::shared_ptr<PAGViewModel> CreateViewModelFromSchema(
@@ -324,9 +329,15 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
   OutputViewStatus outputViewStatus = OutputViewStatus::None;
   std::string outputViewError = {};
 
-  // Target drawing temporarily reparents layers, which leaves the display list dirty even when
-  // no authored content changed. Consume this separate flag only after a successful target draw.
+  // Tracks document, resource and display changes that require a target-view redraw. The reusable
+  // wrapper is kept separately in outputTargetState; repreparing it is not itself a content change.
+  // Consume this flag only after a successful target draw.
   bool outputViewDirty = true;
+
+  // Reusable identity wrapper for the target view. Prepared on the first successful draw and
+  // released before any tree rebuild, node edit or image refresh. Keeping it across frames avoids
+  // re-walking the tree, allocating a wrapper and toggling mask ownership on every draw.
+  std::unique_ptr<OutputTargetState> outputTargetState = nullptr;
 
   std::unique_ptr<PAGDisplayOptions> displayOptions = nullptr;
 

@@ -105,6 +105,9 @@ std::shared_ptr<PAGScene> PAGScene::Make(std::shared_ptr<PAGXDocument> document)
 }
 
 void PAGScene::buildRuntimeTree() {
+  // A rebuild destroys the runtime tree the wrapper was inserted into. Restore the original tree
+  // and drop the prepared state before removing the old root or replacing the binding.
+  outputTargetState.reset();
   // Detach any previously built tree (a rebuild after an external-document edit) so the display list
   // and timeline cache do not retain stale runtime layers.
   if (_rootComposition != nullptr && _rootComposition->runtimeLayer != nullptr) {
@@ -159,6 +162,33 @@ void PAGScene::resolveOutputTarget() {
   outputTargetNode = nullptr;
   outputViewError.clear();
   outputViewStatus = ResolveOutputView(document.get(), &outputTargetNode, &outputViewError);
+}
+
+bool PAGScene::ensureOutputTargetState() {
+  auto root = _rootComposition != nullptr ? _rootComposition->runtimeLayer : nullptr;
+  auto target = _rootComposition != nullptr && _rootComposition->binding != nullptr
+                    ? _rootComposition->binding->get<tgfx::Layer>(outputTargetNode)
+                    : nullptr;
+  if (root == nullptr || target == nullptr) {
+    outputTargetState.reset();
+    return false;
+  }
+  if (outputTargetState != nullptr) {
+    // A state that was already created may only be reused. A different binding or a disturbed
+    // hookup means the tree changed without an invalidation path: fail rather than silently
+    // re-hooking and reporting the frame as drawn. Only explicit invalidation resets the state.
+    if (!outputTargetState->binds(root, target)) {
+      return false;
+    }
+    return outputTargetState->isPrepared();
+  }
+  // No state yet: this is either the first draw or a draw after an explicit invalidation.
+  outputTargetState = std::make_unique<OutputTargetState>();
+  if (!outputTargetState->prepare(root, target)) {
+    outputTargetState.reset();
+    return false;
+  }
+  return true;
 }
 
 std::shared_ptr<PAGViewModel> PAGScene::CreateViewModelFromSchema(
@@ -411,6 +441,9 @@ void PAGScene::buildViewModels() {
 }
 
 PAGScene::~PAGScene() {
+  // Release the wrapper while the runtime tree is still alive so it can restore the original
+  // parent, child order and mask ownership.
+  outputTargetState.reset();
   if (document != nullptr) {
     document->unregisterLiveScene(this);
   }
@@ -563,19 +596,13 @@ bool PAGScene::renderTo(const std::shared_ptr<PAGSurface>& surface, tgfx::Contex
     return false;
   }
   if (outputViewStatus == OutputViewStatus::Invalid) {
-    // The declaration cannot be rendered, so there is nothing left to redraw. Consuming the flag
-    // keeps hosts that gate on hasContentChanged() from retrying the same failed draw forever.
+    // The declaration cannot be rendered, so there is nothing left to redraw. Release any prepared
+    // wrapper and consume the flag to keep hosts from retrying the same failed draw forever.
+    outputTargetState.reset();
     outputViewDirty = false;
     return false;
   }
   if (outputViewStatus == OutputViewStatus::Valid) {
-    auto* root = _rootComposition != nullptr ? _rootComposition->runtimeLayer.get() : nullptr;
-    auto target = _rootComposition != nullptr && _rootComposition->binding != nullptr
-                      ? _rootComposition->binding->get<tgfx::Layer>(outputTargetNode)
-                      : nullptr;
-    if (root == nullptr || target == nullptr) {
-      return false;
-    }
     auto zoomScale = displayList->zoomScale();
     if (zoomScale <= 0.0f) {
       return false;
@@ -597,6 +624,9 @@ bool PAGScene::renderTo(const std::shared_ptr<PAGSurface>& surface, tgfx::Contex
     // is already empty.
     auto outputBounds = getOutputBounds();
     if (!outputBounds.has_value()) {
+      // The window was cleared without a declaration change: consume the pending redraw but also
+      // release the wrapper so a later re-declaration prepares against the current tree.
+      outputTargetState.reset();
       outputViewDirty = false;
       return false;
     }
@@ -610,11 +640,18 @@ bool PAGScene::renderTo(const std::shared_ptr<PAGSurface>& surface, tgfx::Contex
     // The clip is expressed in root coordinates, which is the space the current canvas matrix
     // maps to the surface.
     canvas->clipRect(tgfx::Rect::MakeXYWH(bounds.x, bounds.y, bounds.width, bounds.height));
-    DrawOutputTarget(canvas, _rootComposition->runtimeLayer, target);
+    // Prepare the reusable wrapper just before drawing. A failure here or in draw() must not
+    // consume the pending redraw: the host has to retry once the tree is repaired.
+    if (!ensureOutputTargetState() || !outputTargetState->draw(canvas)) {
+      return false;
+    }
     clearAllViewModelsDirty();
     outputViewDirty = false;
     return true;
   }
+  // A declaration that transitioned to None renders the whole canvas; the wrapper from a previous
+  // Valid state must have been released by onNodesChanged() or the declaration change path.
+  outputTargetState.reset();
   displayList->render(tgfxSurface.get(), autoClear);
   clearAllViewModelsDirty();
   return true;
@@ -739,6 +776,9 @@ void PAGScene::onImageResourcesChanged(const std::vector<Image*>& changedImages)
     return;
   }
   outputViewDirty = true;
+  // Image replacement can rebuild layer content; conservatively drop the prepared wrapper so the
+  // next draw hooks into the current tree while keeping the existing refresh and dirty behavior.
+  outputTargetState.reset();
   std::unordered_set<const Image*> changed(changedImages.begin(), changedImages.end());
   RefreshViewModelImages(_rootComposition.get(), changed);
 }
@@ -910,6 +950,10 @@ bool PAGScene::rootToSurfaceMatrix(Matrix* out) const {
 }
 
 void PAGScene::onNodesChanged(const std::vector<Node*>& dirtyNodes) {
+  // Restore and drop the wrapper before any tree edit. refreshNodes() and buildRuntimeTree() can
+  // reorder or replace layers, so the prepared hookup cannot survive this entry point. The next
+  // valid draw lazily prepares against the refreshed tree.
+  outputTargetState.reset();
   // The dirty nodes belong either to this scene's own document or to an external (child) document
   // this scene embeds. A child document dispatches to this scene through its own notifyChange; in
   // that case the nodes are not owned here, and an external composition is built into the runtime

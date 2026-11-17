@@ -23,6 +23,7 @@
 #include <string>
 #include <vector>
 #include "pagx/PAGXDocument.h"
+#include "pagx/utils/RasterLayerParent.h"
 
 namespace tgfx {
 class Canvas;
@@ -68,17 +69,76 @@ OutputViewStatus ResolveOutputView(const PAGXDocument* document, const Layer** t
 bool HasDeclaredOutputView(const PAGXDocument& document);
 
 /**
- * Draws only the given target layer onto the canvas. The layer's own transform, alpha,
- * visibility, mask and scrollRect are applied exactly once through a temporary parent, and
- * backdrop-dependent layer styles sample the ancestors and prior siblings of the target in the
- * original tree while later siblings are excluded. A target that another layer references as its
- * mask is temporarily released from that ownership so the mask skip rule does not drop it from the
- * output. The original tree shape is restored before returning.
+ * Owns the prepared target-view wrapper across draws for a single PAGScene. It keeps the shared
+ * parenting tool alive so repeated draws do not re-walk the tree, allocate a wrapper or toggle mask
+ * ownership. Construction, preparation and drawing are separated so a scene can prepare once and
+ * reuse the state until an edit, resource update or display change invalidates it.
+ */
+class OutputTargetState {
+ public:
+  OutputTargetState() = default;
+
+  OutputTargetState(const OutputTargetState&) = delete;
+  OutputTargetState& operator=(const OutputTargetState&) = delete;
+
+  /**
+   * Prepares the wrapper for the given root and target, checking that the target belongs to the
+   * tree and enabling temporary release of an external mask owner. On failure the tree is left
+   * unchanged and the state stays invalid.
+   * @param root the root layer of the tree that owns the target.
+   * @param target the layer to draw.
+   * @return true when the wrapper is ready for drawing.
+   */
+  bool prepare(const std::shared_ptr<tgfx::Layer>& root,
+               const std::shared_ptr<tgfx::Layer>& target);
+
+  /**
+   * Draws the target through the prepared wrapper. The target's own transform, alpha, visibility,
+   * mask and scrollRect are applied exactly once, and the canvas matrix is scoped to this call.
+   * @return false without drawing when the state is not prepared or the hookup was disturbed;
+   *         true after a draw was issued (TGFX drawing itself does not report GPU failures).
+   */
+  bool draw(tgfx::Canvas* canvas);
+
+  /**
+   * Returns true when the wrapper is prepared and still occupies the target's original slot.
+   */
+  bool isPrepared() const;
+
+  /**
+   * Returns true when this state was prepared for the given root and target. Used to detect a
+   * binding that changed without the owning scene invalidating the state first.
+   */
+  bool binds(const std::shared_ptr<tgfx::Layer>& root,
+             const std::shared_ptr<tgfx::Layer>& target) const {
+    return this->root == root && this->target == target;
+  }
+
+  /**
+   * Restores the original tree and mask ownership and drops the prepared state. Idempotent.
+   */
+  void reset();
+
+ private:
+  RasterLayerParent parent = {};
+  std::shared_ptr<tgfx::Layer> root = nullptr;
+  std::shared_ptr<tgfx::Layer> target = nullptr;
+};
+
+/**
+ * Draws only the given target layer onto the canvas in a single scoped preparation. The layer's
+ * own transform, alpha, visibility, mask and scrollRect are applied exactly once through a
+ * temporary parent, and backdrop-dependent layer styles sample the ancestors and prior siblings of
+ * the target in the original tree while later siblings are excluded. A target that another layer
+ * references as its mask is temporarily released from that ownership so the mask skip rule does not
+ * drop it from the output. The original tree shape is restored before returning.
  * @param canvas the destination canvas in the target's parent coordinate space.
  * @param root the root layer of the tree that owns the target; used as the coordinate space.
  * @param targetLayer the layer to draw.
+ * @return false without drawing when the arguments are null, the target is not in the tree, or the
+ *         temporary parent could not be prepared; true after a draw was issued.
  */
-void DrawOutputTarget(tgfx::Canvas* canvas, const std::shared_ptr<tgfx::Layer>& root,
+bool DrawOutputTarget(tgfx::Canvas* canvas, const std::shared_ptr<tgfx::Layer>& root,
                       const std::shared_ptr<tgfx::Layer>& targetLayer);
 
 }  // namespace pagx
