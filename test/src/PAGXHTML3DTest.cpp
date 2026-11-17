@@ -29,14 +29,12 @@
 // centre) is asserted explicitly.
 
 #include <cmath>
-#include <cstring>
 #include <memory>
 #include <string>
 #include <vector>
 #include "base/PAGTest.h"
+#include "base/PAGXTestUtils.h"
 #include "pagx/HTMLImporter.h"
-#include "pagx/PAGScene.h"
-#include "pagx/PAGSurface.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/nodes/Animation.h"
 #include "pagx/nodes/AnimationObject.h"
@@ -46,18 +44,9 @@
 #include "pagx/types/Matrix.h"
 #include "pagx/types/Matrix3D.h"
 #include "pagx/utils/LayerTransformUtils.h"
-#include "tgfx/core/Bitmap.h"
-#include "tgfx/core/Pixmap.h"
 
 namespace pag {
 namespace {
-
-constexpr float kEps = 0.01f;
-constexpr int DocSize = 200;
-
-bool NearlyEqual(float a, float b, float eps = kEps) {
-  return std::fabs(a - b) <= eps;
-}
 
 bool HasZeroAnchor(const pagx::Layer* layer) {
   return NearlyEqual(layer->anchor.x, 0.0f) && NearlyEqual(layer->anchor.y, 0.0f) &&
@@ -121,19 +110,6 @@ std::vector<pagx::Layer*> LayersWithNonIdentityMatrix3D(
     CollectLayersWithMatrix3D(layer, &layers);
   }
   return layers;
-}
-
-bool HasDiagnosticContaining(const std::shared_ptr<pagx::PAGXDocument>& doc,
-                             const std::string& needle) {
-  if (doc == nullptr) {
-    return false;
-  }
-  for (const auto& message : doc->errors) {
-    if (message.find(needle) != std::string::npos) {
-      return true;
-    }
-  }
-  return false;
 }
 
 pagx::Animation* FirstAnimation(const std::shared_ptr<pagx::PAGXDocument>& doc) {
@@ -201,57 +177,6 @@ pagx::Matrix3D MultiplyPose(const pagx::Matrix3D& left, const pagx::Matrix3D& ri
     }
   }
   return result;
-}
-
-// Renders one frame through the runtime path (PAGScene + PAGSurface), matching the CLI player.
-std::vector<uint8_t> RenderFrame(const std::shared_ptr<pagx::PAGXDocument>& doc,
-                                 int64_t timeUs = 0) {
-  std::vector<uint8_t> pixels = {};
-  if (doc == nullptr) {
-    return pixels;
-  }
-  auto scene = pagx::PAGScene::Make(doc);
-  if (scene == nullptr) {
-    return pixels;
-  }
-  if (timeUs != 0) {
-    for (const auto& id : scene->getAnimationIds()) {
-      auto animation = scene->getAnimation(id);
-      if (animation != nullptr) {
-        animation->setCurrentTime(timeUs);
-        animation->apply(1.0f);
-      }
-    }
-  }
-  scene->advanceAndApply(timeUs);
-  auto surface = pagx::PAGSurface::MakeOffscreen(DocSize, DocSize);
-  if (surface == nullptr || !scene->draw(surface)) {
-    return {};
-  }
-  tgfx::Bitmap bitmap(DocSize, DocSize, false, false);
-  if (bitmap.isEmpty()) {
-    return {};
-  }
-  tgfx::Pixmap pixmap(bitmap);
-  if (!surface->readPixels(pixmap.writablePixels(), pixmap.rowBytes())) {
-    return {};
-  }
-  const auto* src = reinterpret_cast<const uint8_t*>(pixmap.writablePixels());
-  pixels.assign(src, src + static_cast<size_t>(pixmap.rowBytes()) * DocSize);
-  return pixels;
-}
-
-size_t CountDifferentPixels(const std::vector<uint8_t>& a, const std::vector<uint8_t>& b) {
-  if (a.size() != b.size() || a.empty()) {
-    return a.size() + 1;
-  }
-  size_t different = 0;
-  for (size_t i = 0; i + 3 < a.size(); i += 4) {
-    if (std::memcmp(&a[i], &b[i], 4) != 0) {
-      ++different;
-    }
-  }
-  return different;
 }
 
 }  // namespace
@@ -537,7 +462,7 @@ PAG_TEST(PAGXHTML3DTest, Matrix3DSingularIsRejected) {
   ASSERT_NE(layer, nullptr);
   EXPECT_TRUE(layer->matrix3D.isIdentity());
   EXPECT_TRUE(layer->matrix.isIdentity());
-  EXPECT_FALSE(doc->errors.empty());
+  EXPECT_TRUE(HasDiagnosticContaining(doc, "not invertible"));
 }
 
 // ---------------------------------------------------------------------------------------------

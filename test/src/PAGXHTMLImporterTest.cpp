@@ -27,6 +27,7 @@
 #include <type_traits>
 #include <vector>
 #include "base/PAGTest.h"
+#include "base/PAGXTestUtils.h"
 #include "cli/CommandVerify.h"
 #include "pagx/FontConfig.h"
 #include "pagx/HTMLImporter.h"
@@ -91,10 +92,6 @@ namespace pag {
 namespace {
 
 constexpr float kEps = 0.001f;
-
-inline bool NearlyEqual(float a, float b, float eps = kEps) {
-  return std::fabs(a - b) <= eps;
-}
 
 inline std::string SaveFile(const std::string& content, const std::string& key) {
   auto outPath = ProjectPath::Absolute("test/out/" + key);
@@ -203,15 +200,6 @@ inline std::shared_ptr<pagx::PAGXDocument> ParseRaw(const std::string& html) {
   pagx::HTMLImporter::Options opts;
   opts.autoNormalize = false;
   return pagx::HTMLImporter::ParseString(html, opts);
-}
-
-inline bool HasDiagnosticContaining(const std::shared_ptr<pagx::PAGXDocument>& doc,
-                                    const std::string& needle) {
-  if (!doc) return false;
-  for (const auto& msg : doc->errors) {
-    if (msg.find(needle) != std::string::npos) return true;
-  }
-  return false;
 }
 
 pagx::ColorMatrixFilter* ParseColorMatrixFilter(const std::string& filter,
