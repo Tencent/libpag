@@ -832,9 +832,11 @@ void HTMLStyleCascade::parseBoxTransform(HTMLBoxAttributes& box, const PropertyM
   const auto origin =
       ResolveTransformOrigin(originValue, referenceWidthPx, referenceHeightPx, _valueParser);
   HTMLTransform parsed = {};
-  // `transform: none` parses to the identity but declares no pose of its own, so `valid` stays false
-  // and `applyBoxTransform` can still materialise a bare `preserve-3d` parent camera on this layer.
-  parsed.valid = ToLower(transform) != "none";
+  // An exact identity pose declares no pose of its own (`transform: none` and a computed
+  // `matrix(1,0,0,1,0,0)` both land here), so `valid` stays false and `applyBoxTransform` can still
+  // materialise a bare `preserve-3d` parent camera on this layer. A flat but non-identity pose
+  // (`scale(0)`) keeps `valid`, or the `scale(0)` fix would fall back to the bare camera path.
+  parsed.valid = !pose.isIdentity();
   parsed.pose = pose;
   parsed.origin = origin.point;
   parsed.originZ = origin.z;

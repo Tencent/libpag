@@ -990,9 +990,9 @@ PAG_TEST(PAGXHTML3DTest, PlainIntermediateLayerEndsTheCameraChain) {
 }
 
 /**
- * Test case: a `preserve-3d` layer that has its own transform keeps the existing single-fold route.
- * `translateZ(0)` is a flat pose pivoted on the plane, so the camera does not apply and the layer
- * writes no projection — the camera reaches the subtree through the pose alone.
+ * Test case: a `preserve-3d` layer that has its own non-identity flat transform keeps the existing
+ * single-fold route. A flat pose is pivoted on the plane, so the camera does not apply and the layer
+ * writes no projection — the flat pose itself is the layer's whole transform.
  */
 PAG_TEST(PAGXHTML3DTest, Preserve3DWithOwnFlatTransformKeepsTheExistingRoute) {
   auto doc = ParseHtml(R"HTML(
@@ -1000,7 +1000,7 @@ PAG_TEST(PAGXHTML3DTest, Preserve3DWithOwnFlatTransformKeepsTheExistingRoute) {
       <div style="position:absolute;left:0;top:0;width:200px;height:120px;perspective:600px;
            perspective-origin:0px 0px">
         <div id="stage" style="position:absolute;left:0;top:0;width:200px;height:120px;
-             transform-style:preserve-3d;transform:translateZ(0px)">
+             transform-style:preserve-3d;transform:translateX(10px)">
           <div id="card" style="position:absolute;left:20px;top:20px;width:80px;height:60px;
                background-color:#38BDF8;transform:rotateY(45deg)"></div>
         </div>
@@ -1014,10 +1014,44 @@ PAG_TEST(PAGXHTML3DTest, Preserve3DWithOwnFlatTransformKeepsTheExistingRoute) {
   ASSERT_NE(card, nullptr);
   EXPECT_TRUE(stage->preserve3D);
   EXPECT_TRUE(stage->matrix3D.isIdentity());
-  EXPECT_TRUE(stage->matrix.isIdentity());
+  EXPECT_TRUE(NearlyEqual(stage->matrix.tx, 10.0f, 1e-6f));
   const auto composed = MultiplyPose(stage->matrix3D, card->matrix3D);
   EXPECT_TRUE(NearlyEqual(composed.getRowColumn(3, 0), 0.0f, 1e-6f));
   EXPECT_TRUE(NearlyEqual(composed.getRowColumn(3, 2), 0.0f, 1e-6f));
+}
+
+/**
+ * Test case: a `preserve-3d` layer whose transform resolves to the exact identity declares no pose
+ * of its own, so it carries the parent camera exactly like a layer that omits `transform`. Both
+ * `transform: none` and a computed `matrix(1, 0, 0, 1, 0, 0)` land on that identity; a flat but
+ * non-identity pose (`scale(0)`, `translateX(10px)`) does not, and keeps the route above.
+ */
+PAG_TEST(PAGXHTML3DTest, IdentityTransformKeepsTheBarePreserve3DCamera) {
+  const char* values[] = {"none", "matrix(1,0,0,1,0,0)"};
+  for (const char* value : values) {
+    std::string html = R"HTML(
+      <html><body style="width:200px;height:120px">
+        <div style="position:absolute;left:0;top:0;width:200px;height:120px;perspective:600px;
+             perspective-origin:0px 0px">
+          <div id="stage" style="position:absolute;left:0;top:0;width:200px;height:120px;
+               transform-style:preserve-3d;transform:VALUE">
+            <div id="card" style="position:absolute;left:20px;top:20px;width:80px;height:60px;
+                 background-color:#38BDF8;transform:rotateY(45deg)"></div>
+          </div>
+        </div>
+      </body></html>
+    )HTML";
+    html.replace(html.find("VALUE"), 5, value);
+    auto doc = ParseHtml(html);
+    ASSERT_NE(doc, nullptr) << value;
+    EXPECT_FALSE(HasDiagnosticContaining(doc, "html: transform")) << value;
+    auto* stage = FindLayerById(doc, "stage");
+    ASSERT_NE(stage, nullptr) << value;
+    EXPECT_TRUE(stage->preserve3D) << value;
+    EXPECT_TRUE(stage->matrix.isIdentity()) << value;
+    EXPECT_TRUE(pagx::IsInvertibleMatrix3D(stage->matrix3D)) << value;
+    EXPECT_TRUE(NearlyEqual(stage->matrix3D.getRowColumn(3, 2), -1.0f / 600.0f, 1e-6f)) << value;
+  }
 }
 
 /**
