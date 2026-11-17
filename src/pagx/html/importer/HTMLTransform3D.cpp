@@ -20,6 +20,7 @@
 #include <cctype>
 #include <cmath>
 #include <cstdlib>
+#include <unordered_set>
 #include "pagx/html/importer/HTMLDetail.h"
 #include "pagx/html/importer/HTMLDiagnosticSink.h"
 #include "pagx/html/importer/HTMLValueParser.h"
@@ -32,14 +33,14 @@ using namespace pagx::html;
 
 namespace {
 
-constexpr float kPoseEpsilon = 1e-6f;
+constexpr float POSE_EPSILON = 1e-6f;
 
 bool NearlyZero(float value) {
-  return std::fabs(value) <= kPoseEpsilon;
+  return std::fabs(value) <= POSE_EPSILON;
 }
 
 bool NearlyOne(float value) {
-  return std::fabs(value - 1.0f) <= kPoseEpsilon;
+  return std::fabs(value - 1.0f) <= POSE_EPSILON;
 }
 
 Matrix3D Multiply(const Matrix3D& left, const Matrix3D& right) {
@@ -245,13 +246,17 @@ bool ResolveLengthToken(const std::string& token, float referencePx, HTMLValuePa
       return false;
     }
     out = referencePx * fraction;
-    return true;
+    return std::isfinite(out);
   }
   // The callers name the offending argument themselves, so the generic unit warning is suppressed
   // here: `translate(10foo)` reports once, not twice.
   out = valueParser.parseAbsoluteLengthPx(trimmed, /*warn=*/false);
   return std::isfinite(out);
 }
+
+// Which box dimension a percentage length argument resolves against. There is no default: a caller
+// that forgot the axis used to resolve percentages against the width silently.
+enum class TransformAxis { X, Y, Z };
 
 // Argument accessors for one transform function. A small struct keeps the parser flat and avoids
 // the capturing lambdas the project style discourages.
@@ -262,12 +267,17 @@ struct TransformArgs {
   float referenceWidthPx = NAN;
   float referenceHeightPx = NAN;
 
-  // `axis`: 0 = x (percent of width), 1 = y (percent of height), 2 = z (no percentage basis).
-  bool LengthAt(size_t index, float& value, int axis = 0) const {
+  // The Z axis has no percentage basis, so a percentage there is reported as unsupported.
+  bool LengthAt(size_t index, float& value, TransformAxis axis) const {
     if (index >= parts.size()) {
       return false;
     }
-    const float reference = axis == 0 ? referenceWidthPx : (axis == 1 ? referenceHeightPx : NAN);
+    float reference = NAN;
+    if (axis == TransformAxis::X) {
+      reference = referenceWidthPx;
+    } else if (axis == TransformAxis::Y) {
+      reference = referenceHeightPx;
+    }
     return ResolveLengthToken(parts[index], reference, valueParser, value);
   }
 
@@ -325,24 +335,26 @@ bool ParseFunction(const std::string& token, HTMLValueParser& valueParser,
     float z = 0.0f;
     if (name == "translate" || name == "translate3d") {
       // `translate` stops at two lengths, so only `translate3d` reaches the depth axis.
-      if (!transformArgs.LengthAt(0, x, 0)) {
+      if (!transformArgs.LengthAt(0, x, TransformAxis::X)) {
         diagnostics.warn("html: translate first argument '" + parts[0] +
                          "' is not a px length; ignored");
         return false;
       }
-      if (parts.size() > 1 && !transformArgs.LengthAt(1, y, 1)) {
+      if (parts.size() > 1 && !transformArgs.LengthAt(1, y, TransformAxis::Y)) {
         diagnostics.warn("html: translate second argument '" + parts[1] +
                          "' is not a px length; ignored");
         return false;
       }
-      if (parts.size() > 2 && !transformArgs.LengthAt(2, z, 2)) {
+      if (parts.size() > 2 && !transformArgs.LengthAt(2, z, TransformAxis::Z)) {
         diagnostics.warn("html: translate third argument '" + parts[2] +
                          "' is not a px length; ignored");
         return false;
       }
     } else {
       float& only = name == "translatex" ? x : (name == "translatey" ? y : z);
-      const int onlyAxis = name == "translatex" ? 0 : (name == "translatey" ? 1 : 2);
+      const TransformAxis onlyAxis = name == "translatex"   ? TransformAxis::X
+                                     : name == "translatey" ? TransformAxis::Y
+                                                            : TransformAxis::Z;
       if (!transformArgs.LengthAt(0, only, onlyAxis)) {
         diagnostics.warn("html: " + label + " argument '" + parts[0] +
                          "' is not a px length; ignored");
@@ -528,7 +540,8 @@ bool ParseFunction(const std::string& token, HTMLValueParser& valueParser,
       return true;
     }
     float distance = 0.0f;
-    if (!transformArgs.LengthAt(0, distance, 2) || !std::isfinite(distance) || distance < 0.0f) {
+    if (!transformArgs.LengthAt(0, distance, TransformAxis::Z) || !std::isfinite(distance) ||
+        distance < 0.0f) {
       diagnostics.warn("html: perspective distance must be a non-negative length; got '" + token +
                        "'; ignored");
       return false;
@@ -567,17 +580,12 @@ bool IsOriginKeyword(const std::string& token) {
 }  // namespace
 
 bool IsSupportedTransformFunction(const std::string& name) {
-  static const char* kSupported[] = {
+  static const std::unordered_set<std::string> SUPPORTED_FUNCTIONS = {
       "translate", "translatex", "translatey", "translatez", "translate3d", "scale",
       "scalex",    "scaley",     "scalez",     "scale3d",    "rotate",      "rotatex",
       "rotatey",   "rotatez",    "rotate3d",   "skewx",      "skewy",       "skew",
       "matrix",    "matrix3d",   "perspective"};
-  for (const auto* candidate : kSupported) {
-    if (name == candidate) {
-      return true;
-    }
-  }
-  return false;
+  return SUPPORTED_FUNCTIONS.find(name) != SUPPORTED_FUNCTIONS.end();
 }
 
 bool SplitTransformFunctions(const std::string& value, std::vector<std::string>* out) {
@@ -729,9 +737,15 @@ bool ParseCssTransformList(const std::string& value, HTMLValueParser& valueParse
     return false;
   }
   const std::string trimmed = Trim(value);
-  if (trimmed.empty() || ToLower(trimmed) == "none") {
+  if (trimmed.empty()) {
     *out = {};
     return false;
+  }
+  if (ToLower(trimmed) == "none") {
+    // `none` is a valid declaration of "no transform", so it resolves to the identity and reports
+    // success: `false` only ever means "there is a diagnostic".
+    *out = {};
+    return true;
   }
   std::vector<std::string> tokens = {};
   if (!SplitTransformFunctions(trimmed, &tokens)) {
@@ -761,23 +775,13 @@ bool ParseCssTransformList(const std::string& value, HTMLValueParser& valueParse
   return true;
 }
 
-// Internal: the identity with its bottom row set to `(0, 0, -1/distance, 1)`. `Layer.perspective`
-// builds the same matrix, but a CSS `perspective` declaration lives on the parent and has to be
-// pushed into the child pose instead.
-static Matrix3D PerspectiveMatrix(float distance) {
-  if (!(distance > 0.0f) || !std::isfinite(distance)) {
-    return {};
-  }
-  return MakePerspective(distance);
-}
-
 Matrix3D PushPerspective(const Matrix3D& pose, float distance, float originX, float originY) {
   if (!(distance > 0.0f) || !std::isfinite(distance)) {
     return pose;
   }
   // CSS projects about `perspective-origin` (the parent's centre by default), not about the parent's
   // local origin, so the projection is conjugated with that point before it is folded into the pose.
-  const Matrix3D projection = PerspectiveMatrix(distance);
+  const Matrix3D projection = MakePerspective(distance);
   if (!std::isfinite(originX) || !std::isfinite(originY) || (originX == 0.0f && originY == 0.0f)) {
     return Multiply(projection, pose);
   }
@@ -812,7 +816,7 @@ bool IsFlatTransform(const Matrix3D& matrix) {
   //
   // This is a *geometric* test, so it deliberately differs from `HasPerspective` in
   // `LayerTransformUtils.h`, which asks whether the matrix carries a projection row at all (an exact
-  // `!= 0`). The projection coefficient is `1 / distance`, so a camera at `distance >= 1 / kPoseEpsilon`
+  // `!= 0`). The projection coefficient is `1 / distance`, so a camera at `distance >= 1 / POSE_EPSILON`
   // (i.e. `perspective(1000000px)` or further) reads as flat here while `HasPerspective` still sees a
   // projection: on the z = 0 plane the two disagree by less than a pixel, and the exact test is what
   // export needs to keep the row it was given.
@@ -838,7 +842,7 @@ bool IsLinearIdentity(const Matrix3D& matrix) {
   for (int row = 0; row < 3; ++row) {
     for (int column = 0; column < 3; ++column) {
       const float expected = row == column ? 1.0f : 0.0f;
-      if (std::fabs(matrix.getRowColumn(row, column) - expected) > kPoseEpsilon) {
+      if (std::fabs(matrix.getRowColumn(row, column) - expected) > POSE_EPSILON) {
         return false;
       }
     }

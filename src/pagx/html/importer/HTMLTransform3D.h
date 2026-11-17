@@ -77,9 +77,11 @@ HTMLTransformOrigin ResolveTransformOrigin(const std::string& value, float width
 
 /**
  * Parses a CSS `transform` value (a whitespace-separated function list) into a 4x4 pose, composed
- * in CSS order. Emits a diagnostic and returns false when a function is unknown, an argument is
- * invalid, the perspective distance is not positive, a `rotate3d` axis is degenerate, the result is
- * not finite, or a 3D result is not invertible (PAGX rejects such poses).
+ * in CSS order. `none` is a valid declaration of "no transform", so it resolves to the identity and
+ * reports success; an absent value (empty string) is the only silent false. Emits a diagnostic and
+ * returns false when a function is unknown, an argument is invalid, the perspective distance is not
+ * positive, a `rotate3d` axis is degenerate, the result is not finite, or a 3D result is not
+ * invertible (PAGX rejects such poses).
  */
 bool ParseCssTransformList(const std::string& value, HTMLValueParser& valueParser,
                            HTMLDiagnosticSink& diagnostics, Matrix3D* out,
@@ -88,7 +90,9 @@ bool ParseCssTransformList(const std::string& value, HTMLValueParser& valueParse
 /**
  * Returns `P * pose` for a CSS `perspective` declared on the pose's parent. The projection is pushed
  * into the child pose because PAGX keeps it on the layer that owns the pose; `Layer.perspective`
- * cannot be used for that, as it would only project the declaring layer itself.
+ * cannot be used for that, as it would only project the declaring layer itself. Two callers need it:
+ * `PlacePose` folds the camera into a child pose, and `HTMLLayerBuilder::applyBareParentCamera`
+ * materialises it on a `preserve-3d` layer that has no pose of its own.
  */
 Matrix3D PushPerspective(const Matrix3D& pose, float distance, float originX, float originY);
 

@@ -416,7 +416,7 @@ bool ParseTransformPose(const std::string& value, HTMLValueParser& parser,
                         const HTMLTransformReference& reference) {
   outPose = {};
   const std::string trimmed = Trim(value);
-  if (trimmed.empty() || ToLower(trimmed) == "none") {
+  if (trimmed.empty()) {
     return true;  // identity == translate(0, 0)
   }
   return ParseCssTransformList(trimmed, parser, diagnostics, &outPose, reference.widthPx,
