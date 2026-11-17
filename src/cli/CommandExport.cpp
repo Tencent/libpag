@@ -28,7 +28,7 @@
 #include <string>
 #include <vector>
 #include "cli/CliUtils.h"
-#include "cli/VideoEncoder.h"
+#include "cli/VideoEncoderProcessInternal.h"
 #include "cli/VideoFrameSource.h"
 #include "pagx/FontConfig.h"
 #include "pagx/HTMLExporter.h"
