@@ -474,7 +474,7 @@ HTMLBoxAttributes HTMLStyleCascade::computeBoxAttributes(const std::shared_ptr<D
   }
   parseBoxPositioning(box, props);
   parseBoxLayout(box, props);
-  parseBoxVisuals(box, props, reference, elementName);
+  parseBoxVisuals(box, props);
   parseBoxTransform(box, props, elementName, reference.widthPx, reference.heightPx);
   return box;
 }
@@ -655,9 +655,7 @@ bool HTMLStyleCascade::resolveBackgroundColor(const PropertyMap& props, Color* o
   return true;
 }
 
-void HTMLStyleCascade::parseBoxVisuals(HTMLBoxAttributes& box, const PropertyMap& props,
-                                       const HTMLTransformReference& reference,
-                                       const std::string& elementName) {
+void HTMLStyleCascade::parseBoxVisuals(HTMLBoxAttributes& box, const PropertyMap& props) {
   if (resolveBackgroundColor(props, &box.backgroundColor)) {
     box.backgroundColorSet = true;
   }
@@ -772,6 +770,17 @@ void HTMLStyleCascade::parseBoxVisuals(HTMLBoxAttributes& box, const PropertyMap
 
   box.objectFit = LookupLowerTrimmed(props, "object-fit");
 
+  static const char* VisualsDisallowed[] = {"outline"};
+  for (const auto* prop : VisualsDisallowed) {
+    if (!LookupProperty(props, prop).empty()) {
+      _diagnostics.warn(std::string("html: ") + prop + " not supported; ignored");
+    }
+  }
+}
+
+void HTMLStyleCascade::parseBoxTransform(HTMLBoxAttributes& box, const PropertyMap& props,
+                                         const std::string& elementName, float referenceWidthPx,
+                                         float referenceHeightPx) {
   // CSS `perspective` on this element projects its children; the value rides on the box so the
   // parser context can push `P` into each child pose. `perspective-origin` is resolved against the
   // same reference box and travels with the camera: PAGX has no origin parameter, so the parser
@@ -791,7 +800,7 @@ void HTMLStyleCascade::parseBoxVisuals(HTMLBoxAttributes& box, const PropertyMap
     const std::string authored = Trim(LookupProperty(props, "perspective-origin"));
     const std::string origin = authored.empty() ? std::string("50% 50%") : authored;
     const auto resolved =
-        ResolveTransformOrigin(origin, reference.widthPx, reference.heightPx, _valueParser);
+        ResolveTransformOrigin(origin, referenceWidthPx, referenceHeightPx, _valueParser);
     if (!resolved.valid) {
       _diagnostics.warn("html: perspective-origin '" + origin + "' on <" + elementName +
                         "> is not a valid CSS position; using the default 50% 50%");
@@ -809,17 +818,6 @@ void HTMLStyleCascade::parseBoxVisuals(HTMLBoxAttributes& box, const PropertyMap
     }
   }
 
-  static const char* VisualsDisallowed[] = {"outline"};
-  for (const auto* prop : VisualsDisallowed) {
-    if (!LookupProperty(props, prop).empty()) {
-      _diagnostics.warn(std::string("html: ") + prop + " not supported; ignored");
-    }
-  }
-}
-
-void HTMLStyleCascade::parseBoxTransform(HTMLBoxAttributes& box, const PropertyMap& props,
-                                         const std::string& elementName, float referenceWidthPx,
-                                         float referenceHeightPx) {
   box.preserve3D = ToLower(Trim(LookupProperty(props, "transform-style"))) == "preserve-3d";
   const std::string transform = Trim(LookupProperty(props, "transform"));
   Matrix3D pose = {};

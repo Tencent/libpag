@@ -88,6 +88,8 @@ class HTMLParserContext {
   void attachParentCamera(HTMLBoxAttributes& box, const std::shared_ptr<DOMNode>& element,
                           const HTMLInheritedStyle& inherited);
 
+  void forwardParentCamera(const HTMLBoxAttributes& box, HTMLInheritedStyle& childInherited);
+
   // Container conversion (for <div>-like elements). Emits the standard "outer
   // background + inner padded container" double-layer when both background and
   // padding/layout are present.

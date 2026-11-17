@@ -743,16 +743,8 @@ Layer* HTMLParserContext::convertBody(const std::shared_ptr<DOMNode>& body, floa
     _layerBuilder->applyLayoutAttributes(layer, box);
   }
 
-  // CSS `perspective` on `<body>` projects its direct children just like on any other container, so
-  // the bag handed down carries the camera one level (see convertContainer).
   HTMLInheritedStyle childInherited = inherited;
-  childInherited.parentPerspectivePx = box.perspectivePx;
-  childInherited.parentBorderWidthPx = box.borderWidthPx;
-  if (box.perspectivePx > 0.0f && std::isfinite(box.perspectiveOriginX) &&
-      std::isfinite(box.perspectiveOriginY)) {
-    childInherited.parentPerspectiveOriginX = box.perspectiveOriginX;
-    childInherited.parentPerspectiveOriginY = box.perspectiveOriginY;
-  }
+  forwardParentCamera(box, childInherited);
 
   auto child = body->getFirstChild();
   while (child) {
@@ -790,6 +782,16 @@ void HTMLParserContext::attachParentCamera(HTMLBoxAttributes& box,
       inherited.parentPerspectivePx > 0.0f &&
           Animates3DTransform(_styleCascade->keyframes(), _styleCascade->getResolvedStyle(element)),
       element->name, *_diagnostics, _flowChildPerspectiveWarned);
+}
+
+void HTMLParserContext::forwardParentCamera(const HTMLBoxAttributes& box,
+                                            HTMLInheritedStyle& childInherited) {
+  childInherited.parentPerspectivePx = box.perspectivePx;
+  childInherited.parentBorderWidthPx = box.borderWidthPx;
+  const bool hasCamera = box.perspectivePx > 0.0f && std::isfinite(box.perspectiveOriginX) &&
+                         std::isfinite(box.perspectiveOriginY);
+  childInherited.parentPerspectiveOriginX = hasCamera ? box.perspectiveOriginX : NAN;
+  childInherited.parentPerspectiveOriginY = hasCamera ? box.perspectiveOriginY : NAN;
 }
 
 Layer* HTMLParserContext::convertElement(const std::shared_ptr<DOMNode>& element,
@@ -933,15 +935,8 @@ Layer* HTMLParserContext::convertContainer(const std::shared_ptr<DOMNode>& eleme
     _layerBuilder->applyLayoutAttributes(layer, box);
   }
 
-  // CSS `perspective` projects the direct children, so the bag handed down carries it only one level.
   HTMLInheritedStyle childInherited = inherited;
-  childInherited.parentPerspectivePx = box.perspectivePx;
-  childInherited.parentBorderWidthPx = box.borderWidthPx;
-  if (box.perspectivePx > 0.0f && std::isfinite(box.perspectiveOriginX) &&
-      std::isfinite(box.perspectiveOriginY)) {
-    childInherited.parentPerspectiveOriginX = box.perspectiveOriginX;
-    childInherited.parentPerspectiveOriginY = box.perspectiveOriginY;
-  }
+  forwardParentCamera(box, childInherited);
   auto child = element->getFirstChild();
   while (child) {
     if (child->type == DOMNodeType::Element) {
