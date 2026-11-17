@@ -496,7 +496,8 @@ Everything else inside a `@keyframes` stop is warned and dropped
 |-----------------------|--------------|-------------|------------|
 | `opacity` | `alpha` | the element's `Layer` | float |
 | `transform` (pure translation only) | `x` / `y` | the element's `Layer` | float |
-| `transform` (scale / rotate / skew / any non-pure-translation) | `matrix` | the element's `Layer` | matrix |
+| `transform` (scale / rotate / skew / any non-pure-translation, staying on the plane) | `matrix` | the element's `Layer` | matrix |
+| `transform` (depth or perspective) | `matrix3D` | the element's `Layer` | matrix3D |
 | `color` / `background-color` | `color` | the `SolidColor` inside the element's `Fill` | color |
 | `filter: drop-shadow(...)` | `offsetX` / `offsetY` / `blurX` / `blurY` / `color` | a `DropShadowFilter` on the element's `Layer` | float / color |
 | `filter: blur(...)` | `blurX` / `blurY` | a `BlurFilter` on the element's `Layer` | float |
@@ -507,11 +508,12 @@ Everything else inside a `@keyframes` stop is warned and dropped
 separated function list composed in CSS order). When *every* keyframe is a pure translation the
 animation uses the cheaper `x` / `y` channels (which stack on top of the layout-assigned position).
 A flat pose routes the whole affine through one `matrix` channel, and a pose with depth or
-perspective through one `matrix3D` channel. Neither channel carries the pivot: `transform-origin`
-stays on the animated layer as `anchor`, which the runtime applies once after interpolation, so the
-pivot cannot drift between keyframes. Layout-affecting properties (`width`, `height`, `margin`,
-`padding`, `gap`, `flex`, …) are never animatable (see §4.4) and are dropped with
-`subset:animation-unsupported-property`.
+perspective through one `matrix3D` channel. Every `matrix3D` keyframe must be invertible, exactly
+like a static 3D pose; a non-invertible stop is dropped. Neither channel carries the pivot:
+`transform-origin` stays on the animated layer as `anchor` / `anchorZ`, which the runtime applies
+once after interpolation, so the pivot cannot drift between keyframes. Layout-affecting properties
+(`width`, `height`, `margin`, `padding`, `gap`, `flex`, …) are never animatable (see §4.4) and are
+dropped with `subset:animation-unsupported-property`.
 
 > Matrix-channel interpolation decomposes each keyframe into translation / scale / rotation / shear
 > and interpolates those components (`pagx/runtime/MatrixDecompose.h`); it cannot recover full turns

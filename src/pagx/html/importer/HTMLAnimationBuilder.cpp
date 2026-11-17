@@ -401,11 +401,6 @@ void ApplyAnimationLonghands(const std::unordered_map<std::string, std::string>&
 
 constexpr float kPi = 3.14159265358979323846f;
 
-// Parses a single finite float from a token (whitespace tolerated). Returns true and writes the
-// result on success; on failure (non-numeric, NaN, infinity) leaves the output untouched. Used to
-// validate matrix/scale arguments before they are folded into a transform matrix — without this
-// guard, `strtof`'s 0-on-failure behavior would silently produce degenerate matrices for malformed
-// transforms.
 // Parses a CSS `transform` value into the 4x4 pose a keyframe carries. How that pose is routed
 // (x/y, 2D `matrix` or `matrix3D`) is decided by `PlacePose`, once the parent camera has been folded
 // in, so classification does not happen here as well. `transform-origin` is NOT folded in: the pivot
@@ -750,10 +745,13 @@ SolidColor* FindSolidFillInElements(const std::vector<Element*>& elements, int e
 // `outer` keeps the parent-facing slot (width/height/percent/positional-constraints/flex,
 // `includeInLayout`) and the existing `id` used by alpha targets and external references.
 // All other state — internal layout (layout/gap/padding/alignment/arrangement),
-// transform / visibility / compositing (matrix/matrix3D/preserve3D/blendMode/visible/
-// antiAlias/groupOpacity/passThroughBackground), content/styles/filters/children/composition,
-// clip/mask state — is moved to `inner`. After the split, `outer.children` contains `inner`
-// only. `alpha` stays on `outer` because the alpha channel still targets the original id.
+// transform / visibility / compositing (matrix/matrix3D/anchor/anchorZ/preserve3D/blendMode/
+// visible/antiAlias/groupOpacity/passThroughBackground), content/styles/filters/children/
+// composition, clip/mask state — is moved to `inner`. `anchor` / `anchorZ` travel with the pose
+// and `preserve3D`: the pivot is expressed in the coordinate space the `matrix3D` opens, so
+// splitting it off would apply it in the wrong space (or twice). After the split,
+// `outer.children` contains `inner` only. `alpha` stays on `outer` because the alpha channel
+// still targets the original id.
 Layer* SplitForTransformAnimation(Layer* outer, PAGXDocument* document,
                                   HTMLIdAllocator& idAllocator) {
   auto* inner = document->makeNode<Layer>();

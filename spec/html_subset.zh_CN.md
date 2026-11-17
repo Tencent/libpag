@@ -466,8 +466,9 @@ CSS 圆角头像的常见写法是用 `border-radius` + `overflow: hidden` 的�
 
 `transform` 会逐关键帧解析成与静态路径相同的 4x4 姿态（空格分隔的函数列表按 CSS 顺序合成）。当
 *每一个*关键帧都是纯平移时，动画使用更廉价的 `x` / `y` 通道（它们叠加在布局分配的位置之上）。停留在
-平面上的姿态整条路由到单个 `matrix` 通道，带深度或透视的姿态则路由到单个 `matrix3D` 通道。两条通道都
-不携带支点：`transform-origin` 以 `anchor` 的形式留在被动画的图层上，由运行时在插值之后统一施加一次，
+平面上的姿态整条路由到单个 `matrix` 通道，带深度或透视的姿态则路由到单个 `matrix3D` 通道。每个
+`matrix3D` 关键帧必须可逆（与静态 3D 姿态一致），不可逆的停靠点会被丢弃。两条通道都不携带支点：
+`transform-origin` 以 `anchor` / `anchorZ` 的形式留在被动画的图层上，由运行时在插值之后统一施加一次，
 因此支点不会在关键帧之间漂移。影响布局的属性（`width`、`height`、`margin`、`padding`、`gap`、
 `flex` …）永远不可动画（见 §4.4），被丢弃并告警（`subset:animation-unsupported-property`）。
 
