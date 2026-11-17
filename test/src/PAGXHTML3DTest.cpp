@@ -1022,12 +1022,12 @@ PAG_TEST(PAGXHTML3DTest, Preserve3DWithOwnFlatTransformKeepsTheExistingRoute) {
 
 /**
  * Test case: a `preserve-3d` layer whose transform resolves to the exact identity declares no pose
- * of its own, so it carries the parent camera exactly like a layer that omits `transform`. Both
- * `transform: none` and a computed `matrix(1, 0, 0, 1, 0, 0)` land on that identity; a flat but
+ * of its own, so it carries the parent camera exactly like a layer that omits `transform`. `none`, a
+ * computed `matrix(1, 0, 0, 1, 0, 0)` and `rotate(0deg)` all land on that identity; a flat but
  * non-identity pose (`scale(0)`, `translateX(10px)`) does not, and keeps the route above.
  */
 PAG_TEST(PAGXHTML3DTest, IdentityTransformKeepsTheBarePreserve3DCamera) {
-  const char* values[] = {"none", "matrix(1,0,0,1,0,0)"};
+  const char* values[] = {"none", "matrix(1,0,0,1,0,0)", "rotate(0deg)"};
   for (const char* value : values) {
     std::string html = R"HTML(
       <html><body style="width:200px;height:120px">
@@ -1046,12 +1046,54 @@ PAG_TEST(PAGXHTML3DTest, IdentityTransformKeepsTheBarePreserve3DCamera) {
     ASSERT_NE(doc, nullptr) << value;
     EXPECT_FALSE(HasDiagnosticContaining(doc, "html: transform")) << value;
     auto* stage = FindLayerById(doc, "stage");
+    auto* card = FindLayerById(doc, "card");
     ASSERT_NE(stage, nullptr) << value;
+    ASSERT_NE(card, nullptr) << value;
     EXPECT_TRUE(stage->preserve3D) << value;
     EXPECT_TRUE(stage->matrix.isIdentity()) << value;
     EXPECT_TRUE(pagx::IsInvertibleMatrix3D(stage->matrix3D)) << value;
     EXPECT_TRUE(NearlyEqual(stage->matrix3D.getRowColumn(3, 2), -1.0f / 600.0f, 1e-6f)) << value;
+    // The skipped pivot must not leave a residue behind.
+    EXPECT_TRUE(NearlyEqual(stage->anchor.x, 0.0f)) << value;
+    EXPECT_TRUE(NearlyEqual(stage->anchor.y, 0.0f)) << value;
+    EXPECT_TRUE(NearlyEqual(stage->anchorZ, 0.0f)) << value;
+    // The grandchild keeps its own pose; only the camera rides on the intermediate layer.
+    EXPECT_TRUE(NearlyEqual(card->matrix3D.getRowColumn(0, 0), 0.70710678f, 0.001f)) << value;
+    EXPECT_TRUE(NearlyEqual(card->matrix3D.getRowColumn(3, 2), 0.0f, 1e-6f)) << value;
   }
+
+  // An identity pose is no pose, so a flat but non-identity one must not take the bare camera route:
+  // `scale(0)` has to stay a zero linear block, otherwise the invisible-element fix regresses.
+  auto scaleZero = ParseHtml(R"HTML(
+    <html><body style="width:200px;height:120px">
+      <div style="position:absolute;left:0;top:0;width:200px;height:120px;perspective:600px;
+           perspective-origin:0px 0px">
+        <div id="stage" style="position:absolute;left:0;top:0;width:200px;height:120px;
+             transform-style:preserve-3d;transform:scale(0)">
+          <div id="card" style="position:absolute;left:20px;top:20px;width:80px;height:60px;
+               background-color:#38BDF8;transform:rotateY(45deg)"></div>
+        </div>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(scaleZero, nullptr);
+  EXPECT_FALSE(HasDiagnosticContaining(scaleZero, "non-invertible"));
+  auto* scaleZeroStage = FindLayerById(scaleZero, "stage");
+  ASSERT_NE(scaleZeroStage, nullptr);
+  EXPECT_TRUE(scaleZeroStage->matrix3D.isIdentity()) << "must not materialise the bare camera";
+  EXPECT_TRUE(NearlyEqual(scaleZeroStage->matrix.a, 0.0f, 1e-6f));
+  EXPECT_TRUE(NearlyEqual(scaleZeroStage->matrix.d, 0.0f, 1e-6f));
+
+  // The pivot is skipped with the pose, so a bad `transform-origin` is not reported on a layer that
+  // has no transform of its own.
+  auto badOrigin = ParseHtml(R"HTML(
+    <html><body style="width:200px;height:120px">
+      <div id="box" style="width:100px;height:60px;background-color:#000;
+           transform:none;transform-origin:10foo 20px"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(badOrigin, nullptr);
+  EXPECT_FALSE(HasDiagnosticContaining(badOrigin, "not a valid CSS position"));
 }
 
 /**
