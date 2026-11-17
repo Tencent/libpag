@@ -17,11 +17,15 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TestUtils.h"
+#include <algorithm>
+#include <cstdlib>
 #include <fstream>
 #include "base/utils/TGFXCast.h"
+#include "pagx/PAGSurface.h"
 #include "rendering/utils/Directory.h"
 #include "tgfx/core/Buffer.h"
 #include "tgfx/core/Stream.h"
+#include "tgfx/core/Surface.h"
 #include "utils/ProjectPath.h"
 #include "utils/TestDir.h"
 
@@ -73,6 +77,76 @@ Bitmap MakeSnapshot(std::shared_ptr<PAGSurface> pagSurface) {
     return {};
   }
   return bitmap;
+}
+
+Bitmap MakeSnapshot(std::shared_ptr<tgfx::Surface> surface) {
+  if (surface == nullptr) {
+    return {};
+  }
+  Bitmap bitmap(surface->width(), surface->height(), false, false);
+  if (bitmap.isEmpty()) {
+    return {};
+  }
+  Pixmap pixmap(bitmap);
+  if (!surface->readPixels(pixmap.info(), pixmap.writablePixels())) {
+    return {};
+  }
+  return bitmap;
+}
+
+Bitmap MakeSnapshot(std::shared_ptr<pagx::PAGSurface> surface) {
+  if (surface == nullptr) {
+    return {};
+  }
+  Bitmap bitmap(surface->width(), surface->height(), false, false);
+  if (bitmap.isEmpty()) {
+    return {};
+  }
+  Pixmap pixmap(bitmap);
+  if (!surface->readPixels(pixmap.writablePixels(), pixmap.rowBytes())) {
+    return {};
+  }
+  return bitmap;
+}
+
+int CountDifferentPixelsInRect(const Bitmap& first, const Bitmap& second, int left, int top,
+                               int right, int bottom) {
+  if (first.isEmpty() || second.isEmpty() || first.width() != second.width() ||
+      first.height() != second.height()) {
+    return -1;
+  }
+  const int width = first.width();
+  const int height = first.height();
+  left = std::max(left, 0);
+  top = std::max(top, 0);
+  right = std::min(right, width);
+  bottom = std::min(bottom, height);
+  Pixmap firstPixmap(first);
+  Pixmap secondPixmap(second);
+  const auto* firstPixels = static_cast<const uint8_t*>(firstPixmap.pixels());
+  const auto* secondPixels = static_cast<const uint8_t*>(secondPixmap.pixels());
+  const size_t rowBytes = firstPixmap.rowBytes();
+  int differentPixels = 0;
+  for (int y = top; y < bottom; y++) {
+    for (int x = left; x < right; x++) {
+      const auto offset = static_cast<size_t>(y) * rowBytes + static_cast<size_t>(x) * 4;
+      for (size_t channel = 0; channel < 4; channel++) {
+        if (std::abs(firstPixels[offset + channel] - secondPixels[offset + channel]) > 8) {
+          differentPixels++;
+          break;
+        }
+      }
+    }
+  }
+  return differentPixels;
+}
+
+int CountDifferentPixels(const Bitmap& first, const Bitmap& second) {
+  // Guard the empty bitmap before touching width(); size mismatches are handled by InRect.
+  if (first.isEmpty() || second.isEmpty()) {
+    return -1;
+  }
+  return CountDifferentPixelsInRect(first, second, 0, 0, first.width(), first.height());
 }
 
 std::shared_ptr<PAGLayer> GetLayer(std::shared_ptr<PAGComposition> root, LayerType type,

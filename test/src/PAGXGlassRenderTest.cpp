@@ -19,13 +19,10 @@
 #include <algorithm>
 #include <cmath>
 #include "base/PAGTest.h"
-#include "pagx/PAGScene.h"
-#include "pagx/PAGSurface.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/PAGXExporter.h"
 #include "pagx/PAGXImporter.h"
 #include "pagx/PAGXOptimizer.h"
-#include "pagx/nodes/BackgroundBlurStyle.h"
 #include "pagx/nodes/ColorStop.h"
 #include "pagx/nodes/Fill.h"
 #include "pagx/nodes/GlassStyle.h"
@@ -41,6 +38,7 @@
 #include "tgfx/layers/DisplayList.h"
 #include "tgfx/layers/Layer.h"
 #include "utils/PAGXTestUtils.h"
+#include "utils/TestUtils.h"
 
 namespace pag {
 
@@ -118,10 +116,7 @@ static tgfx::Bitmap RenderViaDisplayList(pagx::PAGXDocument* document, tgfx::Con
   tgfx::DisplayList displayList;
   displayList.root()->addChild(layer);
   displayList.render(surface.get(), false);
-
-  tgfx::Bitmap bitmap(surface->width(), surface->height(), false, false, nullptr);
-  tgfx::Pixmap pixmap(bitmap);
-  return surface->readPixels(pixmap.info(), pixmap.writablePixels()) ? bitmap : tgfx::Bitmap{};
+  return MakeSnapshot(surface);
 }
 
 static tgfx::Bitmap RenderViaOrphanDirectDraw(pagx::PAGXDocument* document,
@@ -139,51 +134,7 @@ static tgfx::Bitmap RenderViaOrphanDirectDraw(pagx::PAGXDocument* document,
     return {};
   }
   layer->draw(surface->getCanvas(), layer->alpha());
-
-  tgfx::Bitmap bitmap(surface->width(), surface->height(), false, false, nullptr);
-  tgfx::Pixmap pixmap(bitmap);
-  return surface->readPixels(pixmap.info(), pixmap.writablePixels()) ? bitmap : tgfx::Bitmap{};
-}
-
-// Counts pixels differing by more than 8 levels in any channel inside the given rect.
-static int CountDifferentPixelsInRect(const tgfx::Bitmap& first, const tgfx::Bitmap& second,
-                                      int left, int top, int right, int bottom) {
-  if (first.isEmpty() || second.isEmpty() || first.width() != second.width() ||
-      first.height() != second.height()) {
-    return -1;
-  }
-  const int width = first.width();
-  const int height = first.height();
-  left = std::max(left, 0);
-  top = std::max(top, 0);
-  right = std::min(right, width);
-  bottom = std::min(bottom, height);
-  tgfx::Pixmap firstPixmap(first);
-  tgfx::Pixmap secondPixmap(second);
-  const auto* firstPixels = static_cast<const uint8_t*>(firstPixmap.pixels());
-  const auto* secondPixels = static_cast<const uint8_t*>(secondPixmap.pixels());
-  const size_t rowBytes = firstPixmap.rowBytes();
-  int differentPixels = 0;
-  for (int y = top; y < bottom; y++) {
-    for (int x = left; x < right; x++) {
-      const auto offset = static_cast<size_t>(y) * rowBytes + static_cast<size_t>(x) * 4;
-      for (size_t channel = 0; channel < 4; channel++) {
-        if (std::abs(firstPixels[offset + channel] - secondPixels[offset + channel]) > 8) {
-          differentPixels++;
-          break;
-        }
-      }
-    }
-  }
-  return differentPixels;
-}
-
-static int CountDifferentPixels(const tgfx::Bitmap& first, const tgfx::Bitmap& second) {
-  // Guard the empty bitmap before touching width(); size mismatches are handled by InRect.
-  if (first.isEmpty() || second.isEmpty()) {
-    return -1;
-  }
-  return CountDifferentPixelsInRect(first, second, 0, 0, first.width(), first.height());
+  return MakeSnapshot(surface);
 }
 
 // Largest single-channel difference inside the rect: the pixel counter above saturates at "differs",
@@ -846,175 +797,6 @@ PAGX_TEST(PAGXGlassRenderTest, GlassStyleContourFallbackReplacesGradientFillWith
   EXPECT_EQ(solidGap, 0) << "the gradient end must match an alpha-0 solid fill, got " << solidGap;
 }
 
-static std::shared_ptr<pagx::PAGXDocument> MakeBlurTargetDocument(bool withBlur) {
-  auto document = pagx::PAGXDocument::Make(200, 200);
-  auto makeHalf = [&document](const std::string& id, float x, const pagx::Color& color) {
-    auto layer = document->makeNode<pagx::Layer>(id);
-    auto rect = document->makeNode<pagx::Rectangle>();
-    rect->size = {100.0f, 200.0f};
-    rect->position = {x + 50.0f, 100.0f};
-    auto fill = document->makeNode<pagx::Fill>();
-    auto solid = document->makeNode<pagx::SolidColor>();
-    solid->color = color;
-    fill->color = solid;
-    layer->contents = {rect, fill};
-    document->layers.push_back(layer);
-  };
-  makeHalf("left", 0.0f, {1.0f, 0.0f, 0.0f, 1.0f});
-  makeHalf("right", 100.0f, {0.0f, 0.0f, 1.0f, 1.0f});
-
-  auto target = document->makeNode<pagx::Layer>("blurTarget");
-  auto rect = document->makeNode<pagx::Rectangle>();
-  rect->size = {100.0f, 100.0f};
-  rect->position = {100.0f, 100.0f};
-  auto fill = document->makeNode<pagx::Fill>();
-  auto solid = document->makeNode<pagx::SolidColor>();
-  solid->color = {1.0f, 1.0f, 1.0f, 0.2f};
-  fill->color = solid;
-  target->contents = {rect, fill};
-  if (withBlur) {
-    auto blur = document->makeNode<pagx::BackgroundBlurStyle>();
-    blur->blurX = 20.0f;
-    blur->blurY = 20.0f;
-    target->styles.push_back(blur);
-  }
-  document->layers.push_back(target);
-  document->targetLayerId = "blurTarget";
-  document->outputBounds = pagx::Rect::MakeXYWH(0, 0, 200, 200);
-  return document;
-}
-
-static tgfx::Bitmap RenderTargetView(const std::shared_ptr<pagx::PAGXDocument>& document) {
-  auto scene = pagx::PAGScene::Make(document);
-  EXPECT_NE(scene, nullptr);
-  if (scene == nullptr) {
-    return {};
-  }
-  auto outputBounds = scene->getOutputBounds();
-  EXPECT_TRUE(outputBounds.has_value());
-  if (!outputBounds.has_value()) {
-    return {};
-  }
-  int width = static_cast<int>(ceilf(outputBounds->width));
-  int height = static_cast<int>(ceilf(outputBounds->height));
-  auto surface = pagx::PAGSurface::MakeOffscreen(width, height);
-  EXPECT_NE(surface, nullptr);
-  if (surface == nullptr) {
-    return {};
-  }
-  EXPECT_TRUE(scene->draw(surface));
-  tgfx::Bitmap bitmap(width, height, false, false);
-  tgfx::Pixmap pixmap(bitmap);
-  if (!surface->readPixels(pixmap.writablePixels(), pixmap.rowBytes())) {
-    return {};
-  }
-  return bitmap;
-}
-
-PAGX_TEST(PAGXGlassRenderTest, TargetViewAppliesTargetMask) {
-  auto document = pagx::PAGXDocument::Make(200, 200);
-  auto* maskLayer = document->makeNode<pagx::Layer>("mask");
-  auto* maskRect = document->makeNode<pagx::Rectangle>();
-  maskRect->position = {100.0f, 100.0f};
-  maskRect->size = {100.0f, 100.0f};
-  auto* maskFill = document->makeNode<pagx::Fill>();
-  auto* maskColor = document->makeNode<pagx::SolidColor>();
-  maskColor->color = {1.0f, 1.0f, 1.0f, 1.0f};
-  maskFill->color = maskColor;
-  maskLayer->contents = {maskRect, maskFill};
-  maskLayer->visible = false;
-  document->layers.push_back(maskLayer);
-
-  auto* target = document->makeNode<pagx::Layer>("target");
-  target->mask = maskLayer;
-  target->maskType = pagx::MaskType::Alpha;
-  auto* targetRect = document->makeNode<pagx::Rectangle>();
-  targetRect->position = {100.0f, 100.0f};
-  targetRect->size = {200.0f, 200.0f};
-  auto* targetFill = document->makeNode<pagx::Fill>();
-  auto* targetColor = document->makeNode<pagx::SolidColor>();
-  targetColor->color = {1.0f, 0.0f, 0.0f, 1.0f};
-  targetFill->color = targetColor;
-  target->contents = {targetRect, targetFill};
-  document->layers.push_back(target);
-  document->targetLayerId = "target";
-  document->outputBounds = pagx::Rect::MakeXYWH(0, 0, 200, 200);
-
-  auto view = RenderTargetView(document);
-  ASSERT_FALSE(view.isEmpty());
-  EXPECT_GT(view.getColor(100, 100).red, 0.9f);
-  EXPECT_GT(view.getColor(100, 100).alpha, 0.99f);
-  EXPECT_NEAR(view.getColor(10, 10).alpha, 0.0f, 0.01f);
-}
-
-PAGX_TEST(PAGXGlassRenderTest, TargetViewClipsToOutputBounds) {
-  auto document = pagx::PAGXDocument::Make(200, 200);
-  auto* target = document->makeNode<pagx::Layer>("target");
-  auto* rect = document->makeNode<pagx::Rectangle>();
-  rect->size = {200.0f, 200.0f};
-  auto* fill = document->makeNode<pagx::Fill>();
-  auto* color = document->makeNode<pagx::SolidColor>();
-  color->color = {1.0f, 0.0f, 0.0f, 1.0f};
-  fill->color = color;
-  target->contents = {rect, fill};
-  document->layers.push_back(target);
-  document->targetLayerId = "target";
-  document->outputBounds = pagx::Rect::MakeXYWH(0, 0, 100, 80);
-
-  auto scene = pagx::PAGScene::Make(document);
-  ASSERT_NE(scene, nullptr);
-  // The surface covers the whole canvas instead of the output window, so anything the target
-  // draws outside outputBounds would land in the extra area without a clip.
-  auto surface = pagx::PAGSurface::MakeOffscreen(200, 200);
-  ASSERT_NE(surface, nullptr);
-  ASSERT_TRUE(scene->draw(surface));
-  tgfx::Bitmap bitmap(200, 200, false, false);
-  {
-    // The Pixmap keeps the bitmap's pixels locked, so it has to go out of scope before getColor()
-    // can create its own Pixmap over the same Bitmap.
-    tgfx::Pixmap pixmap(bitmap);
-    ASSERT_TRUE(surface->readPixels(pixmap.writablePixels(), pixmap.rowBytes()));
-  }
-
-  auto inside = bitmap.getColor(50, 40);
-  EXPECT_GT(inside.red, 0.9f);
-  EXPECT_NEAR(inside.alpha, 1.0f, 0.01f);
-  EXPECT_NEAR(bitmap.getColor(150, 40).alpha, 0.0f, 0.01f);
-  EXPECT_NEAR(bitmap.getColor(50, 120).alpha, 0.0f, 0.01f);
-}
-
-PAGX_TEST(PAGXGlassRenderTest, TargetViewSurvivesXmlReload) {
-  auto document = MakeGlassDocument(true);
-  document->targetLayerId = "glass";
-  document->outputBounds = pagx::Rect::MakeXYWH(0, 0, 300, 300);
-  auto originalView = RenderTargetView(document);
-  ASSERT_FALSE(originalView.isEmpty());
-
-  auto xml = pagx::PAGXExporter::ToXML(*document);
-  auto reloaded = pagx::PAGXImporter::FromXML(xml);
-  ASSERT_TRUE(reloaded != nullptr);
-  EXPECT_TRUE(reloaded->errors.empty());
-  EXPECT_EQ(reloaded->targetLayerId, "glass");
-  ASSERT_TRUE(reloaded->outputBounds.has_value());
-  auto reloadedView = RenderTargetView(reloaded);
-  ASSERT_FALSE(reloadedView.isEmpty());
-  EXPECT_LE(CountDifferentPixels(originalView, reloadedView), 16);
-}
-
-PAGX_TEST(PAGXGlassRenderTest, TargetViewSamplesBackdropForBackgroundBlur) {
-  auto blurView = RenderTargetView(MakeBlurTargetDocument(true));
-  auto controlView = RenderTargetView(MakeBlurTargetDocument(false));
-  ASSERT_FALSE(blurView.isEmpty());
-  ASSERT_FALSE(controlView.isEmpty());
-
-  EXPECT_NEAR(blurView.getColor(10, 10).alpha, 0.0f, 0.01f);
-  EXPECT_GT(CountDifferentPixels(blurView, controlView), 200);
-  // Near the red/blue boundary the blur mixes both halves; the control keeps a sharp edge.
-  auto blurredEdge = blurView.getColor(100, 100);
-  EXPECT_GT(blurredEdge.red, 0.1f);
-  EXPECT_GT(blurredEdge.blue, 0.1f);
-}
-
 PAGX_TEST(PAGXGlassRenderTest, TargetViewSamplesBackdropAndKeepsOutputBounds) {
   auto glassDocument = MakeGlassDocument(true);
   glassDocument->targetLayerId = "glass";
@@ -1041,42 +823,6 @@ PAGX_TEST(PAGXGlassRenderTest, TargetViewSamplesBackdropAndKeepsOutputBounds) {
   auto center = glassView.getColor(150, 150);
   EXPECT_GT(center.alpha, 0.95f);
   EXPECT_GT(center.blue, center.red);
-}
-
-PAGX_TEST(PAGXGlassRenderTest, TargetViewAppliesTargetAlphaOnce) {
-  auto opaqueDocument = MakeGlassDocument(false);
-  opaqueDocument->targetLayerId = "glass";
-  opaqueDocument->outputBounds = pagx::Rect::MakeXYWH(0, 0, 300, 300);
-  auto translucentDocument = MakeGlassDocument(false);
-  translucentDocument->targetLayerId = "glass";
-  translucentDocument->outputBounds = pagx::Rect::MakeXYWH(0, 0, 300, 300);
-  auto* translucentLayer = translucentDocument->findNode<pagx::Layer>("glass");
-  ASSERT_NE(translucentLayer, nullptr);
-  translucentLayer->alpha = 0.5f;
-
-  auto opaqueView = RenderTargetView(opaqueDocument);
-  auto translucentView = RenderTargetView(translucentDocument);
-  ASSERT_FALSE(opaqueView.isEmpty());
-  ASSERT_FALSE(translucentView.isEmpty());
-  EXPECT_NEAR(opaqueView.getColor(150, 150).alpha, 0.8f, 0.02f);
-  EXPECT_NEAR(translucentView.getColor(150, 150).alpha, 0.4f, 0.02f);
-}
-
-PAGX_TEST(PAGXGlassRenderTest, TargetViewHiddenTargetStaysTransparent) {
-  auto document = MakeGlassDocument(false);
-  document->targetLayerId = "glass";
-  document->outputBounds = pagx::Rect::MakeXYWH(0, 0, 300, 300);
-  auto* glassLayer = document->findNode<pagx::Layer>("glass");
-  ASSERT_NE(glassLayer, nullptr);
-  glassLayer->visible = false;
-
-  auto view = RenderTargetView(document);
-  ASSERT_FALSE(view.isEmpty());
-  for (int y = 0; y < view.height(); y += 10) {
-    for (int x = 0; x < view.width(); x += 10) {
-      EXPECT_NEAR(view.getColor(x, y).alpha, 0.0f, 0.01f) << x << "," << y;
-    }
-  }
 }
 
 }  // namespace pag

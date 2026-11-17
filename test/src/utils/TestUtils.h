@@ -35,6 +35,14 @@
 #include "tgfx/gpu/opengl/GLTypes.h"
 #endif
 
+namespace pagx {
+class PAGSurface;
+}  // namespace pagx
+
+namespace tgfx {
+class Surface;
+}  // namespace tgfx
+
 namespace pag {
 /**
  * Unregisters a test font when the scope exits, including early returns from fatal assertions.
@@ -66,6 +74,31 @@ bool CreateGLTexture(tgfx::Context* context, int width, int height, tgfx::GLText
 std::vector<std::string> GetAllPAGFiles(const std::string& path);
 
 tgfx::Bitmap MakeSnapshot(std::shared_ptr<PAGSurface> pagSurface);
+
+/**
+ * Reads a tgfx surface into a bitmap. Returns an empty bitmap when the surface is null, the
+ * bitmap cannot be allocated, or the readback fails.
+ */
+tgfx::Bitmap MakeSnapshot(std::shared_ptr<tgfx::Surface> surface);
+
+/**
+ * Reads a PAGX surface into a bitmap. Returns an empty bitmap when the surface is null, the
+ * bitmap cannot be allocated, or the readback fails.
+ */
+tgfx::Bitmap MakeSnapshot(std::shared_ptr<pagx::PAGSurface> surface);
+
+/**
+ * Counts pixels whose channels differ by more than 8 levels inside the given rect, returning -1
+ * when the bitmaps cannot be compared.
+ */
+int CountDifferentPixelsInRect(const tgfx::Bitmap& first, const tgfx::Bitmap& second, int left,
+                               int top, int right, int bottom);
+
+/**
+ * Counts pixels whose channels differ by more than 8 levels, returning -1 when the bitmaps cannot
+ * be compared.
+ */
+int CountDifferentPixels(const tgfx::Bitmap& first, const tgfx::Bitmap& second);
 
 std::shared_ptr<PAGLayer> GetLayer(std::shared_ptr<PAGComposition> root, LayerType type,
                                    int& targetIndex);
