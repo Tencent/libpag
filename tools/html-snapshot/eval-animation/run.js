@@ -662,6 +662,9 @@ function parsePagxCaseHeader(xml) {
     target: pick(/Target:\s*(\S+)/),
     channel: pick(/Channel:\s*(\S+)/),
     expect: pick(/Expect:\s*(\w+)/) || 'unknown',
+    // Names a channel the reference renderer does not draw at all: the fixture still measures the
+    // export against that renderer, but a mismatch it causes is a renderer gap, not our defect.
+    renderer: pick(/Renderer:\s*([^\n]+)/),
     ref: pick(/Ref:\s*(\S+)/),
   };
 }
@@ -1335,6 +1338,12 @@ function gradePagxRow(row) {
     // renderers, not a defect of the export (composite/09, text/06).
     row.grade = GRADE_STATIC_LIMITED;
     row.attribution = 'static';
+    return;
+  }
+  if (row.renderer) {
+    // The code the reference renderer should draw is missing from its own output, so the case cannot
+    // match no matter what the export does: name the renderer, not the exporter.
+    row.attribution = 'renderer-gap';
     return;
   }
   if (row.expect === 'gap') {
