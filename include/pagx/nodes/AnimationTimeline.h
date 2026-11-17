@@ -48,9 +48,10 @@ class AnimationTimeline : public Timeline {
   /**
    * Shifts the evaluation point of the referenced Animation, measured in frames of the
    * Animation's own frameRate. At runtime the content is evaluated at (currentFrame -
-   * evaluationOffset): a positive offset delays content playback (freezes at the first frame); a
-   * negative offset skips ahead (content starts from that frame). Carries the semantics of PAG's
-   * compositionStartTime. Default is 0.
+   * evaluationOffset). For Once animations, a positive offset delays playback while freezing at
+   * the first frame, and a negative offset skips ahead. For Loop and PingPong animations, the
+   * offset shifts the wrapped phase without changing the playback period. Carries the semantics
+   * of PAG's compositionStartTime. Default is 0.
    */
   int64_t evaluationOffset = 0;
 
