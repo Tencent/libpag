@@ -35,7 +35,6 @@
 const fs = require('fs');
 const path = require('path');
 const compare = require('../eval/compare');
-const { freezeToState } = require('./freeze');
 const { makeFail } = require('../dist/lib/common');
 const {
   spawnCapture,
@@ -779,22 +778,7 @@ async function processPagxCase(entry, outDir, opts) {
     rgbDeltaMax: NaN,
     motion: NaN,
     exportMotion: NaN,
-    // Static baseline (see measureStaticBaseline) plus the fidelity grade it feeds.
-    staticSSIM0: NaN,
-    staticSSIMworst: NaN,
-    animSSIM0: NaN,
-    animSSIMworst: NaN,
-    freezeSSIM0: NaN,
-    freezeSSIMworst: NaN,
-    stateSSIM0: NaN,
-    stateSSIMworst: NaN,
-    staticAvailable: 'no',
-    staticNote: '',
-    // Per-instant animation loss (staticSSIM_i - animSSIM_i, signed) and the clamped worst of the
-    // two, which is what the grade uses.
-    animLoss0: NaN,
-    animLossWorst: NaN,
-    animLoss: NaN,
+    // Fidelity grade; `grade(mean)` and `grade(min)` are the two readings it takes the stricter of.
     animGradeMean: '',
     animGradeMin: '',
     grade: '',
@@ -935,300 +919,11 @@ async function processPagxCase(entry, outDir, opts) {
     row.exportMotion < PAGX_STATIC_RGB_EPSILON,
   );
 
-  // 5. static baseline at t=0 and at the worst animSSIM frame, then the fidelity grade.
-  const staticRow = await measureStaticBaseline({
-    pagxPath,
-    xml,
-    caseDir,
-    pagxBin: opts.pagxBin,
-    browserEngine: opts.browserEngine,
-    exportedHtml,
-    times,
-    ssims,
-    refFrames,
-    renderFrames: exportFrames,
-    skipExisting,
-  });
-  Object.assign(row, staticRow);
   row.hasText = caseDrawsText(xml);
   gradePagxRow(row);
   return row;
 }
 
-// ---------------------------------------------------------------------------------------------
-// Static baseline: freeze the PAGX at one instant, then compare the two renderers on that state.
-//
-// `animSSIM` (the case's ssimMean) diffs an animated PAGX render against the exported HTML seeked to
-// the same time, so it charges the exporter for *both* its static fidelity and its animation wiring.
-// Freezing separates them: the frozen document carries the channel values of that instant as plain
-// attributes and no <Animations> at all, so `pagx render` of it and the browser rendering its static
-// HTML export are two readings of one identical, motionless state. Whatever gap remains is the
-// static ceiling; the gap between that and animSSIM is what the animation writer contributes.
-//
-// Two instants only (t=0 and the case's worst animSSIM frame): the freeze costs two renders plus the
-// static exports, and every extra instant buys nothing for attribution.
-// ---------------------------------------------------------------------------------------------
-
-const STATIC_DIR = 'static';
-// The frozen document is rendered through the PAGX *static* path while the reference animSSIM frame
-// comes from its animated path, and those two paths can differ slightly on their own (measured:
-// up to ~0.004 SSIM on a text-in-layer case). The structural `exact` flag, not this floor, is what
-// decides availability; the floor only catches a baking bug the static analysis missed.
-const STATIC_FREEZE_FLOOR = 0.99;
-
-// spawnCapture resolves only after the child's pipes close, so a browser that outlives its parent
-// (or a Playwright launch that never settles) leaves the promise pending even after its own timeout
-// fired. Every static-baseline step therefore runs under a deadline of its own: a stuck capture
-// costs one instant's evidence, not the whole run.
-function withDeadline(promise, ms, label) {
-  return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error(`${label}-timeout`)), ms);
-    promise.then(
-      (value) => {
-        clearTimeout(timer);
-        resolve(value);
-      },
-      (err) => {
-        clearTimeout(timer);
-        reject(err);
-      },
-    );
-  });
-}
-
-const STATIC_BROWSER_TIMEOUT_MS = 120000;
-const STATIC_TOOL_TIMEOUT_MS = 60000;
-
-function indexOfMin(values) {
-  let best = -1;
-  for (let i = 0; i < values.length; i++) {
-    if (!isFinite(values[i])) continue;
-    if (best < 0 || values[i] < values[best]) best = i;
-  }
-  return best < 0 ? 0 : best;
-}
-
-async function measureStaticBaseline(params) {
-  const dir = path.join(params.caseDir, STATIC_DIR);
-  ensureDir(dir);
-  const row = {
-    staticSSIM0: NaN,
-    staticSSIMworst: NaN,
-    animSSIM0: NaN,
-    animSSIMworst: NaN,
-    freezeSSIM0: NaN,
-    freezeSSIMworst: NaN,
-    stateSSIM0: NaN,
-    stateSSIMworst: NaN,
-    staticAvailable: 'no',
-    staticNote: '',
-  };
-  const notes = [];
-  let allExact = true;
-  const engineArgs = params.browserEngine ? ['--browser-engine', params.browserEngine] : [];
-  const worstIdx = indexOfMin(params.ssims);
-  const instants = [
-    // t=0 is outside the sample grid (samples sit strictly inside the window), so both of its
-    // pictures — the reference render and the exported-HTML screenshot — have to be taken here.
-    { tag: '0', timeSec: 0, animatedPng: null, animatedBrowserPng: null, field: '0' },
-    {
-      tag: 'worst',
-      timeSec: params.times[worstIdx],
-      animatedPng: params.refFrames[worstIdx],
-      animatedBrowserPng: params.renderFrames[worstIdx],
-      field: 'worst',
-    },
-  ];
-
-  for (const instant of instants) {
-    const stem = path.join(dir, instant.tag);
-    const frozenPath = `${stem}.frozen.pagx`;
-    const refPng = `${stem}.ref.png`;
-    const htmlPath = `${stem}.html`;
-    const browserDir = `${stem}.browser`;
-    const browserPng = path.join(browserDir, 'frame-000.png');
-    const timesJson = `${stem}.times.json`;
-    const animatedPng = instant.animatedPng || `${stem}.animated.png`;
-    // The exported HTML seeked to the same instant: animSSIM of *this* moment, needed because the
-    // loss has to be a same-instant difference (staticSSIM_i - animSSIM_i), not a mean minus a
-    // minimum. For the worst instant the case's own render frame already is that picture.
-    const animatedBrowserDir = `${stem}.animated-browser`;
-    const animatedBrowserPng = instant.animatedBrowserPng || path.join(animatedBrowserDir, 'frame-000.png');
-
-    const frozen = freezeToState(params.xml, instant.timeSec);
-    if (!frozen.exact) allExact = false;
-    // Notes are kept even when the freeze is exact: `skipped:` records a channel the runtime
-    // ignores, which is a registered difference worth carrying into the report/attribution.
-    if (frozen.notes.length) notes.push(`${instant.tag}:${frozen.notes.join('+')}`);
-
-    // Artifacts of an instant are reusable only if they were produced for this exact time: the
-    // frozen document bakes that time into its attributes, so reusing one across a changed sample
-    // grid would compare two different states.
-    const metaPath = `${stem}.meta.json`;
-    let reusable = false;
-    try {
-      reusable = JSON.parse(fs.readFileSync(metaPath, 'utf8')).timeSec === instant.timeSec;
-    } catch (err) {
-      reusable = false;
-    }
-
-    try {
-      if (!reusable || !fs.existsSync(frozenPath)) {
-        fs.writeFileSync(frozenPath, frozen.xml, 'utf8');
-      }
-      if (!reusable || !fs.existsSync(refPng)) {
-        const r = await withDeadline(
-          runPagxRenderAtTime({
-            pagxBin: params.pagxBin,
-            pagxFile: frozenPath,
-            output: refPng,
-            scale: 1,
-            timeSec: 0,
-            stderrPath: `${stem}.ref.stderr.txt`,
-          }),
-          STATIC_TOOL_TIMEOUT_MS,
-          'ref-render',
-        );
-        if (r.code !== 0 || !fs.existsSync(refPng)) throw new Error('ref-render-failed');
-      }
-      // The same-time render of the *animated* source: the self-check that the frozen document
-      // really reproduces the picture the runtime shows at this instant.
-      if (!reusable || !fs.existsSync(animatedPng)) {
-        const r = await withDeadline(
-          runPagxRenderAtTime({
-            pagxBin: params.pagxBin,
-            pagxFile: params.pagxPath,
-            output: animatedPng,
-            scale: 1,
-            timeSec: instant.timeSec,
-            stderrPath: `${stem}.animated.stderr.txt`,
-          }),
-          STATIC_TOOL_TIMEOUT_MS,
-          'animated-render',
-        );
-        if (r.code !== 0 || !fs.existsSync(animatedPng)) throw new Error('animated-render-failed');
-      }
-      if (!reusable || !fs.existsSync(htmlPath)) {
-        const r = await withDeadline(
-          runPagxExportHtml({
-            pagxBin: params.pagxBin,
-            pagxFile: frozenPath,
-            htmlFile: htmlPath,
-            stderrPath: `${stem}.export.stderr.txt`,
-          }),
-          STATIC_TOOL_TIMEOUT_MS,
-          'static-export',
-        );
-        if (r.code !== 0 || !fs.existsSync(htmlPath)) throw new Error('static-export-failed');
-      }
-      // A document without <Animations> needs no seek: capture it at its own resting state. The
-      // times file exists only because baseline-frames.js drives its capture loop from one.
-      fs.writeFileSync(
-        timesJson,
-        JSON.stringify({ width: 0, height: 0, globalDurationMs: 0, samples: [{ index: 0, timeSec: 0 }] }),
-        'utf8',
-      );
-      if (!reusable || !fs.existsSync(browserPng)) {
-        const r = await withDeadline(
-          spawnCapture(
-            process.execPath,
-            [
-              path.join(SCRIPT_DIR, 'baseline-frames.js'), htmlPath,
-              '-o', browserDir,
-              '--samples', '1',
-              '--times-json', timesJson,
-              ...engineArgs,
-            ],
-            { stderrPath: `${stem}.browser.stderr.txt` },
-          ),
-          STATIC_BROWSER_TIMEOUT_MS,
-          'static-browser',
-        );
-        if (r.code !== 0 || !fs.existsSync(browserPng)) throw new Error('static-browser-failed');
-      }
-
-      // animSSIM of this instant: the exported HTML seeked to it against the animated reference.
-      if (!fs.existsSync(animatedBrowserPng)) {
-        fs.writeFileSync(
-          `${stem}.animated.times.json`,
-          JSON.stringify({ width: 0, height: 0, globalDurationMs: 0, samples: [{ index: 0, timeSec: instant.timeSec }] }),
-          'utf8',
-        );
-        const r = await withDeadline(
-          spawnCapture(
-            process.execPath,
-            [
-              path.join(SCRIPT_DIR, 'baseline-frames.js'), params.exportedHtml,
-              '-o', animatedBrowserDir,
-              '--samples', '1',
-              '--times-json', `${stem}.animated.times.json`,
-              ...engineArgs,
-            ],
-            { stderrPath: `${stem}.animated-browser.stderr.txt` },
-          ),
-          STATIC_BROWSER_TIMEOUT_MS,
-          'animated-browser',
-        );
-        if (r.code !== 0 || !fs.existsSync(animatedBrowserPng)) throw new Error('animated-browser-failed');
-      }
-
-      // Publish the self-check pair under both instants, so `<tag>.ref.png` (the frozen document's
-      // render) and `<tag>.animated.png` (the source at the same instant) sit side by side. For the
-      // worst instant that picture already exists as the case's reference frame; copying it keeps
-      // the artifact set symmetric without rendering the same frame twice.
-      const animatedCopy = `${stem}.animated.png`;
-      if (path.resolve(animatedCopy) !== path.resolve(animatedPng) && !fs.existsSync(animatedCopy)) {
-        fs.copyFileSync(animatedPng, animatedCopy);
-      }
-      if (path.resolve(refPng) === path.resolve(animatedPng) || path.resolve(refPng) === path.resolve(animatedCopy)) {
-        throw new Error('freeze-pair-same-file');
-      }
-
-      const staticSSIM = compare.pixelMetrics(refPng, browserPng, `${stem}.diff.png`).ssim;
-      const freezeSSIM = compare.pixelMetrics(animatedPng, refPng, null).ssim;
-      const animSSIM = compare.pixelMetrics(animatedPng, animatedBrowserPng, null).ssim;
-      // Did the two renderers agree that the frozen state is the animated one? Two independent
-      // readings: the PAGX renders (`freezeSSIM`, freeze correctness) and the browser renderings of
-      // both exports (`stateSSIM`, whether the static export route reproduces that same state at
-      // all). When the static route diverges, staticSSIM measures the route gap, not fidelity.
-      const stateSSIM = compare.pixelMetrics(browserPng, animatedBrowserPng, null).ssim;
-      const suffix = instant.tag === '0' ? '0' : 'worst';
-      row[`staticSSIM${suffix}`] = staticSSIM;
-      row[`freezeSSIM${suffix}`] = freezeSSIM;
-      row[`animSSIM${suffix}`] = animSSIM;
-      row[`stateSSIM${suffix}`] = stateSSIM;
-      if (!(freezeSSIM >= STATIC_FREEZE_FLOOR)) {
-        allExact = false;
-        notes.push(`${instant.tag}:freeze-drift-${freezeSSIM.toFixed(4)}`);
-      }
-      // stateSSIM is recorded, not gated: a small value means the exporter's two routes disagree on
-      // this state, which is exactly what animLoss is meant to quantify (composite/18 scores 0.82
-      // here). Gating on it would discard the static evidence for every case whose animation path
-      // is imperfect — i.e. the cases the metric exists for.
-      if (!(stateSSIM >= STATIC_FREEZE_FLOOR)) {
-        notes.push(`${instant.tag}:state-drift-${stateSSIM.toFixed(4)}`);
-      }
-      fs.writeFileSync(
-        metaPath,
-        JSON.stringify({
-          timeSec: instant.timeSec,
-          exact: frozen.exact,
-          freezeSSIM,
-          refPng: path.basename(refPng),
-          animatedPng: path.basename(animatedPng),
-        }),
-        'utf8',
-      );
-    } catch (err) {
-      notes.push(`${instant.tag}:${err && err.message ? err.message : String(err)}`);
-      allExact = false;
-    }
-  }
-
-  row.staticAvailable = allExact ? 'yes' : 'no';
-  row.staticNote = notes.join(' ');
-  return row;
-}
 
 function pagxScoredRows(rows) {
   return rows.filter((r) => !r.error && r.flag !== 'ref-static' && r.flag !== 'both-static');
@@ -1246,20 +941,12 @@ function pagxScoredRows(rows) {
 // `-webkit-text-stroke`. Those outlines differ by a pixel or two at the edges whatever the animation
 // does, which caps a text case around 0.95-0.99; grading it on the shape-agnostic 0.999 curve would
 // report a rendering-strategy difference as a distortion of the export.
-// A case scores the stricter of animSSIM and staticSSIM. When the static ceiling sits below the
-// animSSIM tier, the residual error is the *static* path (browser font shape, layout) rather than
-// the animation writer, so the case is reported as static-limited and animLoss
-// (staticSSIM - animSSIM at the same instant) says how much the animation writer itself costs.
+// A case takes the stricter of its per-frame mean and its worst frame.
 // ---------------------------------------------------------------------------------------------
 
 const GRADE_COMPLETE = '完全还原';
 const GRADE_BASIC = '略有差异';
-const GRADE_STATIC_LIMITED = '静态受限';
 const GRADE_DISTORTED = '差异较大';
-
-// A static route that scores this much worse than the animated one on the same state is not the
-// font-shape ceiling the grade is about; it is a defect of the static path itself.
-const STATIC_ROUTE_DEFECT_GAP = 0.05;
 
 const TEXT_COMPLETE_SSIM = 0.99;
 const TEXT_BASIC_SSIM = 0.97;
@@ -1282,11 +969,6 @@ function gradeTierName(tier) {
   return GRADE_DISTORTED;
 }
 
-// The static ceiling of a case: the stricter of its two instants.
-function staticCeiling(row) {
-  const values = [row.staticSSIM0, row.staticSSIMworst].filter((v) => isFinite(v));
-  return values.length ? Math.min(...values) : NaN;
-}
 
 function gradePagxRow(row) {
   // The animated metric is graded on two readings: the per-frame mean (overall fidelity) and the
@@ -1298,46 +980,9 @@ function gradePagxRow(row) {
   const animTier = Math.min(animTierMean, animTierMin);
   row.animGradeMean = gradeTierName(animTierMean);
   row.animGradeMin = gradeTierName(animTierMin);
-  const staticValue = row.staticAvailable === 'yes' ? staticCeiling(row) : NaN;
-  const staticTier = gradeTier(staticValue, hasText);
-  if (staticTier > 0) {
-    // Same instant against same instant: subtracting a mean animSSIM from the worst staticSSIM (or
-    // the other way round) mixes two different states and flips conclusions on small-loss cases.
-    row.animLoss0 = row.staticSSIM0 - row.animSSIM0;
-    row.animLossWorst = row.staticSSIMworst - row.animSSIMworst;
-    const losses = [row.animLoss0, row.animLossWorst].filter((v) => isFinite(v));
-    // A negative loss means this state exports *better* statically than the animation does, so the
-    // animation writer is not the limiter: clamp it away rather than crediting the case.
-    row.animLoss = losses.length ? Math.max(0, Math.max(...losses)) : NaN;
-  }
-  if (staticTier === 0) {
-    row.grade = gradeTierName(animTier);
-    row.attribution = row.grade === GRADE_DISTORTED ? 'static-unavailable' : '';
-    return;
-  }
-  const hasSkippedChannel = /skipped:/.test(row.staticNote || '');
-  if (staticTier < animTier) {
-    // The static state already scores below the animated one, so the animation writer is not what
-    // is missing: grade the animation loss itself.
-    row.grade = GRADE_STATIC_LIMITED;
-    if (hasSkippedChannel) row.attribution = 'known-limit';
-    else if (row.animLoss <= 0.001) row.attribution = 'animation-complete';
-    else if (row.animLoss <= 0.01) row.attribution = 'animation-basic';
-    else row.attribution = 'static';
-    return;
-  }
-  row.grade = gradeTierName(Math.min(animTier, staticTier));
+  row.grade = gradeTierName(animTier);
   if (row.grade !== GRADE_DISTORTED) {
     row.attribution = '';
-    return;
-  }
-  if (hasText && row.staticAvailable === 'yes' && isFinite(row.animLoss) &&
-      row.animLoss <= 0.01) {
-    // The animated route is as faithful as the static route on the very states it plays, so what is
-    // left is the glyph-outline difference the text curve already accounts for - a ceiling of the
-    // renderers, not a defect of the export (composite/09, text/06).
-    row.grade = GRADE_STATIC_LIMITED;
-    row.attribution = 'static';
     return;
   }
   if (row.renderer) {
@@ -1351,30 +996,12 @@ function gradePagxRow(row) {
     row.attribution = 'known-limit';
     return;
   }
-  if (hasSkippedChannel) {
-    // A channel the runtime ignores but the exporter honors (or vice versa): the two routes can
-    // never agree on that state, so it is a registered difference, not a fidelity defect.
-    row.attribution = 'known-limit';
-    return;
-  }
   if (animTierMin < animTierMean) {
-    // The mean is fine but at least one frame is not: the animation wiring for that frame is the
-    // error, whatever the static ceiling is.
+    // The mean is fine but at least one frame is not: that frame's keyframes are the defect.
     row.attribution = 'exporter';
     return;
   }
-  if (row.animLoss > 0.001) {
-    // Same state, exported worse through the animated route: the keyframe writing is the error.
-    row.attribution = 'exporter';
-    return;
-  }
-  // The animation writer costs nothing here, so the ceiling is the limiter. A static route that
-  // renders this state far *worse* than the animated one is a static-path defect, not the
-  // font-shape difference the tier is meant to record.
-  const worstNegative = Math.min(
-    ...[row.animLoss0, row.animLossWorst].filter((v) => isFinite(v)),
-  );
-  row.attribution = worstNegative < -STATIC_ROUTE_DEFECT_GAP ? 'exporter' : 'static';
+  row.attribution = 'exporter';
 }
 
 function summarizePagx(rows) {
@@ -1407,21 +1034,11 @@ function summarizePagx(rows) {
       errored: all.filter((r) => r.error).length,
     });
   }
-  // Grade buckets over the rows that produced a picture to grade. `static-unavailable` rows still
-  // land in a grade (from animSSIM alone) but are counted separately so the summary never implies
-  // they had static evidence.
+  // Grade buckets over the rows that produced a picture to grade.
   const grades = {};
-  for (const name of [GRADE_COMPLETE, GRADE_BASIC, GRADE_STATIC_LIMITED, GRADE_DISTORTED]) {
+  for (const name of [GRADE_COMPLETE, GRADE_BASIC, GRADE_DISTORTED]) {
     grades[name] = rows.filter((r) => !r.error && r.grade === name).length;
   }
-  const staticStats = {
-    available: rows.filter((r) => r.staticAvailable === 'yes').length,
-    unavailable: rows.filter((r) => r.staticAvailable !== 'yes').length,
-    ssimMean:
-      mean(rows.filter((r) => r.staticAvailable === 'yes').map((r) => staticCeiling(r))),
-    animLossMean: mean(rows.filter((r) => r.staticAvailable === 'yes').map((r) => r.animLoss)),
-    freezeMean: mean(rows.map((r) => Math.min(r.freezeSSIM0, r.freezeSSIMworst))),
-  };
   // The two families are graded on different curves (see gradeTier), so the summary keeps them
   // apart: a text case at 0.98 is complete for its family and would read as "basic" in a combined
   // bucket.
@@ -1430,7 +1047,7 @@ function summarizePagx(rows) {
     ssimMean: mean(list.map((r) => r.ssimMean)),
     ssimMin: mean(list.map((r) => r.ssimMin)),
     grades: Object.fromEntries(
-      [GRADE_COMPLETE, GRADE_BASIC, GRADE_STATIC_LIMITED, GRADE_DISTORTED].map((name) => [
+      [GRADE_COMPLETE, GRADE_BASIC, GRADE_DISTORTED].map((name) => [
         name,
         list.filter((r) => r.grade === name).length,
       ])
@@ -1453,7 +1070,6 @@ function summarizePagx(rows) {
     byExpect,
     groups,
     grades,
-    staticStats,
     distorted,
   };
 }
@@ -1463,11 +1079,8 @@ function writePagxCsv(rows, outPath) {
     'name', 'group', 'target', 'channel', 'expect', 'ref', 'frames', 'ssimMean', 'ssimMin',
     'pixelDiffMean', 'rgbDeltaMean', 'rgbDeltaMax', 'motion', 'exportMotion', 'flag', 'width',
     'height', 'error',
-    // Static baseline + grade. ssimMean / ssimMin above are the animated metric (animSSIM) and keep
-    // their meaning; eval_gate.py reads them by name and ignores everything after.
-    'staticSSIM0', 'staticSSIMworst', 'animSSIM0', 'animSSIMworst', 'freezeSSIM0',
-    'freezeSSIMworst', 'stateSSIM0', 'stateSSIMworst', 'staticAvailable', 'staticNote', 'animLoss0',
-    'animLossWorst', 'animLoss',
+    // Grade. ssimMean / ssimMin above are the metric it reads; eval_gate.py reads them by name and
+    // ignores everything after.
     'hasText', 'animGradeMean', 'animGradeMin', 'grade', 'attribution',
   ];
   const lines = [headers.join(',')];
@@ -1506,26 +1119,21 @@ function writePagxMarkdown(rows, outPath, label) {
   lines.push('');
   lines.push('## Restore fidelity');
   lines.push('');
-  lines.push('Grades: `>= 0.999` complete / `>= 0.99` basic / below that distorted, applied to both the per-frame mean and the worst frame of animSSIM (`grade(mean)` / `grade(min)`) and taking the stricter one, so a case with one badly reproduced frame cannot pass on a good mean. `animSSIM` (the `ssim mean` column) diffs an animated PAGX render against the exported HTML seeked to the same time. `staticSSIM` diffs the PAGX *frozen* to one instant against the browser rendering the static HTML export of that same frozen document, so it excludes the animation writer and shows the static ceiling. A case takes the stricter of the two. `animLoss` is per instant `staticSSIM − animSSIM` (worst of the two instants, clamped at 0): it is how much the animation writer costs *at that same state*; attribution `static` means the loss is ~0 and the ceiling itself (font shape / static layout) is what keeps the case down, `exporter` means either the animation path adds the error or the static route renders the state more than 0.05 worse than the animated one, `known-limit` means the corpus header already declares the channel unsupported.');
+  lines.push('Grades: `>= 0.999` 完全还原 / `>= 0.99` 略有差异 / below that 差异较大 for documents without text, and `>= 0.99` / `>= 0.97` for documents with text (glyph outlines differ between the renderers). Applied to both the per-frame mean and the worst frame of animSSIM (`grade(mean)` / `grade(min)`) and taking the stricter one, so a case with one badly reproduced frame cannot pass on a good mean. `animSSIM` (the `ssim mean` column) diffs an animated PAGX render against the exported HTML seeked to the same time; there is no static-instance baseline any more. Attribution `exporter` means the animation path carries the error, `renderer-gap` means the reference renderer itself does not draw a code the fixture declares, `known-limit` means the corpus header already declares the channel unsupported.');
   lines.push('');
   lines.push('| grade | cases |');
   lines.push('| --- | --- |');
-  for (const name of [GRADE_COMPLETE, GRADE_BASIC, GRADE_STATIC_LIMITED, GRADE_DISTORTED]) {
+  for (const name of [GRADE_COMPLETE, GRADE_BASIC, GRADE_DISTORTED]) {
     lines.push(`| ${name} | ${s.grades[name]} |`);
   }
-  lines.push('');
-  lines.push(`- static baseline available — ${s.staticStats.available} case(s), unavailable ${s.staticStats.unavailable} (freeze cannot represent the animated state: multi-phase mounts, matrix / matrix3D, contour-path point channels)`);
-  lines.push(`- staticSSIM mean over available cases — ${fmt(s.staticStats.ssimMean)}; animLoss mean — ${fmt(s.staticStats.animLossMean)} (per instant staticSSIM − animSSIM, clamped at 0, worst of t=0 and the worst frame)`);
-  lines.push(`- freeze self-check (min over t=0 / worst) mean — ${fmt(s.staticStats.freezeMean)} (frozen render vs the animated render at the same instant; 1.0 means the frozen document reproduces the runtime picture)`);
   lines.push('');
   if (s.distorted.length) {
     lines.push('### Distorted cases (attribution required)');
     lines.push('');
-    lines.push('| case | animSSIM | staticSSIM | animLoss (t=0) | animLoss (worst) | animLoss | attribution | note |');
-    lines.push('| --- | --- | --- | --- | --- | --- | --- | --- |');
+    lines.push('| case | animSSIM | worst frame | attribution |');
+    lines.push('| --- | --- | --- | --- |');
     for (const r of s.distorted) {
-      const ceiling = r.staticAvailable === 'yes' ? staticCeiling(r) : NaN;
-      lines.push(`| ${r.name} | ${fmt(r.ssimMean)} | ${fmt(ceiling)} | ${fmt(r.animLoss0)} | ${fmt(r.animLossWorst)} | ${fmt(r.animLoss)} | ${r.attribution || '-'} | ${r.staticNote || ''} |`);
+      lines.push(`| ${r.name} | ${fmt(r.ssimMean)} | ${fmt(r.ssimMin)} | ${r.attribution || '-'} |`);
     }
     lines.push('');
   }
@@ -1541,8 +1149,8 @@ function writePagxMarkdown(rows, outPath, label) {
   lines.push('');
   lines.push('SSIM is luma-only, so a wrong hue can still score ~1; `rgbΔ` (mean per-channel RGB delta, 0-255) catches color errors. `ref span` / `export span` are the largest RGB delta from the first frame on each timeline (0 = never changes). `static0` / `staticWorst` are the two static instants; `freeze` is the PAGX-side self-check (frozen render vs the animated render at the same instant) and `state` the browser-side one (the frozen export vs the animated export at that same instant). A case is only attributed statically when both agree with the animated state (>= 0.99).');
   lines.push('');
-  lines.push('| case | expect | target.channel | frames | ssim mean | ssim min | static0 | staticWorst | animLoss0 | animLossWorst | animLoss | freeze | state | grade(mean) | grade(min) | grade | attribution | rgbΔ mean | rgbΔ max | pixelDiff% | ref span | export span | flag | error |');
-  lines.push('| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |');
+  lines.push('| case | expect | target.channel | frames | ssim mean | ssim min | grade(mean) | grade(min) | grade | attribution | rgbΔ mean | rgbΔ max | pixelDiff% | ref span | export span | flag | error |');
+  lines.push('| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |');
   for (const r of rows) {
     const tc = r.target || r.channel ? `${r.target}.${r.channel}` : '-';
     lines.push('| ' + [
@@ -1552,13 +1160,6 @@ function writePagxMarkdown(rows, outPath, label) {
       String(r.frames),
       fmt(r.ssimMean),
       fmt(r.ssimMin),
-      r.staticAvailable === 'yes' ? fmt(r.staticSSIM0) : '-',
-      r.staticAvailable === 'yes' ? fmt(r.staticSSIMworst) : '-',
-      fmt(r.animLoss0),
-      fmt(r.animLossWorst),
-      fmt(r.animLoss),
-      fmt(Math.min(r.freezeSSIM0, r.freezeSSIMworst)),
-      fmt(Math.min(r.stateSSIM0, r.stateSSIMworst)),
       r.animGradeMean || '',
       r.animGradeMin || '',
       r.grade || '',
@@ -1573,13 +1174,6 @@ function writePagxMarkdown(rows, outPath, label) {
     ].join(' | ') + ' |');
   }
   lines.push('');
-  if (s.staticStats.unavailable) {
-    lines.push('Unavailable static baselines (animSSIM is still reported; no static attribution):');
-    lines.push('');
-    for (const r of rows.filter((x) => !x.error && x.staticAvailable !== 'yes')) {
-      lines.push(`- \`${r.name}\` — ${r.staticNote || 'no note'}`);
-    }
-  }
   fs.writeFileSync(outPath, lines.join('\n') + '\n', 'utf8');
 }
 
@@ -1697,7 +1291,6 @@ function ssimClass(v) {
 function gradeClass(grade) {
   if (grade === GRADE_COMPLETE) return 'good';
   if (grade === GRADE_BASIC) return 'mid';
-  if (grade === GRADE_STATIC_LIMITED) return 'na';
   return 'bad';
 }
 
@@ -1814,21 +1407,12 @@ function writeIndexHtml(rows, outDir, label) {
       ? ` <span class="ssim-tag na">${r.expect} · ${r.target}.${r.channel}</span>` +
         (r.flag ? ` <span class="ssim-tag bad">${r.flag}</span>` : '')
       : '';
-    // Static ceiling and the grade it feeds: the animated SSIM tag alone cannot tell an exporter
-    // bug apart from a static-path (browser font) difference.
-    const staticTags = r.source === 'pagx'
-      ? (r.staticAvailable === 'yes'
-        ? ` <span class="ssim-tag ${ssimClass(staticCeiling(r))}">static ${fmt(staticCeiling(r), 4)}</span>`
-        : ' <span class="ssim-tag na">static n/a</span>') +
-        (isFinite(r.animLoss) ? ` <span class="ssim-tag ${ssimClass(1 - Math.abs(r.animLoss))}">animLoss ${fmt(r.animLoss, 4)}</span>` : '') +
-        (r.grade ? ` <span class="ssim-tag ${gradeClass(r.grade)}">${r.grade}${r.attribution ? ` · ${r.attribution}` : ''}</span>` : '')
+    // The grade and its attribution: the SSIM tag alone cannot say whether a low score is an export
+    // defect, a renderer gap or a corpus limitation.
+    const staticTags = r.source === 'pagx' && r.grade
+      ? ` <span class="ssim-tag ${gradeClass(r.grade)}">${r.grade}${r.attribution ? ` · ${r.attribution}` : ''}</span>`
       : '';
-    const staticFigures = r.source === 'pagx' && r.staticAvailable === 'yes'
-      ? `
-      <figure><figcaption>static ref (frozen pagx, t=0)</figcaption><img src="${frameUrl(`${dir}/static/0.ref.png`)}"/></figure>
-      <figure><figcaption>static candidate (frozen export)</figcaption><img src="${frameUrl(`${dir}/static/0.browser/frame-000.png`)}"/></figure>
-      <figure><figcaption>static diff</figcaption><img src="${frameUrl(`${dir}/static/0.diff.png`)}"/></figure>`
-      : '';
+    const staticFigures = '';
     return `
 <section class="case">
   <h2>${r.name} <span class="ssim-tag ${cls}">SSIM ${fmt(r.ssimMean, 4)}</span>${staticTags}${rtTags}${pagxTags}</h2>
@@ -1838,7 +1422,6 @@ function writeIndexHtml(rows, outDir, label) {
     &middot; animations captured <b>${r.animCaptured}</b>
     <span class="muted">(import warnings ${r.animWarnings}, dropped ${r.animDropped})</span>
     ${status}
-    ${r.staticAvailable === 'yes' ? '' : `<br/><span class="muted">static baseline unavailable — ${r.staticNote || 'no note'}</span>`}
   </p>
   ${staticFigures ? `<div class="stage">${staticFigures}</div>` : ''}
   ${body}
@@ -1853,10 +1436,9 @@ function writeIndexHtml(rows, outDir, label) {
   if (pagxSource) {
     const p = summarizePagx(rows);
     gradeSummaryItems = `
-    <li>档位 — 完全还原 <b>${p.grades[GRADE_COMPLETE]}</b>，略有差异 <b>${p.grades[GRADE_BASIC]}</b>，静态受限 <b>${p.grades[GRADE_STATIC_LIMITED]}</b>，差异较大 <b>${p.grades[GRADE_DISTORTED]}</b></li>
-    <li><b>无 text 节点</b>（完全 ≥0.999 / 略有差异 ≥0.99）— ${p.nonText.cases} 例 &middot; SSIM 均值 <b>${fmt(p.nonText.ssimMean, 4)}</b> &middot; 完全还原 <b>${p.nonText.grades[GRADE_COMPLETE]}</b>，略有差异 <b>${p.nonText.grades[GRADE_BASIC]}</b>，静态受限 <b>${p.nonText.grades[GRADE_STATIC_LIMITED]}</b>，差异较大 <b>${p.nonText.grades[GRADE_DISTORTED]}</b></li>
-    <li><b>带 text 节点</b>（完全 ≥0.99 / 略有差异 ≥0.97；字形轮廓两侧不同）— ${p.text.cases} 例 &middot; SSIM 均值 <b>${fmt(p.text.ssimMean, 4)}</b> &middot; 完全还原 <b>${p.text.grades[GRADE_COMPLETE]}</b>，略有差异 <b>${p.text.grades[GRADE_BASIC]}</b>，静态受限 <b>${p.text.grades[GRADE_STATIC_LIMITED]}</b>，差异较大 <b>${p.text.grades[GRADE_DISTORTED]}</b></li>
-    <li>static baseline — <b>${p.staticStats.available}</b> available / <b>${p.staticStats.unavailable}</b> unavailable &middot; staticSSIM mean <b>${fmt(p.staticStats.ssimMean, 4)}</b> &middot; animLoss mean <b>${fmt(p.staticStats.animLossMean, 4)}</b> &middot; freeze self-check mean <b>${fmt(p.staticStats.freezeMean, 4)}</b></li>`;
+    <li>档位 — 完全还原 <b>${p.grades[GRADE_COMPLETE]}</b>，略有差异 <b>${p.grades[GRADE_BASIC]}</b>，差异较大 <b>${p.grades[GRADE_DISTORTED]}</b></li>
+    <li><b>无 text 节点</b>（完全 ≥0.999 / 略有差异 ≥0.99）— ${p.nonText.cases} 例 &middot; SSIM 均值 <b>${fmt(p.nonText.ssimMean, 4)}</b> &middot; 完全还原 <b>${p.nonText.grades[GRADE_COMPLETE]}</b>，略有差异 <b>${p.nonText.grades[GRADE_BASIC]}</b>，差异较大 <b>${p.nonText.grades[GRADE_DISTORTED]}</b></li>
+    <li><b>带 text 节点</b>（完全 ≥0.99 / 略有差异 ≥0.97；字形轮廓两侧不同）— ${p.text.cases} 例 &middot; SSIM 均值 <b>${fmt(p.text.ssimMean, 4)}</b> &middot; 完全还原 <b>${p.text.grades[GRADE_COMPLETE]}</b>，略有差异 <b>${p.text.grades[GRADE_BASIC]}</b>，差异较大 <b>${p.text.grades[GRADE_DISTORTED]}</b></li>`;
   }
 
   const html = `<!DOCTYPE html>
@@ -1930,23 +1512,22 @@ function writeIndexHtml(rows, outDir, label) {
     <tbody>
       <tr>
         <th>无 text 节点</th>
-        <td>SSIM ≥ <b>0.999</b><br/>anim-loss ≤ 0.001</td>
-        <td>SSIM ≥ <b>0.99</b><br/>anim-loss ≤ 0.01</td>
-        <td>SSIM <b>&lt; 0.99</b><br/>或 anim-loss &gt; 0.01</td>
+        <td>SSIM ≥ <b>0.999</b></td>
+        <td>SSIM ≥ <b>0.99</b></td>
+        <td>SSIM <b>&lt; 0.99</b></td>
       </tr>
       <tr>
         <th>带 text 节点</th>
-        <td>SSIM ≥ <b>0.99</b><br/>anim-loss ≤ 0.001</td>
-        <td>SSIM ≥ <b>0.97</b><br/>anim-loss ≤ 0.01</td>
-        <td>SSIM <b>&lt; 0.97</b><br/>或 anim-loss &gt; 0.01</td>
+        <td>SSIM ≥ <b>0.99</b></td>
+        <td>SSIM ≥ <b>0.97</b></td>
+        <td>SSIM <b>&lt; 0.97</b></td>
       </tr>
     </tbody>
   </table>
   <p class="note">SSIM 取 <code>mean</code> 与 <code>min</code> 中更严的一档。带 text 节点用更宽的一条曲线：两套渲染器
     的字形轮廓本就不同（PAGX 填充带 hint 的轮廓、fauxBold 时再并一个描边；浏览器用自己的字面栅格化、
     fauxBold 用 <code>-webkit-text-stroke</code>），文本用例的静态天花板通常落在 0.95–0.99。
-    anim-loss = 同一时刻 <code>staticSSIM − animSSIM</code>，衡量动画写入本身引入的误差。
-    <b>静态受限</b>（灰色）表示静态上限已低于动画得分档位、且 anim-loss ≤ 0.01，即剩余差异来自字形轮廓而非动画。</p>
+    带 text 的用例用更宽的一条曲线，是因为两套渲染器的字形轮廓本就不同，这部分差异与动画写入无关。</p>
 </div>
 <div class="toolbar">
   <button id="play-all" type="button">▶ Play all</button>
@@ -2215,8 +1796,7 @@ async function main() {
       if (row.error) {
         console.log(`[${doneCount}/${total}] ${c.name}  ERROR ${row.error} (${dur} ms)`);
       } else if (pagxSource) {
-        const staticText = row.staticAvailable === 'yes' ? fmt(staticCeiling(row), 4) : 'n/a';
-        console.log(`[${doneCount}/${total}] ${c.name}  SSIM ${fmt(row.ssimMean, 4)}  min ${fmt(row.ssimMin, 4)}  static ${staticText}  ${row.grade}${row.attribution ? '/' + row.attribution : ''}  ${row.expect}${row.flag ? '  ' + row.flag : ''}  (${dur} ms)`);
+        console.log(`[${doneCount}/${total}] ${c.name}  SSIM ${fmt(row.ssimMean, 4)}  min ${fmt(row.ssimMin, 4)}  ${row.grade}${row.attribution ? '/' + row.attribution : ''}  ${row.expect}${row.flag ? '  ' + row.flag : ''}  (${dur} ms)`);
       } else if (row.roundtrip) {
         console.log(`[${doneCount}/${total}] ${c.name}  SSIM ${fmt(row.ssimMean, 4)}  expHtml/pagx ${fmt(row.exportBrowserVsPagxSsimMean, 4)}  rtPagx/pagx ${fmt(row.roundtripVsPagxSsimMean, 4)}  anim ${row.animCaptured}  (${dur} ms)`);
       } else {
