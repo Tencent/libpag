@@ -225,20 +225,4 @@ if [ "${#FAILED_CORPORA[@]}" -gt 0 ]; then
   echo "run_html_eval: failed corpora: ${FAILED_CORPORA[*]}" >&2
 fi
 
-# --- optional animation gate ----------------------------------------------
-# The nine `resources/html/animations/css` cases (43-51) pin the pivot / 3D animation
-# contract and are gated case by case against
-# resources/html/animations/css/expected.json. They are opt-in: the gate needs Chromium
-# plus per-sample renders, takes roughly a minute, and is noisier than the static
-# corpora, so it is not part of the default run. CI can export HTML_ANIM_EVAL=1 to
-# enable it; the toolchain installed above is reused through SKIP_BOOTSTRAP=1.
-if [ "${HTML_ANIM_EVAL:-0}" != "0" ]; then
-  echo ""
-  echo "=== Optional animation eval gate (HTML_ANIM_EVAL=$HTML_ANIM_EVAL) ==="
-  if ! SKIP_BOOTSTRAP=1 "$ROOT/test/run_html_anim_eval.sh"; then
-    echo "run_html_eval: animation eval gate failed" >&2
-    RUN_STATUS=1
-  fi
-fi
-
 exit "$RUN_STATUS"

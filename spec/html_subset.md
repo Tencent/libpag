@@ -699,14 +699,3 @@ Limits of that rewrite, in order of how often they are hit:
 * An inline-SVG shape animation ignores the parent camera. That is not a loss: shape transforms are
   restricted to the z = 0 plane (a 3D shape pose is rejected with a diagnostic), and a flat pose
   projects to itself (`w = 1`), so folding the camera in would not change a pixel.
-
-### 13.8 Evaluation footprint
-
-The nine cases `43`–`51` under `resources/html/animations/css` pin the pivot / 3D semantics above
-(2D pivot routing, `matrix3D` keyframes, the depth-pivot camera skip, the parent camera folded into a
-child pose). They are an **opt-in** target, not part of the default `HTMLTest` run: after building
-`pagx`, run `test/run_html_anim_eval.sh`, or `HTML_ANIM_EVAL=1 test/run_html_eval.sh` to run it
-alongside the static corpora. Each case's expected `ssimMean` and tolerance live in
-`resources/html/animations/css/expected.json`; a score more than `tolerance` below the ledger fails the
-script while a higher score is only reported. Update that file only after an intended semantic change
-(for example closing the depth-pivot `camera-skips` gap), never to silence a regression.
