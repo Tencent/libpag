@@ -272,12 +272,15 @@ function PrepareOutput(options) {
 function LoadRunConfig(options, directory, cacheDirectory, runInfo) {
   const buildInfo = SnapshotBuild(path.join(__dirname, 'dist', `${options.backend}-${options.mode}`),
     directory, options.backend, options.mode);
+  // The async video export lane drives one scenario with no image comparisons, so it must not
+  // require the baseline cache that the compare lane injects into the page.
+  const needsCache = options.mode === 'compare' && !options.asyncVideoExport;
   const config = { buildInfo, filter: options.filter, asyncVideoExport: options.asyncVideoExport,
     baselineVersion: fs.readFileSync(path.join(ProjectRoot, 'test/baseline/version.json'), 'utf8'),
-    cache: options.mode === 'compare' ? ReadExpectedCache(cacheDirectory, options.backend) : null };
+    cache: needsCache ? ReadExpectedCache(cacheDirectory, options.backend) : null };
   if (options.mode === 'update') {
     runInfo.source = { ...CheckUpdateSource(buildInfo), ref: 'origin/main', clean: true };
-  } else {
+  } else if (needsCache) {
     runInfo.cacheProvenance = config.cache.provenance;
   }
   return { buildInfo, config };

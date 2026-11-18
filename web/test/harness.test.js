@@ -399,8 +399,9 @@ if (process.env.PAG_HARNESS_BROWSER === '1') {
           const server = await StartServer(root);
           const page = await browser.newPage();
           try {
-            const config = { buildInfo, scenario, cache: Cache(), filter: '', baselineVersion: Cache().version,
-              fixtureVersion: Cache().version, fixtureResult: Result(), asyncVideoExport };
+            const config = { buildInfo, scenario, cache: asyncVideoExport ? null : Cache(), filter: '',
+              baselineVersion: Cache().version, fixtureVersion: Cache().version, fixtureResult: Result(),
+              asyncVideoExport };
             await page.evaluateOnNewDocument(InstallFixture, config);
             await page.goto(`http://127.0.0.1:${server.address().port}/index.html`);
             await page.waitForFunction(function finished() { return window.__pagTest?.finished; }, { timeout: 10000 });

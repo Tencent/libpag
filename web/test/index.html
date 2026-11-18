@@ -101,7 +101,7 @@
             if (baseline !== config.baselineVersion) {
                 throw new Error('Baseline version changed since the DATA file was built');
             }
-            if (manifest.mode === 'compare') {
+            if (manifest.mode === 'compare' && !config.asyncVideoExport) {
                 if (!config.cache) throw new Error('Missing baseline cache');
                 const cachePath = `/test/baseline/.cache/${manifest.backend}`;
                 fs.mkdirTree(cachePath);
