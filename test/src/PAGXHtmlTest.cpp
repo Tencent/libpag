@@ -3994,12 +3994,58 @@ CLI_TEST(PAGXHtmlTest, AnimationTextModifierStroke) {
   options.extractStyleSheet = false;
   auto html = LoadXMLAndConvert(xml, options);
   ASSERT_FALSE(html.empty());
-  // One rule per glyph, each carrying the modified pose and the stroke width.
+  // One rule per glyph, each carrying the modified pose.
   EXPECT_EQ(CountOccurrences(html, "@keyframes "), 2u) << html;
   EXPECT_NE(html.find("id=\"strokeMod_g0\""), std::string::npos) << html;
   EXPECT_NE(html.find("id=\"strokeMod_g1\""), std::string::npos) << html;
-  EXPECT_NE(html.find("stroke-width:"), std::string::npos) << html;
   EXPECT_NE(html.find("rotate("), std::string::npos) << html;
+  // A modifier only modulates a stroke the text already has: this document declares no <Stroke>,
+  // and the runtime paints nothing for these two channels, so the export must stay inert. It used
+  // to emit `stroke`/`stroke-width` from the modifier alone - an outline the reference does not
+  // have (composite/15 measured 0.9559 until this was fixed).
+  EXPECT_EQ(html.find("stroke:"), std::string::npos) << html;
+  EXPECT_EQ(html.find("stroke-width:"), std::string::npos) << html;
+  EXPECT_EQ(html.find("-webkit-text-stroke"), std::string::npos) << html;
+}
+
+CLI_TEST(PAGXHtmlTest, AnimationTextModifierStrokeNeedsTheTextStroke) {
+  // Same document plus the painter the runtime needs: now the modifier's colour and width must
+  // reach the glyphs, mixed against the text's own stroke by the selector factor.
+  const char* xml = R"(<pagx width="320" height="200">
+    <Layer left="0" right="0" top="0" bottom="0">
+      <Text text="AB" fontFamily="Arial" fontStyle="Bold" fontSize="48" position="60,120"/>
+      <TextModifier id="strokeMod" strokeColor="#0E7490" strokeWidth="1.5">
+        <RangeSelector id="strokeSel" start="0" end="1" offset="0" unit="percentage"
+                       shape="rampUp" easeIn="0" easeOut="0" weight="1"/>
+      </TextModifier>
+      <Fill color="#BE123C"/>
+      <Stroke color="#1E1B4B" width="2"/>
+    </Layer>
+    <Animations>
+      <Animation id="strokeMix" duration="60" frameRate="60" loop="once">
+        <Object target="strokeMod">
+          <Channel name="strokeWidth" type="float">
+            <Key time="0" value="1.5" interpolation="linear"/>
+            <Key time="60" value="3"/>
+          </Channel>
+        </Object>
+      </Animation>
+    </Animations>
+  </pagx>)";
+
+  pagx::HTMLExportOptions options;
+  options.extractStyleSheet = false;
+  auto html = LoadXMLAndConvert(xml, options);
+  ASSERT_FALSE(html.empty());
+  auto tag = FindTagContaining(html, "id=\"strokeMod_g0\"");
+  ASSERT_FALSE(tag.empty()) << html;
+  // The colour is the text's own painter at the start of the ramp; the width starts from the
+  // painter's 2px and mixes towards the modifier's 1.5px by the glyph factor (0.25 for the first
+  // glyph), which is 1.875px, then reaches 3px at the end.
+  EXPECT_NE(tag.find("stroke=\"#1E1B4B\""), std::string::npos) << tag;
+  auto first = KeyframeStopOf(html, "id=\"strokeMod_g0\"", "0%");
+  ASSERT_FALSE(first.empty()) << html;
+  EXPECT_NE(first.find("stroke-width: 1.875px"), std::string::npos) << first;
 }
 
 CLI_TEST(PAGXHtmlTest, AnimationMixedEasingSplitsTheRule) {
