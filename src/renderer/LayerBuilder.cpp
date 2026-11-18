@@ -543,13 +543,73 @@ struct PathMaskRuntimeTarget : RuntimeTarget {
     };
     std::vector<Entry> entries = {};
     // Kept alive so late channel applications (the layer may outlive the build context) still
-    // have a mask layer to update.
+    // have a mask layer to update. Clip mode drives one combined-path layer; feather mode drives
+    // one layer per entry (see rebuildFeather).
     std::shared_ptr<tgfx::ShapeLayer> maskLayer = nullptr;
+    bool featherMode = false;
+    std::vector<std::shared_ptr<tgfx::ShapeLayer>> featherLayers = {};
+
+    // The legacy renderer switches the whole layer to its feather mask (pag::FeatherMask) as
+    // soon as any mask carries a feather or a non-opaque opacity.
+    static bool NeedsFeatherMode(const std::vector<MaskPath*>& maskPaths) {
+      for (auto* maskPath : maskPaths) {
+        if (maskPath != nullptr && (maskPath->feather.x != 0.0f || maskPath->feather.y != 0.0f ||
+                                    maskPath->opacity != 1.0f)) {
+          return true;
+        }
+      }
+      return false;
+    }
+
+    void rebuild() {
+      if (featherMode) {
+        rebuildFeather();
+      } else {
+        rebuildClip();
+      }
+    }
+
+    // Mirrors pag::FeatherMask::draw: every usable mask paints its own coverage at its opacity,
+    // blurred by feather / 2, and the results composite with SrcOver - the mask modes do not
+    // combine paths in this mode. An inverted mask covers only its own bounding box minus the
+    // shape, because the legacy rasterizes each mask into a surface sized to the path bounds.
+    void rebuildFeather() {
+      bool isFirst = true;
+      for (size_t i = 0; i < entries.size() && i < featherLayers.size(); i++) {
+        auto* maskPath = entries[i].node;
+        tgfx::Path path = entries[i].currentPath;
+        if (maskPath == nullptr || maskPath->maskMode == MaskMode::None || path.isEmpty()) {
+          featherLayers[i]->setPath({});
+          continue;
+        }
+        pag::ExpandPath(&path, maskPath->expansion);
+        auto inverted = maskPath->inverted;
+        if (isFirst) {
+          isFirst = false;
+          if (maskPath->maskMode == MaskMode::Subtract) {
+            inverted = !inverted;
+          }
+        }
+        auto bounds = path.getBounds();
+        if (ceilf(bounds.width()) == 0.0f || ceilf(bounds.height()) == 0.0f) {
+          featherLayers[i]->setPath({});
+          continue;
+        }
+        if (inverted) {
+          tgfx::Path boxPath = {};
+          boxPath.addRect(tgfx::Rect::MakeXYWH(bounds.x(), bounds.y(), ceilf(bounds.width()),
+                                               ceilf(bounds.height())));
+          boxPath.addPath(path, tgfx::PathOp::Difference);
+          path = boxPath;
+        }
+        featherLayers[i]->setPath(std::move(path));
+      }
+    }
 
     // Mirrors pag::RenderMasks: returns false when no usable mask remains (every entry skipped),
     // which maps to an inverse-empty clip (everything visible), matching the legacy behavior
     // where an empty combined mask means "no masking at all".
-    void rebuild() {
+    void rebuildClip() {
       tgfx::Path combined = {};
       bool isFirst = true;
       for (auto& entry : entries) {
@@ -1423,11 +1483,18 @@ class LayerBuilderContext {
       return;
     }
     auto state = std::make_shared<PathMaskRuntimeTarget::SharedState>();
-    auto maskLayer = tgfx::ShapeLayer::Make();
-    // Opaque white: the mask only reads coverage, and MaskContext's clip extraction requires an
-    // opaque brush.
-    maskLayer->setFillStyle(tgfx::ShapeStyle::Make(tgfx::Color::White()));
-    state->maskLayer = maskLayer;
+    state->featherMode = PathMaskRuntimeTarget::SharedState::NeedsFeatherMode(node->maskPaths);
+    std::shared_ptr<tgfx::Layer> maskLayer = nullptr;
+    if (state->featherMode) {
+      maskLayer = tgfx::Layer::Make();
+    } else {
+      auto clipLayer = tgfx::ShapeLayer::Make();
+      // Opaque white: the mask only reads coverage, and MaskContext's clip extraction requires
+      // an opaque brush.
+      clipLayer->setFillStyle(tgfx::ShapeStyle::Make(tgfx::Color::White()));
+      state->maskLayer = clipLayer;
+      maskLayer = clipLayer;
+    }
     for (auto* maskPath : node->maskPaths) {
       if (maskPath == nullptr) {
         continue;
@@ -1436,6 +1503,19 @@ class LayerBuilderContext {
       entry.node = maskPath;
       entry.currentPath = PathMaskRuntimeTarget::SharedState::ConvertUsablePath(maskPath->path);
       state->entries.push_back(entry);
+      if (state->featherMode) {
+        auto entryLayer = tgfx::ShapeLayer::Make();
+        entryLayer->setFillStyle(tgfx::ShapeStyle::Make(tgfx::Color::White()));
+        entryLayer->setAlpha(maskPath->opacity);
+        if (maskPath->feather.x != 0.0f || maskPath->feather.y != 0.0f) {
+          // pag::FeatherMask blurs with ImageFilter::Blur(feather / 2); BlurFilter forwards the
+          // same blurriness (scaled by the content scale).
+          entryLayer->setFilters(
+              {tgfx::BlurFilter::Make(maskPath->feather.x / 2.0f, maskPath->feather.y / 2.0f)});
+        }
+        maskLayer->addChild(entryLayer);
+        state->featherLayers.push_back(entryLayer);
+      }
       auto pathTarget = std::unique_ptr<PathMaskRuntimeTarget>(new PathMaskRuntimeTarget());
       pathTarget->state = state;
       pathTarget->slot = state->entries.size() - 1;

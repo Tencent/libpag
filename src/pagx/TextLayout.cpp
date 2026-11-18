@@ -1046,7 +1046,7 @@ class TextLayoutContext {
         // subsequent lines keep the equal-spacing model through the fixed-lineHeight branch.
         if (lineIdx == 0 && !line.glyphs.empty() && !std::isnan(params.firstBaseLine)) {
           relativeBaseline = params.firstBaseLine;
-          baselineY = roundf(relativeBaseline + yOffset);
+          baselineY = relativeBaseline + yOffset;
         } else {
           float halfLeading = (line.maxLineHeight - line.metricsHeight) / 2;
           relativeBaseline = (relativeTop + halfLeading + line.maxAscent) * line.roundingRatio;

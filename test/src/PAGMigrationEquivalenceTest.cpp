@@ -223,6 +223,32 @@ void DumpLegacyLayerTree(pag::Layer* layer, int depth, FILE* out) {
       fprintf(out, " compType=%d compDuration=%lld",
               static_cast<int>(preCompose->composition->type()),
               static_cast<long long>(preCompose->composition->duration));
+      if (preCompose->composition->type() == pag::CompositionType::Video) {
+        auto* video = static_cast<pag::VideoComposition*>(preCompose->composition);
+        for (auto* sequence : video->sequences) {
+          fprintf(
+              out,
+              " seq[%dx%d fps=%.1f frames=%zu firstIdx=%lld lastIdx=%lld static=", sequence->width,
+              sequence->height, sequence->frameRate, sequence->frames.size(),
+              sequence->frames.empty() ? -1LL
+                                       : static_cast<long long>(sequence->frames.front()->frame),
+              sequence->frames.empty() ? -1LL
+                                       : static_cast<long long>(sequence->frames.back()->frame));
+          for (auto& range : sequence->staticTimeRanges) {
+            fprintf(out, "[%lld..%lld]", static_cast<long long>(range.start),
+                    static_cast<long long>(range.end));
+          }
+          fprintf(out, " headers=%zu alpha=%d,%d bytes=", sequence->headers.size(),
+                  sequence->alphaStartX, sequence->alphaStartY);
+          for (size_t i = 0; i < sequence->frames.size() && i < 4; i++) {
+            auto* frame = sequence->frames[i];
+            fprintf(out, "%lld%s:%zu,", static_cast<long long>(frame->frame),
+                    frame->isKeyframe ? "K" : "",
+                    frame->fileBytes ? frame->fileBytes->length() : 0);
+          }
+          fprintf(out, "]");
+        }
+      }
     }
   }
   if (layer->transform != nullptr) {
