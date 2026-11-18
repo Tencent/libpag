@@ -1443,10 +1443,27 @@ function writeIndexHtml(rows, outDir, label) {
   let gradeSummaryItems = '';
   if (pagxSource) {
     const p = summarizePagx(rows);
-    gradeSummaryItems = `
-    <li>档位 — 完全还原 <b>${p.grades[GRADE_COMPLETE]}</b>，略有差异 <b>${p.grades[GRADE_BASIC]}</b>，差异较大 <b>${p.grades[GRADE_DISTORTED]}</b></li>
-    <li><b>无 text 节点</b>（完全 ≥0.999 / 略有差异 ≥0.99）— ${p.nonText.cases} 例 &middot; SSIM 均值 <b>${fmt(p.nonText.ssimMean, 4)}</b> &middot; 完全还原 <b>${p.nonText.grades[GRADE_COMPLETE]}</b>，略有差异 <b>${p.nonText.grades[GRADE_BASIC]}</b>，差异较大 <b>${p.nonText.grades[GRADE_DISTORTED]}</b></li>
-    <li><b>带 text 节点</b>（完全 ≥0.99 / 略有差异 ≥0.96；字形轮廓两侧不同）— ${p.text.cases} 例 &middot; SSIM 均值 <b>${fmt(p.text.ssimMean, 4)}</b> &middot; 完全还原 <b>${p.text.grades[GRADE_COMPLETE]}</b>，略有差异 <b>${p.text.grades[GRADE_BASIC]}</b>，差异较大 <b>${p.text.grades[GRADE_DISTORTED]}</b></li>`;
+    const row = (label, fam, thresholds) => `
+      <tr>
+        <th>${label}<br/><span class="muted">${fam.cases} 例 &middot; 均值 ${fmt(fam.ssimMean, 4)}</span></th>
+        <td class="good">SSIM ≥ <b>${thresholds[0]}</b><br/><b>${fam.grades[GRADE_COMPLETE]}</b> 例</td>
+        <td class="mid">SSIM ≥ <b>${thresholds[1]}</b><br/><b>${fam.grades[GRADE_BASIC]}</b> 例</td>
+        <td class="bad">SSIM &lt; <b>${thresholds[1]}</b><br/><b>${fam.grades[GRADE_DISTORTED]}</b> 例</td>
+      </tr>`;
+    gradeSummaryItems = {
+      rows: row('无 text 节点', p.nonText, ['0.999', '0.99']) +
+        row('带 text 节点', p.text, ['0.99', '0.96']),
+      total: `<tr class="total">
+        <th>合计<br/><span class="muted">${p.cases} 例 &middot; 均值 ${fmt(
+          (p.nonText.ssimMean * p.nonText.cases + p.text.ssimMean * p.text.cases) /
+            Math.max(1, p.nonText.cases + p.text.cases),
+          4
+        )}</span></th>
+        <td class="good"><b>${p.grades[GRADE_COMPLETE]}</b> 例</td>
+        <td class="mid"><b>${p.grades[GRADE_BASIC]}</b> 例</td>
+        <td class="bad"><b>${p.grades[GRADE_DISTORTED]}</b> 例</td>
+      </tr>`,
+    };
   }
 
   const html = `<!DOCTYPE html>
@@ -1465,6 +1482,10 @@ function writeIndexHtml(rows, outDir, label) {
   .summary table.criteria thead th.good { background: #dcfce7; color: #166534; }
   .summary table.criteria thead th.mid  { background: #fef9c3; color: #854d0e; }
   .summary table.criteria thead th.bad  { background: #fee2e2; color: #991b1b; }
+  .summary table.criteria td.good { background: #f0fdf4; }
+  .summary table.criteria td.mid  { background: #fefce8; }
+  .summary table.criteria td.bad  { background: #fef2f2; }
+  .summary table.criteria tr.total th, .summary table.criteria tr.total td { border-top: 2px solid #cbd5e1; font-weight: 600; }
   .summary p.note { margin: 6px 0 0; font-size: 12px; color: #475569; line-height: 1.6; }
   .toolbar { display: flex; align-items: center; gap: 12px; margin: 12px 0 4px; }
   .toolbar button { font-size: 13px; padding: 6px 14px; border: 1px solid #cbd5e1; border-radius: 6px; background: #fff; cursor: pointer; }
@@ -1510,7 +1531,7 @@ function writeIndexHtml(rows, outDir, label) {
 <div class="summary">
   <ul>
     <li>SSIM (per-frame mean) — all <b>${fmt(s.ssimMean, 4)}</b>, moving cases only <b>${fmt(s.ssimMovingMean, 4)}</b></li>
-    <li>pixel diff (per-frame mean) — <b>${isFinite(s.pdMean) ? fmt(s.pdMean * 100, 2) + '%' : '-'}</b></li>${gradeSummaryItems}${rtSummaryItems}
+    <li>pixel diff (per-frame mean) — <b>${isFinite(s.pdMean) ? fmt(s.pdMean * 100, 2) + '%' : '-'}</b></li>${rtSummaryItems}
     <li>animations captured — <b>${s.animCaptured}</b> (dropped at import: <b>${s.animDropped}</b>)</li>
     <li>perspective elements that kept the function form — <b>${s.cameraSkips}</b></li>
   </ul>
@@ -1518,19 +1539,7 @@ function writeIndexHtml(rows, outDir, label) {
     <thead>
       <tr><th></th><th class="good">完全还原</th><th class="mid">略有差异</th><th class="bad">差异较大</th></tr>
     </thead>
-    <tbody>
-      <tr>
-        <th>无 text 节点</th>
-        <td>SSIM ≥ <b>0.999</b></td>
-        <td>SSIM ≥ <b>0.99</b></td>
-        <td>SSIM <b>&lt; 0.99</b></td>
-      </tr>
-      <tr>
-        <th>带 text 节点</th>
-        <td>SSIM ≥ <b>0.99</b></td>
-        <td>SSIM ≥ <b>0.96</b></td>
-        <td>SSIM <b>&lt; 0.96</b></td>
-      </tr>
+    <tbody>${gradeSummaryItems.rows || ''}${gradeSummaryItems.total || ''}
     </tbody>
   </table>
   <p class="note">SSIM 取逐帧均值。带 text 节点用更宽的一条曲线：两套渲染器
