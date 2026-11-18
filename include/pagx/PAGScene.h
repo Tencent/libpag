@@ -256,7 +256,7 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
   // Refreshes every sequence-driven pattern from its player at the default timeline's current
   // time (spec 6.6.1 frame scheduling; the sequence composition clock rides the parent clock).
   void flushSequenceFrames();
-  static void FlushCompositionSequenceFrames(PAGComposition* composition, double currentTime);
+  static void FlushCompositionSequenceFrames(PAGComposition* composition, double parentTime);
   // Rebuilds the flat `textHolders` list from the current runtime tree. Called at the end of
   // buildRuntimeTree and after refreshNodes so the list stays in sync with the binding state.
   void collectTextHolders();

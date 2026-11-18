@@ -247,14 +247,17 @@ tgfx::MergePathOp ToTGFX(MergePathMode mode) {
 tgfx::LayerMaskType ToTGFXMaskType(MaskType type) {
   switch (type) {
     case MaskType::Alpha:
-    case MaskType::AlphaInverted:
       return tgfx::LayerMaskType::Alpha;
+    case MaskType::AlphaInverted:
+      return tgfx::LayerMaskType::AlphaInverted;
     case MaskType::Luminance:
-    case MaskType::LuminanceInverted:
       return tgfx::LayerMaskType::Luminance;
+    case MaskType::LuminanceInverted:
+      return tgfx::LayerMaskType::LuminanceInverted;
     case MaskType::Contour:
-    case MaskType::ContourInverted:
       return tgfx::LayerMaskType::Contour;
+    case MaskType::ContourInverted:
+      return tgfx::LayerMaskType::ContourInverted;
   }
   return tgfx::LayerMaskType::Alpha;
 }

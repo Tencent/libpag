@@ -83,6 +83,9 @@ void MigrateLayerVisibility(pag::Layer* legacyLayer, PAGXDocument* document,
                             AnimationObject* object);
 void MigrateGroupTransformAnimation(pag::ShapeTransform* transform, float frameRate,
                                     PAGXDocument* document, AnimationObject* object);
+void MigrateShapeElementAnimation(pag::ShapeElement* element, float frameRate,
+                                  PAGXDocument* document, AnimationObject* object,
+                                  AnimationObject* colorObject);
 void MigrateGlowEffectAnimation(pag::GlowEffect* effect, float frameRate, PAGXDocument* document,
                                 AnimationObject* object);
 void MigrateMosaicEffectAnimation(pag::MosaicEffect* effect, float frameRate,
@@ -161,6 +164,7 @@ struct ConvertState {
   // composition's animation (plus its frame rate) receives the group's animated transform
   // channels.
   int groupIdCounter = 0;
+  int elementIdCounter = 0;
   Animation* currentAnimation = nullptr;
   float currentFrameRate = 30.0f;
   std::vector<ConvertedTextEntry> convertedTexts = {};
@@ -570,15 +574,16 @@ BlendMode ConvertBlendMode(pag::BlendMode mode) {
 // so fitsToGeometry stays false.
 ColorSource* ConvertGradientColorSource(ConvertState* state, pag::GradientFillType fillType,
                                         const pag::Point& startPoint, const pag::Point& endPoint,
-                                        const std::shared_ptr<pag::GradientColor>& colors) {
+                                        const std::shared_ptr<pag::GradientColor>& colors,
+                                        const std::string& id = "") {
   Gradient* gradient = nullptr;
   if (fillType == pag::GradientFillType::Linear) {
-    auto* linear = state->document->makeNode<LinearGradient>();
+    auto* linear = state->document->makeNode<LinearGradient>(id);
     linear->startPoint = {startPoint.x, startPoint.y};
     linear->endPoint = {endPoint.x, endPoint.y};
     gradient = linear;
   } else {
-    auto* radial = state->document->makeNode<RadialGradient>();
+    auto* radial = state->document->makeNode<RadialGradient>(id);
     radial->center = {startPoint.x, startPoint.y};
     radial->radius = sqrtf((endPoint.x - startPoint.x) * (endPoint.x - startPoint.x) +
                            (endPoint.y - startPoint.y) * (endPoint.y - startPoint.y));
@@ -623,6 +628,75 @@ ColorSource* ConvertGradientColorSource(ConvertState* state, pag::GradientFillTy
   return gradient;
 }
 
+// Returns a targetable id for a shape element whose properties vary over time (so its animated
+// channels can attach to the node), or an empty id for a static element.
+static std::string AnimatedElementId(ConvertState* state, pag::ShapeElement* element) {
+  if (state->currentAnimation == nullptr) {
+    return {};
+  }
+  std::vector<pag::TimeRange> ranges = {{0, std::numeric_limits<pag::Frame>::max()}};
+  element->excludeVaryingRanges(&ranges);
+  if (ranges.size() == 1 && ranges[0].start == 0 &&
+      ranges[0].end == std::numeric_limits<pag::Frame>::max()) {
+    return {};
+  }
+  return "pag-legacy-elem-" + std::to_string(state->elementIdCounter++);
+}
+
+// Migrates the animated properties of a shape element onto the node with the given id; paint
+// colors and gradient geometry animate the color source node (colorId).
+static void AttachShapeElementAnimation(ConvertState* state, pag::ShapeElement* element,
+                                        const std::string& id, const std::string& colorId) {
+  if (id.empty() || state->currentAnimation == nullptr) {
+    return;
+  }
+  auto* object = state->document->makeNode<AnimationObject>();
+  object->target = id;
+  AnimationObject* colorObject = nullptr;
+  if (!colorId.empty()) {
+    colorObject = state->document->makeNode<AnimationObject>();
+    colorObject->target = colorId;
+  }
+  MigrateShapeElementAnimation(element, state->currentFrameRate, state->document, object,
+                               colorObject);
+  if (!object->channels.empty()) {
+    state->currentAnimation->objects.push_back(object);
+  }
+  if (colorObject != nullptr && !colorObject->channels.empty()) {
+    state->currentAnimation->objects.push_back(colorObject);
+  }
+}
+
+// Adds a translation to the "<baseName>.x" / "<baseName>.y" channels animating the given node, so
+// a translation baked into static geometry also applies to animated values.
+static void ShiftAnimatedPoint(ConvertState* state, const std::string& targetId,
+                               const std::string& baseName, float dx, float dy) {
+  if (targetId.empty() || state->currentAnimation == nullptr) {
+    return;
+  }
+  for (auto* object : state->currentAnimation->objects) {
+    if (object == nullptr || object->target != targetId) {
+      continue;
+    }
+    for (auto* channel : object->channels) {
+      if (channel == nullptr || channel->valueType() != ChannelValueType::Float) {
+        continue;
+      }
+      float delta = 0.0f;
+      if (channel->name == baseName + ".x") {
+        delta = dx;
+      } else if (channel->name == baseName + ".y") {
+        delta = dy;
+      } else {
+        continue;
+      }
+      for (auto& keyframe : static_cast<TypedChannel<float>*>(channel)->keyframes) {
+        keyframe.value += delta;
+      }
+    }
+  }
+}
+
 void ConvertShapeElement(ConvertState* state, pag::ShapeElement* element,
                          std::vector<Element*>* contents, pag::Frame startFrame) {
   if (element == nullptr) {
@@ -631,34 +705,38 @@ void ConvertShapeElement(ConvertState* state, pag::ShapeElement* element,
   switch (element->type()) {
     case pag::ShapeType::Rectangle: {
       auto* legacy = static_cast<pag::RectangleElement*>(element);
-      auto* rect = state->document->makeNode<Rectangle>();
-      bool animated = false;
-      auto size = PropertyValueAtStart(legacy->size, startFrame, &animated);
-      if (animated) {
-        state->warn(PAGExportWarning::AnimatedContentSkipped, "animated shape size");
-      }
+      auto id = AnimatedElementId(state, element);
+      auto* rect = state->document->makeNode<Rectangle>(id);
+      auto size = PropertyValueAtStart(legacy->size, startFrame, nullptr);
       rect->size = {size.x, size.y};
       auto rpos = PropertyValueAtStart(legacy->position, startFrame, nullptr);
       rect->position = {rpos.x, rpos.y};
       rect->roundness = PropertyValueAtStart(legacy->roundness, startFrame, nullptr);
       rect->reversed = legacy->reversed;
       contents->push_back(rect);
+      AttachShapeElementAnimation(state, element, id, "");
       break;
     }
     case pag::ShapeType::Ellipse: {
       auto* legacy = static_cast<pag::EllipseElement*>(element);
-      auto* ellipse = state->document->makeNode<Ellipse>();
+      auto id = AnimatedElementId(state, element);
+      auto* ellipse = state->document->makeNode<Ellipse>(id);
       auto esize = PropertyValueAtStart(legacy->size, startFrame, nullptr);
       ellipse->size = {esize.x, esize.y};
       auto epos = PropertyValueAtStart(legacy->position, startFrame, nullptr);
       ellipse->position = {epos.x, epos.y};
       ellipse->reversed = legacy->reversed;
       contents->push_back(ellipse);
+      AttachShapeElementAnimation(state, element, id, "");
       break;
     }
     case pag::ShapeType::PolyStar: {
       auto* legacy = static_cast<pag::PolyStarElement*>(element);
-      auto* polystar = state->document->makeNode<Polystar>();
+      auto id = AnimatedElementId(state, element);
+      auto* polystar = state->document->makeNode<Polystar>(id);
+      polystar->type = legacy->polyType == pag::PolyStarType::Polygon ? PolystarType::Polygon
+                                                                      : PolystarType::Star;
+      polystar->reversed = legacy->reversed;
       polystar->pointCount =
           static_cast<int>(PropertyValueAtStart(legacy->points, startFrame, nullptr));
       auto ppos = PropertyValueAtStart(legacy->position, startFrame, nullptr);
@@ -666,11 +744,11 @@ void ConvertShapeElement(ConvertState* state, pag::ShapeElement* element,
       polystar->rotation = PropertyValueAtStart(legacy->rotation, startFrame, nullptr);
       polystar->innerRadius = PropertyValueAtStart(legacy->innerRadius, startFrame, nullptr);
       polystar->outerRadius = PropertyValueAtStart(legacy->outerRadius, startFrame, nullptr);
-      polystar->innerRoundness =
-          PropertyValueAtStart(legacy->innerRoundness, startFrame, nullptr) / 100.0f;
-      polystar->outerRoundness =
-          PropertyValueAtStart(legacy->outerRoundness, startFrame, nullptr) / 100.0f;
+      // Legacy roundness is a Percent already in the 0-1 range, matching PAGX.
+      polystar->innerRoundness = PropertyValueAtStart(legacy->innerRoundness, startFrame, nullptr);
+      polystar->outerRoundness = PropertyValueAtStart(legacy->outerRoundness, startFrame, nullptr);
       contents->push_back(polystar);
+      AttachShapeElementAnimation(state, element, id, "");
       break;
     }
     case pag::ShapeType::ShapePath: {
@@ -700,8 +778,10 @@ void ConvertShapeElement(ConvertState* state, pag::ShapeElement* element,
     }
     case pag::ShapeType::Fill: {
       auto* legacy = static_cast<pag::FillElement*>(element);
-      auto* fill = state->document->makeNode<Fill>();
-      auto* solid = state->document->makeNode<SolidColor>();
+      auto id = AnimatedElementId(state, element);
+      auto colorId = id.empty() ? std::string() : id + "-color";
+      auto* fill = state->document->makeNode<Fill>(id);
+      auto* solid = state->document->makeNode<SolidColor>(colorId);
       auto color = PropertyValueAtStart(legacy->color, startFrame, nullptr);
       solid->color = ConvertColor(color);
       auto opacity = PropertyValueAtStart(legacy->opacity, startFrame, nullptr);
@@ -710,12 +790,15 @@ void ConvertShapeElement(ConvertState* state, pag::ShapeElement* element,
       fill->fillRule =
           legacy->fillRule == pag::FillRule::NonZeroWinding ? FillRule::Winding : FillRule::EvenOdd;
       contents->push_back(fill);
+      AttachShapeElementAnimation(state, element, id, colorId);
       break;
     }
     case pag::ShapeType::Stroke: {
       auto* legacy = static_cast<pag::StrokeElement*>(element);
-      auto* stroke = state->document->makeNode<Stroke>();
-      auto* solid = state->document->makeNode<SolidColor>();
+      auto id = AnimatedElementId(state, element);
+      auto colorId = id.empty() ? std::string() : id + "-color";
+      auto* stroke = state->document->makeNode<Stroke>(id);
+      auto* solid = state->document->makeNode<SolidColor>(colorId);
       solid->color = ConvertColor(PropertyValueAtStart(legacy->color, startFrame, nullptr));
       stroke->color = solid;
       stroke->alpha = PropertyValueAtStart(legacy->opacity, startFrame, nullptr) / 255.0f;
@@ -732,6 +815,7 @@ void ConvertShapeElement(ConvertState* state, pag::ShapeElement* element,
         stroke->miterLimit = PropertyValueAtStart(legacy->miterLimit, startFrame, nullptr);
       }
       contents->push_back(stroke);
+      AttachShapeElementAnimation(state, element, id, colorId);
       break;
     }
     case pag::ShapeType::ShapeGroup: {
@@ -789,6 +873,8 @@ void ConvertShapeElement(ConvertState* state, pag::ShapeElement* element,
           if (element == nullptr) {
             continue;
           }
+          // Animated positions override the static field, so the bake shifts their channels too.
+          ShiftAnimatedPoint(state, element->id, "position", bakeX, bakeY);
           switch (element->nodeType()) {
             case NodeType::Rectangle:
               static_cast<Rectangle*>(element)->position.x += bakeX;
@@ -822,6 +908,9 @@ void ConvertShapeElement(ConvertState* state, pag::ShapeElement* element,
                   colorSource->nodeType() == NodeType::ImagePattern) {
                 break;
               }
+              ShiftAnimatedPoint(state, colorSource->id, "startPoint", bakeX, bakeY);
+              ShiftAnimatedPoint(state, colorSource->id, "endPoint", bakeX, bakeY);
+              ShiftAnimatedPoint(state, colorSource->id, "center", bakeX, bakeY);
               if (colorSource->nodeType() == NodeType::LinearGradient) {
                 auto* linear = static_cast<LinearGradient*>(colorSource);
                 linear->startPoint.x += bakeX;
@@ -845,24 +934,29 @@ void ConvertShapeElement(ConvertState* state, pag::ShapeElement* element,
     }
     case pag::ShapeType::GradientFill: {
       auto* legacy = static_cast<pag::GradientFillElement*>(element);
-      auto* fill = state->document->makeNode<Fill>();
+      auto id = AnimatedElementId(state, element);
+      auto colorId = id.empty() ? std::string() : id + "-color";
+      auto* fill = state->document->makeNode<Fill>(id);
       fill->color = ConvertGradientColorSource(
           state, legacy->fillType, PropertyValueAtStart(legacy->startPoint, startFrame, nullptr),
           PropertyValueAtStart(legacy->endPoint, startFrame, nullptr),
-          PropertyValueAtStart(legacy->colors, startFrame, nullptr));
+          PropertyValueAtStart(legacy->colors, startFrame, nullptr), colorId);
       fill->alpha = PropertyValueAtStart(legacy->opacity, startFrame, nullptr) / 255.0f;
       fill->fillRule =
           legacy->fillRule == pag::FillRule::NonZeroWinding ? FillRule::Winding : FillRule::EvenOdd;
       contents->push_back(fill);
+      AttachShapeElementAnimation(state, element, id, colorId);
       break;
     }
     case pag::ShapeType::GradientStroke: {
       auto* legacy = static_cast<pag::GradientStrokeElement*>(element);
-      auto* stroke = state->document->makeNode<Stroke>();
+      auto id = AnimatedElementId(state, element);
+      auto colorId = id.empty() ? std::string() : id + "-color";
+      auto* stroke = state->document->makeNode<Stroke>(id);
       stroke->color = ConvertGradientColorSource(
           state, legacy->fillType, PropertyValueAtStart(legacy->startPoint, startFrame, nullptr),
           PropertyValueAtStart(legacy->endPoint, startFrame, nullptr),
-          PropertyValueAtStart(legacy->colors, startFrame, nullptr));
+          PropertyValueAtStart(legacy->colors, startFrame, nullptr), colorId);
       stroke->alpha = PropertyValueAtStart(legacy->opacity, startFrame, nullptr) / 255.0f;
       stroke->width = PropertyValueAtStart(legacy->strokeWidth, startFrame, nullptr);
       stroke->cap = static_cast<LineCap>(legacy->lineCap);
@@ -875,6 +969,7 @@ void ConvertShapeElement(ConvertState* state, pag::ShapeElement* element,
         stroke->dashes.push_back(PropertyValueAtStart(dash, startFrame, nullptr));
       }
       contents->push_back(stroke);
+      AttachShapeElementAnimation(state, element, id, colorId);
       break;
     }
     case pag::ShapeType::MergePaths: {
@@ -886,18 +981,22 @@ void ConvertShapeElement(ConvertState* state, pag::ShapeElement* element,
     }
     case pag::ShapeType::TrimPaths: {
       auto* legacy = static_cast<pag::TrimPathsElement*>(element);
-      auto* trim = state->document->makeNode<TrimPath>();
-      trim->start = PropertyValueAtStart(legacy->start, startFrame, nullptr) / 100.0f;
-      trim->end = PropertyValueAtStart(legacy->end, startFrame, nullptr) / 100.0f;
+      auto id = AnimatedElementId(state, element);
+      auto* trim = state->document->makeNode<TrimPath>(id);
+      // Legacy start/end are Percent values already in the 0-1 range, matching PAGX.
+      trim->start = PropertyValueAtStart(legacy->start, startFrame, nullptr);
+      trim->end = PropertyValueAtStart(legacy->end, startFrame, nullptr);
       trim->offset = PropertyValueAtStart(legacy->offset, startFrame, nullptr);
       trim->type = legacy->trimType == pag::TrimPathsType::Individually ? TrimType::Separate
                                                                         : TrimType::Continuous;
       contents->push_back(trim);
+      AttachShapeElementAnimation(state, element, id, "");
       break;
     }
     case pag::ShapeType::Repeater: {
       auto* legacy = static_cast<pag::RepeaterElement*>(element);
-      auto* repeater = state->document->makeNode<Repeater>();
+      auto id = AnimatedElementId(state, element);
+      auto* repeater = state->document->makeNode<Repeater>(id);
       repeater->copies = PropertyValueAtStart(legacy->copies, startFrame, nullptr);
       repeater->offset = PropertyValueAtStart(legacy->offset, startFrame, nullptr);
       repeater->order = legacy->composite == pag::RepeaterOrder::Above
@@ -910,7 +1009,7 @@ void ConvertShapeElement(ConvertState* state, pag::ShapeElement* element,
         auto position = PropertyValueAtStart(legacy->transform->position, startFrame, nullptr);
         repeater->position = {position.x, position.y};
         auto scale = PropertyValueAtStart(legacy->transform->scale, startFrame, nullptr);
-        repeater->scale = {scale.x / 100.0f, scale.y / 100.0f};
+        repeater->scale = {scale.x, scale.y};
         repeater->rotation = PropertyValueAtStart(legacy->transform->rotation, startFrame, nullptr);
         repeater->startAlpha =
             PropertyValueAtStart(legacy->transform->startOpacity, startFrame, nullptr) / 255.0f;
@@ -918,13 +1017,16 @@ void ConvertShapeElement(ConvertState* state, pag::ShapeElement* element,
             PropertyValueAtStart(legacy->transform->endOpacity, startFrame, nullptr) / 255.0f;
       }
       contents->push_back(repeater);
+      AttachShapeElementAnimation(state, element, id, "");
       break;
     }
     case pag::ShapeType::RoundCorners: {
       auto* legacy = static_cast<pag::RoundCornersElement*>(element);
-      auto* round = state->document->makeNode<RoundCorner>();
+      auto id = AnimatedElementId(state, element);
+      auto* round = state->document->makeNode<RoundCorner>(id);
       round->radius = PropertyValueAtStart(legacy->radius, startFrame, nullptr);
       contents->push_back(round);
+      AttachShapeElementAnimation(state, element, id, "");
       break;
     }
     default:
@@ -1904,19 +2006,15 @@ Layer* ConvertLayer(ConvertState* state, pag::Layer* legacyLayer, float parentFr
       }
       if (composition != nullptr) {
         layer->composition = composition;
-        // Time-lock mount (spec 6.3): the legacy mapping is
-        // compositionFrame = (parentFrame - compositionStartTime) * (childRate / parentRate),
-        // which maps to startTime = compositionStartTime / parentRate and
-        // timeScale = childRate / parentRate.
-        auto childRate = legacy->composition != nullptr ? legacy->composition->frameRate : 60.0f;
-        if (parentFrameRate > 0.0f && childRate > 0.0f) {
+        // Time-lock mount (spec 6.3): the legacy mapping
+        // compositionFrame = (parentFrame - compositionStartTime) * (childRate / parentRate)
+        // only converts between the two frame grids; in seconds it is
+        // childTime = parentTime - compositionStartTime / parentRate, so the lock carries the
+        // start offset with a unit scale (the PAGX clocks are in seconds). The legacy layer
+        // stretch is not consumed by the legacy renderer (PreComposeLayer::getCompositionFrame
+        // ignores it), so it does not scale the child clock either.
+        if (parentFrameRate > 0.0f) {
           layer->startTime = static_cast<float>(legacy->compositionStartTime) / parentFrameRate;
-          layer->timeScale = childRate / parentFrameRate;
-        }
-        // The legacy layer time stretch (Ratio, 1 = none) multiplies the lock scale.
-        auto stretch = legacyLayer->stretch.value();
-        if (stretch > 0.0f && stretch != 1.0f) {
-          layer->timeScale *= stretch;
         }
       }
       // The legacy renderer applies layer effects to precompose layers the same way (e.g. a

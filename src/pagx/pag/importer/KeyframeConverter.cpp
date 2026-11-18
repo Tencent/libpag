@@ -23,7 +23,9 @@
 // has no spatial-interpolation concept. Multi-dimensional bezier eases collapse to the
 // first dimension's handles (PAGX stores one easing per keyframe).
 
+#include <algorithm>
 #include <cmath>
+#include <limits>
 #include <string>
 #include <typeinfo>
 #include <vector>
@@ -54,15 +56,22 @@ KeyframeInterpolationType ConvertInterpolation(pag::KeyframeInterpolationType ty
   return KeyframeInterpolationType::Hold;
 }
 
-// Copies the first dimension's easing handles onto the new keyframe.
-template <typename T>
-void ConvertEase(const std::vector<pag::Point>& bezierOut, const std::vector<pag::Point>& bezierIn,
-                 Keyframe<T>* out) {
-  if (!bezierOut.empty()) {
-    out->bezierOut = {bezierOut[0].x, bezierOut[0].y};
+// Converts the easing handles of PAGX key at index from the legacy keyframe list. A legacy keyframe
+// stores BOTH handles of its own segment, while a PAGX segment pairs the left key's bezierOut with
+// the right key's bezierIn: the out handle therefore comes from the legacy keyframe starting at this
+// key and the in handle from the legacy keyframe ending at it (the previous segment). The first key
+// has no incoming segment; index == keyframes.size() is the closing key appended after the final
+// segment. Only the first dimension's handles carry over.
+template <typename V, typename T>
+void ConvertSegmentEase(const std::vector<pag::Keyframe<V>*>& keyframes, size_t index,
+                        Keyframe<T>* out) {
+  if (index < keyframes.size() && !keyframes[index]->bezierOut.empty()) {
+    const auto& handle = keyframes[index]->bezierOut[0];
+    out->bezierOut = {handle.x, handle.y};
   }
-  if (!bezierIn.empty()) {
-    out->bezierIn = {bezierIn[0].x, bezierIn[0].y};
+  if (index > 0 && index <= keyframes.size() && !keyframes[index - 1]->bezierIn.empty()) {
+    const auto& handle = keyframes[index - 1]->bezierIn[0];
+    out->bezierIn = {handle.x, handle.y};
   }
 }
 
@@ -74,12 +83,13 @@ void ConvertFloatChannel(pag::Property<float>* legacy, float frameRateDivisor,
   if (animatable == nullptr) {
     return;
   }
-  for (auto* legacyKeyframe : animatable->keyframes) {
+  for (size_t segment = 0; segment < animatable->keyframes.size(); segment++) {
+    auto* legacyKeyframe = animatable->keyframes[segment];
     Keyframe<float> keyframe = {};
     keyframe.time = legacyKeyframe->startTime;
     keyframe.value = legacyKeyframe->startValue;
     keyframe.interpolation = ConvertInterpolation(legacyKeyframe->interpolationType);
-    ConvertEase(legacyKeyframe->bezierOut, legacyKeyframe->bezierIn, &keyframe);
+    ConvertSegmentEase(animatable->keyframes, segment, &keyframe);
     channel->keyframes.push_back(keyframe);
   }
   // The legacy keyframe is a segment [startTime, endTime] interpolating startValue to
@@ -94,7 +104,7 @@ void ConvertFloatChannel(pag::Property<float>* legacy, float frameRateDivisor,
       keyframe.time = last->endTime;
       keyframe.value = last->endValue;
       keyframe.interpolation = ConvertInterpolation(last->interpolationType);
-      ConvertEase(last->bezierOut, last->bezierIn, &keyframe);
+      ConvertSegmentEase(animatable->keyframes, animatable->keyframes.size(), &keyframe);
       channel->keyframes.push_back(keyframe);
     }
   }
@@ -110,12 +120,13 @@ void ConvertOpacityChannel(pag::Property<pag::Opacity>* legacy, float frameRate,
   if (animatable == nullptr) {
     return;
   }
-  for (auto* legacyKeyframe : animatable->keyframes) {
+  for (size_t segment = 0; segment < animatable->keyframes.size(); segment++) {
+    auto* legacyKeyframe = animatable->keyframes[segment];
     Keyframe<float> keyframe = {};
     keyframe.time = legacyKeyframe->startTime;
     keyframe.value = legacyKeyframe->startValue / 255.0f;
     keyframe.interpolation = ConvertInterpolation(legacyKeyframe->interpolationType);
-    ConvertEase(legacyKeyframe->bezierOut, legacyKeyframe->bezierIn, &keyframe);
+    ConvertSegmentEase(animatable->keyframes, segment, &keyframe);
     channel->keyframes.push_back(keyframe);
   }
 
@@ -126,30 +137,31 @@ void ConvertOpacityChannel(pag::Property<pag::Opacity>* legacy, float frameRate,
       keyframe.time = last->endTime;
       keyframe.value = last->endValue / 255.0f;
       keyframe.interpolation = ConvertInterpolation(last->interpolationType);
-      ConvertEase(last->bezierOut, last->bezierIn, &keyframe);
+      ConvertSegmentEase(animatable->keyframes, animatable->keyframes.size(), &keyframe);
       channel->keyframes.push_back(keyframe);
     }
   }
 }
 
-// Point keyframes for a two-axis channel pair emitted as two separate float channels
-// ("name.x" / "name.y"); spatial interpolation samples per frame.
-void ConvertPointChannel(pag::Property<pag::Point>* legacy, const std::string& baseName,
-                         bool spatial, float frameRate, PAGXDocument* document,
-                         AnimationObject* object) {
+// Point keyframes for a two-axis channel pair emitted as two separate float channels named
+// nameX / nameY; spatial interpolation samples per frame.
+void ConvertNamedPointChannel(pag::Property<pag::Point>* legacy, const std::string& nameX,
+                              const std::string& nameY, bool spatial, float frameRate,
+                              PAGXDocument* document, AnimationObject* object) {
   auto* animatable = dynamic_cast<pag::AnimatableProperty<pag::Point>*>(legacy);
   if (animatable == nullptr) {
     return;
   }
   auto* channelX = document->makeNode<TypedChannel<float>>();
-  channelX->name = baseName + ".x";
+  channelX->name = nameX;
   auto* channelY = document->makeNode<TypedChannel<float>>();
-  channelY->name = baseName + ".y";
+  channelY->name = nameY;
   if (spatial) {
-    // Spatial bezier handles have no PAGX equivalent (design doc §7.4: sample per frame).
+    // Spatial bezier handles have no PAGX equivalent (design doc §7.4: sample per frame). The
+    // last segment's end frame is sampled too so later times clamp to the end value.
     auto first = animatable->keyframes.front()->startTime;
     auto last = animatable->keyframes.back()->endTime;
-    for (auto frame = first; frame < last; frame++) {
+    for (auto frame = first; frame <= last; frame++) {
       auto value = animatable->getValueAt(frame);
       Keyframe<float> keyX = {};
       keyX.time = frame;
@@ -163,18 +175,19 @@ void ConvertPointChannel(pag::Property<pag::Point>* legacy, const std::string& b
       channelY->keyframes.push_back(keyY);
     }
   } else {
-    for (auto* legacyKeyframe : animatable->keyframes) {
+    for (size_t segment = 0; segment < animatable->keyframes.size(); segment++) {
+      auto* legacyKeyframe = animatable->keyframes[segment];
       Keyframe<float> keyX = {};
       keyX.time = legacyKeyframe->startTime;
       keyX.value = legacyKeyframe->startValue.x;
       keyX.interpolation = ConvertInterpolation(legacyKeyframe->interpolationType);
-      ConvertEase(legacyKeyframe->bezierOut, legacyKeyframe->bezierIn, &keyX);
+      ConvertSegmentEase(animatable->keyframes, segment, &keyX);
       channelX->keyframes.push_back(keyX);
       Keyframe<float> keyY = {};
       keyY.time = legacyKeyframe->startTime;
       keyY.value = legacyKeyframe->startValue.y;
       keyY.interpolation = ConvertInterpolation(legacyKeyframe->interpolationType);
-      ConvertEase(legacyKeyframe->bezierOut, legacyKeyframe->bezierIn, &keyY);
+      ConvertSegmentEase(animatable->keyframes, segment, &keyY);
       channelY->keyframes.push_back(keyY);
     }
     // The final legacy segment [startTime, endTime] carries an end value with no successor
@@ -186,13 +199,13 @@ void ConvertPointChannel(pag::Property<pag::Point>* legacy, const std::string& b
         endX.time = lastKey->endTime;
         endX.value = lastKey->endValue.x;
         endX.interpolation = ConvertInterpolation(lastKey->interpolationType);
-        ConvertEase(lastKey->bezierOut, lastKey->bezierIn, &endX);
+        ConvertSegmentEase(animatable->keyframes, animatable->keyframes.size(), &endX);
         channelX->keyframes.push_back(endX);
         Keyframe<float> endY = {};
         endY.time = lastKey->endTime;
         endY.value = lastKey->endValue.y;
         endY.interpolation = ConvertInterpolation(lastKey->interpolationType);
-        ConvertEase(lastKey->bezierOut, lastKey->bezierIn, &endY);
+        ConvertSegmentEase(animatable->keyframes, animatable->keyframes.size(), &endY);
         channelY->keyframes.push_back(endY);
       }
     }
@@ -200,6 +213,50 @@ void ConvertPointChannel(pag::Property<pag::Point>* legacy, const std::string& b
   (void)frameRate;
   object->channels.push_back(channelX);
   object->channels.push_back(channelY);
+}
+
+void ConvertPointChannel(pag::Property<pag::Point>* legacy, const std::string& baseName,
+                         bool spatial, float frameRate, PAGXDocument* document,
+                         AnimationObject* object) {
+  ConvertNamedPointChannel(legacy, baseName + ".x", baseName + ".y", spatial, frameRate, document,
+                           object);
+}
+
+// A float channel for an animated legacy float (or Percent) property; static properties add none.
+void MigrateAnimatedFloat(pag::Property<float>* legacy, const std::string& name,
+                          PAGXDocument* document, AnimationObject* object) {
+  if (legacy == nullptr || !legacy->animatable()) {
+    return;
+  }
+  auto* channel = document->makeNode<TypedChannel<float>>();
+  channel->name = name;
+  ConvertFloatChannel(legacy, 0.0f, channel);
+  if (!channel->keyframes.empty()) {
+    object->channels.push_back(channel);
+  }
+}
+
+// An alpha channel (0-1) for an animated legacy opacity (0-255) property.
+void MigrateAnimatedOpacity(pag::Property<pag::Opacity>* legacy, const std::string& name,
+                            PAGXDocument* document, AnimationObject* object) {
+  if (legacy == nullptr || !legacy->animatable()) {
+    return;
+  }
+  auto* channel = document->makeNode<TypedChannel<float>>();
+  channel->name = name;
+  ConvertOpacityChannel(legacy, 0.0f, channel);
+  if (!channel->keyframes.empty()) {
+    object->channels.push_back(channel);
+  }
+}
+
+void MigrateAnimatedPoint(pag::Property<pag::Point>* legacy, const std::string& nameX,
+                          const std::string& nameY, bool spatial, float frameRate,
+                          PAGXDocument* document, AnimationObject* object) {
+  if (legacy == nullptr || !legacy->animatable()) {
+    return;
+  }
+  ConvertNamedPointChannel(legacy, nameX, nameY, spatial, frameRate, document, object);
 }
 
 }  // namespace
@@ -258,7 +315,8 @@ void MigratePathDataChannel(pag::Property<pag::PathHandle>* legacy, const std::s
   auto* channel = document->makeNode<TypedChannel<PathData*>>();
   channel->name = channelName;
   auto keyIndex = 0;
-  for (auto* legacyKeyframe : animatable->keyframes) {
+  for (size_t segment = 0; segment < animatable->keyframes.size(); segment++) {
+    auto* legacyKeyframe = animatable->keyframes[segment];
     // Null path values have no XML form (the value serializes as an @id reference), so they
     // drop out; the legacy codec always stores a real (possibly empty) PathData instead.
     if (legacyKeyframe->startValue == nullptr) {
@@ -270,7 +328,7 @@ void MigratePathDataChannel(pag::Property<pag::PathHandle>* legacy, const std::s
                                            idPrefix + "-key-" + std::to_string(keyIndex));
     keyIndex++;
     keyframe.interpolation = ConvertInterpolation(legacyKeyframe->interpolationType);
-    ConvertEase(legacyKeyframe->bezierOut, legacyKeyframe->bezierIn, &keyframe);
+    ConvertSegmentEase(animatable->keyframes, segment, &keyframe);
     channel->keyframes.push_back(keyframe);
   }
   auto* last = animatable->keyframes.back();
@@ -280,10 +338,7 @@ void MigratePathDataChannel(pag::Property<pag::PathHandle>* legacy, const std::s
     keyframe.value = ConvertLegacyPathData(document, *last->endValue,
                                            idPrefix + "-key-" + std::to_string(keyIndex));
     keyframe.interpolation = ConvertInterpolation(last->interpolationType);
-    // The closing key's bezierIn participates in the FINAL segment's easing (PAGX pairs the
-    // left key's out handle with the right key's in handle), so it copies the last legacy
-    // keyframe's in handle - the same handle the legacy SingleEaseKeyframe easing consumed.
-    ConvertEase(last->bezierOut, last->bezierIn, &keyframe);
+    ConvertSegmentEase(animatable->keyframes, animatable->keyframes.size(), &keyframe);
     channel->keyframes.push_back(keyframe);
   }
   if (channel->keyframes.empty()) {
@@ -400,12 +455,13 @@ static void ConvertMosaicBlockChannel(pag::Property<uint16_t>* legacy,
   if (animatable == nullptr) {
     return;
   }
-  for (auto* legacyKeyframe : animatable->keyframes) {
+  for (size_t segment = 0; segment < animatable->keyframes.size(); segment++) {
+    auto* legacyKeyframe = animatable->keyframes[segment];
     Keyframe<float> keyframe = {};
     keyframe.time = legacyKeyframe->startTime;
     keyframe.value = static_cast<float>(legacyKeyframe->startValue);
     keyframe.interpolation = ConvertInterpolation(legacyKeyframe->interpolationType);
-    ConvertEase(legacyKeyframe->bezierOut, legacyKeyframe->bezierIn, &keyframe);
+    ConvertSegmentEase(animatable->keyframes, segment, &keyframe);
     channel->keyframes.push_back(keyframe);
   }
   if (!animatable->keyframes.empty()) {
@@ -415,7 +471,7 @@ static void ConvertMosaicBlockChannel(pag::Property<uint16_t>* legacy,
       keyframe.time = last->endTime;
       keyframe.value = static_cast<float>(last->endValue);
       keyframe.interpolation = ConvertInterpolation(last->interpolationType);
-      ConvertEase(last->bezierOut, last->bezierIn, &keyframe);
+      ConvertSegmentEase(animatable->keyframes, animatable->keyframes.size(), &keyframe);
       channel->keyframes.push_back(keyframe);
     }
   }
@@ -1134,18 +1190,19 @@ void MigrateGradientOverlayStyleAnimation(pag::GradientOverlayStyle* style, floa
       channelX->name = "offsetX";
       auto* channelY = document->makeNode<TypedChannel<float>>();
       channelY->name = "offsetY";
-      for (auto* legacyKeyframe : animatable->keyframes) {
+      for (size_t segment = 0; segment < animatable->keyframes.size(); segment++) {
+        auto* legacyKeyframe = animatable->keyframes[segment];
         Keyframe<float> keyX = {};
         keyX.time = legacyKeyframe->startTime;
         keyX.value = legacyKeyframe->startValue.x;
         keyX.interpolation = ConvertInterpolation(legacyKeyframe->interpolationType);
-        ConvertEase(legacyKeyframe->bezierOut, legacyKeyframe->bezierIn, &keyX);
+        ConvertSegmentEase(animatable->keyframes, segment, &keyX);
         channelX->keyframes.push_back(keyX);
         Keyframe<float> keyY = {};
         keyY.time = legacyKeyframe->startTime;
         keyY.value = legacyKeyframe->startValue.y;
         keyY.interpolation = ConvertInterpolation(legacyKeyframe->interpolationType);
-        ConvertEase(legacyKeyframe->bezierOut, legacyKeyframe->bezierIn, &keyY);
+        ConvertSegmentEase(animatable->keyframes, segment, &keyY);
         channelY->keyframes.push_back(keyY);
       }
       auto* last = animatable->keyframes.back();
@@ -1154,13 +1211,13 @@ void MigrateGradientOverlayStyleAnimation(pag::GradientOverlayStyle* style, floa
         keyX.time = last->endTime;
         keyX.value = last->endValue.x;
         keyX.interpolation = ConvertInterpolation(last->interpolationType);
-        ConvertEase(last->bezierOut, last->bezierIn, &keyX);
+        ConvertSegmentEase(animatable->keyframes, animatable->keyframes.size(), &keyX);
         channelX->keyframes.push_back(keyX);
         Keyframe<float> keyY = {};
         keyY.time = last->endTime;
         keyY.value = last->endValue.y;
         keyY.interpolation = ConvertInterpolation(last->interpolationType);
-        ConvertEase(last->bezierOut, last->bezierIn, &keyY);
+        ConvertSegmentEase(animatable->keyframes, animatable->keyframes.size(), &keyY);
         channelY->keyframes.push_back(keyY);
       }
       object->channels.push_back(channelX);
@@ -1282,12 +1339,13 @@ void MigrateDropShadowStyleAnimation(pag::DropShadowStyle* style, float frameRat
     if (animatable != nullptr && !animatable->keyframes.empty()) {
       auto* channel = document->makeNode<TypedChannel<float>>();
       channel->name = "spread";
-      for (auto* legacyKeyframe : animatable->keyframes) {
+      for (size_t segment = 0; segment < animatable->keyframes.size(); segment++) {
+        auto* legacyKeyframe = animatable->keyframes[segment];
         Keyframe<float> keyframe = {};
         keyframe.time = legacyKeyframe->startTime;
         keyframe.value = legacyKeyframe->startValue * 100.0f;
         keyframe.interpolation = ConvertInterpolation(legacyKeyframe->interpolationType);
-        ConvertEase(legacyKeyframe->bezierOut, legacyKeyframe->bezierIn, &keyframe);
+        ConvertSegmentEase(animatable->keyframes, segment, &keyframe);
         channel->keyframes.push_back(keyframe);
       }
       auto* last = animatable->keyframes.back();
@@ -1296,7 +1354,7 @@ void MigrateDropShadowStyleAnimation(pag::DropShadowStyle* style, float frameRat
         keyframe.time = last->endTime;
         keyframe.value = last->endValue * 100.0f;
         keyframe.interpolation = ConvertInterpolation(last->interpolationType);
-        ConvertEase(last->bezierOut, last->bezierIn, &keyframe);
+        ConvertSegmentEase(animatable->keyframes, animatable->keyframes.size(), &keyframe);
         channel->keyframes.push_back(keyframe);
       }
       object->channels.push_back(channel);
@@ -1387,12 +1445,13 @@ void MigrateOuterGlowStyleAnimation(pag::OuterGlowStyle* style, float frameRate,
     }
     auto* channel = document->makeNode<TypedChannel<float>>();
     channel->name = percentNames[i];
-    for (auto* legacyKeyframe : animatable->keyframes) {
+    for (size_t segment = 0; segment < animatable->keyframes.size(); segment++) {
+      auto* legacyKeyframe = animatable->keyframes[segment];
       Keyframe<float> keyframe = {};
       keyframe.time = legacyKeyframe->startTime;
       keyframe.value = legacyKeyframe->startValue * 100.0f;
       keyframe.interpolation = ConvertInterpolation(legacyKeyframe->interpolationType);
-      ConvertEase(legacyKeyframe->bezierOut, legacyKeyframe->bezierIn, &keyframe);
+      ConvertSegmentEase(animatable->keyframes, segment, &keyframe);
       channel->keyframes.push_back(keyframe);
     }
     auto* last = animatable->keyframes.back();
@@ -1401,7 +1460,7 @@ void MigrateOuterGlowStyleAnimation(pag::OuterGlowStyle* style, float frameRate,
       keyframe.time = last->endTime;
       keyframe.value = last->endValue * 100.0f;
       keyframe.interpolation = ConvertInterpolation(last->interpolationType);
-      ConvertEase(last->bezierOut, last->bezierIn, &keyframe);
+      ConvertSegmentEase(animatable->keyframes, animatable->keyframes.size(), &keyframe);
       channel->keyframes.push_back(keyframe);
     }
     object->channels.push_back(channel);
@@ -1516,6 +1575,165 @@ void MigrateStrokeStyleAnimation(pag::StrokeStyle* style, float frameRate, PAGXD
       channel->keyframes.push_back(keyframe);
     }
     object->channels.push_back(channel);
+  }
+}
+
+// Radius channel of a radial gradient migrated from legacy start/end points: the PAGX radius is
+// the start-to-end distance, so it is sampled per frame over the union of both animated ranges.
+static void MigrateRadialGradientRadius(pag::Property<pag::Point>* startPoint,
+                                        pag::Property<pag::Point>* endPoint, PAGXDocument* document,
+                                        AnimationObject* object) {
+  auto* animatedStart = dynamic_cast<pag::AnimatableProperty<pag::Point>*>(startPoint);
+  auto* animatedEnd = dynamic_cast<pag::AnimatableProperty<pag::Point>*>(endPoint);
+  if ((animatedStart == nullptr || animatedStart->keyframes.empty()) &&
+      (animatedEnd == nullptr || animatedEnd->keyframes.empty())) {
+    return;
+  }
+  auto first = std::numeric_limits<pag::Frame>::max();
+  auto last = std::numeric_limits<pag::Frame>::min();
+  for (auto* animated : {animatedStart, animatedEnd}) {
+    if (animated != nullptr && !animated->keyframes.empty()) {
+      first = std::min(first, animated->keyframes.front()->startTime);
+      last = std::max(last, animated->keyframes.back()->endTime);
+    }
+  }
+  auto* channel = document->makeNode<TypedChannel<float>>();
+  channel->name = "radius";
+  for (auto frame = first; frame <= last; frame++) {
+    auto start = startPoint->getValueAt(frame);
+    auto end = endPoint->getValueAt(frame);
+    Keyframe<float> keyframe = {};
+    keyframe.time = frame;
+    keyframe.value =
+        sqrtf((end.x - start.x) * (end.x - start.x) + (end.y - start.y) * (end.y - start.y));
+    keyframe.interpolation = KeyframeInterpolationType::Linear;
+    channel->keyframes.push_back(keyframe);
+  }
+  object->channels.push_back(channel);
+}
+
+static void MigrateGradientPointsAnimation(pag::GradientFillType fillType,
+                                           pag::Property<pag::Point>* startPoint,
+                                           pag::Property<pag::Point>* endPoint, float frameRate,
+                                           PAGXDocument* document, AnimationObject* colorObject) {
+  if (fillType == pag::GradientFillType::Linear) {
+    MigrateAnimatedPoint(startPoint, "startPoint.x", "startPoint.y", true, frameRate, document,
+                         colorObject);
+    MigrateAnimatedPoint(endPoint, "endPoint.x", "endPoint.y", true, frameRate, document,
+                         colorObject);
+    return;
+  }
+  MigrateAnimatedPoint(startPoint, "center.x", "center.y", true, frameRate, document, colorObject);
+  MigrateRadialGradientRadius(startPoint, endPoint, document, colorObject);
+}
+
+void MigrateShapeElementAnimation(pag::ShapeElement* element, float frameRate,
+                                  PAGXDocument* document, AnimationObject* object,
+                                  AnimationObject* colorObject) {
+  if (element == nullptr || object == nullptr) {
+    return;
+  }
+  switch (element->type()) {
+    case pag::ShapeType::Rectangle: {
+      auto* legacy = static_cast<pag::RectangleElement*>(element);
+      MigrateAnimatedPoint(legacy->size, "size.width", "size.height", false, frameRate, document,
+                           object);
+      MigrateAnimatedPoint(legacy->position, "position.x", "position.y", true, frameRate, document,
+                           object);
+      MigrateAnimatedFloat(legacy->roundness, "roundness", document, object);
+      break;
+    }
+    case pag::ShapeType::Ellipse: {
+      auto* legacy = static_cast<pag::EllipseElement*>(element);
+      MigrateAnimatedPoint(legacy->size, "size.width", "size.height", false, frameRate, document,
+                           object);
+      MigrateAnimatedPoint(legacy->position, "position.x", "position.y", true, frameRate, document,
+                           object);
+      break;
+    }
+    case pag::ShapeType::PolyStar: {
+      auto* legacy = static_cast<pag::PolyStarElement*>(element);
+      MigrateAnimatedFloat(legacy->points, "pointCount", document, object);
+      MigrateAnimatedPoint(legacy->position, "position.x", "position.y", true, frameRate, document,
+                           object);
+      MigrateAnimatedFloat(legacy->rotation, "rotation", document, object);
+      MigrateAnimatedFloat(legacy->innerRadius, "innerRadius", document, object);
+      MigrateAnimatedFloat(legacy->outerRadius, "outerRadius", document, object);
+      MigrateAnimatedFloat(legacy->innerRoundness, "innerRoundness", document, object);
+      MigrateAnimatedFloat(legacy->outerRoundness, "outerRoundness", document, object);
+      break;
+    }
+    case pag::ShapeType::Fill: {
+      auto* legacy = static_cast<pag::FillElement*>(element);
+      MigrateAnimatedOpacity(legacy->opacity, "alpha", document, object);
+      if (colorObject != nullptr && legacy->color != nullptr && legacy->color->animatable()) {
+        MigrateAnimatorColorChannel(legacy->color, "color", frameRate, document, colorObject);
+      }
+      break;
+    }
+    case pag::ShapeType::Stroke: {
+      auto* legacy = static_cast<pag::StrokeElement*>(element);
+      MigrateAnimatedOpacity(legacy->opacity, "alpha", document, object);
+      MigrateAnimatedFloat(legacy->strokeWidth, "width", document, object);
+      MigrateAnimatedFloat(legacy->dashOffset, "dashOffset", document, object);
+      if (colorObject != nullptr && legacy->color != nullptr && legacy->color->animatable()) {
+        MigrateAnimatorColorChannel(legacy->color, "color", frameRate, document, colorObject);
+      }
+      break;
+    }
+    case pag::ShapeType::GradientFill: {
+      auto* legacy = static_cast<pag::GradientFillElement*>(element);
+      MigrateAnimatedOpacity(legacy->opacity, "alpha", document, object);
+      if (colorObject != nullptr) {
+        MigrateGradientPointsAnimation(legacy->fillType, legacy->startPoint, legacy->endPoint,
+                                       frameRate, document, colorObject);
+      }
+      break;
+    }
+    case pag::ShapeType::GradientStroke: {
+      auto* legacy = static_cast<pag::GradientStrokeElement*>(element);
+      MigrateAnimatedOpacity(legacy->opacity, "alpha", document, object);
+      MigrateAnimatedFloat(legacy->strokeWidth, "width", document, object);
+      MigrateAnimatedFloat(legacy->miterLimit, "miterLimit", document, object);
+      MigrateAnimatedFloat(legacy->dashOffset, "dashOffset", document, object);
+      if (colorObject != nullptr) {
+        MigrateGradientPointsAnimation(legacy->fillType, legacy->startPoint, legacy->endPoint,
+                                       frameRate, document, colorObject);
+      }
+      break;
+    }
+    case pag::ShapeType::TrimPaths: {
+      auto* legacy = static_cast<pag::TrimPathsElement*>(element);
+      MigrateAnimatedFloat(legacy->start, "start", document, object);
+      MigrateAnimatedFloat(legacy->end, "end", document, object);
+      MigrateAnimatedFloat(legacy->offset, "offset", document, object);
+      break;
+    }
+    case pag::ShapeType::Repeater: {
+      auto* legacy = static_cast<pag::RepeaterElement*>(element);
+      MigrateAnimatedFloat(legacy->copies, "copies", document, object);
+      MigrateAnimatedFloat(legacy->offset, "offset", document, object);
+      auto* transform = legacy->transform;
+      if (transform != nullptr) {
+        MigrateAnimatedPoint(transform->anchorPoint, "anchor.x", "anchor.y", true, frameRate,
+                             document, object);
+        MigrateAnimatedPoint(transform->position, "position.x", "position.y", true, frameRate,
+                             document, object);
+        MigrateAnimatedPoint(transform->scale, "scale.x", "scale.y", false, frameRate, document,
+                             object);
+        MigrateAnimatedFloat(transform->rotation, "rotation", document, object);
+        MigrateAnimatedOpacity(transform->startOpacity, "startAlpha", document, object);
+        MigrateAnimatedOpacity(transform->endOpacity, "endAlpha", document, object);
+      }
+      break;
+    }
+    case pag::ShapeType::RoundCorners: {
+      auto* legacy = static_cast<pag::RoundCornersElement*>(element);
+      MigrateAnimatedFloat(legacy->radius, "radius", document, object);
+      break;
+    }
+    default:
+      break;
   }
 }
 

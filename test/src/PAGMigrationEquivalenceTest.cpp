@@ -57,20 +57,100 @@ int LegacyKeyframeCount(pag::Property<T>* property) {
   return animatable != nullptr ? static_cast<int>(animatable->keyframes.size()) : 0;
 }
 
+// Appends the type ids of shape elements whose properties vary over time (ShapeGroup recurses
+// and ShapePath is skipped: their transforms / outlines migrate as channels already).
+void CollectAnimatedShapeElements(const std::vector<pag::ShapeElement*>& elements,
+                                  std::string* out) {
+  for (auto* element : elements) {
+    if (element == nullptr) {
+      continue;
+    }
+    if (element->type() == pag::ShapeType::ShapeGroup) {
+      CollectAnimatedShapeElements(static_cast<pag::ShapeGroupElement*>(element)->elements, out);
+      continue;
+    }
+    if (element->type() == pag::ShapeType::ShapePath) {
+      continue;
+    }
+    std::vector<pag::TimeRange> ranges = {{0, 1000000}};
+    element->excludeVaryingRanges(&ranges);
+    if (ranges.size() != 1 || ranges[0].start != 0 || ranges[0].end != 1000000) {
+      *out += std::to_string(static_cast<int>(element->type())) + ",";
+    }
+  }
+}
+
 void DumpLegacyLayerTree(pag::Layer* layer, int depth, FILE* out) {
   if (layer == nullptr || out == nullptr) {
     return;
   }
   auto indent = std::string(static_cast<size_t>(depth) * 2, ' ');
-  fprintf(out, "%sLAYER type=%d name=%s startTime=%lld active=%d", indent.c_str(),
+  fprintf(out, "%sLAYER type=%d name=%s startTime=%lld duration=%lld active=%d", indent.c_str(),
           static_cast<int>(layer->type()), layer->name.c_str(),
-          static_cast<long long>(layer->startTime), layer->isActive ? 1 : 0);
+          static_cast<long long>(layer->startTime), static_cast<long long>(layer->duration),
+          layer->isActive ? 1 : 0);
+  if (layer->stretch.numerator != static_cast<int32_t>(layer->stretch.denominator)) {
+    fprintf(out, " stretch=%d/%u", layer->stretch.numerator, layer->stretch.denominator);
+  }
+  if (layer->timeRemap != nullptr) {
+    fprintf(out, " timeRemapKeys=%d", LegacyKeyframeCount(layer->timeRemap));
+  }
+  if (layer->motionBlur) {
+    fprintf(out, " motionBlur=1");
+  }
+  if (layer->trackMatteType != pag::TrackMatteType::None) {
+    fprintf(out, " trackMatte=%d", static_cast<int>(layer->trackMatteType));
+  }
+  if (!layer->effects.empty() || !layer->layerStyles.empty()) {
+    fprintf(out, " effects=%zu styles=%zu", layer->effects.size(), layer->layerStyles.size());
+  }
+  if (layer->type() == pag::LayerType::Shape) {
+    std::string animated = {};
+    CollectAnimatedShapeElements(static_cast<pag::ShapeLayer*>(layer)->contents, &animated);
+    if (!animated.empty()) {
+      fprintf(out, " animShapeElems=%s", animated.c_str());
+    }
+  }
+  if (layer->type() == pag::LayerType::Image) {
+    auto* imageLayer = static_cast<pag::ImageLayer*>(layer);
+    if (imageLayer->imageFillRule != nullptr && imageLayer->imageFillRule->timeRemap != nullptr) {
+      fprintf(out, " fillRuleTimeRemapKeys=%d",
+              LegacyKeyframeCount(imageLayer->imageFillRule->timeRemap));
+    }
+  }
+  if (layer->type() == pag::LayerType::PreCompose) {
+    auto* preCompose = static_cast<pag::PreComposeLayer*>(layer);
+    fprintf(out, " compStart=%lld", static_cast<long long>(preCompose->compositionStartTime));
+    if (preCompose->composition != nullptr &&
+        preCompose->composition->type() != pag::CompositionType::Vector) {
+      fprintf(out, " compType=%d compDuration=%lld",
+              static_cast<int>(preCompose->composition->type()),
+              static_cast<long long>(preCompose->composition->duration));
+    }
+  }
   if (layer->transform != nullptr) {
     fprintf(out, " tx[pos=%d scale=%d rot=%d opacity=%d]",
             LegacyKeyframeCount(layer->transform->position),
             LegacyKeyframeCount(layer->transform->scale),
             LegacyKeyframeCount(layer->transform->rotation),
             LegacyKeyframeCount(layer->transform->opacity));
+    auto* animScale = dynamic_cast<pag::AnimatableProperty<pag::Point>*>(layer->transform->scale);
+    if (animScale != nullptr) {
+      for (auto* key : animScale->keyframes) {
+        fprintf(out, " scaleKey[%lld..%lld int=%d (%.3f,%.3f)->(%.3f,%.3f) out=",
+                static_cast<long long>(key->startTime), static_cast<long long>(key->endTime),
+                static_cast<int>(key->interpolationType), key->startValue.x, key->startValue.y,
+                key->endValue.x, key->endValue.y);
+        for (auto& p : key->bezierOut) {
+          fprintf(out, "(%.3f,%.3f)", p.x, p.y);
+        }
+        fprintf(out, " in=");
+        for (auto& p : key->bezierIn) {
+          fprintf(out, "(%.3f,%.3f)", p.x, p.y);
+        }
+        fprintf(out, "]");
+      }
+    }
   }
   fprintf(out, "\n");
   for (auto* mask : layer->masks) {
@@ -315,6 +395,15 @@ void CompareSample(const std::string& path, SampleResult* result) {
   // Evenly sample at most kMaxFramesPerSample frames across the duration (always including the
   // first and the last).
   int step = totalFrames > kMaxFramesPerSample ? totalFrames / kMaxFramesPerSample : 1;
+  // PAG_DUMP_EQ_STEP overrides the sampling step for the samples matched by PAG_DUMP_EQ_FILTER
+  // (e.g. 1 = every frame), so timing divergences can be bracketed to the exact frame. Only the
+  // matched samples change; the default sampling (and the reported metrics) are unaffected.
+  auto stepOverride = getenv("PAG_DUMP_EQ_STEP");
+  auto stepFilter = getenv("PAG_DUMP_EQ_FILTER");
+  if (stepOverride != nullptr && stepFilter != nullptr &&
+      result->fileName.find(stepFilter) != std::string::npos && atoi(stepOverride) > 0) {
+    step = atoi(stepOverride);
+  }
 
   std::vector<uint8_t> legacyPixels;
   std::vector<uint8_t> migratedPixels;

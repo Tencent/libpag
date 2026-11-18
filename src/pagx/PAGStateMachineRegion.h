@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <cmath>
 #include <cstdint>
 #include <memory>
 #include <set>
@@ -43,7 +44,10 @@ inline int64_t FramesToUs(Frame frames, float frameRate) {
   if (frameRate <= 0.0f) {
     return 0;
   }
-  return static_cast<int64_t>(static_cast<double>(frames) / frameRate * 1000000.0);
+  // Round up: the channel evaluator converts microseconds back to frames, and a truncated value
+  // (410 frames at 24 fps -> 17083333us -> 409.99999 frames) would keep a Once animation clamped
+  // at its duration from ever reaching a keyframe placed exactly at the end.
+  return static_cast<int64_t>(ceil(static_cast<double>(frames) / frameRate * 1000000.0));
 }
 
 // Per-region runtime execution state for a PAGStateMachine. Defined in this internal header (not the

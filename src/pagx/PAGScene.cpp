@@ -662,9 +662,8 @@ void PAGScene::flushSequenceFrames() {
   if (_rootComposition == nullptr) {
     return;
   }
-  // The sequence composition clock rides the default timeline (the parent clock of the
-  // time-locked mount); nested lock chains with non-unit scales land with the precise
-  // per-instance local time pass.
+  // The default timeline is the root clock; each time-locked mount down the tree derives its own
+  // local clock from it (see FlushCompositionSequenceFrames).
   double currentTime = 0.0;
   auto defaultTimeline = getDefaultTimeline();
   auto animation = std::dynamic_pointer_cast<PAGAnimation>(defaultTimeline);
@@ -677,9 +676,18 @@ void PAGScene::flushSequenceFrames() {
   FlushCompositionSequenceFrames(_rootComposition.get(), currentTime);
 }
 
-void PAGScene::FlushCompositionSequenceFrames(PAGComposition* composition, double currentTime) {
+void PAGScene::FlushCompositionSequenceFrames(PAGComposition* composition, double parentTime) {
   if (composition == nullptr) {
     return;
+  }
+  // A sequence plays on the clock of the composition that mounts it: a time-locked mount
+  // (spec 6.3) offsets and scales the parent clock exactly like propagateTimeLock, so a sequence
+  // composition placed at a non-zero start time shows the matching frame instead of the frame of
+  // the root clock.
+  auto currentTime = parentTime;
+  if (composition->isTimeLocked()) {
+    currentTime = (parentTime - static_cast<double>(composition->timeLockStartTime())) *
+                  static_cast<double>(composition->timeLockScale());
   }
   auto* binding = composition->binding.get();
   if (binding != nullptr) {

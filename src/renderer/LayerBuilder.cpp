@@ -1169,8 +1169,16 @@ class LayerBuilderContext {
         // tgfx requires mask layer to be visible for hasValidMask() check.
         // The mask layer won't be drawn because maskOwner is set.
         maskLayer->setVisible(true);
-        layer->setMask(maskLayer);
-        layer->setMaskType(maskType);
+        // A tgfx layer holds a single mask. When the target also carries mask paths, the matte
+        // masks the path-mask layer instead: the target is then masked by P x matte (or
+        // P x (1 - matte) when inverted), the same product the legacy renderer composes.
+        auto host = layer;
+        auto pathMask = _pathMaskLayers.find(layer.get());
+        if (pathMask != _pathMaskLayers.end() && layer->mask() == pathMask->second) {
+          host = pathMask->second;
+        }
+        host->setMask(maskLayer);
+        host->setMaskType(maskType);
       }
     }
     _pendingMasks.clear();
@@ -1331,9 +1339,8 @@ class LayerBuilderContext {
       }
       // Whole-path layer masks (spec 7.6) attach directly: the combined clip path is
       // self-contained (no cross-layer references), so unlike track mattes it needs no second
-      // pass. A layer with BOTH a track-matte reference and mask paths keeps the matte (the
-      // single tgfx mask slot cannot express both; the corpus has no such layer yet).
-      if (!node->maskPaths.empty() && node->mask == nullptr) {
+      // pass. A layer with both mask paths and a track matte chains them in resolvePendingMasks.
+      if (!node->maskPaths.empty()) {
         attachPathMask(layer.get(), node);
       }
 
@@ -1440,6 +1447,7 @@ class LayerBuilderContext {
     target->addChild(maskLayer);
     target->setMask(maskLayer);
     target->setMaskType(tgfx::LayerMaskType::Alpha);
+    _pathMaskLayers[target] = maskLayer;
   }
 
   // Converts a Composition slot. The base (static) build expands the composition's layers in place
@@ -5274,6 +5282,9 @@ class LayerBuilderContext {
   LayerBuildResult _result = {};
   std::vector<std::tuple<std::shared_ptr<tgfx::Layer>, const Layer*, tgfx::LayerMaskType>>
       _pendingMasks = {};
+  // The mask-path layer attached to each target that carries Layer.maskPaths, so a track matte
+  // on the same target can chain onto it (see resolvePendingMasks).
+  std::unordered_map<tgfx::Layer*, std::shared_ptr<tgfx::Layer>> _pathMaskLayers = {};
   // Displacement map filters wait for the composition's children to finish building before
   // their map layer references resolve (the map layer may convert after the target).
   std::vector<std::tuple<std::shared_ptr<DisplacementMapLayerFilter>, const Layer*, const Layer*>>
