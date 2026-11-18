@@ -252,9 +252,6 @@ class Layer : public Node, public LayoutNode {
 
   /**
    * A reference to a composition used as the layer content.
-   *
-   * For a mounted import this may point at a synthesized wrapper that is not part of the
-   * authored resources; call PAGXDocument::isMountedComposition() before treating it as one.
    */
   Composition* composition = nullptr;
 
@@ -269,6 +266,10 @@ class Layer : public Node, public LayoutNode {
    * Externally loaded PAGX document used as this layer's composition content. When set, the
    * composition's layers and animations point into this document, and runtime timeline target lookup
    * is resolved against this document instead of the owner document.
+   *
+   * The sub-document is a separate, read-only domain: editing it reaches the owner only through a
+   * full runtime rebuild (which resets state machines, ViewModel values and all layer/timeline
+   * handles), and structural edits do not take effect. Flatten it before editing.
    */
   std::shared_ptr<PAGXDocument> externalDoc = nullptr;
 
