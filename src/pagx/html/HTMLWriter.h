@@ -632,6 +632,14 @@ float FauxBoldStrokeWidth(float fontSize);
 float TextLineHeightForCSS(const std::string& fontFamily, const std::string& fontStyle,
                            float fontSize, bool singleLine);
 
+// PAGX's line box for a text block: `lineHeight` is the advance to emit and `baselineShift` the
+// vertical offset that puts the browser's first baseline on PAGX's baseline row. A non-zero
+// `authoredLineHeight` switches to the explicit-lineHeight branch, where PAGX drops the rounding
+// ratio. Returns false when the family cannot be resolved.
+bool TextBlockPlacement(const std::string& fontFamily, const std::string& fontStyle, float fontSize,
+                        float authoredLineHeight, bool anchorToTop, float* lineHeight,
+                        float* baselineShift);
+
 class HTMLWriter {
  public:
   HTMLWriter(HTMLBuilder* defs, HTMLWriterContext* ctx) : _defs(defs), _ctx(ctx) {

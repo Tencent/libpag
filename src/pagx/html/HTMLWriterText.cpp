@@ -775,6 +775,46 @@ float TextLineHeightForCSS(const std::string& fontFamily, const std::string& fon
   return singleLine ? alignment.singleLineHeight : alignment.lineHeight;
 }
 
+bool TextBlockPlacement(const std::string& fontFamily, const std::string& fontStyle, float fontSize,
+                        float authoredLineHeight, bool anchorToTop, float* lineHeight,
+                        float* baselineShift) {
+  if (lineHeight == nullptr || baselineShift == nullptr) {
+    return false;
+  }
+  auto alignment = ComputeLineBoxAlignment(fontFamily, fontStyle, fontSize);
+  if (!alignment.hasFont) {
+    return false;
+  }
+  auto typeface = SystemFonts::ResolveTypeface(fontFamily, fontStyle);
+  if (typeface == nullptr) {
+    return false;
+  }
+  auto metrics = GetTextLayoutMetrics(tgfx::Font(typeface, fontSize));
+  float ascent = fabsf(metrics.ascent);
+  float leading = std::max(0.0f, metrics.leading);
+  float metricsHeight = ascent + metrics.descent + leading;
+  if (metricsHeight <= 0.0f) {
+    return false;
+  }
+  // An authored lineHeight replaces PAGX's rounded advance and also drops the rounding ratio
+  // (TextLayout.cpp FinishLine sets roundingRatio = 1 in that branch).
+  float box = authoredLineHeight > 0.0f ? authoredLineHeight : alignment.lineHeight;
+  float ratio = authoredLineHeight > 0.0f ? 1.0f : box / metricsHeight;
+  float halfLeading = (box - metricsHeight) / 2;
+  // PAGX's line box counts the leading as content and puts the baseline at the ascent (scaled by
+  // the rounding ratio); a CSS line box centres the content area and splits the leading around it.
+  float relative = (halfLeading + ascent) * ratio;
+  // PAGX snaps the finished row with `roundf(yOffset + relative)`. A top-anchored line has
+  // yOffset = 0, so that row is exactly `roundf(relative)` and can be reproduced here. Middle/Far
+  // centre the block by a yOffset that follows the browser's own line count, which CSS cannot see,
+  // so there the unrounded relative row is the best available estimate.
+  float pagxBaseline = anchorToTop ? roundf(relative) : relative;
+  float cssBaseline = (box - (ascent + metrics.descent)) / 2 + ascent;
+  *lineHeight = box;
+  *baselineShift = pagxBaseline - cssBaseline;
+  return true;
+}
+
 // PAGX fakes bold by stroking the Regular outline with a width of `fontSize * FauxBoldScale`, and
 // `-webkit-text-stroke-width` is also the total width of a band centred on the outline, so the PAGX
 // width transfers one to one. `font-weight: bold` would swap the face instead and change the
