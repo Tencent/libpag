@@ -220,15 +220,19 @@ void SolidStrokeFilter::onUpdateUniforms(
 
 std::vector<float> SolidStrokeFilter::computeVertices(const tgfx::Texture* source,
                                                       const tgfx::Texture* target,
-                                                      const tgfx::Point&) const {
+                                                      const tgfx::Point& offset) const {
   auto outputBounds = tgfx::Rect::MakeWH(target->width(), target->height());
   tgfx::Point contentPoint[4] = {{outputBounds.left, outputBounds.bottom},
                                  {outputBounds.right, outputBounds.bottom},
                                  {outputBounds.left, outputBounds.top},
                                  {outputBounds.right, outputBounds.top}};
 
-  auto deltaX = -option.spreadSizeX;
-  auto deltaY = -option.spreadSizeY;
+  // The target covers the requested render bounds, whose origin is -offset in source space; the
+  // dilated silhouette is the source moved by the stroke offset, so target pixel t samples the
+  // source at t - offset - strokeOffset. With the full filter bounds this equals t - spreadSize,
+  // and a clipped render region (only part of the output requested) stays aligned.
+  auto deltaX = -offset.x - option.offsetX;
+  auto deltaY = -offset.y - option.offsetY;
 
   tgfx::Point texturePoints[4] = {
       {deltaX, (outputBounds.height() + deltaY)},

@@ -68,10 +68,14 @@ void DropShadowLayerFilter::setShowBehindLayer(bool value) {
 }
 
 std::shared_ptr<tgfx::ImageFilter> DropShadowLayerFilter::makeShadowFilter(float scale) const {
+  // Like the legacy DropShadowFilter, the shadow renders with the opaque color and the opacity
+  // applies when the shadow is drawn: the solid stroke core only takes the RGB channels.
+  auto color = _color;
+  color.alpha = 1.0f;
   auto spread = _spread / 100.0f;
   if (spread <= 0.0f) {
     return tgfx::ImageFilter::DropShadowOnly(_offsetX * scale, _offsetY * scale, _blurX * scale,
-                                             _blurY * scale, _color);
+                                             _blurY * scale, color);
   }
   if (_blurX <= 0.0f && _blurY <= 0.0f) {
     return nullptr;
@@ -88,7 +92,7 @@ std::shared_ptr<tgfx::ImageFilter> DropShadowLayerFilter::makeShadowFilter(float
   auto mode = coreX < STROKE_SPREAD_MIN_THICK_SIZE ? pag::SolidStrokeMode::Normal
                                                    : pag::SolidStrokeMode::Thick;
   auto option = pag::SolidStrokeOption();
-  option.color = _color;
+  option.color = color;
   option.spreadSizeX = coreX * scale;
   option.spreadSizeY = coreY * scale;
   // The mixed spread case dilates at the shadow offset and blurs without one, matching the
@@ -104,7 +108,7 @@ std::shared_ptr<tgfx::ImageFilter> DropShadowLayerFilter::makeShadowFilter(float
   }
   return tgfx::ImageFilter::Compose(
       std::move(strokeFilter),
-      tgfx::ImageFilter::DropShadowOnly(0.0f, 0.0f, sigmaX * scale, sigmaY * scale, _color));
+      tgfx::ImageFilter::DropShadowOnly(0.0f, 0.0f, sigmaX * scale, sigmaY * scale, color));
 }
 
 std::shared_ptr<tgfx::Image> DropShadowLayerFilter::onFilterImage(
@@ -128,7 +132,9 @@ std::shared_ptr<tgfx::Image> DropShadowLayerFilter::onFilterImage(
   // shadow against the empty recording entirely.
   tgfx::PictureRecorder recorder = {};
   auto* canvas = recorder.beginRecording();
-  canvas->drawImage(shadowImage, 0.0f, 0.0f);
+  tgfx::Paint shadowPaint = {};
+  shadowPaint.setAlpha(_color.alpha);
+  canvas->drawImage(shadowImage, 0.0f, 0.0f, &shadowPaint);
   if (!_showBehindLayer) {
     // Knock the shadow out of the content's coverage: the tgfx native style masks by the
     // layer's vector contour, which this filter path cannot extract, so the alpha-weighted
