@@ -146,4 +146,131 @@ PAGX_TEST(PAGXImporterValidationTest, AnimatingColorMatrixRejected) {
   EXPECT_TRUE(HasError(doc, "Animating a ColorMatrixFilter is not supported"));
 }
 
+static std::shared_ptr<pagx::PAGXDocument> ParseSpringKey(const std::string& keyAttributes) {
+  std::string xml =
+      "<pagx width=\"100\" height=\"100\">\n"
+      "  <Layer id=\"box\">\n"
+      "    <Rectangle position=\"50,50\" size=\"80,60\"/>\n"
+      "    <Fill color=\"#00FF00\"/>\n"
+      "  </Layer>\n"
+      "  <Animations>\n"
+      "    <Animation id=\"a\" duration=\"60\" frameRate=\"60\">\n"
+      "      <Object target=\"box\">\n"
+      "        <Channel name=\"alpha\" type=\"float\">\n"
+      "          <Key time=\"0\" value=\"0\" " +
+      keyAttributes +
+      "/>\n"
+      "          <Key time=\"60\" value=\"1\"/>\n"
+      "        </Channel>\n"
+      "      </Object>\n"
+      "    </Animation>\n"
+      "  </Animations>\n"
+      "</pagx>\n";
+  return pagx::PAGXImporter::FromXML(xml);
+}
+
+/**
+ * Test case: a spring keyframe omitting springModel uses the documented normalized-v1 default.
+ */
+PAGX_TEST(PAGXImporterValidationTest, SpringModelDefaultsToNormalizedV1) {
+  auto doc = ParseSpringKey("interpolation=\"spring\" springBounce=\"0.2\"");
+  ASSERT_TRUE(doc != nullptr);
+  EXPECT_TRUE(doc->errors.empty());
+}
+
+/**
+ * Test case: Spring interpolation without a springBounce attribute reports an error instead of
+ * silently playing another curve.
+ */
+PAGX_TEST(PAGXImporterValidationTest, SpringMissingBounceRejected) {
+  auto doc = ParseSpringKey("interpolation=\"spring\"");
+  ASSERT_TRUE(doc != nullptr);
+  EXPECT_TRUE(HasError(doc, "requires a 'springBounce'"));
+}
+
+/**
+ * Test case: a springBounce outside the supported range reports an error.
+ */
+PAGX_TEST(PAGXImporterValidationTest, SpringOutOfRangeBounceRejected) {
+  auto doc = ParseSpringKey("interpolation=\"spring\" springBounce=\"1.5\"");
+  ASSERT_TRUE(doc != nullptr);
+  EXPECT_TRUE(HasError(doc, "springBounce must be within [-0.5, 1]"));
+}
+
+/**
+ * Test case: an unknown springModel reports an error instead of being treated as the default
+ * mapping.
+ */
+PAGX_TEST(PAGXImporterValidationTest, SpringUnknownModelRejected) {
+  auto doc =
+      ParseSpringKey("interpolation=\"spring\" springBounce=\"0.2\" springModel=\"normalized-v2\"");
+  ASSERT_TRUE(doc != nullptr);
+  EXPECT_TRUE(HasError(doc, "Unsupported springModel"));
+}
+
+/**
+ * Test case: spring attributes on a non-spring keyframe report an error rather than being dropped.
+ */
+PAGX_TEST(PAGXImporterValidationTest, SpringAttributesWithoutSpringRejected) {
+  auto doc = ParseSpringKey("interpolation=\"linear\" springBounce=\"0.2\"");
+  ASSERT_TRUE(doc != nullptr);
+  EXPECT_TRUE(HasError(doc, "require interpolation=\"spring\""));
+}
+
+/**
+ * Test case: a physical spring missing one of its three parameters reports an error instead of
+ * evaluating with a zero value.
+ */
+PAGX_TEST(PAGXImporterValidationTest, PhysicalSpringMissingParameterRejected) {
+  auto doc = ParseSpringKey(
+      "interpolation=\"spring\" springModel=\"physical-v1\" springStiffness=\"100\" "
+      "springDamping=\"10\"");
+  ASSERT_TRUE(doc != nullptr);
+  EXPECT_TRUE(HasError(doc, "requires a 'springMass'"));
+}
+
+/**
+ * Test case: non-positive stiffness or mass and negative damping report errors.
+ */
+PAGX_TEST(PAGXImporterValidationTest, PhysicalSpringInvalidValuesRejected) {
+  auto stiffness = ParseSpringKey(
+      "interpolation=\"spring\" springModel=\"physical-v1\" springStiffness=\"0\" "
+      "springDamping=\"10\" springMass=\"1\"");
+  ASSERT_TRUE(stiffness != nullptr);
+  EXPECT_TRUE(HasError(stiffness, "springStiffness must be greater than 0"));
+
+  auto damping = ParseSpringKey(
+      "interpolation=\"spring\" springModel=\"physical-v1\" springStiffness=\"100\" "
+      "springDamping=\"-1\" springMass=\"1\"");
+  ASSERT_TRUE(damping != nullptr);
+  EXPECT_TRUE(HasError(damping, "springDamping must be greater than or equal to 0"));
+
+  auto mass = ParseSpringKey(
+      "interpolation=\"spring\" springModel=\"physical-v1\" springStiffness=\"100\" "
+      "springDamping=\"10\" springMass=\"0\"");
+  ASSERT_TRUE(mass != nullptr);
+  EXPECT_TRUE(HasError(mass, "springMass must be greater than 0"));
+}
+
+/**
+ * Test case: mixing normalized and physical spring attributes in one keyframe reports an error.
+ */
+PAGX_TEST(PAGXImporterValidationTest, PhysicalSpringRejectsBounce) {
+  auto doc = ParseSpringKey(
+      "interpolation=\"spring\" springModel=\"physical-v1\" springBounce=\"0.2\" "
+      "springStiffness=\"100\" springDamping=\"10\" springMass=\"1\"");
+  ASSERT_TRUE(doc != nullptr);
+  EXPECT_TRUE(HasError(doc, "springBounce requires springModel=\"normalized-v1\""));
+}
+
+/**
+ * Test case: physical spring attributes without a physical springModel report an error.
+ */
+PAGX_TEST(PAGXImporterValidationTest, NormalizedSpringRejectsPhysicalAttributes) {
+  auto doc =
+      ParseSpringKey("interpolation=\"spring\" springBounce=\"0.2\" springStiffness=\"100\"");
+  ASSERT_TRUE(doc != nullptr);
+  EXPECT_TRUE(HasError(doc, "require springModel=\"physical-v1\""));
+}
+
 }  // namespace pag

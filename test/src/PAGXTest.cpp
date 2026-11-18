@@ -5982,6 +5982,56 @@ PAGX_TEST(PAGXTest, KeyframeInterpolationRoundTrip) {
 }
 
 /**
+ * Test case: Spring interpolation preserves Bounce and the model through XML round-trip.
+ */
+PAGX_TEST(PAGXTest, SpringInterpolationRoundTrip) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto layer = doc->makeNode<pagx::Layer>("L");
+  doc->layers.push_back(layer);
+
+  auto animation = doc->makeNode<pagx::Animation>("spring");
+  animation->duration = 60;
+  doc->animations.push_back(animation);
+
+  auto object = doc->makeNode<pagx::AnimationObject>();
+  object->target = "L";
+  animation->objects.push_back(object);
+
+  auto prop = doc->makeNode<pagx::TypedChannel<float>>();
+  prop->name = "alpha";
+
+  pagx::Keyframe<float> first = {};
+  first.time = 0;
+  first.value = 0.0f;
+  first.interpolation = pagx::KeyframeInterpolationType::Spring;
+  first.spring.bounce = 0.35f;
+  prop->keyframes.push_back(first);
+
+  pagx::Keyframe<float> second = {};
+  second.time = 60;
+  second.value = 1.0f;
+  prop->keyframes.push_back(second);
+  object->channels.push_back(prop);
+
+  auto xml = pagx::PAGXExporter::ToXML(*doc);
+  EXPECT_NE(xml.find("interpolation=\"spring\""), std::string::npos);
+  EXPECT_NE(xml.find("springModel=\"normalized-v1\""), std::string::npos);
+
+  auto loaded = pagx::PAGXImporter::FromXML(xml);
+  ASSERT_TRUE(loaded != nullptr);
+  ASSERT_TRUE(loaded->errors.empty());
+  ASSERT_EQ(loaded->animations.size(), 1u);
+  auto* loadedAnimation = static_cast<pagx::Animation*>(loaded->animations[0]);
+  auto* loadedProp =
+      static_cast<pagx::TypedChannel<float>*>(loadedAnimation->objects[0]->channels[0]);
+  ASSERT_EQ(loadedProp->keyframes.size(), 2u);
+  EXPECT_EQ(loadedProp->keyframes[0].interpolation, pagx::KeyframeInterpolationType::Spring);
+  EXPECT_FLOAT_EQ(loadedProp->keyframes[0].spring.bounce, 0.35f);
+  EXPECT_EQ(loadedProp->keyframes[0].spring.model, pagx::SpringEasingModel::NormalizedV1);
+  EXPECT_EQ(loadedProp->keyframes[1].interpolation, pagx::KeyframeInterpolationType::Linear);
+}
+
+/**
  * Test case: Layer.timelines attribute round-trip (comma-separated names).
  */
 PAGX_TEST(PAGXTest, LayerTimelinesRoundTrip) {
@@ -9540,10 +9590,11 @@ PAGX_TEST(PAGXTest, NotifyChangeKeepsTimelineWhenNoTimelineNodeDirty) {
 }
 
 /**
- * Test case: editing a timeline node (a Channel keyframe) resets the scene's timelines so the new
- * keyframe value takes effect on the next apply.
+ * Test case: editing a Channel keeps the existing timeline instance and its playback time. The
+ * edited keyframes are re-evaluated at the preserved time on the next apply instead of restarting
+ * from frame zero.
  */
-PAGX_TEST(PAGXTest, NotifyChangeResetsTimelinesOnChannelEdit) {
+PAGX_TEST(PAGXTest, NotifyChangeKeepsTimelineOnChannelEdit) {
   auto doc = pagx::PAGXDocument::Make(100, 100);
   auto layer = doc->makeNode<pagx::Layer>("L");
   layer->width = 50;
@@ -9558,32 +9609,131 @@ PAGX_TEST(PAGXTest, NotifyChangeResetsTimelinesOnChannelEdit) {
   anim->objects.push_back(object);
   auto* alphaChannel = doc->makeNode<pagx::TypedChannel<float>>();
   alphaChannel->name = "alpha";
-  alphaChannel->keyframes.push_back({0, 0.5f, pagx::KeyframeInterpolationType::Hold, {}, {}});
+  alphaChannel->keyframes.push_back({0, 0.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  alphaChannel->keyframes.push_back({60, 1.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
   object->channels.push_back(alphaChannel);
 
   auto scene = pagx::PAGScene::Make(doc);
   ASSERT_TRUE(scene != nullptr);
+  auto timeline = std::static_pointer_cast<pagx::PAGAnimation>(scene->getDefaultTimeline());
+  ASSERT_TRUE(timeline != nullptr);
   auto tgfxLayer = scene->mutableBinding()->get<tgfx::Layer>(layer);
   ASSERT_TRUE(tgfxLayer != nullptr);
-  scene->getDefaultTimeline()->apply(1.0f);
-  EXPECT_FLOAT_EQ(tgfxLayer->alpha(), 0.5f);
 
-  // Edit the keyframe value and mark the Channel node dirty: timelines are rebuilt.
-  alphaChannel->keyframes[0].value = 0.25f;
+  // Advance to frame 30: the linear ramp writes alpha = 0.5.
+  timeline->advance(500'000);
+  timeline->apply(1.0f);
+  EXPECT_NEAR(tgfxLayer->alpha(), 0.5f, 1.0e-3f);
+  auto timeBeforeEdit = timeline->currentTime();
+
+  // Move both ends so the value at frame 30 differs from the old value and from the start value.
+  alphaChannel->keyframes[0].value = 0.2f;
+  alphaChannel->keyframes[1].value = 0.6f;
   doc->notifyChange({alphaChannel}, true);
 
-  // A freshly rebuilt timeline applies the new value.
-  auto rebuilt = std::static_pointer_cast<pagx::PAGAnimation>(scene->getDefaultTimeline());
-  ASSERT_TRUE(rebuilt != nullptr);
-  tgfxLayer->setAlpha(1.0f);
-  rebuilt->apply(1.0f);
-  EXPECT_FLOAT_EQ(tgfxLayer->alpha(), 0.25f);
+  EXPECT_EQ(scene->getDefaultTimeline().get(), timeline.get());
+  EXPECT_EQ(timeline->currentTime(), timeBeforeEdit);
+
+  // At the preserved frame 30 the edited curve evaluates to 0.2 + (0.6 - 0.2) * 0.5 = 0.4.
+  timeline->apply(1.0f);
+  EXPECT_NEAR(tgfxLayer->alpha(), 0.4f, 1.0e-3f);
+}
+
+/**
+ * Test case: removing a Channel keeps the timeline alive with its playback time, and a replacement
+ * Channel re-resolves on the next apply so the old channel is no longer driven.
+ */
+PAGX_TEST(PAGXTest, NotifyChangeRemovedChannelKeepsTimeline) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto layer = doc->makeNode<pagx::Layer>("L");
+  layer->width = 50;
+  layer->height = 50;
+  doc->layers.push_back(layer);
+  auto anim = doc->makeNode<pagx::Animation>("anim");
+  anim->duration = 60;
+  anim->frameRate = 60;
+  doc->animations.push_back(anim);
+  auto* object = doc->makeNode<pagx::AnimationObject>();
+  object->target = "L";
+  anim->objects.push_back(object);
+  auto* alphaChannel = doc->makeNode<pagx::TypedChannel<float>>();
+  alphaChannel->name = "alpha";
+  alphaChannel->keyframes.push_back({0, 0.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  alphaChannel->keyframes.push_back({60, 1.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  object->channels.push_back(alphaChannel);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+  auto timeline = std::static_pointer_cast<pagx::PAGAnimation>(scene->getDefaultTimeline());
+  ASSERT_TRUE(timeline != nullptr);
+  auto tgfxLayer = scene->mutableBinding()->get<tgfx::Layer>(layer);
+  ASSERT_TRUE(tgfxLayer != nullptr);
+
+  timeline->advance(500'000);
+  timeline->apply(1.0f);
+  EXPECT_NEAR(tgfxLayer->alpha(), 0.5f, 1.0e-3f);
+  auto timeBeforeEdit = timeline->currentTime();
+
+  object->channels.clear();
+  doc->notifyChange({alphaChannel}, true);
+  EXPECT_EQ(scene->getDefaultTimeline().get(), timeline.get());
+  EXPECT_EQ(timeline->currentTime(), timeBeforeEdit);
+  timeline->apply(1.0f);
+
+  auto* replacement = doc->makeNode<pagx::TypedChannel<float>>();
+  replacement->name = "alpha";
+  replacement->keyframes.push_back({0, 0.2f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  replacement->keyframes.push_back({60, 0.6f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  object->channels.push_back(replacement);
+  doc->notifyChange({replacement}, true);
+
+  EXPECT_EQ(scene->getDefaultTimeline().get(), timeline.get());
+  EXPECT_EQ(timeline->currentTime(), timeBeforeEdit);
+  timeline->apply(1.0f);
+  EXPECT_NEAR(tgfxLayer->alpha(), 0.4f, 1.0e-3f);
+}
+
+/**
+ * Test case: a Channel edit inside a nested composition keeps that composition's timeline alive, so
+ * reapplying at the preserved time uses the edited keyframes instead of restarting at frame zero.
+ */
+PAGX_TEST(PAGXTest, NotifyChangeKeepsNestedTimelineOnChannelEdit) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto fx = MakeAlphaComposition(doc.get(), "comp", "anim", "child");
+
+  auto slot = doc->makeNode<pagx::Layer>("slot");
+  slot->composition = fx.comp;
+  slot->width = 50;
+  slot->height = 50;
+  auto driver = std::make_unique<pagx::AnimationTimeline>();
+  driver->animationId = fx.animationId;
+  driver->playing = true;
+  slot->timelines.push_back(std::move(driver));
+  doc->layers.push_back(slot);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+  auto& slotTree =
+      *static_cast<pagx::PAGComposition*>(scene->rootComposition()->children[0].get())->binding;
+  auto tgfxChild = slotTree.get<tgfx::Layer>(fx.childLayer);
+  ASSERT_TRUE(tgfxChild != nullptr);
+
+  scene->advanceAndApply(500'000);
+  EXPECT_NEAR(tgfxChild->alpha(), 0.5f, 1.0e-3f);
+
+  fx.alphaChannel->keyframes[0].value = 0.2f;
+  fx.alphaChannel->keyframes[1].value = 0.6f;
+  doc->notifyChange({fx.alphaChannel}, true);
+
+  // No time advance: the edited curve is evaluated at the preserved frame 30.
+  scene->advanceAndApply(0);
+  EXPECT_NEAR(tgfxChild->alpha(), 0.4f, 1.0e-3f);
 }
 
 /**
  * Test case: a reference edit (repointing AnimationObject.target to a different node) takes effect
- * when the caller marks the referencing timeline node dirty, since the timeline is rebuilt and
- * re-resolves its targets. Demonstrates the "mark every node on the reference chain dirty" rule.
+ * when the caller marks the referencing timeline node dirty. The instantiated timeline survives the
+ * edit and re-resolves its targets on the next apply.
  */
 PAGX_TEST(PAGXTest, NotifyChangeRetargetAnimationObject) {
   auto doc = pagx::PAGXDocument::Make(100, 100);
@@ -9614,16 +9764,22 @@ PAGX_TEST(PAGXTest, NotifyChangeRetargetAnimationObject) {
   auto tgfxB = binding->get<tgfx::Layer>(layerB);
   ASSERT_TRUE(tgfxA != nullptr);
   ASSERT_TRUE(tgfxB != nullptr);
-  scene->getDefaultTimeline()->apply(1.0f);
+  auto timeline = std::static_pointer_cast<pagx::PAGAnimation>(scene->getDefaultTimeline());
+  ASSERT_TRUE(timeline != nullptr);
+  timeline->advance(500'000);
+  timeline->apply(1.0f);
   EXPECT_FLOAT_EQ(tgfxA->alpha(), 0.5f);
+  auto timeBeforeRetarget = timeline->currentTime();
 
-  // Repoint the target from A to B and mark the referencing AnimationObject dirty: the timeline is
-  // rebuilt and re-resolves to B.
+  // Repoint the target from A to B and mark the referencing AnimationObject dirty: the timeline
+  // survives, re-resolves to B, and keeps its playback time.
   object->target = "B";
   tgfxA->setAlpha(1.0f);
   tgfxB->setAlpha(1.0f);
   doc->notifyChange({object}, true);
-  scene->getDefaultTimeline()->apply(1.0f);
+  EXPECT_EQ(scene->getDefaultTimeline().get(), timeline.get());
+  EXPECT_EQ(timeline->currentTime(), timeBeforeRetarget);
+  timeline->apply(1.0f);
   EXPECT_FLOAT_EQ(tgfxB->alpha(), 0.5f);
   EXPECT_FLOAT_EQ(tgfxA->alpha(), 1.0f);
 }
@@ -12933,6 +13089,168 @@ PAGX_TEST(PAGXTest, StateMachineRoundTrip) {
   ASSERT_EQ(loadedSM->regions[0]->transitions.size(), 1u);
   EXPECT_EQ(loadedSM->regions[0]->transitions[0]->from, "normal");
   EXPECT_EQ(loadedSM->regions[0]->transitions[0]->duration, 10);
+}
+
+/**
+ * Test case: physical spring parameters survive XML round-trip.
+ */
+PAGX_TEST(PAGXTest, PhysicalSpringInterpolationRoundTrip) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto layer = doc->makeNode<pagx::Layer>("L");
+  doc->layers.push_back(layer);
+
+  auto animation = doc->makeNode<pagx::Animation>("spring");
+  animation->duration = 60;
+  doc->animations.push_back(animation);
+
+  auto object = doc->makeNode<pagx::AnimationObject>();
+  object->target = "L";
+  animation->objects.push_back(object);
+
+  auto prop = doc->makeNode<pagx::TypedChannel<float>>();
+  prop->name = "alpha";
+
+  pagx::Keyframe<float> first = {};
+  first.time = 0;
+  first.value = 0.0f;
+  first.interpolation = pagx::KeyframeInterpolationType::Spring;
+  first.spring.model = pagx::SpringEasingModel::PhysicalV1;
+  first.spring.stiffness = 120.0f;
+  first.spring.damping = 18.0f;
+  first.spring.mass = 1.0f;
+  prop->keyframes.push_back(first);
+
+  pagx::Keyframe<float> second = {};
+  second.time = 60;
+  second.value = 1.0f;
+  prop->keyframes.push_back(second);
+  object->channels.push_back(prop);
+
+  auto xml = pagx::PAGXExporter::ToXML(*doc);
+  EXPECT_NE(xml.find("interpolation=\"spring\""), std::string::npos);
+  EXPECT_NE(xml.find("springModel=\"physical-v1\""), std::string::npos);
+  EXPECT_NE(xml.find("springStiffness=\"120\""), std::string::npos);
+  EXPECT_NE(xml.find("springDamping=\"18\""), std::string::npos);
+  EXPECT_NE(xml.find("springMass=\"1\""), std::string::npos);
+  EXPECT_EQ(xml.find("springBounce"), std::string::npos);
+
+  auto loaded = pagx::PAGXImporter::FromXML(xml);
+  ASSERT_TRUE(loaded != nullptr);
+  ASSERT_TRUE(loaded->errors.empty());
+  ASSERT_EQ(loaded->animations.size(), 1u);
+  auto* loadedAnimation = static_cast<pagx::Animation*>(loaded->animations[0]);
+  auto* loadedProp =
+      static_cast<pagx::TypedChannel<float>*>(loadedAnimation->objects[0]->channels[0]);
+  ASSERT_EQ(loadedProp->keyframes.size(), 2u);
+  EXPECT_EQ(loadedProp->keyframes[0].spring.model, pagx::SpringEasingModel::PhysicalV1);
+  EXPECT_FLOAT_EQ(loadedProp->keyframes[0].spring.stiffness, 120.0f);
+  EXPECT_FLOAT_EQ(loadedProp->keyframes[0].spring.damping, 18.0f);
+  EXPECT_FLOAT_EQ(loadedProp->keyframes[0].spring.mass, 1.0f);
+}
+
+/**
+ * Test case: a Transition using Spring interpolation preserves its Bounce and model through XML
+ * round-trip.
+ */
+PAGX_TEST(PAGXTest, StateTransitionSpringRoundTrip) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+
+  auto sm = doc->makeNode<pagx::StateMachine>("btnSM");
+  doc->animations.push_back(sm);
+
+  auto region = doc->makeNode<pagx::StateRegion>();
+  region->name = "visual";
+  region->initialState = "normal";
+  sm->regions.push_back(region);
+
+  auto state = doc->makeNode<pagx::AnimationState>();
+  state->name = "normal";
+  region->states.push_back(state);
+
+  auto transition = doc->makeNode<pagx::StateTransition>();
+  transition->from = "normal";
+  transition->to = "normal";
+  transition->duration = 10;
+  transition->interpolation = pagx::KeyframeInterpolationType::Spring;
+  transition->spring.bounce = -0.2f;
+  region->transitions.push_back(transition);
+
+  auto xml = pagx::PAGXExporter::ToXML(*doc);
+  EXPECT_NE(xml.find("interpolation=\"spring\""), std::string::npos);
+
+  auto loaded = pagx::PAGXImporter::FromXML(xml);
+  ASSERT_TRUE(loaded != nullptr);
+  ASSERT_TRUE(loaded->errors.empty());
+
+  pagx::StateMachine* loadedSM = nullptr;
+  for (const auto& node : loaded->nodes) {
+    if (node->nodeType() == pagx::NodeType::StateMachine) {
+      loadedSM = static_cast<pagx::StateMachine*>(node.get());
+      break;
+    }
+  }
+  ASSERT_TRUE(loadedSM != nullptr);
+  ASSERT_EQ(loadedSM->regions.size(), 1u);
+  ASSERT_EQ(loadedSM->regions[0]->transitions.size(), 1u);
+  auto* loadedTransition = loadedSM->regions[0]->transitions[0];
+  EXPECT_EQ(loadedTransition->interpolation, pagx::KeyframeInterpolationType::Spring);
+  EXPECT_FLOAT_EQ(loadedTransition->spring.bounce, -0.2f);
+  EXPECT_EQ(loadedTransition->spring.model, pagx::SpringEasingModel::NormalizedV1);
+}
+
+/**
+ * Test case: a Transition using a physical spring preserves its three parameters through XML
+ * round-trip.
+ */
+PAGX_TEST(PAGXTest, StateTransitionPhysicalSpringRoundTrip) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+
+  auto sm = doc->makeNode<pagx::StateMachine>("btnSM");
+  doc->animations.push_back(sm);
+
+  auto region = doc->makeNode<pagx::StateRegion>();
+  region->name = "visual";
+  region->initialState = "normal";
+  sm->regions.push_back(region);
+
+  auto state = doc->makeNode<pagx::AnimationState>();
+  state->name = "normal";
+  region->states.push_back(state);
+
+  auto transition = doc->makeNode<pagx::StateTransition>();
+  transition->from = "normal";
+  transition->to = "normal";
+  transition->duration = 10;
+  transition->interpolation = pagx::KeyframeInterpolationType::Spring;
+  transition->spring.model = pagx::SpringEasingModel::PhysicalV1;
+  transition->spring.stiffness = 120.0f;
+  transition->spring.damping = 18.0f;
+  transition->spring.mass = 1.0f;
+  region->transitions.push_back(transition);
+
+  auto xml = pagx::PAGXExporter::ToXML(*doc);
+  EXPECT_NE(xml.find("springModel=\"physical-v1\""), std::string::npos);
+
+  auto loaded = pagx::PAGXImporter::FromXML(xml);
+  ASSERT_TRUE(loaded != nullptr);
+  ASSERT_TRUE(loaded->errors.empty());
+
+  pagx::StateMachine* loadedSM = nullptr;
+  for (const auto& node : loaded->nodes) {
+    if (node->nodeType() == pagx::NodeType::StateMachine) {
+      loadedSM = static_cast<pagx::StateMachine*>(node.get());
+      break;
+    }
+  }
+  ASSERT_TRUE(loadedSM != nullptr);
+  ASSERT_EQ(loadedSM->regions.size(), 1u);
+  ASSERT_EQ(loadedSM->regions[0]->transitions.size(), 1u);
+  auto* loadedTransition = loadedSM->regions[0]->transitions[0];
+  EXPECT_EQ(loadedTransition->spring.model, pagx::SpringEasingModel::PhysicalV1);
+  EXPECT_FLOAT_EQ(loadedTransition->spring.stiffness, 120.0f);
+  EXPECT_FLOAT_EQ(loadedTransition->spring.damping, 18.0f);
+  EXPECT_FLOAT_EQ(loadedTransition->spring.mass, 1.0f);
+  EXPECT_EQ(loadedTransition->spring.bounce, 0.0f);
 }
 
 PAGX_TEST(PAGXTest, StateMachineTimelineRoundTrip) {

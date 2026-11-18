@@ -65,7 +65,7 @@ class StateTransition : public Node {
 
   /**
    * The interpolation curve applied to the crossfade weight over duration. Reuses the keyframe
-   * interpolation model (None / Linear / Bezier / Hold).
+   * interpolation model (None / Linear / Bezier / Hold / Spring).
    */
   KeyframeInterpolationType interpolation = KeyframeInterpolationType::Linear;
 
@@ -78,6 +78,11 @@ class StateTransition : public Node {
    * The incoming bezier handle for the crossfade weight curve, used when interpolation is Bezier.
    */
   Point bezierIn = {};
+
+  /**
+   * The spring parameters for the crossfade weight curve, used when interpolation is Spring.
+   */
+  SpringEasing spring = {};
 
   /**
    * Whether this transition may interrupt an in-progress crossfade. When false (default), the

@@ -2470,6 +2470,7 @@ PAGX 动画系统由关键帧动画（Animation）和状态机（StateMachine）
 | `Linear` | 当前关键帧与下一关键帧之间线性过渡 |
 | `Bezier` | 使用 `bezierOut` 和下一个关键帧的 `bezierIn` 控制柄进行三次贝塞尔缓动 |
 | `Hold` | 保持当前值直到下一个关键帧，然后跳变 |
+| `Spring` | 物理弹簧缓动。`normalized-v1` 使用 `springBounce`，区间归一化为一个时间单位；`physical-v1` 使用 `springStiffness`、`springDamping`、`springMass`，按区间真实时长（帧数除以动画帧率）求值 |
 
 **透视插值**：图层的 `perspective` 最终以投影系数 `-1/d` 进入渲染，因此它的关键帧插值的是该系数而不是距离——从 1000 变化到 200 的透视距离在中点经过约 333 而不是 600。这与浏览器对 CSS 关键帧动画中 `perspective()` 变换函数的插值方式一致，也让投影以恒定速率收紧。缓动作用于该系数，因此 `Linear`、`Bezier`、`Hold` 的含义不变。距离 0 表示无透视，即系数 0、该空间里"无穷远"的一端，因此与有限距离连续衔接：0 与 200 各取一半得到 400，而不会跳到近处镜头。负值同样不是投影：持有负值的关键帧按无透视处理。这是 PAGX 的约定，并非严格复制浏览器行为——浏览器会丢弃该非法声明并回退到元素的静态距离，而 PAGX 在此不读取静态属性，因此即使图层设置了非零的静态 `perspective`，在该关键帧生效期间也按无透视渲染。其余通道仍插值数值本身。
 
@@ -2482,6 +2483,11 @@ PAGX 动画系统由关键帧动画（Animation）和状态机（StateMachine）
 | `interpolation` | KeyframeInterpolationType | `Linear` | 当前关键帧到下一关键帧的插值方式 |
 | `bezierIn` | string | — | 三次贝塞尔缓入控制点，格式为 `"x,y"`，仅 `Bezier` 模式生效 |
 | `bezierOut` | string | — | 三次贝塞尔缓出控制点，格式为 `"x,y"`，仅 `Bezier` 模式生效 |
+| `springBounce` | decimal | — | 阻尼控制，范围 `[-0.5, 1]`；`springModel="normalized-v1"` 时必填。Figma 仅暴露 `[0, 1]`，负值是过阻尼扩展。`0` 为临界阻尼，正值过冲，负值不过冲 |
+| `springStiffness` | decimal | — | 弹簧刚度，大于 0；`springModel="physical-v1"` 时必填 |
+| `springDamping` | decimal | — | 粘性阻尼系数，大于等于 0；`physical-v1` 时必填。`0` 表示无阻尼 |
+| `springMass` | decimal | — | 振子质量，大于 0；`springModel="physical-v1"` 时必填 |
+| `springModel` | string | `normalized-v1` | `normalized-v1` 或 `physical-v1`；选择参数集合与参数到曲线的映射。仅 `Spring` 模式生效 |
 
 **ImageRef**：图片类型的特殊值，通过 id 引用图片资源，允许关键帧在不同时刻显示不同图片。
 
@@ -2492,6 +2498,25 @@ PAGX 动画系统由关键帧动画（Animation）和状态机（StateMachine）
   <Key time="0" value="0" interpolation="bezier" bezierOut="0.2,0,0.4,1"/>
   <Key time="30" value="1" interpolation="linear"/>
   <Key time="60" value="0" interpolation="hold"/>
+</Channel>
+```
+
+Spring 参数由区间起始关键帧携带：
+
+```xml
+<Channel name="y" type="float">
+  <Key time="0" value="100" interpolation="spring" springBounce="0.35"/>
+  <Key time="60" value="0"/>
+</Channel>
+```
+
+物理弹簧按区间真实时长求值：
+
+```xml
+<Channel name="y" type="float">
+  <Key time="0" value="100" interpolation="spring" springModel="physical-v1"
+       springStiffness="120" springDamping="18" springMass="1"/>
+  <Key time="60" value="0"/>
 </Channel>
 ```
 
@@ -2595,6 +2620,11 @@ PAGX 状态机为需要根据运行时外部输入来控制时间线行为的场
 | `interpolation` | KeyframeInterpolationType | `linear` | 过渡/交叉淡入淡出 (crossfade)权重插值曲线 |
 | `bezierOut` | string | — | 贝塞尔缓出控制柄，格式 `"x,y"`（仅 `interpolation="bezier"` 时生效） |
 | `bezierIn` | string | — | 贝塞尔缓入控制柄，格式 `"x,y"`（仅 `interpolation="bezier"` 时生效） |
+| `springBounce` | decimal | — | 阻尼控制，范围 `[-0.5, 1]`；`interpolation="spring"` 且 `springModel="normalized-v1"` 时必填 |
+| `springStiffness` | decimal | — | 弹簧刚度，大于 0；`interpolation="spring"` 且 `springModel="physical-v1"` 时必填 |
+| `springDamping` | decimal | — | 粘性阻尼系数，大于等于 0；`springModel="physical-v1"` 时必填 |
+| `springMass` | decimal | — | 振子质量，大于 0；`springModel="physical-v1"` 时必填 |
+| `springModel` | string | `normalized-v1` | 弹簧参数到曲线的映射：`normalized-v1` 或 `physical-v1`（仅 `interpolation="spring"` 时生效） |
 | `earlyExit` | bool | false | 若为 `true`，此转换可中断正在进行的过渡/交叉淡入淡出 (crossfade) |
 | `pauseOnExit` | bool | false | 若为 `true`，源状态动画在转换开始时冻结；否则在淡出过程中继续播放 |
 
@@ -3075,7 +3105,8 @@ Layer / Group
 
 | 枚举 | 值 |
 |------|------|
-| **KeyframeInterpolationType** | `none`, `linear`, `bezier`, `hold` |
+| **KeyframeInterpolationType** | `none`, `linear`, `bezier`, `hold`, `spring` |
+| **SpringEasingModel** | `normalized-v1`, `physical-v1` |
 | **ChannelValueType** | `float`, `bool`, `int`, `string`, `image`, `color`, `matrix`, `matrix3D` |
 | **TimelineType** | `animation`, `stateMachine` |
 

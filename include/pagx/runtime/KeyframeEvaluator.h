@@ -25,11 +25,35 @@
 namespace pagx {
 
 /**
+ * Evaluates the easing fraction of one keyframe segment. This is the single easing entry shared by
+ * playback (EvaluateKeyframeSequence), segment sampling and state-machine crossfades, so a curve
+ * cannot diverge between the canvas, the curve editor and exported frames.
+ *
+ * None and Hold return 0 (the segment start). Linear returns progress unchanged and may
+ * extrapolate outside [0, 1]. Bezier and Spring clamp progress to [0, 1]; their result may lie
+ * outside [0, 1] to express overshoot.
+ *
+ * @param interpolation the interpolation mode from the segment's left keyframe.
+ * @param bezierOut the outgoing bezier handle of the left keyframe.
+ * @param bezierIn the incoming bezier handle of the right keyframe.
+ * @param spring the spring parameters of the left keyframe.
+ * @param progress the normalized position within the segment.
+ * @param segmentDurationSeconds the segment length in seconds, used by physical springs. Values
+ *        less than or equal to zero make a physical spring fall back to the normalized model
+ *        with the damping ratio derived from its physical parameters.
+ * @return the eased fraction used to interpolate the segment's values.
+ */
+double EvaluateKeyframeInterpolationProgress(KeyframeInterpolationType interpolation,
+                                             const Point& bezierOut, const Point& bezierIn,
+                                             const SpringEasing& spring, double progress,
+                                             double segmentDurationSeconds = 0.0);
+
+/**
  * Evaluates the interpolated value between two adjacent keyframes at a given point within their
  * span. The caller computes `progress = (framePosition - keyIn.time) / (keyOut.time - keyIn.time)`
  * and passes it in; this function only applies the interpolation behavior. The caller is
- * expected to pass `progress` in [0, 1]; for Hold and Bezier modes, out-of-range values are
- * clamped to the boundaries, while Linear may extrapolate outside that range.
+ * expected to pass `progress` in [0, 1]; for Hold, Bezier and Spring modes, out-of-range values
+ * are clamped to the boundaries, while Linear may extrapolate outside that range.
  *
  * Supported KeyValue types: float, bool, int, std::string, ImageRef, Color, Matrix, PAGImage.
  *
@@ -39,13 +63,29 @@ namespace pagx {
  * @param interp the interpolation mode from keyIn.
  * @param bezierOut the outgoing bezier handle from keyIn, used when interp is Bezier.
  * @param bezierIn the incoming bezier handle from keyOut, used when interp is Bezier.
+ * @param spring the spring parameters from keyIn, used when interp is Spring. A null pointer
+ *        selects the default critically damped spring.
+ * @param segmentDurationSeconds the segment length in seconds, used by physical springs.
  * @return the interpolated KeyValue at the given position.
  */
-KeyValue EvaluateKeyframeSegment(const KeyValue& leftValue,
-                                 const KeyValue& rightValue,
-                                 double progress,
-                                 KeyframeInterpolationType interp,
-                                 const Point* bezierOut = nullptr,
-                                 const Point* bezierIn = nullptr);
+KeyValue EvaluateKeyframeSegment(const KeyValue& leftValue, const KeyValue& rightValue,
+                                 double progress, KeyframeInterpolationType interp,
+                                 const Point* bezierOut = nullptr, const Point* bezierIn = nullptr,
+                                 const SpringEasing* spring = nullptr,
+                                 double segmentDurationSeconds = 0.0);
+
+/**
+ * Returns the time in seconds after which a physical spring's response envelope stays within the
+ * settle tolerance used by the normalized model (about 1% of the span).
+ *
+ * Only PhysicalV1 has a real-time base; NormalizedV1 returns 0 because its duration is defined by
+ * the keyframe interval. Undamped physical springs never settle and return positive infinity.
+ * Invalid spring parameters also return 0.
+ *
+ * @param spring the spring parameters to measure.
+ * @return the settle duration in seconds, 0 when no real-time base applies, or positive infinity
+ *         for an undamped spring.
+ */
+double EvaluateSpringSettleDurationSeconds(const SpringEasing& spring);
 
 }  // namespace pagx

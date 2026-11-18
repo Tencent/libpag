@@ -55,6 +55,36 @@ struct RuntimeColorStop {
  */
 using RuntimeWriter = void (*)(void* object, const KeyValue& value, float mix);
 
+// Returns true when the channel's final value must not be negative. Easing curves may overshoot;
+// size, blur radius, stroke width and corner radius cannot represent negative values.
+inline bool IsNonNegativeRuntimeChannel(const std::string& channel) {
+  return channel == "width" || channel == "height" || channel == "size.width" ||
+         channel == "size.height" || channel == "roundness" || channel == "radius" ||
+         channel == "blurX" || channel == "blurY" || channel == "miterLimit";
+}
+
+// Clamps a channel value to its property domain after interpolation. Transform channels are left
+// untouched so translation, rotation and scale keep their overshoot; color components and alpha
+// are bounded by their [0, 1] domain.
+inline KeyValue ClampRuntimeChannelValue(const std::string& channel, const KeyValue& value) {
+  if (const auto* floatValue = std::get_if<float>(&value)) {
+    if (channel == "alpha") {
+      return KeyValue{std::clamp(*floatValue, 0.0f, 1.0f)};
+    }
+    if (IsNonNegativeRuntimeChannel(channel)) {
+      return KeyValue{std::max(0.0f, *floatValue)};
+    }
+    return value;
+  }
+  if (const auto* colorValue = std::get_if<Color>(&value)) {
+    return KeyValue{Color{std::clamp(colorValue->red, 0.0f, 1.0f),
+                          std::clamp(colorValue->green, 0.0f, 1.0f),
+                          std::clamp(colorValue->blue, 0.0f, 1.0f),
+                          std::clamp(colorValue->alpha, 0.0f, 1.0f), colorValue->colorSpace}};
+  }
+  return value;
+}
+
 // Reads the current value of a channel back from a runtime object into *out. Returns false when the
 // channel currently has no value to sync back (e.g. an unset optional property), in which case the
 // channel is skipped by DataBind syncBack. Symmetric to RuntimeWriter; used to flow target changes
@@ -269,7 +299,8 @@ struct RuntimeBinding {
       // timeline's resolved cache). Fail gracefully.
       return false;
     }
-    return it->second->apply(channel, value, mix);
+    const auto clamped = ClampRuntimeChannelValue(channel, value);
+    return it->second->apply(channel, clamped, mix);
   }
 
   // Reads the current value of a node's channel back into out. Returns false if the node has no

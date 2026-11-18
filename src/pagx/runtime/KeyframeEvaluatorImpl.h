@@ -23,7 +23,7 @@
 #include <string>
 #include <vector>
 #include "pagx/nodes/Keyframe.h"
-#include "pagx/runtime/BezierEasing.h"
+#include "pagx/runtime/KeyframeEvaluator.h"
 #include "pagx/runtime/Matrix3DDecompose.h"
 #include "pagx/runtime/MatrixDecompose.h"
 #include "pagx/runtime/MixUtils.h"
@@ -171,8 +171,8 @@ static bool FramePositionBeforeKeyframe(double value, const Keyframe<T>& kf) {
 // clamp-to-end positions, so at least two keyframes span the position.
 template <typename T>
 static bool ResolveKeyframeSegment(const std::vector<Keyframe<T>>& keyframes, double framePosition,
-                                   const Keyframe<T>** left, const Keyframe<T>** right,
-                                   double* fraction) {
+                                   float frameRate, const Keyframe<T>** left,
+                                   const Keyframe<T>** right, double* fraction) {
   auto upper = std::upper_bound(keyframes.begin(), keyframes.end(), framePosition,
                                 FramePositionBeforeKeyframe<T>);
   *right = &(*upper);
@@ -183,34 +183,30 @@ static bool ResolveKeyframeSegment(const std::vector<Keyframe<T>>& keyframes, do
   if (span <= 0.0) {
     return false;
   }
-  double rawT = (framePosition - leftTime) / span;
-  switch ((*left)->interpolation) {
-    case KeyframeInterpolationType::None:
-    case KeyframeInterpolationType::Hold:
-      return false;
-    case KeyframeInterpolationType::Bezier:
-      *fraction = SolveBezierEasing(static_cast<double>((*left)->bezierOut.x),
-                                    static_cast<double>((*left)->bezierOut.y),
-                                    static_cast<double>((*right)->bezierIn.x),
-                                    static_cast<double>((*right)->bezierIn.y), rawT);
-      return true;
-    case KeyframeInterpolationType::Linear:
-    default:
-      *fraction = rawT;
-      return true;
+  if ((*left)->interpolation == KeyframeInterpolationType::None ||
+      (*left)->interpolation == KeyframeInterpolationType::Hold) {
+    return false;
   }
+  double rawT = (framePosition - leftTime) / span;
+  double spanSeconds = frameRate > 0.0f ? span / static_cast<double>(frameRate) : 0.0;
+  *fraction =
+      EvaluateKeyframeInterpolationProgress((*left)->interpolation, (*left)->bezierOut,
+                                            (*right)->bezierIn, (*left)->spring, rawT, spanSeconds);
+  return true;
 }
 
-// Evaluates a Hold/None/Linear/Bezier-segmented keyframe sequence at the given continuous frame
-// position. Boundary policy is clamp-to-end: positions outside [keyframes.front().time,
+// Evaluates a Hold/None/Linear/Bezier/Spring-segmented keyframe sequence at the given continuous
+// frame position. Boundary policy is clamp-to-end: positions outside [keyframes.front().time,
 // keyframes.back().time] return the boundary value.
 //
-// `interpolation` and bezier control points come from `keyframes[i]` (the segment start) per the
-// plan's ownership rule: keyframes[i].interpolation describes the i -> i+1 segment, with
-// keyframes[i].bezierOut and keyframes[i+1].bezierIn forming the Bezier handles.
+// `interpolation`, bezier control points and spring parameters come from `keyframes[i]` (the
+// segment start) per the ownership rule: keyframes[i].interpolation describes the i -> i+1
+// segment, with keyframes[i].bezierOut and keyframes[i+1].bezierIn forming the Bezier handles and
+// keyframes[i].spring carrying the Spring parameters. frameRate converts the segment span to
+// seconds for physical springs.
 template <typename T>
 T EvaluateKeyframeSequence(const std::vector<Keyframe<T>>& keyframes, double framePosition,
-                           bool pivotInterpolation = false) {
+                           bool pivotInterpolation = false, float frameRate = 60.0f) {
   if (keyframes.empty()) {
     return T{};
   }
@@ -223,7 +219,7 @@ T EvaluateKeyframeSequence(const std::vector<Keyframe<T>>& keyframes, double fra
   const Keyframe<T>* left = nullptr;
   const Keyframe<T>* right = nullptr;
   double fraction = 0.0;
-  if (!ResolveKeyframeSegment(keyframes, framePosition, &left, &right, &fraction)) {
+  if (!ResolveKeyframeSegment(keyframes, framePosition, frameRate, &left, &right, &fraction)) {
     return left->value;
   }
   return LerpKeyframeValueWithMode<T>(left->value, right->value, fraction, pivotInterpolation);
@@ -236,7 +232,7 @@ T EvaluateKeyframeSequence(const std::vector<Keyframe<T>>& keyframes, double fra
 // negative key reads as "no projection" at the endpoints and in a hold segment just as it does
 // inside a blended segment.
 inline float EvaluatePerspectiveSequence(const std::vector<Keyframe<float>>& keyframes,
-                                         double framePosition) {
+                                         double framePosition, float frameRate = 60.0f) {
   if (keyframes.empty()) {
     return 0.0f;
   }
@@ -249,7 +245,7 @@ inline float EvaluatePerspectiveSequence(const std::vector<Keyframe<float>>& key
   const Keyframe<float>* left = nullptr;
   const Keyframe<float>* right = nullptr;
   double fraction = 0.0;
-  if (!ResolveKeyframeSegment(keyframes, framePosition, &left, &right, &fraction)) {
+  if (!ResolveKeyframeSegment(keyframes, framePosition, frameRate, &left, &right, &fraction)) {
     return SanitizePerspectiveDistance(left->value);
   }
   return MixPerspectiveDistance(left->value, right->value, static_cast<float>(fraction));

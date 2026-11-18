@@ -1130,6 +1130,39 @@
       <xs:enumeration value="none"/>
       <xs:enumeration value="bezier"/>
       <xs:enumeration value="hold"/>
+      <xs:enumeration value="spring"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:simpleType name="SpringEasingModelType">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="normalized-v1"/>
+      <xs:enumeration value="physical-v1"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:simpleType name="SpringBounceType">
+    <xs:restriction base="xs:decimal">
+      <xs:minInclusive value="-0.5"/>
+      <xs:maxInclusive value="1"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:simpleType name="SpringStiffnessType">
+    <xs:restriction base="xs:decimal">
+      <xs:minExclusive value="0"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:simpleType name="SpringDampingType">
+    <xs:restriction base="xs:decimal">
+      <xs:minInclusive value="0"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:simpleType name="SpringMassType">
+    <xs:restriction base="xs:decimal">
+      <xs:minExclusive value="0"/>
     </xs:restriction>
   </xs:simpleType>
 
@@ -1159,6 +1192,15 @@
     <xs:attribute name="interpolation" type="KeyframeInterpolationType" default="linear"/>
     <xs:attribute name="bezierOut" type="PointType"/>
     <xs:attribute name="bezierIn" type="PointType"/>
+    <xs:attribute name="springBounce" type="SpringBounceType"/>
+    <xs:attribute name="springStiffness" type="SpringStiffnessType"/>
+    <xs:attribute name="springDamping" type="SpringDampingType"/>
+    <xs:attribute name="springMass" type="SpringMassType"/>
+    <xs:attribute name="springModel" type="SpringEasingModelType" default="normalized-v1"/>
+    <!-- springBounce is required for springModel="normalized-v1"; springStiffness,
+         springDamping and springMass are required for springModel="physical-v1". Attributes from
+         the other model are rejected, and all spring attributes are rejected on other
+         interpolation types. -->
     <!-- Deprecated aliases for bezierOut/bezierIn, kept for backward compatibility. -->
     <xs:attribute name="bezier-out" type="PointType"/>
     <xs:attribute name="bezier-in" type="PointType"/>
@@ -1242,6 +1284,15 @@
     <xs:attribute name="interpolation" type="KeyframeInterpolationType" default="linear"/>
     <xs:attribute name="bezierOut" type="PointType"/>
     <xs:attribute name="bezierIn" type="PointType"/>
+    <xs:attribute name="springBounce" type="SpringBounceType"/>
+    <xs:attribute name="springStiffness" type="SpringStiffnessType"/>
+    <xs:attribute name="springDamping" type="SpringDampingType"/>
+    <xs:attribute name="springMass" type="SpringMassType"/>
+    <xs:attribute name="springModel" type="SpringEasingModelType" default="normalized-v1"/>
+    <!-- springBounce is required for springModel="normalized-v1"; springStiffness,
+         springDamping and springMass are required for springModel="physical-v1". Attributes from
+         the other model are rejected, and all spring attributes are rejected on other
+         interpolation types. -->
     <!-- Deprecated aliases for bezierOut/bezierIn, kept for backward compatibility. -->
     <xs:attribute name="bezier-out" type="PointType"/>
     <xs:attribute name="bezier-in" type="PointType"/>

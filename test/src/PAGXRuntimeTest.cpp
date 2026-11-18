@@ -16,6 +16,11 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include <algorithm>
+#include <cmath>
+#include <limits>
+#include <string>
+#include <vector>
 #include "pagx/PAGAnimation.h"
 #include "pagx/PAGScene.h"
 #include "pagx/PAGSurface.h"
@@ -37,6 +42,7 @@
 #include "pagx/tgfx.h"
 #include "renderer/LayerBuilder.h"
 #include "tgfx/gpu/Context.h"
+#include "tgfx/layers/Layer.h"
 #include "utils/Baseline.h"
 #include "utils/TestUtils.h"
 
@@ -781,6 +787,467 @@ PAGX_TEST(PAGXRuntimeTest, EvaluateKeyframeSegmentBasic) {
   left.bezierOut = {0.5f, 0.5f};
   right.bezierIn = {0.5f, 0.5f};
   EXPECT_FLOAT_EQ(eval(), 25.0f);
+}
+
+/**
+ * Test case: Spring easing pins both endpoints for underdamped, critically damped and overdamped
+ * bounces, and stays finite across the segment.
+ */
+PAGX_TEST(PAGXRuntimeTest, SpringEasingEndpoints) {
+  const float bounces[] = {-0.5f, 0.0f, 0.5f, 0.9f, 1.0f};
+  for (float bounce : bounces) {
+    pagx::SpringEasing spring = {};
+    spring.bounce = bounce;
+    spring.model = pagx::SpringEasingModel::NormalizedV1;
+    auto progress = [&](double t) {
+      return pagx::EvaluateKeyframeInterpolationProgress(pagx::KeyframeInterpolationType::Spring,
+                                                         pagx::Point{}, pagx::Point{}, spring, t);
+    };
+    EXPECT_DOUBLE_EQ(progress(0.0), 0.0);
+    EXPECT_DOUBLE_EQ(progress(1.0), 1.0);
+    for (double t = 0.1; t < 1.0; t += 0.1) {
+      EXPECT_TRUE(std::isfinite(progress(t)));
+    }
+  }
+}
+
+/**
+ * Test case: positive bounce overshoots the target, while critical and overdamped bounces approach
+ * it monotonically without passing it.
+ */
+PAGX_TEST(PAGXRuntimeTest, SpringEasingDampingRegimes) {
+  auto progress = [](float bounce, double t) {
+    pagx::SpringEasing spring = {};
+    spring.bounce = bounce;
+    spring.model = pagx::SpringEasingModel::NormalizedV1;
+    return pagx::EvaluateKeyframeInterpolationProgress(pagx::KeyframeInterpolationType::Spring,
+                                                       pagx::Point{}, pagx::Point{}, spring, t);
+  };
+  auto peak = [&](float bounce) {
+    double result = 0.0;
+    for (int i = 0; i <= 200; ++i) {
+      result = std::max(result, progress(bounce, i / 200.0));
+    }
+    return result;
+  };
+  EXPECT_GT(peak(0.5f), 1.02);
+  EXPECT_NEAR(peak(0.0f), 1.0, 1.0e-9);
+  EXPECT_NEAR(peak(-0.3f), 1.0, 1.0e-9);
+
+  double previous = 0.0;
+  for (int i = 0; i <= 200; ++i) {
+    double value = progress(-0.3f, i / 200.0);
+    EXPECT_GE(value, previous - 1.0e-9);
+    previous = value;
+  }
+}
+
+/**
+ * Test case: the normalized spring shape depends only on normalized segment progress, so stretching
+ * the keyframe interval does not change the values sampled at the same progress.
+ */
+PAGX_TEST(PAGXRuntimeTest, SpringEasingIntervalInvariance) {
+  pagx::Keyframe<float> left{};
+  left.time = 0;
+  left.value = 0.0f;
+  left.interpolation = pagx::KeyframeInterpolationType::Spring;
+  left.spring.bounce = 0.6f;
+
+  pagx::Keyframe<float> shortRight{};
+  shortRight.time = 60;
+  shortRight.value = 100.0f;
+  shortRight.interpolation = pagx::KeyframeInterpolationType::Linear;
+
+  pagx::Keyframe<float> longRight = shortRight;
+  longRight.time = 600;
+
+  const double progresses[] = {0.1, 0.25, 0.5, 0.75, 0.9};
+  for (double progress : progresses) {
+    auto shortValue =
+        pagx::EvaluateKeyframeSequence<float>({left, shortRight}, progress * shortRight.time);
+    auto longValue =
+        pagx::EvaluateKeyframeSequence<float>({left, longRight}, progress * longRight.time);
+    EXPECT_NEAR(shortValue, longValue, 1.0e-3);
+  }
+}
+
+/**
+ * Test case: bounces on both sides of zero stay continuous through the critical-damping branch.
+ */
+PAGX_TEST(PAGXRuntimeTest, SpringEasingNearCriticalDamping) {
+  auto progress = [](float bounce, double t) {
+    pagx::SpringEasing spring = {};
+    spring.bounce = bounce;
+    spring.model = pagx::SpringEasingModel::NormalizedV1;
+    return pagx::EvaluateKeyframeInterpolationProgress(pagx::KeyframeInterpolationType::Spring,
+                                                       pagx::Point{}, pagx::Point{}, spring, t);
+  };
+  const double samples[] = {0.1, 0.3, 0.5, 0.7, 0.9};
+  for (double sample : samples) {
+    double critical = progress(0.0f, sample);
+    EXPECT_NEAR(progress(1.0e-5f, sample), critical, 5.0e-3);
+    EXPECT_NEAR(progress(-1.0e-5f, sample), critical, 5.0e-3);
+  }
+}
+
+/**
+ * Test case: EvaluateKeyframeSegment uses the same spring curve as EvaluateKeyframeSequence, and a
+ * null spring parameter selects the default critically damped spring.
+ */
+PAGX_TEST(PAGXRuntimeTest, EvaluateKeyframeSegmentSpring) {
+  pagx::Keyframe<float> left{};
+  left.time = 0;
+  left.value = 0.0f;
+  left.interpolation = pagx::KeyframeInterpolationType::Spring;
+  left.spring.bounce = 0.6f;
+
+  pagx::Keyframe<float> right{};
+  right.time = 60;
+  right.value = 100.0f;
+  right.interpolation = pagx::KeyframeInterpolationType::Linear;
+
+  double progress = 0.3;
+  auto segment = std::get<float>(pagx::EvaluateKeyframeSegment(left.value, right.value, progress,
+                                                               left.interpolation, &left.bezierOut,
+                                                               &right.bezierIn, &left.spring));
+  auto sequence = pagx::EvaluateKeyframeSequence<float>({left, right}, progress * right.time);
+  EXPECT_NEAR(segment, sequence, 1.0e-4);
+
+  auto defaultSpring = std::get<float>(
+      pagx::EvaluateKeyframeSegment(left.value, right.value, progress, left.interpolation));
+  pagx::SpringEasing critical = {};
+  auto criticalSpring = std::get<float>(
+      pagx::EvaluateKeyframeSegment(left.value, right.value, progress, left.interpolation,
+                                    &left.bezierOut, &right.bezierIn, &critical));
+  EXPECT_NEAR(defaultSpring, criticalSpring, 1.0e-6);
+}
+
+static pagx::SpringEasing MakePhysicalSpring(float stiffness, float damping, float mass) {
+  pagx::SpringEasing spring = {};
+  spring.model = pagx::SpringEasingModel::PhysicalV1;
+  spring.stiffness = stiffness;
+  spring.damping = damping;
+  spring.mass = mass;
+  return spring;
+}
+
+static double PhysicalSpringValue(const pagx::SpringEasing& spring, double progress,
+                                  double durationSeconds) {
+  return pagx::EvaluateKeyframeInterpolationProgress(pagx::KeyframeInterpolationType::Spring,
+                                                     pagx::Point{}, pagx::Point{}, spring, progress,
+                                                     durationSeconds);
+}
+
+/**
+ * Test case: a physical spring follows the analytic critically damped step response over the
+ * segment's real duration.
+ */
+PAGX_TEST(PAGXRuntimeTest, PhysicalSpringEasingMatchesStepResponse) {
+  auto spring = MakePhysicalSpring(100.0f, 20.0f, 1.0f);  // zeta = 1, omega = 10 rad/s
+  EXPECT_DOUBLE_EQ(PhysicalSpringValue(spring, 0.0, 1.0), 0.0);
+  EXPECT_DOUBLE_EQ(PhysicalSpringValue(spring, 1.0, 1.0), 1.0);
+  auto expected = [](double time) { return 1.0 - std::exp(-10.0 * time) * (1.0 + 10.0 * time); };
+  const double samples[] = {0.1, 0.2, 0.5, 0.9};
+  for (double sample : samples) {
+    EXPECT_NEAR(PhysicalSpringValue(spring, sample, 1.0), expected(sample), 1.0e-6);
+  }
+}
+
+/**
+ * Test case: physical springs evaluate in real seconds, so the same progress maps to different
+ * response values when the segment duration changes.
+ */
+PAGX_TEST(PAGXRuntimeTest, PhysicalSpringEasingDurationScalesResponse) {
+  auto spring = MakePhysicalSpring(100.0f, 20.0f, 1.0f);
+  EXPECT_NEAR(PhysicalSpringValue(spring, 0.5, 0.5), PhysicalSpringValue(spring, 0.25, 1.0),
+              1.0e-9);
+  EXPECT_NEAR(PhysicalSpringValue(spring, 0.5, 2.0), PhysicalSpringValue(spring, 0.25, 4.0),
+              1.0e-9);
+  EXPECT_GT(
+      std::fabs(PhysicalSpringValue(spring, 0.5, 1.0) - PhysicalSpringValue(spring, 0.5, 0.5)),
+      0.1);
+}
+
+/**
+ * Test case: physical damping ratios produce underdamped overshoot, a critical monotonic
+ * approach, and an overdamped monotonic approach.
+ */
+PAGX_TEST(PAGXRuntimeTest, PhysicalSpringEasingDampingRegimes) {
+  auto under = MakePhysicalSpring(100.0f, 5.0f, 1.0f);      // zeta = 0.25
+  auto critical = MakePhysicalSpring(100.0f, 20.0f, 1.0f);  // zeta = 1
+  auto over = MakePhysicalSpring(100.0f, 40.0f, 1.0f);      // zeta = 2
+  auto peak = [](const pagx::SpringEasing& spring, double duration) {
+    double result = 0.0;
+    for (int i = 0; i <= 200; ++i) {
+      result = std::max(result, PhysicalSpringValue(spring, i / 200.0, duration));
+    }
+    return result;
+  };
+  EXPECT_GT(peak(under, 1.0), 1.05);
+  EXPECT_LE(peak(critical, 1.0), 1.0 + 1.0e-9);
+  EXPECT_LE(peak(over, 1.0), 1.0 + 1.0e-9);
+
+  double previous = 0.0;
+  for (int i = 0; i <= 200; ++i) {
+    double value = PhysicalSpringValue(over, i / 200.0, 3.0);
+    EXPECT_GE(value, previous - 1.0e-9);
+    previous = value;
+  }
+}
+
+/**
+ * Test case: without a time base a physical spring keeps its damping ratio and evaluates with the
+ * normalized time scale.
+ */
+PAGX_TEST(PAGXRuntimeTest, PhysicalSpringWithoutDurationFallsBackToNormalized) {
+  auto physical = MakePhysicalSpring(100.0f, 10.0f, 1.0f);  // zeta = 0.5
+  pagx::SpringEasing normalized = {};
+  normalized.bounce = 0.5f;
+  normalized.model = pagx::SpringEasingModel::NormalizedV1;
+  const double samples[] = {0.1, 0.3, 0.5, 0.7, 0.9};
+  for (double sample : samples) {
+    double physicalValue = PhysicalSpringValue(physical, sample, 0.0);
+    double normalizedValue = PhysicalSpringValue(normalized, sample, 0.0);
+    EXPECT_NEAR(physicalValue, normalizedValue, 1.0e-9);
+  }
+}
+
+/**
+ * Test case: keyframe sequences convert the segment span to seconds with the supplied frame rate
+ * before evaluating a physical spring.
+ */
+PAGX_TEST(PAGXRuntimeTest, PhysicalSpringSequenceUsesFrameRate) {
+  auto spring = MakePhysicalSpring(100.0f, 20.0f, 1.0f);
+  pagx::Keyframe<float> left = {};
+  left.time = 0;
+  left.value = 0.0f;
+  left.interpolation = pagx::KeyframeInterpolationType::Spring;
+  left.spring = spring;
+
+  pagx::Keyframe<float> right = {};
+  right.time = 60;
+  right.value = 100.0f;
+
+  auto at60 = pagx::EvaluateKeyframeSequence<float>({left, right}, 30.0, false, 60.0f);
+  auto at120 = pagx::EvaluateKeyframeSequence<float>({left, right}, 30.0, false, 120.0f);
+  EXPECT_NEAR(at60, 100.0 * PhysicalSpringValue(spring, 0.5, 1.0), 1.0e-3);
+  EXPECT_NEAR(at120, 100.0 * PhysicalSpringValue(spring, 0.5, 0.5), 1.0e-3);
+  EXPECT_GT(std::fabs(at60 - at120), 1.0f);
+}
+
+/**
+ * Test case: invalid physical parameters fall back to linear progress instead of producing a
+ * non-finite easing value.
+ */
+PAGX_TEST(PAGXRuntimeTest, PhysicalSpringInvalidParametersFallBackToLinear) {
+  auto spring = MakePhysicalSpring(0.0f, 20.0f, 1.0f);
+  EXPECT_DOUBLE_EQ(PhysicalSpringValue(spring, 0.4, 1.0), 0.4);
+}
+
+/**
+ * Test case: non-finite segment durations are invalid input and must not reach the response
+ * formula, where they could produce NaN or an accidental endpoint value.
+ */
+PAGX_TEST(PAGXRuntimeTest, PhysicalSpringInvalidDurationFallsBackToLinear) {
+  auto spring = MakePhysicalSpring(100.0f, 20.0f, 1.0f);
+  EXPECT_DOUBLE_EQ(PhysicalSpringValue(spring, 0.4, std::numeric_limits<double>::quiet_NaN()), 0.4);
+  EXPECT_DOUBLE_EQ(PhysicalSpringValue(spring, 0.4, std::numeric_limits<double>::infinity()), 0.4);
+  EXPECT_DOUBLE_EQ(PhysicalSpringValue(spring, 0.4, -std::numeric_limits<double>::infinity()), 0.4);
+}
+
+/**
+ * Test case: the settle duration helper reports the time at which the response envelope reaches
+ * the settle tolerance, and distinguishes undamped, invalid and normalized springs.
+ */
+PAGX_TEST(PAGXRuntimeTest, SpringSettleDuration) {
+  EXPECT_NEAR(pagx::EvaluateSpringSettleDurationSeconds(MakePhysicalSpring(100.0f, 20.0f, 1.0f)),
+              0.6638, 1.0e-4);
+  EXPECT_NEAR(pagx::EvaluateSpringSettleDurationSeconds(MakePhysicalSpring(100.0f, 10.0f, 1.0f)),
+              1.3276, 1.0e-4);
+  EXPECT_NEAR(pagx::EvaluateSpringSettleDurationSeconds(MakePhysicalSpring(100.0f, 40.0f, 1.0f)),
+              2.4777, 1.0e-4);
+  EXPECT_TRUE(std::isinf(
+      pagx::EvaluateSpringSettleDurationSeconds(MakePhysicalSpring(100.0f, 0.0f, 1.0f))));
+  EXPECT_DOUBLE_EQ(pagx::EvaluateSpringSettleDurationSeconds(MakePhysicalSpring(0.0f, 20.0f, 1.0f)),
+                   0.0);
+
+  pagx::SpringEasing normalized = {};
+  normalized.bounce = 0.5f;
+  normalized.model = pagx::SpringEasingModel::NormalizedV1;
+  EXPECT_DOUBLE_EQ(pagx::EvaluateSpringSettleDurationSeconds(normalized), 0.0);
+}
+
+/**
+ * Test case: a PAGX document using normalized, overdamped and physical springs evaluates to the
+ * expected channel values at the same frame positions an editor would sample.
+ */
+PAGX_TEST(PAGXRuntimeTest, SpringEasingPAGXEndToEnd) {
+  const std::string xml = R"PAGX(<?xml version="1.0" encoding="UTF-8"?>
+<pagx width="640" height="240">
+  <Layer id="normalized" x="20" y="80">
+    <Rectangle position="40,40" size="80,80"/>
+    <Fill color="#4C8DFF"/>
+  </Layer>
+  <Layer id="normalizedOverdamped" x="220" y="80">
+    <Rectangle position="40,40" size="80,80"/>
+    <Fill color="#38C172"/>
+  </Layer>
+  <Layer id="physical" x="420" y="80">
+    <Rectangle position="40,40" size="80,80"/>
+    <Fill color="#F2994A"/>
+  </Layer>
+  <Animations>
+    <Animation id="springDemo" duration="60" frameRate="60" loop="once">
+      <Object target="normalized">
+        <Channel name="x" type="float">
+          <Key time="0" value="20" interpolation="spring"
+               springBounce="0.5" springModel="normalized-v1"/>
+          <Key time="60" value="180"/>
+        </Channel>
+        <Channel name="alpha" type="float">
+          <Key time="0" value="0.3" interpolation="spring"
+               springBounce="0.9" springModel="normalized-v1"/>
+          <Key time="60" value="1"/>
+        </Channel>
+      </Object>
+      <Object target="normalizedOverdamped">
+        <Channel name="x" type="float">
+          <Key time="0" value="20" interpolation="spring"
+               springBounce="-0.3" springModel="normalized-v1"/>
+          <Key time="60" value="180"/>
+        </Channel>
+      </Object>
+      <Object target="physical">
+        <Channel name="x" type="float">
+          <Key time="0" value="20" interpolation="spring" springModel="physical-v1"
+               springStiffness="120" springDamping="15" springMass="1"/>
+          <Key time="60" value="180"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>)PAGX";
+
+  auto doc = pagx::PAGXImporter::FromXML(xml);
+  ASSERT_TRUE(doc != nullptr);
+  ASSERT_TRUE(doc->errors.empty());
+  ASSERT_EQ(doc->animations.size(), 1u);
+  auto* animation = static_cast<pagx::Animation*>(doc->animations[0]);
+
+  auto findChannel = [&](const std::string& target,
+                         const std::string& name) -> pagx::TypedChannel<float>* {
+    for (auto* object : animation->objects) {
+      if (object->target != target) {
+        continue;
+      }
+      for (auto* channel : object->channels) {
+        if (channel->name == name) {
+          return static_cast<pagx::TypedChannel<float>*>(channel);
+        }
+      }
+    }
+    return nullptr;
+  };
+
+  auto* normalizedX = findChannel("normalized", "x");
+  auto* normalizedAlpha = findChannel("normalized", "alpha");
+  auto* overdampedX = findChannel("normalizedOverdamped", "x");
+  auto* physicalX = findChannel("physical", "x");
+  ASSERT_TRUE(normalizedX != nullptr);
+  ASSERT_TRUE(normalizedAlpha != nullptr);
+  ASSERT_TRUE(overdampedX != nullptr);
+  ASSERT_TRUE(physicalX != nullptr);
+
+  auto valueAt = [](pagx::TypedChannel<float>* channel, pagx::Frame frame) {
+    return std::get<float>(channel->evaluateAt(frame));
+  };
+
+  EXPECT_NEAR(valueAt(normalizedX, pagx::Frame{0}), 20.0f, 1.0e-4);
+  EXPECT_NEAR(valueAt(normalizedX, pagx::Frame{15}), 204.710f, 0.01f);
+  EXPECT_NEAR(valueAt(normalizedX, pagx::Frame{30}), 176.715f, 0.01f);
+  EXPECT_NEAR(valueAt(normalizedX, pagx::Frame{45}), 180.304f, 0.01f);
+  EXPECT_NEAR(valueAt(normalizedX, pagx::Frame{60}), 180.0f, 1.0e-4);
+
+  EXPECT_NEAR(valueAt(overdampedX, pagx::Frame{15}), 141.191f, 0.01f);
+  EXPECT_NEAR(valueAt(overdampedX, pagx::Frame{30}), 172.831f, 0.01f);
+  EXPECT_NEAR(valueAt(overdampedX, pagx::Frame{45}), 178.854f, 0.01f);
+  EXPECT_NEAR(valueAt(overdampedX, pagx::Frame{60}), 180.0f, 1.0e-4);
+
+  EXPECT_NEAR(valueAt(physicalX, pagx::Frame{15}), 169.128f, 0.01f);
+  EXPECT_NEAR(valueAt(physicalX, pagx::Frame{30}), 185.139f, 0.01f);
+  EXPECT_NEAR(valueAt(physicalX, pagx::Frame{45}), 179.605f, 0.01f);
+  EXPECT_NEAR(valueAt(physicalX, pagx::Frame{60}), 180.0f, 1.0e-4);
+
+  EXPECT_NEAR(valueAt(normalizedAlpha, pagx::Frame{0}), 0.3f, 1.0e-4);
+  EXPECT_GT(valueAt(normalizedAlpha, pagx::Frame{15}), 1.0f);
+  EXPECT_NEAR(valueAt(normalizedAlpha, pagx::Frame{60}), 1.0f, 1.0e-4);
+}
+
+/**
+ * Test case: spring overshoot is preserved for continuous values and clamped per channel for
+ * colors, which cannot represent components outside [0, 1].
+ */
+PAGX_TEST(PAGXRuntimeTest, SpringEasingColorClampsOvershoot) {
+  pagx::SpringEasing spring = {};
+  spring.bounce = 0.5f;
+  spring.model = pagx::SpringEasingModel::NormalizedV1;
+  double overshootProgress = 0.27;
+  auto eased = pagx::EvaluateKeyframeInterpolationProgress(pagx::KeyframeInterpolationType::Spring,
+                                                           pagx::Point{}, pagx::Point{}, spring,
+                                                           overshootProgress);
+  ASSERT_GT(eased, 1.0);
+
+  pagx::KeyValue left = pagx::Color{0.0f, 0.0f, 0.0f, 1.0f, pagx::ColorSpace::SRGB};
+  pagx::KeyValue right = pagx::Color{1.0f, 0.0f, 0.0f, 1.0f, pagx::ColorSpace::SRGB};
+  auto color = std::get<pagx::Color>(pagx::EvaluateKeyframeSegment(
+      left, right, overshootProgress, pagx::KeyframeInterpolationType::Spring, nullptr, nullptr,
+      &spring));
+  EXPECT_FLOAT_EQ(color.red, 1.0f);
+  EXPECT_FLOAT_EQ(color.green, 0.0f);
+  EXPECT_FLOAT_EQ(color.alpha, 1.0f);
+}
+
+/**
+ * Test case: Spring overshoot on an alpha channel is clamped to [0, 1] at the runtime writer.
+ */
+PAGX_TEST(PAGXRuntimeTest, SpringOvershootClampsAlpha) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto* layer = doc->makeNode<pagx::Layer>("L");
+  doc->layers.push_back(layer);
+
+  auto* animation = doc->makeNode<pagx::Animation>("a");
+  animation->duration = 60;
+  animation->frameRate = 60.0f;
+  auto* object = doc->makeNode<pagx::AnimationObject>();
+  object->target = "L";
+  animation->objects.push_back(object);
+
+  auto* channel = doc->makeNode<pagx::TypedChannel<float>>();
+  channel->name = "alpha";
+  pagx::Keyframe<float> first = {};
+  first.time = 0;
+  first.value = 0.0f;
+  first.interpolation = pagx::KeyframeInterpolationType::Spring;
+  first.spring.bounce = 0.5f;
+  channel->keyframes.push_back(first);
+  pagx::Keyframe<float> second = {};
+  second.time = 60;
+  second.value = 1.0f;
+  second.interpolation = pagx::KeyframeInterpolationType::Linear;
+  channel->keyframes.push_back(second);
+  object->channels.push_back(channel);
+  doc->animations.push_back(animation);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_NE(scene, nullptr);
+  auto timeline = scene->getAnimation("a");
+  ASSERT_NE(timeline, nullptr);
+  auto tgfxLayer = scene->mutableBinding()->get<tgfx::Layer>(layer);
+  ASSERT_NE(tgfxLayer, nullptr);
+
+  timeline->setCurrentTime(273000);
+  timeline->apply();
+  EXPECT_FLOAT_EQ(tgfxLayer->alpha(), 1.0f);
 }
 
 /**

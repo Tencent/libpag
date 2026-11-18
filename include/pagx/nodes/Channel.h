@@ -58,7 +58,8 @@ class Channel : public Node {
 
   /**
    * Evaluates the channel value at the given Frame index. Useful for unit tests and any caller
-   * operating in frame-discrete time.
+   * operating in frame-discrete time. Physical springs use the PAGX default frame rate of 60
+   * because this entry point has no animation context.
    * @param frame the frame index to sample.
    * @return the interpolated value at the given frame.
    */
