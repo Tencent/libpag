@@ -1169,7 +1169,7 @@ function writePagxMarkdown(rows, outPath, label) {
   lines.push('');
   lines.push('## Cases');
   lines.push('');
-  lines.push('SSIM is luma-only, so a wrong hue can still score ~1; `rgbΔ` (mean per-channel RGB delta, 0-255) catches color errors. `ref span` / `export span` are the largest RGB delta from the first frame on each timeline (0 = never changes). `static0` / `staticWorst` are the two static instants; `freeze` is the PAGX-side self-check (frozen render vs the animated render at the same instant) and `state` the browser-side one (the frozen export vs the animated export at that same instant). A case is only attributed statically when both agree with the animated state (>= 0.99).');
+  lines.push('SSIM is luma-only, so a wrong hue can still score ~1; `rgbΔ` (mean per-channel RGB delta, 0-255) catches color errors. `ref span` / `export span` are the largest RGB delta from the first frame on each timeline (0 = never changes).');
   lines.push('');
   lines.push('| case | expect | target.channel | frames | ssim mean | ssim min | grade(mean) | grade(min) | grade | attribution | rgbΔ mean | rgbΔ max | pixelDiff% | ref span | export span | flag | error |');
   lines.push('| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |');
