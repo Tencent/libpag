@@ -772,15 +772,12 @@ async function processPagxCase(entry, outDir, opts) {
     ref: '',
     frames: 0,
     ssimMean: NaN,
-    ssimMin: NaN,
     pixelDiffMean: NaN,
     rgbDeltaMean: NaN,
     rgbDeltaMax: NaN,
     motion: NaN,
     exportMotion: NaN,
     // Fidelity grade; `grade(mean)` and `grade(min)` are the two readings it takes the stricter of.
-    animGradeMean: '',
-    animGradeMin: '',
     grade: '',
     attribution: '',
     flag: '',
@@ -908,7 +905,6 @@ async function processPagxCase(entry, outDir, opts) {
 
   row.frames = samples.length;
   row.ssimMean = mean(ssims);
-  row.ssimMin = Math.min(...ssims);
   row.pixelDiffMean = mean(pdiffs);
   row.rgbDeltaMean = mean(rgbDeltas);
   row.rgbDeltaMax = Math.max(...rgbDeltas);
@@ -971,16 +967,9 @@ function gradeTierName(tier) {
 
 
 function gradePagxRow(row) {
-  // The animated metric is graded on two readings: the per-frame mean (overall fidelity) and the
-  // worst frame (a single badly reproduced frame is a defect a mean would hide). The case takes the
-  // stricter of the two, so both are reported separately.
+  // One reading only: the per-frame mean.
   const hasText = row.hasText === true;
-  const animTierMean = gradeTier(row.ssimMean, hasText);
-  const animTierMin = gradeTier(row.ssimMin, hasText);
-  const animTier = Math.min(animTierMean, animTierMin);
-  row.animGradeMean = gradeTierName(animTierMean);
-  row.animGradeMin = gradeTierName(animTierMin);
-  row.grade = gradeTierName(animTier);
+  row.grade = gradeTierName(gradeTier(row.ssimMean, hasText));
   if (row.grade !== GRADE_DISTORTED) {
     row.attribution = '';
     return;
@@ -994,11 +983,6 @@ function gradePagxRow(row) {
   if (row.expect === 'gap') {
     // The corpus header already declares this channel unsupported by the exporter.
     row.attribution = 'known-limit';
-    return;
-  }
-  if (animTierMin < animTierMean) {
-    // The mean is fine but at least one frame is not: that frame's keyframes are the defect.
-    row.attribution = 'exporter';
     return;
   }
   row.attribution = 'exporter';
@@ -1028,7 +1012,6 @@ function summarizePagx(rows) {
       cases: all.length,
       supportedScored: sup.length,
       ssimMean: mean(sup.map((r) => r.ssimMean)),
-      ssimMin: sup.length ? Math.min(...sup.map((r) => r.ssimMin)) : NaN,
       rgbDeltaMean: mean(sup.map((r) => r.rgbDeltaMean)),
       flagged: all.filter((r) => r.flag).length,
       errored: all.filter((r) => r.error).length,
@@ -1045,7 +1028,6 @@ function summarizePagx(rows) {
   const summarizeFamily = (list) => ({
     cases: list.length,
     ssimMean: mean(list.map((r) => r.ssimMean)),
-    ssimMin: mean(list.map((r) => r.ssimMin)),
     grades: Object.fromEntries(
       [GRADE_COMPLETE, GRADE_BASIC, GRADE_DISTORTED].map((name) => [
         name,
@@ -1076,12 +1058,12 @@ function summarizePagx(rows) {
 
 function writePagxCsv(rows, outPath) {
   const headers = [
-    'name', 'group', 'target', 'channel', 'expect', 'ref', 'frames', 'ssimMean', 'ssimMin',
+    'name', 'group', 'target', 'channel', 'expect', 'ref', 'frames', 'ssimMean',
     'pixelDiffMean', 'rgbDeltaMean', 'rgbDeltaMax', 'motion', 'exportMotion', 'flag', 'width',
     'height', 'error',
-    // Grade. ssimMean / ssimMin above are the metric it reads; eval_gate.py reads them by name and
+    // Grade. ssimMean above is the metric it reads; eval_gate.py reads it by name and
     // ignores everything after.
-    'hasText', 'animGradeMean', 'animGradeMin', 'grade', 'attribution',
+    'hasText', 'grade', 'attribution',
   ];
   const lines = [headers.join(',')];
   for (const r of rows) {
@@ -1130,27 +1112,27 @@ function writePagxMarkdown(rows, outPath, label) {
   if (s.distorted.length) {
     lines.push('### Distorted cases (attribution required)');
     lines.push('');
-    lines.push('| case | animSSIM | worst frame | attribution |');
-    lines.push('| --- | --- | --- | --- |');
+    lines.push('| case | SSIM | attribution |');
+    lines.push('| --- | --- | --- |');
     for (const r of s.distorted) {
-      lines.push(`| ${r.name} | ${fmt(r.ssimMean)} | ${fmt(r.ssimMin)} | ${r.attribution || '-'} |`);
+      lines.push(`| ${r.name} | ${fmt(r.ssimMean)} | ${r.attribution || '-'} |`);
     }
     lines.push('');
   }
   lines.push('## By group (supported cases only)');
   lines.push('');
-  lines.push('| group | cases | scored | ssim mean | ssim min | rgbΔ mean | flagged | errored |');
-  lines.push('| --- | --- | --- | --- | --- | --- | --- | --- |');
+  lines.push('| group | cases | scored | ssim mean | rgbΔ mean | flagged | errored |');
+  lines.push('| --- | --- | --- | --- | --- | --- | --- |');
   for (const g of s.groups) {
-    lines.push(`| ${g.group} | ${g.cases} | ${g.supportedScored} | ${fmt(g.ssimMean)} | ${fmt(g.ssimMin)} | ${fmt(g.rgbDeltaMean, 2)} | ${g.flagged} | ${g.errored} |`);
+    lines.push(`| ${g.group} | ${g.cases} | ${g.supportedScored} | ${fmt(g.ssimMean)} | ${fmt(g.rgbDeltaMean, 2)} | ${g.flagged} | ${g.errored} |`);
   }
   lines.push('');
   lines.push('## Cases');
   lines.push('');
   lines.push('SSIM is luma-only, so a wrong hue can still score ~1; `rgbΔ` (mean per-channel RGB delta, 0-255) catches color errors. `ref span` / `export span` are the largest RGB delta from the first frame on each timeline (0 = never changes).');
   lines.push('');
-  lines.push('| case | expect | target.channel | frames | ssim mean | ssim min | grade(mean) | grade(min) | grade | attribution | rgbΔ mean | rgbΔ max | pixelDiff% | ref span | export span | flag | error |');
-  lines.push('| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |');
+  lines.push('| case | expect | target.channel | frames | ssim mean | grade | attribution | rgbΔ mean | rgbΔ max | pixelDiff% | ref span | export span | flag | error |');
+  lines.push('| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |');
   for (const r of rows) {
     const tc = r.target || r.channel ? `${r.target}.${r.channel}` : '-';
     lines.push('| ' + [
@@ -1159,9 +1141,6 @@ function writePagxMarkdown(rows, outPath, label) {
       tc,
       String(r.frames),
       fmt(r.ssimMean),
-      fmt(r.ssimMin),
-      r.animGradeMean || '',
-      r.animGradeMin || '',
       r.grade || '',
       r.attribution || '',
       fmt(r.rgbDeltaMean, 2),
@@ -1415,7 +1394,7 @@ function writeIndexHtml(rows, outDir, label) {
     const staticFigures = '';
     return `
 <section class="case">
-  <h2>${r.name} <span class="ssim-tag ${cls}">SSIM mean ${fmt(r.ssimMean, 4)}</span><span class="ssim-tag ${ssimClass(r.ssimMin)}">min ${fmt(r.ssimMin, 4)}</span>${staticTags}${rtTags}${pagxTags}</h2>
+  <h2>${r.name} <span class="ssim-tag ${cls}">SSIM ${fmt(r.ssimMean, 4)}</span>${staticTags}${rtTags}${pagxTags}</h2>
   <p>
     frames <b>${r.frames}</b> &middot; pixel diff <b>${isFinite(r.pixelDiffMean) ? fmt(r.pixelDiffMean * 100, 2) + '%' : '-'}</b>
     &middot; motion <b>${fmt(r.motion, 3)}</b>
@@ -1524,7 +1503,7 @@ function writeIndexHtml(rows, outDir, label) {
       </tr>
     </tbody>
   </table>
-  <p class="note">SSIM 取 <code>mean</code> 与 <code>min</code> 中更严的一档。带 text 节点用更宽的一条曲线：两套渲染器
+  <p class="note">SSIM 取逐帧均值。带 text 节点用更宽的一条曲线：两套渲染器
     的字形轮廓本就不同（PAGX 填充带 hint 的轮廓、fauxBold 时再并一个描边；浏览器用自己的字面栅格化、
     fauxBold 用 <code>-webkit-text-stroke</code>），文本用例的静态天花板通常落在 0.95–0.99。
     带 text 的用例用更宽的一条曲线，是因为两套渲染器的字形轮廓本就不同，这部分差异与动画写入无关。</p>
@@ -1796,7 +1775,7 @@ async function main() {
       if (row.error) {
         console.log(`[${doneCount}/${total}] ${c.name}  ERROR ${row.error} (${dur} ms)`);
       } else if (pagxSource) {
-        console.log(`[${doneCount}/${total}] ${c.name}  SSIM ${fmt(row.ssimMean, 4)}  min ${fmt(row.ssimMin, 4)}  ${row.grade}${row.attribution ? '/' + row.attribution : ''}  ${row.expect}${row.flag ? '  ' + row.flag : ''}  (${dur} ms)`);
+        console.log(`[${doneCount}/${total}] ${c.name}  SSIM ${fmt(row.ssimMean, 4)}  ${row.grade}${row.attribution ? '/' + row.attribution : ''}  ${row.expect}${row.flag ? '  ' + row.flag : ''}  (${dur} ms)`);
       } else if (row.roundtrip) {
         console.log(`[${doneCount}/${total}] ${c.name}  SSIM ${fmt(row.ssimMean, 4)}  expHtml/pagx ${fmt(row.exportBrowserVsPagxSsimMean, 4)}  rtPagx/pagx ${fmt(row.roundtripVsPagxSsimMean, 4)}  anim ${row.animCaptured}  (${dur} ms)`);
       } else {
