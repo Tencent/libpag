@@ -40,13 +40,10 @@ if ! git cat-file -e "$MAIN_COMMIT:web/test/artifacts.js" 2>/dev/null; then
     echo "Refusing to seed regression expectations from the branch under test." >&2
     exit 1
 fi
-if [ -n "$(git status --porcelain)" ]; then
-    echo "Error: cache refresh requires a clean working tree and index. No changes were stashed." >&2
-    exit 1
-fi
-
 CURRENT_BRANCH=$(git symbolic-ref --short -q HEAD || true)
 CURRENT_COMMIT=$(git rev-parse HEAD)
+STASH_BEFORE=$(git rev-parse --verify -q refs/stash || true)
+STASH_CREATED=0
 restore_branch() {
     local status=$?
     trap - EXIT
@@ -56,9 +53,22 @@ restore_branch() {
     else
         git switch --detach "$CURRENT_COMMIT" --quiet || exit 1
     fi
+    if [ "$STASH_CREATED" -eq 1 ]; then
+        if ! git stash pop --index --quiet; then
+            echo "Error: could not restore the stashed changes. Keep the stash for recovery." >&2
+            exit 1
+        fi
+    fi
     exit "$status"
 }
 trap restore_branch EXIT
+# Stash local changes (including untracked files) so the build runs on a pristine origin/main
+# checkout; the trap above restores them on exit.
+git stash push --include-untracked --quiet
+STASH_AFTER=$(git rev-parse --verify -q refs/stash || true)
+if [ "$STASH_BEFORE" != "$STASH_AFTER" ]; then
+    STASH_CREATED=1
+fi
 git switch --detach "$MAIN_COMMIT" --quiet
 
 cd "$SCRIPT_DIR"

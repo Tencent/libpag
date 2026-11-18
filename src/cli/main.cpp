@@ -29,6 +29,7 @@
 #include "cli/CommandRender.h"
 #include "cli/CommandResolve.h"
 #include "cli/CommandVerify.h"
+#include "cli/VideoEncoder.h"
 
 #ifndef PAGX_CLI_VERSION
 #define PAGX_CLI_VERSION "0.0.0-dev"
@@ -59,6 +60,7 @@ static void PrintUsage() {
 }
 
 int main(int argc, char* argv[]) {
+  pagx::cli::InitializeVideoEncoderProcess();
   if (argc < 2) {
     PrintUsage();
     return 1;

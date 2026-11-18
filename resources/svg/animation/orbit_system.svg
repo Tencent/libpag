@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200">
+  <defs>
+    <path id="orbitPath" d="M100,30 A70,70 0 1,1 99.99,30" fill="none"/>
+  </defs>
+  <circle cx="100" cy="100" r="70" fill="none" stroke="#e5e7eb" stroke-width="1" stroke-dasharray="2 4"/>
+  <circle cx="100" cy="100" r="15" fill="#fbbf24"/>
+  <g>
+    <circle r="8" fill="#3b82f6">
+      <animateMotion dur="4s" repeatCount="indefinite">
+        <mpath href="#orbitPath"/>
+      </animateMotion>
+    </circle>
+  </g>
+  <g>
+    <circle r="6" fill="#ef4444">
+      <animateMotion dur="4s" begin="-1.3s" repeatCount="indefinite">
+        <mpath href="#orbitPath"/>
+      </animateMotion>
+    </circle>
+  </g>
+  <g>
+    <circle r="5" fill="#10b981">
+      <animateMotion dur="4s" begin="-2.6s" repeatCount="indefinite">
+        <mpath href="#orbitPath"/>
+      </animateMotion>
+    </circle>
+  </g>
+</svg>

@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100">
+  <rect width="50" height="50" fill="red">
+    <set attributeName="display" to="none" begin="0s" dur="2s" fill="freeze"/>
+    <set attributeName="display" to="inline" begin="1s" dur="1s" additive="sum" fill="freeze"/>
+  </rect>
+</svg>

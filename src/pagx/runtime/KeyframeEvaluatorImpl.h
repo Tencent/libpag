@@ -26,6 +26,7 @@
 #include "pagx/runtime/KeyframeEvaluator.h"
 #include "pagx/runtime/Matrix3DDecompose.h"
 #include "pagx/runtime/MatrixDecompose.h"
+#include "pagx/runtime/MixUtils.h"
 #include "pagx/types/Color.h"
 #include "pagx/types/Matrix.h"
 #include "pagx/utils/ColorSpaceUtils.h"
@@ -70,6 +71,30 @@ inline ImageRef LerpKeyframeValue<ImageRef>(const ImageRef& a, const ImageRef& /
   return a;
 }
 
+// Fixed point of an affine matrix: the point p with M(p) == p. A rotation or scale authored as
+// "transform about (x, y)" bakes that pivot into the translation, so interpolating the translation
+// linearly drags the pivot away from its authored position mid-tween. Returns false when the linear
+// part has no unique fixed point (pure translation, singular scale).
+inline bool SolveMatrixFixedPoint(const Matrix& m, float* x, float* y) {
+  const float ia = 1.0f - m.a;
+  const float ib = -m.b;
+  const float ic = -m.c;
+  const float id = 1.0f - m.d;
+  const float det = ia * id - ic * ib;
+  if (std::abs(det) < 1e-4f) {
+    return false;
+  }
+  *x = (id * m.tx - ic * m.ty) / det;
+  *y = (ia * m.ty - ib * m.tx) / det;
+  return true;
+}
+
+// True when the matrix carries neither rotation/scale nor translation.
+inline bool IsIdentityTransform(const Matrix& m) {
+  return std::abs(m.a - 1.0f) < 1e-5f && std::abs(m.b) < 1e-5f && std::abs(m.c) < 1e-5f &&
+         std::abs(m.d - 1.0f) < 1e-5f && std::abs(m.tx) < 1e-3f && std::abs(m.ty) < 1e-3f;
+}
+
 template <>
 inline Matrix LerpKeyframeValue<Matrix>(const Matrix& a, const Matrix& b, double t) {
   // See MatrixDecompose.h for the winding limitation: matrix rotation interpolation cannot recover
@@ -80,6 +105,51 @@ inline Matrix LerpKeyframeValue<Matrix>(const Matrix& a, const Matrix& b, double
   auto mixed = MixDecomposed(da, db, static_cast<float>(t));
   Matrix result = {};
   RecomposeAffine(mixed, &result.a, &result.b, &result.c, &result.d, &result.tx, &result.ty);
+  return result;
+}
+
+// Mode-aware lerp used by the evaluator. Only Matrix reacts to `pivotInterpolation`: SVG transform
+// animations rotate about a fixed point, while CSS-style transforms interpolate the decomposed
+// translation linearly. Keeping the spelling opt-in avoids changing the latter.
+template <typename T>
+inline T LerpKeyframeValueWithMode(const T& a, const T& b, double t, bool pivotInterpolation) {
+  (void)pivotInterpolation;
+  return LerpKeyframeValue<T>(a, b, t);
+}
+
+template <>
+inline Matrix LerpKeyframeValueWithMode<Matrix>(const Matrix& a, const Matrix& b, double t,
+                                                bool pivotInterpolation) {
+  Matrix result = LerpKeyframeValue<Matrix>(a, b, t);
+  if (!pivotInterpolation) {
+    return result;
+  }
+  // Spell out the translation from the shared pivot instead of lerping it, so rotation and scale
+  // happen in place. Sampling interpolates between two poses only, hence a keyframe that starts at
+  // the identity pose contributes the other pose's pivot.
+  float pivotX = 0.0f;
+  float pivotY = 0.0f;
+  bool hasPivot = false;
+  float ax = 0.0f, ay = 0.0f, bx = 0.0f, by = 0.0f;
+  const bool aHasPivot = SolveMatrixFixedPoint(a, &ax, &ay);
+  const bool bHasPivot = SolveMatrixFixedPoint(b, &bx, &by);
+  if (aHasPivot && bHasPivot && std::abs(ax - bx) < 0.5f && std::abs(ay - by) < 0.5f) {
+    hasPivot = true;
+    pivotX = ax;
+    pivotY = ay;
+  } else if (bHasPivot && IsIdentityTransform(a)) {
+    hasPivot = true;
+    pivotX = bx;
+    pivotY = by;
+  } else if (aHasPivot && IsIdentityTransform(b)) {
+    hasPivot = true;
+    pivotX = ax;
+    pivotY = ay;
+  }
+  if (hasPivot) {
+    result.tx = pivotX - (result.a * pivotX + result.c * pivotY);
+    result.ty = pivotY - (result.b * pivotX + result.d * pivotY);
+  }
   return result;
 }
 
@@ -95,6 +165,36 @@ static bool FramePositionBeforeKeyframe(double value, const Keyframe<T>& kf) {
   return value < static_cast<double>(kf.time);
 }
 
+// Locates the segment that contains framePosition and resolves the fraction to blend with, the
+// segment's easing already applied. Returns false when the segment holds its left value; *left is
+// still set so the caller can return it. The caller must have handled the empty sequence and the
+// clamp-to-end positions, so at least two keyframes span the position.
+template <typename T>
+static bool ResolveKeyframeSegment(const std::vector<Keyframe<T>>& keyframes, double framePosition,
+                                   float frameRate, const Keyframe<T>** left,
+                                   const Keyframe<T>** right, double* fraction) {
+  auto upper = std::upper_bound(keyframes.begin(), keyframes.end(), framePosition,
+                                FramePositionBeforeKeyframe<T>);
+  *right = &(*upper);
+  *left = &(*(upper - 1));
+  *fraction = 0.0;
+  double leftTime = static_cast<double>((*left)->time);
+  double span = static_cast<double>((*right)->time) - leftTime;
+  if (span <= 0.0) {
+    return false;
+  }
+  if ((*left)->interpolation == KeyframeInterpolationType::None ||
+      (*left)->interpolation == KeyframeInterpolationType::Hold) {
+    return false;
+  }
+  double rawT = (framePosition - leftTime) / span;
+  double spanSeconds = frameRate > 0.0f ? span / static_cast<double>(frameRate) : 0.0;
+  *fraction =
+      EvaluateKeyframeInterpolationProgress((*left)->interpolation, (*left)->bezierOut,
+                                            (*right)->bezierIn, (*left)->spring, rawT, spanSeconds);
+  return true;
+}
+
 // Evaluates a Hold/None/Linear/Bezier/Spring-segmented keyframe sequence at the given continuous
 // frame position. Boundary policy is clamp-to-end: positions outside [keyframes.front().time,
 // keyframes.back().time] return the boundary value.
@@ -106,7 +206,7 @@ static bool FramePositionBeforeKeyframe(double value, const Keyframe<T>& kf) {
 // seconds for physical springs.
 template <typename T>
 T EvaluateKeyframeSequence(const std::vector<Keyframe<T>>& keyframes, double framePosition,
-                           float frameRate = 60.0f) {
+                           bool pivotInterpolation = false, float frameRate = 60.0f) {
   if (keyframes.empty()) {
     return T{};
   }
@@ -116,25 +216,39 @@ T EvaluateKeyframeSequence(const std::vector<Keyframe<T>>& keyframes, double fra
   if (framePosition >= static_cast<double>(keyframes.back().time)) {
     return keyframes.back().value;
   }
-  auto upper = std::upper_bound(keyframes.begin(), keyframes.end(), framePosition,
-                                FramePositionBeforeKeyframe<T>);
-  auto right = upper;
-  auto left = upper - 1;
-  double leftTime = static_cast<double>(left->time);
-  double rightTime = static_cast<double>(right->time);
-  double span = rightTime - leftTime;
-  if (span <= 0.0) {
+  const Keyframe<T>* left = nullptr;
+  const Keyframe<T>* right = nullptr;
+  double fraction = 0.0;
+  if (!ResolveKeyframeSegment(keyframes, framePosition, frameRate, &left, &right, &fraction)) {
     return left->value;
   }
-  if (left->interpolation == KeyframeInterpolationType::None ||
-      left->interpolation == KeyframeInterpolationType::Hold) {
-    return left->value;
+  return LerpKeyframeValueWithMode<T>(left->value, right->value, fraction, pivotInterpolation);
+}
+
+// Evaluates a perspective distance sequence. Segment selection, easing and the clamp-to-end
+// boundary policy are EvaluateKeyframeSequence's; only the blend differs, because a perspective
+// distance has to mix its projection coefficient to stay in step with a browser's perspective().
+// Every value returned from a keyframe goes through SanitizePerspectiveDistance, so an invalid
+// negative key reads as "no projection" at the endpoints and in a hold segment just as it does
+// inside a blended segment.
+inline float EvaluatePerspectiveSequence(const std::vector<Keyframe<float>>& keyframes,
+                                         double framePosition, float frameRate = 60.0f) {
+  if (keyframes.empty()) {
+    return 0.0f;
   }
-  double rawT = (framePosition - leftTime) / span;
-  double spanSeconds = frameRate > 0.0f ? span / static_cast<double>(frameRate) : 0.0;
-  auto easedT = EvaluateKeyframeInterpolationProgress(
-      left->interpolation, left->bezierOut, right->bezierIn, left->spring, rawT, spanSeconds);
-  return LerpKeyframeValue<T>(left->value, right->value, easedT);
+  if (framePosition <= static_cast<double>(keyframes.front().time)) {
+    return SanitizePerspectiveDistance(keyframes.front().value);
+  }
+  if (framePosition >= static_cast<double>(keyframes.back().time)) {
+    return SanitizePerspectiveDistance(keyframes.back().value);
+  }
+  const Keyframe<float>* left = nullptr;
+  const Keyframe<float>* right = nullptr;
+  double fraction = 0.0;
+  if (!ResolveKeyframeSegment(keyframes, framePosition, frameRate, &left, &right, &fraction)) {
+    return SanitizePerspectiveDistance(left->value);
+  }
+  return MixPerspectiveDistance(left->value, right->value, static_cast<float>(fraction));
 }
 
 }  // namespace pagx

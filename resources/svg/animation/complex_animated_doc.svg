@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="300" height="200" viewBox="0 0 300 200">
+  <rect id="r1" width="50" height="50" fill="red">
+    <animate attributeName="opacity" from="1" to="0" dur="2s" fill="freeze"/>
+  </rect>
+  <circle id="c1" cx="150" cy="100" r="30" fill="blue">
+    <animateTransform attributeName="transform" type="rotate" from="0" to="360" dur="3s" fill="freeze"/>
+  </circle>
+</svg>

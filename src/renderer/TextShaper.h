@@ -20,6 +20,7 @@
 
 #ifdef PAG_USE_HARFBUZZ
 
+#include <cstdint>
 #include <string>
 #include <vector>
 #include "tgfx/core/Font.h"

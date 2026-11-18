@@ -20,6 +20,7 @@
 #include <cctype>
 #include <cstdlib>
 #include <string>
+#include "pagx/utils/StringUtils.h"
 
 namespace pagx {
 
@@ -31,13 +32,6 @@ std::string TrimAscii(const std::string& s) {
   while (begin < end && std::isspace(static_cast<unsigned char>(s[begin]))) ++begin;
   while (end > begin && std::isspace(static_cast<unsigned char>(s[end - 1]))) --end;
   return s.substr(begin, end - begin);
-}
-
-std::string ToLowerAscii(std::string s) {
-  for (auto& c : s) {
-    c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-  }
-  return s;
 }
 
 // Converts a CSS font-weight token to a numeric weight in the OpenType 1-1000 range. Returns

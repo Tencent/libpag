@@ -19,6 +19,7 @@
 #pragma once
 
 #include <cmath>
+#include <cstdint>
 #include <vector>
 #include "Interpolate.h"
 

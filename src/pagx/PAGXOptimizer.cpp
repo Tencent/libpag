@@ -556,9 +556,9 @@ bool TryConvertRectMaskToScrollRect(Layer* layer, const Layer* parent,
     return false;
   }
   // `id` / `name` on the mask layer come from SVG <clipPath>'s identifier and don't carry
-  // user-meaningful state — the mask layer itself stays in doc->layers (hidden) after we
-  // detach the mask reference, so any other consumer can still resolve it. Only customData
-  // truly blocks the rewrite.
+  // user-meaningful state — the mask layer itself stays in doc->layers after we detach the mask
+  // reference, so any other consumer can still resolve it. Only customData truly blocks the
+  // rewrite.
   if (!m->customData.empty()) {
     return false;
   }
@@ -1156,6 +1156,12 @@ bool UnwrapRedundantFirstGroupInElements(std::vector<Element*>& elements) {
   }
   auto* group = static_cast<Group*>(first);
   if (!IsDefaultTransformGroup(group)) {
+    return false;
+  }
+  // A Group with a non-empty id may be referenced by an AnimationObject target (e.g. Groups
+  // created by SVG SMIL import to host animateTransform/animateMotion channels). Unwrapping
+  // such a Group would orphan the animation target, so skip it.
+  if (!group->id.empty()) {
     return false;
   }
   if (!group->customData.empty()) {
