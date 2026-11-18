@@ -159,7 +159,9 @@ class VideoExporterImpl {
                               VideoExportFailure* failure);
 
   std::shared_ptr<VideoExportState> state = {};
-  std::shared_ptr<VideoExportFrame> pendingFrame = {};
+  // Weak on purpose: the host owns the frame, and dropping it means the frame is abandoned rather
+  // than kept alive here, so a released frame can never pin a later start in Busy.
+  std::weak_ptr<VideoExportFrame> pendingFrame = {};
   std::shared_ptr<PAGScene> scene = {};
   std::shared_ptr<PAGSurface> surface = {};
   std::vector<std::shared_ptr<PAGTimeline>> timelines = {};

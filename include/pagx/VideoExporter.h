@@ -176,10 +176,10 @@ class VideoExporter {
    * successful use of nextFrame() or startNextFrame() fixes the exporter's mode; mixing modes is
    * a terminal usage error reported as Failed with VideoExportError::MixedMode.
    *
-   * Only one uncommitted frame may exist at a time. While the previously started frame is
-   * unconsumed the result is Busy, and the result carries that same pending frame so the caller can
-   * still read it even after dropping its own reference; a dropped frame therefore never leaves a
-   * later start stuck in Busy. The caller reads the frame or calls cancel() to end the sequence.
+   * Only one uncommitted frame may exist at a time. While the caller still holds an unconsumed
+   * started frame the result is Busy and carries that same frame. The exporter observes the pending
+   * frame weakly, so dropping the last reference abandons it and the next start renders the same
+   * index again instead of staying Busy; only a successful readPixels() advances currentFrame().
    *
    * Drawing or readback failures are reported as Failed without ending the sequence: the index is
    * not advanced and the next start retries the same frame, which matches the recoverable behavior

@@ -931,7 +931,7 @@ PAGX_TEST(PAGXVideoExporterTest, FailedSynchronousFrameDoesNotLockMode) {
   EXPECT_EQ(exporter->currentFrame(), 1);
 }
 
-PAGX_TEST(PAGXVideoExporterTest, ReleasingAsyncFrameKeepsTheSequenceRecoverable) {
+PAGX_TEST(PAGXVideoExporterTest, ReleasingAsyncFrameRestartsTheSameIndex) {
 #ifdef TGFX_USE_WEBGPU
   GTEST_SKIP() << "Native test does not pump the WebGPU event loop";
 #endif
@@ -940,19 +940,21 @@ PAGX_TEST(PAGXVideoExporterTest, ReleasingAsyncFrameKeepsTheSequenceRecoverable)
   auto started = exporter->startNextFrame();
   ASSERT_EQ(started.status, pagx::VideoExportStartStatus::FrameStarted);
   auto frameIndex = started.frame->index();
+  std::weak_ptr<pagx::VideoExportFrame> releasedReference = started.frame;
   started.frame = nullptr;
+  ASSERT_TRUE(releasedReference.expired());
 
-  // The exporter keeps the pending frame, so discarding the caller reference must not make every
-  // later start report Busy: the pending frame is handed back instead.
-  auto busy = exporter->startNextFrame();
-  EXPECT_EQ(busy.status, pagx::VideoExportStartStatus::Busy);
-  ASSERT_TRUE(busy.frame != nullptr);
-  EXPECT_EQ(busy.frame->index(), frameIndex);
-  EXPECT_EQ(exporter->currentFrame(), 0);
+  // The exporter observes the pending frame weakly, so a dropped frame is abandoned instead of
+  // pinning every later start in Busy: the same index is rendered again and stays consumable.
+  auto restarted = exporter->startNextFrame();
+  EXPECT_EQ(restarted.status, pagx::VideoExportStartStatus::FrameStarted);
+  ASSERT_TRUE(restarted.frame != nullptr);
+  EXPECT_EQ(restarted.frame->index(), frameIndex);
+  EXPECT_EQ(exporter->currentFrame(), frameIndex);
   std::vector<uint8_t> pixels = {};
-  ASSERT_TRUE(ConsumeAsyncFrame(busy.frame, exporter->width(), exporter->height(), &pixels));
+  ASSERT_TRUE(ConsumeAsyncFrame(restarted.frame, exporter->width(), exporter->height(), &pixels));
   EXPECT_EQ(exporter->currentFrame(), frameIndex + 1);
-  EXPECT_EQ(exporter->startNextFrame().status, pagx::VideoExportStartStatus::FrameStarted);
+  EXPECT_EQ(exporter->errorCode(), pagx::VideoExportError::None);
 }
 
 PAGX_TEST(PAGXVideoExporterTest, AsyncInvalidDestinationKeepsTheFrameReadable) {

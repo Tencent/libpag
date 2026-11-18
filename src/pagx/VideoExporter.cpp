@@ -570,8 +570,8 @@ bool VideoExporterImpl::nextFrame(VideoExportFailure* failure) {
   if (state->mode == VideoExportMode::Async) {
     markMixedModeFailure();
     failure->set(VideoExportError::MixedMode, MixedModeError);
-    if (pendingFrame != nullptr) {
-      pendingFrame->impl->fail(VideoExportError::MixedMode, state->error);
+    if (auto pending = pendingFrame.lock()) {
+      pending->impl->fail(VideoExportError::MixedMode, state->error);
     }
     return false;
   }
@@ -614,12 +614,11 @@ VideoExportStartResult VideoExporterImpl::startNextFrame() {
     markMixedModeFailure();
     return {VideoExportStartStatus::Failed, nullptr, state->error, state->errorCode};
   }
-  if (pendingFrame != nullptr) {
-    if (pendingFrame->impl->hasEnded()) {
-      pendingFrame = nullptr;
-    } else {
-      return {VideoExportStartStatus::Busy, pendingFrame, "", VideoExportError::None};
+  if (auto pending = pendingFrame.lock()) {
+    if (!pending->impl->hasEnded()) {
+      return {VideoExportStartStatus::Busy, pending, "", VideoExportError::None};
     }
+    pendingFrame.reset();
   }
   if (state->currentFrame >= totalFrames) {
     return {VideoExportStartStatus::End, nullptr, "", VideoExportError::None};
@@ -657,11 +656,13 @@ void VideoExporterImpl::cancel() {
   if (!wasFailed) {
     state->error = CancelledError;
     state->errorCode = VideoExportError::Cancelled;
-    if (pendingFrame != nullptr && !pendingFrame->impl->consumed) {
-      pendingFrame->impl->fail(VideoExportError::Cancelled, state->error);
+    if (auto pending = pendingFrame.lock()) {
+      if (!pending->impl->consumed) {
+        pending->impl->fail(VideoExportError::Cancelled, state->error);
+      }
     }
   }
-  pendingFrame = nullptr;
+  pendingFrame.reset();
 }
 
 void VideoExporterImpl::markMixedModeFailure() {
