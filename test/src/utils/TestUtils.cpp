@@ -166,7 +166,8 @@ void SaveImage(const Pixmap& pixmap, const std::string& key) {
   }
   std::filesystem::path path = GetOutputFile(key);
   std::filesystem::create_directories(path.parent_path());
-  std::ofstream out(path);
+  // Binary mode is required: text mode expands every LF to CRLF on Windows and corrupts the WebP.
+  std::ofstream out(path, std::ios::binary);
   out.write(reinterpret_cast<const char*>(data->data()),
             static_cast<std::streamsize>(data->size()));
   out.close();
