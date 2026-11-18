@@ -1473,6 +1473,11 @@ Composition* ConvertSequenceComposition(ConvertState* state, pag::Composition* l
     auto* pattern = state->document->makeNode<ImagePattern>();
     pattern->image = primaryImage;
     pattern->scaleMode = ScaleMode::Stretch;
+    // The legacy renderer draws sequence frames with a plain image draw, which samples the edge
+    // texels with clamping. Clamp also keeps decoded YUV video frames drawable: tgfx's tiled
+    // (non-clamp) texture sampling does not support YUV textures and would draw nothing.
+    pattern->tileModeX = TileMode::Clamp;
+    pattern->tileModeY = TileMode::Clamp;
     fill->color = pattern;
     layer->contents.push_back(fill);
     composition->layers.push_back(layer);

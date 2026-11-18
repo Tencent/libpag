@@ -617,7 +617,13 @@ PAG_TEST(PAGMigrationEquivalenceTest, AllSamples) {
   int framesPassed = 0;
   std::string failures;
   int processed = 0;
+  // PAG_EQ_ONLY restricts the run to the samples whose path contains the given text, so a single
+  // sample can be diagnosed in isolation (no state left behind by earlier samples).
+  auto onlyFilter = getenv("PAG_EQ_ONLY");
   for (const auto& path : files) {
+    if (onlyFilter != nullptr && path.find(onlyFilter) == std::string::npos) {
+      continue;
+    }
     SampleResult result = {};
     CompareSample(path, &result);
     processed++;
