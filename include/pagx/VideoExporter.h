@@ -214,16 +214,17 @@ class VideoExporter {
    * is owned by the exporter and stays valid only until the next nextFrame() call, so the host
    * must consume it (write to a pipe, wrap in a VideoFrame) before advancing.
    *
-   * Only synchronous frames are exposed here. After startNextFrame() has been used the exporter
-   * renders asynchronously and this returns nullptr, because the pixels are read through
-   * VideoExportFrame::readPixels() into the host buffer instead.
+   * Only synchronous frames are exposed here, and the buffer is allocated on the first such frame,
+   * so this returns nullptr before it and after startNextFrame() has been used: asynchronous frames
+   * are read through VideoExportFrame::readPixels() into the host buffer instead.
    */
   const uint8_t* pixels() const;
 
   /**
    * Returns the number of bytes between the start of two consecutive pixel rows. May be larger than
-   * `width() * 4`, in which case raw frame sinks must repack the rows. Returns 0 after
-   * startNextFrame() has been used, since asynchronous frames do not use the internal buffer.
+   * `width() * 4`, in which case raw frame sinks must repack the rows. Returns 0 before the first
+   * synchronous frame and after startNextFrame() has been used, since asynchronous frames do not use
+   * the internal buffer.
    */
   size_t rowBytes() const;
 

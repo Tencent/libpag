@@ -483,7 +483,11 @@ std::shared_ptr<VideoExporterImpl> VideoExporterImpl::MakeInternal(
   } else if (!exporter->validateHostSurface(surface, width, height, failure)) {
     return nullptr;
   }
-  if (!exporter->createFramePixmap(width, height, &exporter->pixmap, failure)) {
+  // A document without dynamic content reuses one readback buffer for every frame and exposes it
+  // through pixels(), so that buffer has to exist up front; a dynamic document allocates it on its
+  // first synchronous frame instead and never pays for it when only startNextFrame() is used.
+  if (!plan.hasDynamicContent &&
+      !exporter->createFramePixmap(width, height, &exporter->pixmap, failure)) {
     return nullptr;
   }
   attachSceneOptions(scene, options);
@@ -564,9 +568,7 @@ bool VideoExporterImpl::nextFrame(VideoExportFailure* failure) {
     return false;
   }
   if (state->mode == VideoExportMode::Async) {
-    state->failed = true;
-    state->errorCode = VideoExportError::MixedMode;
-    state->error = MixedModeError;
+    markMixedModeFailure();
     failure->set(VideoExportError::MixedMode, MixedModeError);
     if (pendingFrame != nullptr) {
       pendingFrame->impl->fail(VideoExportError::MixedMode, state->error);
@@ -582,6 +584,9 @@ bool VideoExporterImpl::nextFrame(VideoExportFailure* failure) {
     state->errorCode = VideoExportError::None;
     state->error.clear();
     return true;
+  }
+  if (pixmap == nullptr && !createFramePixmap(outputWidth, outputHeight, &pixmap, failure)) {
+    return false;
   }
   if (!drawNextFrame(failure)) {
     state->errorCode = failure->code;
@@ -606,9 +611,7 @@ VideoExportStartResult VideoExporterImpl::startNextFrame() {
     return {VideoExportStartStatus::Failed, nullptr, state->error, state->errorCode};
   }
   if (state->mode == VideoExportMode::Sync) {
-    state->failed = true;
-    state->errorCode = VideoExportError::MixedMode;
-    state->error = MixedModeError;
+    markMixedModeFailure();
     return {VideoExportStartStatus::Failed, nullptr, state->error, state->errorCode};
   }
   if (pendingFrame != nullptr) {
@@ -661,18 +664,24 @@ void VideoExporterImpl::cancel() {
   pendingFrame = nullptr;
 }
 
+void VideoExporterImpl::markMixedModeFailure() {
+  state->failed = true;
+  state->errorCode = VideoExportError::MixedMode;
+  state->error = MixedModeError;
+}
+
 const uint8_t* VideoExporterImpl::pixels() const {
   if (state != nullptr && state->mode == VideoExportMode::Async) {
     return nullptr;
   }
-  return static_cast<const uint8_t*>(pixmap->pixels());
+  return pixmap != nullptr ? static_cast<const uint8_t*>(pixmap->pixels()) : nullptr;
 }
 
 size_t VideoExporterImpl::rowBytes() const {
   if (state != nullptr && state->mode == VideoExportMode::Async) {
     return 0;
   }
-  return pixmap->rowBytes();
+  return pixmap != nullptr ? pixmap->rowBytes() : 0;
 }
 
 VideoExporter::VideoExporter(std::shared_ptr<VideoExporterImpl> exporterImpl)

@@ -143,6 +143,7 @@ class VideoExporterImpl {
                          VideoExportFailure* failure) const;
   static void attachSceneOptions(const std::shared_ptr<PAGScene>& scene,
                                  const VideoExportOptions& options);
+  void markMixedModeFailure();
   bool drawNextFrame(VideoExportFailure* failure);
 
   static bool ResolvePlaybackPlan(const std::shared_ptr<PAGScene>& scene,

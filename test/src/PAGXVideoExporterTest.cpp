@@ -372,6 +372,19 @@ PAGX_TEST(PAGXVideoExporterTest, MakeExportsStaticDocumentAsSingleFrameByDefault
   EXPECT_FALSE(exporter->nextFrame());
 }
 
+PAGX_TEST(PAGXVideoExporterTest, PixelsAreAllocatedOnTheFirstSynchronousFrame) {
+#ifdef TGFX_USE_WEBGPU
+  GTEST_SKIP() << "VideoExporter currently requires synchronous pixel readback";
+#endif
+  auto exporter = pagx::VideoExporter::Make(MakeAnimatedDocument("once"));
+  ASSERT_TRUE(exporter != nullptr);
+  EXPECT_EQ(exporter->pixels(), nullptr);
+  EXPECT_EQ(exporter->rowBytes(), static_cast<size_t>(0));
+  ASSERT_TRUE(exporter->nextFrame());
+  EXPECT_NE(exporter->pixels(), nullptr);
+  EXPECT_GE(exporter->rowBytes(), static_cast<size_t>(exporter->width()) * 4);
+}
+
 PAGX_TEST(PAGXVideoExporterTest, RenderModeDefaultsToPartialAndSupportsDirect) {
   auto document = MakeStaticDocument();
   ASSERT_TRUE(document != nullptr);

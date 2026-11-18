@@ -90,6 +90,26 @@ void VideoExportFrameImpl::absorbSharedFailure() {
   fail(code, state->error.empty() ? "the export sequence has failed" : state->error);
 }
 
+tgfx::Context* VideoExportFrameImpl::lockReadbackSession() {
+  if (device == nullptr || readback == nullptr) {
+    fail(VideoExportError::ReadbackFailed, "the frame has no readback session");
+    return nullptr;
+  }
+  auto* context = device->lockContext();
+  if (context == nullptr) {
+    fail(VideoExportError::DeviceLost, "failed to lock the export device");
+  }
+  return context;
+}
+
+bool VideoExportFrameImpl::copyPixels(const tgfx::Pixmap& source, void* dstPixels,
+                                      size_t dstRowBytes) {
+  auto destination =
+      tgfx::ImageInfo::Make(source.width(), source.height(), tgfx::ColorType::RGBA_8888,
+                            tgfx::AlphaType::Premultiplied, dstRowBytes);
+  return !destination.isEmpty() && source.readPixels(destination, dstPixels);
+}
+
 VideoExportFrameStatus VideoExportFrameImpl::pollLocked(tgfx::Context* context) {
   if (failed) {
     return VideoExportFrameStatus::Failed;
@@ -99,10 +119,6 @@ VideoExportFrameStatus VideoExportFrameImpl::pollLocked(tgfx::Context* context) 
   }
   if (state->failed || state->cancelled) {
     absorbSharedFailure();
-    return VideoExportFrameStatus::Failed;
-  }
-  if (readback == nullptr) {
-    fail(VideoExportError::ReadbackFailed, "the frame has no readback session");
     return VideoExportFrameStatus::Failed;
   }
   switch (pag::PollAsyncReadback(context, readback)) {
@@ -132,13 +148,8 @@ VideoExportFrameStatus VideoExportFrameImpl::status() {
     }
     return VideoExportFrameStatus::Ready;
   }
-  if (device == nullptr || readback == nullptr) {
-    fail(VideoExportError::ReadbackFailed, "the frame has no readback session");
-    return VideoExportFrameStatus::Failed;
-  }
-  auto* context = device->lockContext();
+  auto* context = lockReadbackSession();
   if (context == nullptr) {
-    fail(VideoExportError::DeviceLost, "failed to lock the export device");
     return VideoExportFrameStatus::Failed;
   }
   auto result = pollLocked(context);
@@ -162,10 +173,7 @@ bool VideoExportFrameImpl::copyGPUPixelsLocked(tgfx::Context* context, void* dst
     // ending the sequence.
     source.readPixels(staticCache->info(), staticCache->writablePixels());
   }
-  auto destination =
-      tgfx::ImageInfo::Make(source.width(), source.height(), tgfx::ColorType::RGBA_8888,
-                            tgfx::AlphaType::Premultiplied, dstRowBytes);
-  auto success = !destination.isEmpty() && source.readPixels(destination, dstPixels);
+  auto success = copyPixels(source, dstPixels, dstRowBytes);
   readback->unlockPixels(context);
   return success;
 }
@@ -188,23 +196,15 @@ bool VideoExportFrameImpl::readPixels(void* dstPixels, size_t dstRowBytes) {
     if (width <= 0 || dstRowBytes < static_cast<size_t>(width) * 4) {
       return false;
     }
-    auto destination =
-        tgfx::ImageInfo::Make(cpuPixels->width(), cpuPixels->height(), tgfx::ColorType::RGBA_8888,
-                              tgfx::AlphaType::Premultiplied, dstRowBytes);
-    if (destination.isEmpty() || !cpuPixels->readPixels(destination, dstPixels)) {
+    if (!copyPixels(*cpuPixels, dstPixels, dstRowBytes)) {
       fail(VideoExportError::ReadbackFailed, "failed to copy the export frame pixels");
       return false;
     }
     commit();
     return true;
   }
-  if (device == nullptr || readback == nullptr) {
-    fail(VideoExportError::ReadbackFailed, "the frame has no readback session");
-    return false;
-  }
-  auto* context = device->lockContext();
+  auto* context = lockReadbackSession();
   if (context == nullptr) {
-    fail(VideoExportError::DeviceLost, "failed to lock the export device");
     return false;
   }
   auto success = false;

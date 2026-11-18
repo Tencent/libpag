@@ -62,6 +62,8 @@ class VideoExportFrameImpl {
   bool consumed = false;
 
  private:
+  tgfx::Context* lockReadbackSession();
+  static bool copyPixels(const tgfx::Pixmap& source, void* dstPixels, size_t dstRowBytes);
   VideoExportFrameStatus pollLocked(tgfx::Context* context);
   bool copyGPUPixelsLocked(tgfx::Context* context, void* dstPixels, size_t dstRowBytes);
   void absorbSharedFailure();
