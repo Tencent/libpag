@@ -884,6 +884,9 @@ PAGX_TEST(PAGXVideoExporterTest, MakeReportsStableErrorCodes) {
                                                   &errorCode);
   EXPECT_EQ(exporter, nullptr);
   EXPECT_EQ(errorCode, pagx::VideoExportError::InvalidArgument);
+
+  // OutOfMemory and DeviceLost are deliberately not asserted here: reaching them needs a failing
+  // GPU allocation or a lost device, and the suite has no fault injection for either.
 }
 
 PAGX_TEST(PAGXVideoExporterTest, AsyncAndSyncModesCannotBeMixed) {
@@ -1267,6 +1270,7 @@ PAGX_TEST(PAGXVideoExporterTest, NextFrameReportsDrawingFailure) {
   std::string errorMsg = {};
   EXPECT_FALSE(exporter->nextFrame(&errorMsg));
   EXPECT_EQ(exporter->currentFrame(), 0);
+  EXPECT_EQ(exporter->errorCode(), pagx::VideoExportError::RenderFailed);
   EXPECT_NE(errorMsg.find("failed to draw frame 0"), std::string::npos);
 }
 

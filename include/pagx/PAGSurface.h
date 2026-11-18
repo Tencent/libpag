@@ -25,7 +25,6 @@
 namespace pagx {
 
 class Drawable;
-class VideoExportFrameImpl;
 class PAGScene;
 
 /**
@@ -108,7 +107,6 @@ class PAGSurface {
   std::shared_ptr<Drawable> drawable = nullptr;
 
   friend class PAGScene;
-  friend class VideoExportFrameImpl;
   friend std::shared_ptr<Drawable> GetSurfaceDrawable(const PAGSurface& surface);
 };
 

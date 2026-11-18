@@ -34,11 +34,16 @@ std::shared_ptr<VideoExportFrameImpl> VideoExportFrameImpl::MakeGPU(
   auto impl = std::make_shared<VideoExportFrameImpl>(std::move(state), index);
   impl->surface = std::move(surface);
   impl->staticCache = std::move(staticCache);
-  if (impl->surface == nullptr || impl->surface->drawable == nullptr) {
+  if (impl->surface == nullptr) {
     failure->set(VideoExportError::InvalidArgument, "the export surface is null");
     return nullptr;
   }
-  impl->device = impl->surface->drawable->getDevice();
+  auto drawable = GetSurfaceDrawable(*impl->surface);
+  if (drawable == nullptr) {
+    failure->set(VideoExportError::InvalidArgument, "the export surface has no render target");
+    return nullptr;
+  }
+  impl->device = drawable->getDevice();
   if (impl->device == nullptr) {
     failure->set(VideoExportError::DeviceLost, "the export surface has no GPU device");
     return nullptr;
@@ -48,7 +53,7 @@ std::shared_ptr<VideoExportFrameImpl> VideoExportFrameImpl::MakeGPU(
     failure->set(VideoExportError::DeviceLost, "failed to lock the export device");
     return nullptr;
   }
-  auto tgfxSurface = impl->surface->drawable->getSurface(context);
+  auto tgfxSurface = drawable->getSurface(context);
   impl->readback = pag::StartAsyncReadback(context, tgfxSurface, &impl->flipY);
   impl->device->unlock();
   if (impl->readback == nullptr) {

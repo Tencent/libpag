@@ -188,7 +188,11 @@ enum class VideoExportFrameStatus {
 
 /** The explicit result of VideoExporter::startNextFrame(). */
 struct VideoExportStartResult {
-  /** Outcome of the start attempt. FrameStarted and Busy carry a frame. */
+  /**
+   * Outcome of the start attempt. FrameStarted and Busy carry a frame. Failed is the default, so a
+   * result built without setting this field reports failure; read error and errorCode together with
+   * it instead of relying on the default value.
+   */
   VideoExportStartStatus status = VideoExportStartStatus::Failed;
   /** The new or pending frame, or null for End and Failed. */
   std::shared_ptr<VideoExportFrame> frame = nullptr;
