@@ -57,6 +57,7 @@ namespace pag {
  * Test case: PAGScene registers itself with the source document on creation and unregisters on
  * destruction.
  */
+#ifdef PAG_TEST_ACCESS_PRIVATE
 PAGX_TEST(PAGXRuntimeTest, PAGSceneLiveSceneRegistration) {
   auto doc = pagx::PAGXDocument::Make(100, 100);
 
@@ -75,6 +76,7 @@ PAGX_TEST(PAGXRuntimeTest, PAGSceneLiveSceneRegistration) {
   EXPECT_EQ(file2->width(), 100.0f);
   EXPECT_EQ(file2->height(), 100.0f);
 }
+#endif
 
 /**
  * Test case: PAGScene timeline lookup by name and identity sharing.
@@ -719,6 +721,7 @@ PAGX_TEST(PAGXRuntimeTest, PerspectiveChannelBlendsThroughEvaluation) {
  * that starts at no perspective lands on twice the target distance halfway, and one that starts at
  * 1000 lands on 333.33. A negative distance is rejected and leaves the pose untouched.
  */
+#ifdef PAG_TEST_ACCESS_PRIVATE
 PAGX_TEST(PAGXRuntimeTest, PerspectiveComponentWriteMixesTheProjectionCoefficient) {
   auto doc = pagx::PAGXDocument::Make(200, 200);
   auto* layer = doc->makeNode<pagx::Layer>("L");
@@ -746,6 +749,7 @@ PAGX_TEST(PAGXRuntimeTest, PerspectiveComponentWriteMixesTheProjectionCoefficien
   ASSERT_TRUE(binding->read(layer, "perspective", &value));
   EXPECT_FLOAT_EQ(std::get<float>(value), unchanged);
 }
+#endif
 
 /**
  * Test case: EvaluateKeyframeSegment evaluates a single keyframe pair at the boundary and mid

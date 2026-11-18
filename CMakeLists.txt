@@ -1316,10 +1316,14 @@ if (PAG_BUILD_TESTS)
             AND CMAKE_CXX_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC")
         # clang-cl ignores the GNU flag unless it is forwarded to the clang driver.
         list(APPEND PAG_TEST_COMPILE_OPTIONS /clang:-fno-access-control)
+        list(APPEND PAG_TEST_DEFINES PAG_TEST_ACCESS_PRIVATE)
     elseif (MSVC)
-        message(FATAL_ERROR "Windows private-access tests require the clang-cl frontend.")
+        # MSVC cannot disable access control. Tests that inspect private members are compiled
+        # out through PAG_TEST_PRIVATE / PAG_PRIVATE_ACCESS, matching tgfx's test setup.
+        message(STATUS "MSVC cannot disable access control; private-access tests are disabled.")
     else ()
         list(APPEND PAG_TEST_COMPILE_OPTIONS -fno-access-control)
+        list(APPEND PAG_TEST_DEFINES PAG_TEST_ACCESS_PRIVATE)
     endif ()
     list(APPEND PAG_TEST_DEFINES ${PAG_DEFINES} PAG_BACKEND_NAME="${PAG_BACKEND_NAME}")
     if (FFAVC_LIB)

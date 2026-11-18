@@ -186,25 +186,25 @@ PAG_TEST(PAGFuzzTest, LayerParentChain) {
 /**
  * 用例描述: 校验循环引用的合成在更新静态时间区间时不会无限递归。
  */
-PAG_TEST(PAGFuzzTest, StaticTimeRangesCycle) {
-  auto firstComposition = MakeVectorComposition(1);
-  auto secondComposition = MakeVectorComposition(2);
-  firstComposition->layers.push_back(MakePreComposeLayer(secondComposition->id));
-  secondComposition->layers.push_back(MakePreComposeLayer(firstComposition->id));
+PAG_TEST_PRIVATE(PAGFuzzTest, StaticTimeRangesCycle) {
+  PAG_PRIVATE_ACCESS(
+      auto firstComposition = MakeVectorComposition(1);
+      auto secondComposition = MakeVectorComposition(2);
+      firstComposition->layers.push_back(MakePreComposeLayer(secondComposition->id));
+      secondComposition->layers.push_back(MakePreComposeLayer(firstComposition->id));
 
-  std::vector<Composition*> compositions = {firstComposition, secondComposition};
-  Codec::InstallReferences(compositions);
+      std::vector<Composition*> compositions = {firstComposition, secondComposition};
+      Codec::InstallReferences(compositions);
 
-  // The cyclic reference is rejected by the codec, so the recursion is triggered directly here to
-  // cover the flag ordering in VectorComposition::updateStaticTimeRanges().
-  firstComposition->updateStaticTimeRanges();
+      // The cyclic reference is rejected by the codec, so the recursion is triggered directly here
+      // to cover the flag ordering in VectorComposition::updateStaticTimeRanges().
+      firstComposition->updateStaticTimeRanges();
 
-  ASSERT_TRUE(firstComposition->staticTimeRangeUpdated);
-  ASSERT_TRUE(secondComposition->staticTimeRangeUpdated);
-  ASSERT_FALSE(firstComposition->staticTimeRanges.empty());
-  ASSERT_FALSE(secondComposition->staticTimeRanges.empty());
+      ASSERT_TRUE(firstComposition->staticTimeRangeUpdated);
+      ASSERT_TRUE(secondComposition->staticTimeRangeUpdated);
+      ASSERT_FALSE(firstComposition->staticTimeRanges.empty());
+      ASSERT_FALSE(secondComposition->staticTimeRanges.empty());
 
-  delete firstComposition;
-  delete secondComposition;
+      delete firstComposition; delete secondComposition;)
 }
 }  // namespace pag

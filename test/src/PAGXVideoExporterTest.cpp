@@ -242,7 +242,7 @@ PAGX_TEST(PAGXVideoExporterTest, MakeSupportsFractionalFrameRate) {
   EXPECT_EQ(exporter->frameCount(), 30);
   ASSERT_TRUE(exporter->nextFrame());
   ASSERT_TRUE(exporter->nextFrame());
-  EXPECT_EQ(exporter->previousFrameTimeUs, 33367);
+  PAG_PRIVATE_ACCESS(EXPECT_EQ(exporter->previousFrameTimeUs, 33367);)
 }
 
 PAGX_TEST(PAGXVideoExporterTest, MakeExportsStaticDocumentAsSingleFrameByDefault) {
@@ -550,14 +550,12 @@ PAGX_TEST(PAGXVideoExporterTest, OutputDimensionsAreAllOrNothing) {
   EXPECT_EQ(height, 19);
 }
 
-PAGX_TEST(PAGXVideoExporterTest, NextFrameReportsDrawingFailure) {
-  auto exporter = pagx::VideoExporter::Make(MakeStaticDocument());
-  ASSERT_TRUE(exporter != nullptr);
-  exporter->surface = nullptr;
-  std::string errorMsg = {};
-  EXPECT_FALSE(exporter->nextFrame(&errorMsg));
-  EXPECT_EQ(exporter->currentFrame(), 0);
-  EXPECT_NE(errorMsg.find("failed to draw frame 0"), std::string::npos);
+PAGX_TEST_PRIVATE(PAGXVideoExporterTest, NextFrameReportsDrawingFailure) {
+  PAG_PRIVATE_ACCESS(auto exporter = pagx::VideoExporter::Make(MakeStaticDocument());
+                     ASSERT_TRUE(exporter != nullptr); exporter->surface = nullptr;
+                     std::string errorMsg = {}; EXPECT_FALSE(exporter->nextFrame(&errorMsg));
+                     EXPECT_EQ(exporter->currentFrame(), 0);
+                     EXPECT_NE(errorMsg.find("failed to draw frame 0"), std::string::npos);)
 }
 
 PAGX_TEST(PAGXVideoExporterTest, NextFrameAdvancesSequentiallyAndStopsAtEnd) {

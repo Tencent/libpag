@@ -88,6 +88,7 @@ namespace pag {
 //  std::filesystem::remove_all(cacheDir);
 //}
 
+#ifdef PAG_TEST_ACCESS_PRIVATE
 namespace {
 static constexpr size_t InitialSequenceDiskSize = 568915u;
 
@@ -480,6 +481,7 @@ PAG_PIXEL_TEST(PAGDiskCacheTest, PAGDecoder) {
   ASSERT_NO_FATAL_FAILURE(CheckDecoderCompositionChanges(state));
   ASSERT_NO_FATAL_FAILURE(CheckDecoderFileLifetimes(state, cacheDir));
 }
+#endif
 
 /**
  * Regression test for the iOS dangling GL context crash: after MakeFrom captures the caller's
@@ -533,6 +535,7 @@ PAG_TEST(PAGDiskCacheTest, PAGDecoderContextDestroyed) {
 }
 #endif  // TGFX_USE_OPENGL
 
+#ifdef PAG_TEST_ACCESS_PRIVATE
 PAG_PIXEL_TEST(PAGDiskCacheTest, PAGDecoder_StaticTimeRanges) {
   pag::PAGDiskCache::RemoveAll();
   auto pagFile = LoadPAGFile("resources/apitest/polygon.pag");
@@ -604,6 +607,7 @@ PAG_PIXEL_TEST(PAGDiskCacheTest, PAGDecoder_StaticTimeRanges) {
   decoder = nullptr;
   pag::PAGDiskCache::RemoveAll();
 }
+#endif
 
 PAG_TEST(PAGDiskCacheTest, FileCache) {
   pag::PAGDiskCache::RemoveAll();
@@ -737,6 +741,7 @@ PAG_TEST(PAGDiskCacheTest, PAGDecoderTeardownRace) {
  * graduated backoff as RenderCache, so a transient failure recovers quickly instead of freezing for
  * the full ceiling.
  */
+#ifdef PAG_TEST_ACCESS_PRIVATE
 PAG_TEST(PAGDiskCacheTest, SequenceRetryDelayGraduatesAndCaps) {
   EXPECT_EQ(SequenceRetryDelay(0), SEQUENCE_RETRY_INITIAL_DELAY);
   EXPECT_EQ(SequenceRetryDelay(1), SEQUENCE_RETRY_INITIAL_DELAY * 2);
@@ -772,5 +777,6 @@ PAG_TEST(PAGDiskCacheTest, PAGDecoderFailedRenderCooldown) {
   EXPECT_TRUE(success);
   pag::PAGDiskCache::RemoveAll();
 }
+#endif
 
 }  // namespace pag

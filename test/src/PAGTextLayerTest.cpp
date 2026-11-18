@@ -163,7 +163,7 @@ PAG_TEST(PAGTextLayerTest, Make) {
   EXPECT_TRUE(textLayer == nullptr);
   textLayer = PAGTextLayer::Make(6000000, "PAGTextLayerMakeTest", 30);
   EXPECT_TRUE(textLayer != nullptr);
-  EXPECT_TRUE(textLayer->getLayer()->transform->position->value.y == 30);
+  PAG_PRIVATE_ACCESS(EXPECT_TRUE(textLayer->getLayer()->transform->position->value.y == 30);)
   EXPECT_TRUE(textLayer->duration() == 6000000);
   EXPECT_TRUE(textLayer->text() == "PAGTextLayerMakeTest");
   EXPECT_TRUE(textLayer->fontSize() == 30);

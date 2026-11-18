@@ -2165,6 +2165,7 @@ PAG_TEST(PAGXHTMLImporterTest, InlineNoWrapFlexGrowTextLeafKeepsWidth) {
 // the middle dot as a 14px gap, but those widths represent source `width:auto` rather than authored
 // constraints. The internal intrinsic-width marker clears them only after inference, leaving both
 // the row and its editable text children content-sized in PAGX.
+#ifdef PAG_TEST_ACCESS_PRIVATE
 PAG_TEST(PAGXHTMLImporterTest, SnapshotIntrinsicInlineRowKeepsAdaptiveWidthAfterFlexInference) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:1120px;height:80px">
@@ -2210,6 +2211,7 @@ PAG_TEST(PAGXHTMLImporterTest, SnapshotIntrinsicInlineRowKeepsAdaptiveWidthAfter
   doc->applyLayout();
   EXPECT_GT(row->layoutWidth, originalRowWidth);
 }
+#endif
 
 // A centered flattened line is not a fixed-width authored box: its width follows the editable
 // glyphs, while its center remains anchored to the fixed host. The `center` marker must therefore
@@ -3786,6 +3788,7 @@ PAG_TEST(PAGXHTMLImporterTest, FontWeightNumericMapsToBold) {
   EXPECT_FALSE(text->fauxItalic);
 }
 
+#ifdef PAG_TEST_ACCESS_PRIVATE
 PAG_TEST(PAGXHTMLImporterTest, MissingBoldFaceFallsBackWithoutFauxBold) {
   constexpr const char* family = "HTML Missing Bold Test";
   auto doc = ParseFromString(R"HTML(
@@ -3817,6 +3820,7 @@ PAG_TEST(PAGXHTMLImporterTest, MissingBoldFaceFallsBackWithoutFauxBold) {
   }
   EXPECT_FALSE(text->fauxBold);
 }
+#endif
 
 PAG_TEST(PAGXHTMLImporterTest, FontWeight500MapsToMedium) {
   // Registered families are resolved by LayoutContext through an exact (family, style) key, so the
@@ -7830,6 +7834,7 @@ PAG_TEST(PAGXHTMLImporterTest,
 // being truncated, the undelayed member holds its last value across the shared tail on every pass
 // (an intended pause, not a bug), the stagger stays aligned one full period later, and the
 // replayed delay is reported once per delayed element.
+#ifdef PAG_TEST_ACCESS_PRIVATE
 PAG_TEST(PAGXHTMLImporterTest, AnimationInfiniteDelayPlaysDelayedMembersToTheEnd) {
   pagx::HTMLImporter::Options opts;
   opts.autoNormalize = false;
@@ -7883,6 +7888,7 @@ PAG_TEST(PAGXHTMLImporterTest, AnimationInfiniteDelayPlaysDelayedMembersToTheEnd
   EXPECT_NEAR(b->alpha(), 45.0f / 60.0f, 1e-2f);
   EXPECT_NEAR(a->alpha(), 1.0f, 1e-2f);
 }
+#endif
 
 // Infinite animations are grouped by cycle length (the CSS animation-duration) and loop mode, not by
 // their end point. Each group gets its own Animation ending at the latest `delay + duration` among
@@ -8018,6 +8024,7 @@ PAG_TEST(PAGXHTMLImporterTest, InlineSvgInfiniteDelayExtendsSharedDuration) {
 
 // The earliest negative delay sets frame 0 for the whole infinite-loop group, including inline
 // SVG shapes. CSS time 0 is at frame 30, and all original keyframe intervals remain intact.
+#ifdef PAG_TEST_ACCESS_PRIVATE
 PAG_TEST(PAGXHTMLImporterTest, AnimationInfiniteNegativeDelayShiftsSharedTimeline) {
   pagx::HTMLImporter::Options opts;
   opts.autoNormalize = false;
@@ -8093,6 +8100,7 @@ PAG_TEST(PAGXHTMLImporterTest, AnimationInfiniteNegativeDelayShiftsSharedTimelin
   EXPECT_NEAR(earlyLayer->alpha(), 0.5f, 1e-2f);
   EXPECT_NEAR(middleLayer->alpha(), 0.0f, 1e-2f);
 }
+#endif
 
 // Once animations with the same original end can share a window even when only one starts at a
 // negative CSS time. The trailing baseline remains one frame after the shifted active end.

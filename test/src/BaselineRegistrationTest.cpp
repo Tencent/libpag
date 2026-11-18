@@ -49,6 +49,7 @@ PAG_TEST(BaselineRegistrationTest, UnmarkedCaseDoesNotRegisterPixels) {
   EXPECT_FALSE(PAGTest::IsPixelComparison());
 }
 
+#ifdef PAG_TEST_ACCESS_PRIVATE
 PAG_TEST(BaselineRegistrationTest, NonGpuExceptionsAreLimitedToTheirKeys) {
   EXPECT_TRUE(Baseline::IsNonGpuPixelComparison("PAGImageTest", "image2", "PAGImageTest/image2"));
   EXPECT_FALSE(Baseline::IsNonGpuPixelComparison("PAGImageTest", "image2", "PAGImageTest/image"));
@@ -60,12 +61,16 @@ PAG_TEST(BaselineRegistrationTest, NonGpuExceptionsAreLimitedToTheirKeys) {
   EXPECT_FALSE(
       Baseline::IsNonGpuPixelComparison("PAGXCliTest", "Render_Text", "PAGXTest/html/sample"));
 }
+#endif
 
+#ifdef PAG_TEST_ACCESS_PRIVATE
 PAG_PIXEL_TEST(BaselineRegistrationTest, RegisteredCaseIsRecognizedBeforeComparison) {
   EXPECT_TRUE(PAGTest::IsPixelComparison());
   EXPECT_TRUE(Baseline::CheckPixelComparison("BaselineRegistrationTest/registered"));
 }
+#endif
 
+#ifdef PAG_TEST_ACCESS_PRIVATE
 PAG_PIXEL_TEST(BaselineRegistrationTest, RegisteredCaseIsRecognizedInTask) {
   bool recognized = false;
   auto task = tgfx::Task::Run([&recognized] {
@@ -76,17 +81,20 @@ PAG_PIXEL_TEST(BaselineRegistrationTest, RegisteredCaseIsRecognizedInTask) {
   task->wait();
   EXPECT_TRUE(recognized);
 }
+#endif
 
 CLI_TEST(BaselineCliRegistrationTest, UnmarkedCommandDoesNotRegisterPixels) {
   EXPECT_FALSE(PAGTest::IsPixelComparison());
 }
 
+#ifdef PAG_TEST_ACCESS_PRIVATE
 CLI_PIXEL_TEST(BaselineCliRegistrationTest, RegisteredCommandIsRecognizedBeforeComparison) {
   EXPECT_TRUE(PAGTest::IsPixelComparison());
   EXPECT_TRUE(Baseline::CheckPixelComparison("BaselineCliRegistrationTest/registered"));
 }
+#endif
 
-#ifndef UPDATE_BASELINE
+#if !defined(UPDATE_BASELINE) && defined(PAG_TEST_ACCESS_PRIVATE)
 PAG_TEST(BaselineRegistrationTest, CountsComparisonsWithoutChangingExpectedValues) {
   Baseline instance("/missing/baseline", "/missing/cache", "/missing/output");
   instance.baselineVersions = {{"suite", {{"image", "v1"}}}};

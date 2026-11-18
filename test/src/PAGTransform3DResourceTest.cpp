@@ -41,6 +41,7 @@
 #endif
 
 namespace pag {
+#ifdef PAG_TEST_ACCESS_PRIVATE
 
 /** Verifies scene textures are accounted independently and symmetrically with snapshots across
  * reuse, resize, idle release and full release. */
@@ -269,5 +270,6 @@ PAG_TEST(PAGTransform3DResourceTest, QueriesReuseSnapshotsAndReleaseSceneTexture
   EXPECT_EQ(cache.usedAssets, usedAssets);
   EXPECT_EQ(snapshot->idleFrames, 1);
 }
+#endif
 
 }  // namespace pag

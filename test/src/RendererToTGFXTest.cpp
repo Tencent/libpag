@@ -35,8 +35,9 @@ PAGX_TEST(RendererToTGFXTest, NullInputReturnsNull) {
  * The public Data factories reject empty input, so the size-0 buffer is built through the private
  * constructor (the test target compiles with -fno-access-control).
  */
-PAGX_TEST(RendererToTGFXTest, EmptyDataReturnsValidEmpty) {
-  auto emptyData = std::shared_ptr<pagx::Data>(new pagx::Data(nullptr, 0));
+PAGX_TEST_PRIVATE(RendererToTGFXTest, EmptyDataReturnsValidEmpty) {
+  std::shared_ptr<pagx::Data> emptyData = nullptr;
+  PAG_PRIVATE_ACCESS(emptyData = std::shared_ptr<pagx::Data>(new pagx::Data(nullptr, 0));)
   ASSERT_TRUE(emptyData != nullptr);
   ASSERT_EQ(emptyData->size(), 0u);
 

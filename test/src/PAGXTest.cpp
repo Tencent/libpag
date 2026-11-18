@@ -142,6 +142,7 @@
 #include "utils/TestUtils.h"
 
 namespace pag {
+#ifdef PAG_TEST_ACCESS_PRIVATE
 using namespace tgfx;
 
 static std::shared_ptr<pagx::PAGXDocument> LoadAndResolve(const std::string& filePath) {
@@ -17059,4 +17060,5 @@ PAGX_TEST(PAGXTest, ShadowSpreadApproximations) {
 }
 
 // Canonical scene render test: Composition-wrapped layer with animation via scene.
+#endif
 }  // namespace pag

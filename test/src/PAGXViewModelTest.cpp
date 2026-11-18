@@ -48,6 +48,7 @@
 #include "utils/ProjectPath.h"
 
 namespace pag {
+#ifdef PAG_TEST_ACCESS_PRIVATE
 
 static std::shared_ptr<pagx::PAGScene> MakeScene(pagx::PAGXDocument* doc, const std::string& vmId,
                                                  int propCount) {
@@ -3184,5 +3185,6 @@ PAGX_PIXEL_TEST(PAGXViewModelTest, TextReshapeByAnimationBaseline) {
   EXPECT_TRUE(scene->draw(surface));
   EXPECT_TRUE(Baseline::Compare(surface, "PAGXViewModelTest/TextReshapeByAnimation"));
 }
+#endif
 
 }  // namespace pag

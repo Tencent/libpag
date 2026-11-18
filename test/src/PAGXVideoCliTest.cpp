@@ -677,7 +677,7 @@ CLI_TEST(PAGXCliTest, VideoEncoder_EncodesPaddedFramesWhenFFmpegIsAvailable) {
   errorMsg.clear();
   ASSERT_TRUE(encoder->finish(&errorMsg)) << errorMsg;
   EXPECT_FALSE(std::filesystem::exists(options.outputFile + ".part"));
-  EXPECT_FALSE(std::filesystem::exists(encoder->stagingDirectory));
+  PAG_PRIVATE_ACCESS(EXPECT_FALSE(std::filesystem::exists(encoder->stagingDirectory));)
   ASSERT_TRUE(std::filesystem::exists(options.outputFile));
   EXPECT_GT(std::filesystem::file_size(options.outputFile), 1000u);
 
