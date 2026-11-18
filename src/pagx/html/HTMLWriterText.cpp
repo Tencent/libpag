@@ -1846,7 +1846,10 @@ void HTMLWriter::writeTextModifier(HTMLBuilder& out, const std::vector<GeoInfo>&
             record.ownerText = text;
             record.scope = _ctx->animation.scope;
             record.composed = composed;
-            record.selector = composed ? spanSelector : nullptr;
+            // Keep the selector even when the layout is not composed: the frame re-derives the
+            // glyph factor from it, so an animated window retints and re-poses every glyph without
+            // needing a per-frame layout pass.
+            record.selector = spanSelector;
             record.layoutY = glyphPositions.empty() ? 0.0f : glyphPositions[0].y;
             record.glyphIndex = charIdx;
             record.totalGlyphs = totalGlyphs;
