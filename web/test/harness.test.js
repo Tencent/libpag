@@ -16,9 +16,9 @@ function TempDirectory(t) {
   return directory;
 }
 
-function BuildInfo(backend = 'webgl', mode = 'compare') {
+function BuildInfo(backend = 'webgl', mode = 'compare', asyncify = false) {
   return { protocol: 1, backend, mode, buildId: 'a'.repeat(32), sourceRevision: 'b'.repeat(40),
-    tgfxRevision: 'c'.repeat(40), configuration: 'Release' };
+    tgfxRevision: 'c'.repeat(40), asyncify, configuration: 'Release' };
 }
 
 function Result() {
@@ -71,9 +71,12 @@ test('CLI selects explicit backends and rejects malformed or filtered updates', 
   assert.equal(ParseOptions(['--backend', 'webgpu', '--filter=Suite.*']).backend, 'webgpu');
   assert.equal(ParseOptions(['--filter', 'Suite.*']).filter, 'Suite.*');
   assert.equal(ParseOptions(['--backend=webgpu', '--async-video-export']).asyncVideoExport, true);
+  assert.equal(ParseOptions(['--backend=webgpu', '--build-variant=noasync']).buildVariant, 'noasync');
+  assert.equal(ParseOptions(['--build-variant', 'asyncify']).buildVariant, 'asyncify');
   for (const args of [['--backend'], ['--backend=metal'], ['--unknown'], ['--filter='],
     ['--mode=update', '--filter=Suite.*'], ['--async-video-export'],
-    ['--backend=webgpu', '--async-video-export', '--filter=Suite.*']]) {
+    ['--backend=webgpu', '--async-video-export', '--filter=Suite.*'],
+    ['--build-variant=debug']]) {
     assert.throws(function parse() { ParseOptions(args); });
   }
 });
@@ -83,6 +86,17 @@ test('build identity rejects stale generation mode and wrong backend', function 
   assert.throws(function mode() { ValidateBuildInfo(BuildInfo('webgl', 'update'), 'webgl', 'compare'); });
   assert.throws(function backend() { ValidateBuildInfo(BuildInfo('webgpu'), 'webgl', 'compare'); });
   assert.throws(function missing() { ValidateBuildInfo({}, 'webgl', 'compare'); });
+});
+
+test('build identity rejects a variant the lane does not expect', function () {
+  const asyncify = BuildInfo('webgpu', 'compare', true);
+  assert.doesNotThrow(function match() {
+    ValidateBuildInfo(asyncify, 'webgpu', 'compare', 'asyncify');
+  });
+  assert.throws(function wrong() { ValidateBuildInfo(asyncify, 'webgpu', 'compare', 'noasync'); });
+  assert.throws(function untyped() {
+    ValidateBuildInfo(Object.assign(BuildInfo('webgpu'), { asyncify: 'false' }), 'webgpu', 'compare');
+  });
 });
 
 test('publishing isolates backends and verifies the entire artifact set', function (t) {

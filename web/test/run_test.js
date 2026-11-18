@@ -11,21 +11,25 @@ const TimeoutMS = 30 * 60 * 1000;
 
 function ParseOptions(args) {
   const options = { backend: 'webgl', mode: 'compare', filter: '', output: '', noSandbox: false,
-    asyncVideoExport: false };
+    asyncVideoExport: false, buildVariant: '' };
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--no-sandbox' || args[i] === '--async-video-export') {
       if (args[i] === '--no-sandbox') options.noSandbox = true;
       else options.asyncVideoExport = true;
       continue;
     }
-    const match = /^--(backend|mode|filter|output)(?:=(.*))?$/.exec(args[i]);
+    const match = /^--(backend|mode|filter|output|build-variant)(?:=(.*))?$/.exec(args[i]);
     if (!match) throw new Error(`Unknown option: ${args[i]}`);
     const value = match[2] === undefined ? args[++i] : match[2];
     if (!value || value.startsWith('--')) throw new Error(`Missing value: ${match[1]}`);
-    options[match[1]] = value;
+    options[match[1] === 'build-variant' ? 'buildVariant' : match[1]] = value;
   }
   if (!Backends.includes(options.backend) || !Modes.includes(options.mode)) {
     throw new Error('Invalid backend or mode');
+  }
+  if (options.buildVariant && options.buildVariant !== 'asyncify' &&
+      options.buildVariant !== 'noasync') {
+    throw new Error('Invalid build variant');
   }
   if (options.mode === 'update' && options.filter) throw new Error('Filtered baseline updates are forbidden');
   if (options.asyncVideoExport && (options.backend !== 'webgpu' || options.filter)) {
@@ -271,7 +275,7 @@ function PrepareOutput(options) {
 
 function LoadRunConfig(options, directory, cacheDirectory, runInfo) {
   const buildInfo = SnapshotBuild(path.join(__dirname, 'dist', `${options.backend}-${options.mode}`),
-    directory, options.backend, options.mode);
+    directory, options.backend, options.mode, options.buildVariant);
   // The async video export lane drives one scenario with no image comparisons, so it must not
   // require the baseline cache that the compare lane injects into the page.
   const needsCache = options.mode === 'compare' && !options.asyncVideoExport;
@@ -324,7 +328,7 @@ async function ExecuteSuite(session, output, options, buildInfo, runInfo) {
   runInfo.errors.push(...state.errors);
   session.collecting = true;
   runInfo.artifacts = await CollectFiles(page, output, options);
-  ValidateBuildInfo(state.buildInfo, options.backend, options.mode);
+  ValidateBuildInfo(state.buildInfo, options.backend, options.mode, options.buildVariant);
   if (state.buildInfo.buildId !== buildInfo.buildId) throw new Error('WASM build identity mismatch');
   ValidateResult(state.result);
   if (options.asyncVideoExport && !fs.existsSync(path.join(output, 'report.json'))) {
