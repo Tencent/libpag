@@ -103,9 +103,11 @@ struct VideoExportOptions {
   float duration = -1.0f;
 
   /**
-   * Output scale factor applied to the document size. The exporter renders at
-   * `ceil(documentSize * scale)` pixels. Must be finite and greater than zero; Make() rejects
-   * invalid values instead of hiding host parameter errors.
+   * Output scale factor applied to the document size. When the output size is derived, the exporter
+   * renders at `ceil(documentSize * scale)` pixels. When outputWidth/outputHeight are set, this
+   * value does not affect sizing: it only zooms the content into the explicit canvas, so content
+   * that overflows is cropped instead of being scaled to fit. Must be finite and greater than zero;
+   * Make() rejects invalid values instead of hiding host parameter errors.
    */
   float scale = 1.0f;
 
@@ -147,20 +149,35 @@ struct VideoExportOptions {
 
 /**
  * Stable reason code for a failed export, independent of the human-readable message. Hosts map
- * these values onto their own user-facing errors instead of parsing text.
+ * these values onto their own user-facing errors instead of parsing text. Except for MixedMode and
+ * Cancelled every code describes one failed attempt: the exporter keeps the uncommitted frame index
+ * and can be retried, although the codes below marked as document problems only stop repeating once
+ * the document or the options change.
  */
 enum class VideoExportError {
+  /** No failure happened. */
   None,
+  /** An option, the document or the surface is invalid; rebuilding with valid input is required. */
   InvalidArgument,
+  /** The document declares no playback period and the options supply no duration. */
   NoDuration,
+  /** The document contains a state machine, which needs an explicit positive duration. */
   StateMachineRequiresDuration,
+  /** Automatic frame rate was requested but the mounted animations declare different rates. */
   MixedFrameRates,
+  /** The requested frame count or the last frame time does not fit in the supported range. */
   TooLong,
+  /** The full-frame readback buffer could not be allocated; a lower resolution can be retried. */
   OutOfMemory,
+  /** Drawing a frame failed; the same index is retried by the next start. */
   RenderFailed,
+  /** The asynchronous surface readback failed; the same index is retried by the next start. */
   ReadbackFailed,
+  /** The GPU device or its context is unavailable; retry once the device has recovered. */
   DeviceLost,
+  /** nextFrame() and startNextFrame() were mixed; terminal, the exporter cannot continue. */
   MixedMode,
+  /** The sequence was cancelled; terminal for every later attempt. */
   Cancelled,
 };
 
@@ -172,7 +189,11 @@ enum class VideoExportStartStatus {
   Busy,
   /** Every frame of the sequence was consumed; the result carries no frame. */
   End,
-  /** A failure ended the sequence; the result describes it with a message and a code. */
+  /**
+   * A failure stopped this start attempt; the result describes it with a message and a code.
+   * Drawing, readback and device failures are retryable and keep the index uncommitted, while only
+   * cancel() and MixedMode end the sequence.
+   */
   Failed,
 };
 

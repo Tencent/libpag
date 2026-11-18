@@ -19,8 +19,8 @@
     "test:webgpu": "npm run build:webgpu && node run_test.js --backend=webgpu --build-variant=asyncify",
     "test:webgpu:noasync": "npm run build:webgpu:noasync && node run_test.js --backend=webgpu --async-video-export --build-variant=noasync",
     "autotest": "npm run autotest:webgl",
-    "autotest:webgl": "node run_test.js --backend=webgl",
-    "autotest:webgpu": "node run_test.js --backend=webgpu",
+    "autotest:webgl": "node run_test.js --backend=webgl --build-variant=noasync",
+    "autotest:webgpu": "node run_test.js --backend=webgpu --build-variant=asyncify",
     "clean": "rm -rf build-webgl build-webgpu build-webgpu-noasync build-baseline-webgl build-baseline-webgpu dist results"
   },
   "devDependencies": {

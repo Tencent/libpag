@@ -586,6 +586,8 @@ bool VideoExporterImpl::nextFrame(VideoExportFailure* failure) {
     return true;
   }
   if (pixmap == nullptr && !createFramePixmap(outputWidth, outputHeight, &pixmap, failure)) {
+    state->errorCode = failure->code;
+    state->error = failure->message;
     return false;
   }
   if (!drawNextFrame(failure)) {

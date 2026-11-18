@@ -61,6 +61,11 @@ class VideoExporterImpl;
  * Layout: PAGScene::Make() applies layout automatically when the document has not applied it yet,
  * so callers only need to register fonts on PAGXDocument::fontConfig() beforehand when the
  * document relies on external fonts.
+ *
+ * Binary compatibility: like VideoExportOptions, this class is part of the public API but does not
+ * promise binary ABI stability. Its size and the symbols of its entry points change between
+ * releases, so callers and the library must be built with compatible headers and recompiled
+ * together; a binary built against an older header will fail to link or run.
  */
 class VideoExporter {
  public:
@@ -83,7 +88,7 @@ class VideoExporter {
    *
    * @param document the source document, which is retained for the lifetime of the returned
    *                 exporter. Must be non-null.
-   * @param options sampling frame rate, duration, scale and background.
+   * @param options sampling frame rate, duration, scale, background and render mode.
    * @param errorMsg optional pointer that receives a human-readable description on failure.
    * @param errorCode optional pointer that receives the stable failure code on failure.
    * @return a new exporter, or nullptr when the document or options are invalid, an animation has
@@ -107,7 +112,8 @@ class VideoExporter {
    *                 exporter. Must be non-null.
    * @param surface the host surface to render into; retained for the lifetime of the exporter and
    *                required to match the resolved output dimensions exactly. Must be non-null.
-   * @param options sampling frame rate, duration, scale, background and explicit output size.
+   * @param options sampling frame rate, duration, scale, background, render mode and the explicit
+   *                output size that the surface has to match.
    * @param errorMsg optional pointer that receives a human-readable description on failure.
    * @param errorCode optional pointer that receives the stable failure code on failure.
    * @return a new exporter, or nullptr when the document, surface or options are invalid, the
@@ -133,7 +139,8 @@ class VideoExporter {
   PAGRenderMode renderMode() const;
 
   /**
-   * Returns the output width in pixels, which is `ceil(documentWidth * scale)` plus optional padding.
+   * Returns the output width in pixels, which is `ceil(documentWidth * scale)` plus the optional
+   * padding.
    */
   int width() const;
 
@@ -223,8 +230,8 @@ class VideoExporter {
   /**
    * Returns the number of bytes between the start of two consecutive pixel rows. May be larger than
    * `width() * 4`, in which case raw frame sinks must repack the rows. Returns 0 before the first
-   * synchronous frame and after startNextFrame() has been used, since asynchronous frames do not use
-   * the internal buffer.
+   * synchronous frame and after startNextFrame() has been used, since asynchronous frames do not
+   * use the internal buffer.
    */
   size_t rowBytes() const;
 
