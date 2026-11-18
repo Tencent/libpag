@@ -1027,8 +1027,8 @@ PAGX_TEST(PAGXRuntimeTest, PhysicalSpringSequenceUsesFrameRate) {
   right.time = 60;
   right.value = 100.0f;
 
-  auto at60 = pagx::EvaluateKeyframeSequence<float>({left, right}, 30.0, 60.0f);
-  auto at120 = pagx::EvaluateKeyframeSequence<float>({left, right}, 30.0, 120.0f);
+  auto at60 = pagx::EvaluateKeyframeSequence<float>({left, right}, 30.0, false, 60.0f);
+  auto at120 = pagx::EvaluateKeyframeSequence<float>({left, right}, 30.0, false, 120.0f);
   EXPECT_NEAR(at60, 100.0 * PhysicalSpringValue(spring, 0.5, 1.0), 1.0e-3);
   EXPECT_NEAR(at120, 100.0 * PhysicalSpringValue(spring, 0.5, 0.5), 1.0e-3);
   EXPECT_GT(std::fabs(at60 - at120), 1.0f);
