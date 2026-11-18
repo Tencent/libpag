@@ -1415,7 +1415,7 @@ function writeIndexHtml(rows, outDir, label) {
     const staticFigures = '';
     return `
 <section class="case">
-  <h2>${r.name} <span class="ssim-tag ${cls}">SSIM ${fmt(r.ssimMean, 4)}</span>${staticTags}${rtTags}${pagxTags}</h2>
+  <h2>${r.name} <span class="ssim-tag ${cls}">SSIM mean ${fmt(r.ssimMean, 4)}</span><span class="ssim-tag ${ssimClass(r.ssimMin)}">min ${fmt(r.ssimMin, 4)}</span>${staticTags}${rtTags}${pagxTags}</h2>
   <p>
     frames <b>${r.frames}</b> &middot; pixel diff <b>${isFinite(r.pixelDiffMean) ? fmt(r.pixelDiffMean * 100, 2) + '%' : '-'}</b>
     &middot; motion <b>${fmt(r.motion, 3)}</b>
