@@ -1786,13 +1786,9 @@ void HTMLWriter::writeTextModifier(HTMLBuilder& out, const std::vector<GeoInfo>&
             // CSS transform applies right-to-left on the point, so the equivalent sequence is
             // rotate(+axis) skewX(-skew) rotate(-axis). Skip the rotations when skewAxis is 0 to
             // keep the simpler output for the common pure-horizontal-skew case.
-            if (!FloatNearlyZero(modifier->skewAxis)) {
-              transform += "rotate(" + CssFloatToString(-modifier->skewAxis) + "deg) ";
-            }
+            transform += "rotate(" + CssFloatToString(-modifier->skewAxis) + "deg) ";
             transform += "skewX(" + CssFloatToString(-modifier->skew * absF) + "deg) ";
-            if (!FloatNearlyZero(modifier->skewAxis)) {
-              transform += "rotate(" + CssFloatToString(modifier->skewAxis) + "deg) ";
-            }
+            transform += "rotate(" + CssFloatToString(modifier->skewAxis) + "deg) ";
           }
           if (!FloatNearlyZero(anchorX) || !FloatNearlyZero(anchorY)) {
             transform += "translate(" + CssFloatToString(-anchorX) + "px," +
