@@ -118,6 +118,10 @@ double SolveSpringEasing(const SpringEasing& spring, double progress,
     if (!std::isfinite(zeta)) {
       return progress;
     }
+    // Non-finite durations are invalid input, not a missing time base; keep the result finite.
+    if (!std::isfinite(segmentDurationSeconds)) {
+      return progress;
+    }
     if (segmentDurationSeconds <= 0.0) {
       // No time base was supplied; keep the damping ratio but use the normalized time scale.
       return SolveNormalizedSpringEasing(std::max(zeta, MIN_SPRING_DAMPING_RATIO), progress);

@@ -18,6 +18,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <limits>
 #include <vector>
 #include "pagx/PAGAnimation.h"
 #include "pagx/PAGScene.h"
@@ -839,6 +840,17 @@ PAGX_TEST(PAGXRuntimeTest, PhysicalSpringSequenceUsesFrameRate) {
 PAGX_TEST(PAGXRuntimeTest, PhysicalSpringInvalidParametersFallBackToLinear) {
   auto spring = MakePhysicalSpring(0.0f, 20.0f, 1.0f);
   EXPECT_DOUBLE_EQ(PhysicalSpringValue(spring, 0.4, 1.0), 0.4);
+}
+
+/**
+ * Test case: non-finite segment durations are invalid input and must not reach the response
+ * formula, where they could produce NaN or an accidental endpoint value.
+ */
+PAGX_TEST(PAGXRuntimeTest, PhysicalSpringInvalidDurationFallsBackToLinear) {
+  auto spring = MakePhysicalSpring(100.0f, 20.0f, 1.0f);
+  EXPECT_DOUBLE_EQ(PhysicalSpringValue(spring, 0.4, std::numeric_limits<double>::quiet_NaN()), 0.4);
+  EXPECT_DOUBLE_EQ(PhysicalSpringValue(spring, 0.4, std::numeric_limits<double>::infinity()), 0.4);
+  EXPECT_DOUBLE_EQ(PhysicalSpringValue(spring, 0.4, -std::numeric_limits<double>::infinity()), 0.4);
 }
 
 /**
