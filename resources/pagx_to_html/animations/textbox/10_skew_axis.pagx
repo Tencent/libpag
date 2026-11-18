@@ -9,7 +9,7 @@
   </Layer>
   <Layer left="0" right="0" top="0" bottom="0">
     <TextBox id="boxSkewAxis" position="40,50" width="220" height="90" textAlign="center" paragraphAlign="middle" skew="25">
-      <Text text="AB" fontFamily="Arial" fontSize="36"/>
+      <Text text="AB" fontFamily="Arial" fontSize="64"/>
       <Fill color="#7C3AED"/>
     </TextBox>
   </Layer>
