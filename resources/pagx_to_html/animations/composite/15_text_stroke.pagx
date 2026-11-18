@@ -1,11 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Tests: A TextModifier strokes its glyphs and the stroke re-colours while the same modifier
-     rotates them: two modifier channels plus a pose channel on one timeline.
+<!--
+ Tests: A TextModifier carries strokeColor/strokeWidth/rotation on a Text that has no Stroke painter.
+     The runtime draws nothing for those two channels here - a modifier only modulates a stroke the
+     text already has (text/21 and text/22 cover them with a painter) - so this case pins that the
+     export does not invent an outline either: it used to emit `stroke`/`stroke-width` from the
+     modifier alone and measured 0.9559 against a reference with zero stroke pixels.
      Target: TextModifier  Channel: strokeColor,strokeWidth,rotation  Type: mixed
      Ref: PAGXHtmlTest.AnimationTextModifierStroke
-     Renderer: text-stroke - the PAGX renderer does not draw TextModifier strokeColor/strokeWidth at
-     all (measured: a static copy with strokeWidth 1.5 and no animation also renders zero stroke
-     pixels), so this case compares our correct stroke against a reference that has none.-->
+-->
 <pagx width="320" height="200">
   <Layer left="0" right="0" top="0" bottom="0">
     <Rectangle left="0" right="0" top="0" bottom="0"/>
