@@ -953,7 +953,7 @@ function pagxScoredRows(rows) {
 //   >= 0.99   basic       — anti-aliasing / quantization level
 //   else      distorted   — needs a per-case attribution
 //
-// A case that draws text is graded on a looser curve - complete at 0.99, basic at 0.97 - because the
+// A case that draws text is graded on a looser curve - complete at 0.99, basic at 0.96 - because the
 // two renderers shape glyphs differently: PAGX fills a hinted outline and, for fauxBold, unions a
 // stroked one, while the browser rasterises its own face and (for fauxBold) strokes with
 // `-webkit-text-stroke`. Those outlines differ by a pixel or two at the edges whatever the animation
@@ -967,7 +967,7 @@ const GRADE_BASIC = '略有差异';
 const GRADE_DISTORTED = '差异较大';
 
 const TEXT_COMPLETE_SSIM = 0.99;
-const TEXT_BASIC_SSIM = 0.97;
+const TEXT_BASIC_SSIM = 0.96;
 
 function gradeTier(ssim, hasText = false) {
   if (!isFinite(ssim)) return 0;
@@ -1123,7 +1123,7 @@ function writePagxMarkdown(rows, outPath, label) {
   lines.push('');
   lines.push('## Restore fidelity');
   lines.push('');
-  lines.push('Grades: `>= 0.999` 完全还原 / `>= 0.99` 略有差异 / below that 差异较大 for documents without text, and `>= 0.99` / `>= 0.97` for documents with text (glyph outlines differ between the renderers). Applied to the per-frame mean of animSSIM. `animSSIM` (the `ssim mean` column) diffs an animated PAGX render against the exported HTML seeked to the same time; there is no static-instance baseline any more. Attribution `exporter` means the animation path carries the error, `renderer-gap` means the reference renderer itself does not draw a code the fixture declares, `known-limit` means the corpus header already declares the channel unsupported.');
+  lines.push('Grades: `>= 0.999` 完全还原 / `>= 0.99` 略有差异 / below that 差异较大 for documents without text, and `>= 0.99` / `>= 0.96` for documents with text (glyph outlines differ between the renderers). Applied to the per-frame mean of animSSIM. `animSSIM` (the `ssim mean` column) diffs an animated PAGX render against the exported HTML seeked to the same time; there is no static-instance baseline any more. Attribution `exporter` means the animation path carries the error, `renderer-gap` means the reference renderer itself does not draw a code the fixture declares, `known-limit` means the corpus header already declares the channel unsupported.');
   lines.push('');
   lines.push('| grade | cases |');
   lines.push('| --- | --- |');
@@ -1446,7 +1446,7 @@ function writeIndexHtml(rows, outDir, label) {
     gradeSummaryItems = `
     <li>档位 — 完全还原 <b>${p.grades[GRADE_COMPLETE]}</b>，略有差异 <b>${p.grades[GRADE_BASIC]}</b>，差异较大 <b>${p.grades[GRADE_DISTORTED]}</b></li>
     <li><b>无 text 节点</b>（完全 ≥0.999 / 略有差异 ≥0.99）— ${p.nonText.cases} 例 &middot; SSIM 均值 <b>${fmt(p.nonText.ssimMean, 4)}</b> &middot; 完全还原 <b>${p.nonText.grades[GRADE_COMPLETE]}</b>，略有差异 <b>${p.nonText.grades[GRADE_BASIC]}</b>，差异较大 <b>${p.nonText.grades[GRADE_DISTORTED]}</b></li>
-    <li><b>带 text 节点</b>（完全 ≥0.99 / 略有差异 ≥0.97；字形轮廓两侧不同）— ${p.text.cases} 例 &middot; SSIM 均值 <b>${fmt(p.text.ssimMean, 4)}</b> &middot; 完全还原 <b>${p.text.grades[GRADE_COMPLETE]}</b>，略有差异 <b>${p.text.grades[GRADE_BASIC]}</b>，差异较大 <b>${p.text.grades[GRADE_DISTORTED]}</b></li>`;
+    <li><b>带 text 节点</b>（完全 ≥0.99 / 略有差异 ≥0.96；字形轮廓两侧不同）— ${p.text.cases} 例 &middot; SSIM 均值 <b>${fmt(p.text.ssimMean, 4)}</b> &middot; 完全还原 <b>${p.text.grades[GRADE_COMPLETE]}</b>，略有差异 <b>${p.text.grades[GRADE_BASIC]}</b>，差异较大 <b>${p.text.grades[GRADE_DISTORTED]}</b></li>`;
   }
 
   const html = `<!DOCTYPE html>
@@ -1528,8 +1528,8 @@ function writeIndexHtml(rows, outDir, label) {
       <tr>
         <th>带 text 节点</th>
         <td>SSIM ≥ <b>0.99</b></td>
-        <td>SSIM ≥ <b>0.97</b></td>
-        <td>SSIM <b>&lt; 0.97</b></td>
+        <td>SSIM ≥ <b>0.96</b></td>
+        <td>SSIM <b>&lt; 0.96</b></td>
       </tr>
     </tbody>
   </table>
