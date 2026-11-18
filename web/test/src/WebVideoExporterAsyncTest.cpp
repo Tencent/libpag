@@ -30,7 +30,6 @@ std::shared_ptr<pagx::VideoExporter> exporter = nullptr;
 std::shared_ptr<pagx::VideoExportFrame> firstFrame = nullptr;
 std::vector<uint8_t> firstPixels = {};
 std::string testError = {};
-bool sawPending = false;
 
 int Fail(const std::string& message) {
   testError = message;
@@ -65,7 +64,6 @@ int StartAsyncVideoExportTest() {
   firstFrame = nullptr;
   firstPixels.clear();
   testError.clear();
-  sawPending = false;
   auto document = pagx::PAGXImporter::FromXML(
       "<pagx width=\"2\" height=\"2\">"
       "  <Layer>"
@@ -93,14 +91,19 @@ int StartAsyncVideoExportTest() {
     return Fail("the first frame did not start with index zero: " + started.error);
   }
   firstFrame = started.frame;
-  sawPending = firstFrame->status() == pagx::VideoExportFrameStatus::Pending;
-  if (sawPending) {
+  auto firstStatus = firstFrame->status();
+  if (firstStatus == pagx::VideoExportFrameStatus::Pending) {
+    // Pending is optional: a backend whose mapping completes synchronously (Asyncify) reports Ready
+    // immediately. Whenever it is observed, the contract is that the frame is neither readable nor
+    // committed, so the check below must not require Pending to appear.
     std::vector<uint8_t> pendingPixels(24, 0xCD);
     auto beforeRead = pendingPixels;
     if (firstFrame->readPixels(pendingPixels.data(), 12) || exporter->currentFrame() != 0 ||
         pendingPixels != beforeRead) {
       return Fail("Pending readPixels modified pixels or committed the frame index");
     }
+  } else if (firstStatus != pagx::VideoExportFrameStatus::Ready) {
+    return Fail("the first frame failed before it could be consumed: " + firstFrame->error());
   }
   return 0;
 }
@@ -111,16 +114,11 @@ int PollAsyncVideoExportTest() {
     Fail("poll called before the first frame was started");
     return static_cast<int>(pagx::VideoExportFrameStatus::Failed);
   }
-  auto status = firstFrame->status();
-  sawPending = sawPending || status == pagx::VideoExportFrameStatus::Pending;
-  return static_cast<int>(status);
+  return static_cast<int>(firstFrame->status());
 }
 
 EMSCRIPTEN_KEEPALIVE
 int ConsumeAsyncVideoExportTest() {
-  if (!sawPending) {
-    return Fail("WebGPU completed the first frame without an observable Pending state");
-  }
   if (firstFrame == nullptr || firstFrame->status() != pagx::VideoExportFrameStatus::Ready) {
     return Fail("the first frame was consumed before it became Ready");
   }

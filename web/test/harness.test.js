@@ -26,6 +26,13 @@ function Result() {
     comparisons: { compared: 1, versionSkipped: 1, missingBaseline: 0 } };
 }
 
+// The async lane runs one hand-driven scenario instead of gtest, so it reports a single test and no
+// image comparisons.
+function AsyncResult() {
+  return { exitCode: 0, tests: 1, failed: 0, skipped: 0,
+    comparisons: { compared: 0, versionSkipped: 0, missingBaseline: 0 } };
+}
+
 function Cache() {
   return { md5: JSON.stringify({ suite: { image: 'd'.repeat(32) } }),
     version: JSON.stringify({ suite: { image: 'v1' } }) };
@@ -333,6 +340,13 @@ async function FixtureModule() {
         return JSON.stringify(config.scenario === 'identity' ? { ...config.buildInfo, buildId: 'f'.repeat(32) } : config.buildInfo);
       }
       if (name === 'GetRunResult') return JSON.stringify(config.fixtureResult);
+      if (config.asyncVideoExport) {
+        // The async lane drives one scenario through these three entry points instead of gtest.
+        if (name === 'StartAsyncVideoExportTest') return 0;
+        if (name === 'PollAsyncVideoExportTest') return 1;
+        if (name === 'ConsumeAsyncVideoExportTest') return 0;
+        if (name === 'GetAsyncVideoExportTestError') return '';
+      }
       if (config.scenario === 'crash') throw new Error('Simulated native abort');
       if (config.scenario !== 'report') {
         fs.writeFile('/test/report.json', JSON.stringify({ tests: config.fixtureResult.tests,
@@ -368,10 +382,13 @@ if (process.env.PAG_HARNESS_BROWSER === '1') {
   test('browser executes the actual harness page with isolated protocol fixtures', async function (t) {
     const browser = await require('puppeteer').launch({ headless: true });
     try {
-      for (const scenario of ['webgl', 'webgpu', 'identity', 'crash', 'report', 'gpu-error']) {
+      for (const scenario of ['webgl', 'webgpu', 'identity', 'crash', 'report', 'gpu-error',
+        'async-video-export']) {
         await t.test(scenario, async function (subtest) {
           const root = TempDirectory(subtest);
-          const backend = scenario === 'webgpu' || scenario === 'gpu-error' ? 'webgpu' : 'webgl';
+          const asyncVideoExport = scenario === 'async-video-export';
+          const backend = ['webgl', 'identity', 'crash', 'report'].includes(scenario) ? 'webgl' :
+            'webgpu';
           const buildInfo = BuildInfo(backend);
           fs.copyFileSync(path.join(__dirname, 'index.html'), path.join(root, 'index.html'));
           fs.writeFileSync(path.join(root, 'build-info.json'), JSON.stringify(buildInfo));
@@ -383,7 +400,7 @@ if (process.env.PAG_HARNESS_BROWSER === '1') {
           const page = await browser.newPage();
           try {
             const config = { buildInfo, scenario, cache: Cache(), filter: '', baselineVersion: Cache().version,
-              fixtureVersion: Cache().version, fixtureResult: Result() };
+              fixtureVersion: Cache().version, fixtureResult: Result(), asyncVideoExport };
             await page.evaluateOnNewDocument(InstallFixture, config);
             await page.goto(`http://127.0.0.1:${server.address().port}/index.html`);
             await page.waitForFunction(function finished() { return window.__pagTest?.finished; }, { timeout: 10000 });
@@ -392,11 +409,13 @@ if (process.env.PAG_HARNESS_BROWSER === '1') {
               assert.ok(state.errors.length > 0);
             } else {
               assert.deepEqual(state.errors, []);
-              assert.deepEqual(state.result, Result());
+              assert.deepEqual(state.result, asyncVideoExport ? AsyncResult() : Result());
               const output = path.join(root, 'output');
               fs.mkdirSync(output);
               await CollectFiles(page, output, { backend, mode: 'compare' });
-              if (scenario === 'report') {
+              if (scenario === 'report' || asyncVideoExport) {
+                // The async lane has no gtest report on the MEMFS volume; run_test.js synthesizes
+                // one, so the page itself must not invent a report file.
                 assert.throws(function missing() { fs.readFileSync(path.join(output, 'report.json')); });
               } else {
                 assert.equal(JSON.parse(fs.readFileSync(path.join(output, 'report.json'))).tests, 2);
