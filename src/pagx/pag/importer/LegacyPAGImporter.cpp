@@ -1008,7 +1008,25 @@ void ConvertShapeElement(ConvertState* state, pag::ShapeElement* element,
     case pag::ShapeType::MergePaths: {
       auto* legacy = static_cast<pag::MergePathsElement*>(element);
       auto* merge = state->document->makeNode<MergePath>();
-      merge->mode = static_cast<MergePathMode>(legacy->mode);
+      // The enum orders differ (legacy Merge/Add/Subtract/Intersect/ExcludeIntersections), so the
+      // modes map by meaning, matching the path ops of the legacy ApplyMergePaths.
+      switch (legacy->mode) {
+        case pag::MergePathsMode::Merge:
+          merge->mode = MergePathMode::Append;
+          break;
+        case pag::MergePathsMode::Add:
+          merge->mode = MergePathMode::Union;
+          break;
+        case pag::MergePathsMode::Subtract:
+          merge->mode = MergePathMode::Difference;
+          break;
+        case pag::MergePathsMode::Intersect:
+          merge->mode = MergePathMode::Intersect;
+          break;
+        case pag::MergePathsMode::ExcludeIntersections:
+          merge->mode = MergePathMode::Xor;
+          break;
+      }
       contents->push_back(merge);
       break;
     }
@@ -1109,7 +1127,17 @@ static void ConvertShapeElementList(ConvertState* state,
       continue;
     }
     auto type = elements[i]->type();
-    if (type == pag::ShapeType::ShapeGroup) {
+    if (type == pag::ShapeType::MergePaths) {
+      // A merge replaces everything accumulated so far with the merged path: earlier groups and
+      // paints stop being render items in both renderers, so stacking restarts after it.
+      renderItems.clear();
+      stack.clear();
+      hasGroup = false;
+      hasPaint = false;
+      firstPaint = elements.size();
+      lastPaint = 0;
+      hasModifier = true;
+    } else if (type == pag::ShapeType::ShapeGroup) {
       hasGroup = true;
       renderItems.push_back(i);
       stack.insert(stack.begin(), i);
