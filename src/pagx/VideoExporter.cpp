@@ -43,6 +43,9 @@ namespace {
 
 constexpr int DefaultFrameRate = 60;
 
+constexpr char MixedModeError[] = "cannot mix nextFrame() with startNextFrame()";
+constexpr char CancelledError[] = "the export sequence was cancelled";
+
 void SetError(std::string* errorMsg, VideoExportError* errorCode, VideoExportError code,
               const std::string& text) {
   if (errorMsg != nullptr) {
@@ -122,6 +125,17 @@ bool ValidateOptions(const std::shared_ptr<PAGXDocument>& document,
       !std::isfinite(document->height)) {
     SetError(errorMsg, errorCode, VideoExportError::InvalidArgument,
              "the document dimensions must be finite and positive");
+    return false;
+  }
+  if ((options.outputWidth == 0) != (options.outputHeight == 0) || options.outputWidth < 0 ||
+      options.outputHeight < 0) {
+    SetError(errorMsg, errorCode, VideoExportError::InvalidArgument,
+             "explicit output dimensions must both be positive or both be zero");
+    return false;
+  }
+  if (options.outputWidth > 0 && options.padToEvenSize) {
+    SetError(errorMsg, errorCode, VideoExportError::InvalidArgument,
+             "padToEvenSize cannot be combined with explicit output dimensions");
     return false;
   }
   return ValidateDocumentAnimations(*document, errorMsg, errorCode);
@@ -403,11 +417,6 @@ std::shared_ptr<VideoExporter> VideoExporter::MakeInternal(std::shared_ptr<PAGXD
   int width = options.outputWidth;
   int height = options.outputHeight;
   const bool hasExplicitSize = width > 0 && height > 0;
-  if ((width == 0) != (height == 0) || width < 0 || height < 0) {
-    SetError(errorMsg, errorCode, VideoExportError::InvalidArgument,
-             "explicit output dimensions must both be positive or both be zero");
-    return nullptr;
-  }
   if (!hasExplicitSize &&
       !ComputeVideoOutputDimensions(document->width, document->height, options.scale,
                                     options.padToEvenSize, &width, &height)) {
@@ -546,8 +555,8 @@ bool VideoExporter::nextFrame(std::string* errorMsg) {
   }
   if (state->mode == VideoExportMode::Async) {
     state->failed = true;
-    SetError(errorMsg, &state->errorCode, VideoExportError::MixedMode, "mixed_mode");
-    state->error = "mixed_mode";
+    SetError(errorMsg, &state->errorCode, VideoExportError::MixedMode, MixedModeError);
+    state->error = MixedModeError;
     if (pendingFrame != nullptr) {
       pendingFrame->impl->fail(VideoExportError::MixedMode, state->error);
     }
@@ -589,14 +598,14 @@ VideoExportStartResult VideoExporter::startNextFrame() {
   if (state->mode == VideoExportMode::Sync) {
     state->failed = true;
     state->errorCode = VideoExportError::MixedMode;
-    state->error = "mixed_mode";
+    state->error = MixedModeError;
     return {VideoExportStartStatus::Failed, nullptr, state->error, state->errorCode};
   }
   if (pendingFrame != nullptr) {
-    if (pendingFrame->impl->consumed) {
+    if (pendingFrame->impl->consumed || pendingFrame->impl->failed) {
       pendingFrame = nullptr;
     } else {
-      return {VideoExportStartStatus::Busy, nullptr, "", VideoExportError::None};
+      return {VideoExportStartStatus::Busy, pendingFrame, "", VideoExportError::None};
     }
   }
   if (state->currentFrame >= totalFrames) {
@@ -615,7 +624,6 @@ VideoExportStartResult VideoExporter::startNextFrame() {
                                            &renderErrorCode);
     }
     if (impl == nullptr) {
-      state->failed = true;
       state->error = renderError;
       state->errorCode = renderErrorCode;
       return {VideoExportStartStatus::Failed, nullptr, renderError, renderErrorCode};
@@ -636,7 +644,7 @@ void VideoExporter::cancel() {
   auto wasFailed = state->failed;
   state->cancelled = true;
   if (!wasFailed) {
-    state->error = "cancelled";
+    state->error = CancelledError;
     state->errorCode = VideoExportError::Cancelled;
     if (pendingFrame != nullptr && !pendingFrame->impl->consumed) {
       pendingFrame->impl->fail(VideoExportError::Cancelled, state->error);

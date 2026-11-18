@@ -93,7 +93,6 @@ void VideoExportFrameImpl::fail(VideoExportError code, const std::string& messag
   failureCode = code;
   errorMessage = message;
   if (!state->cancelled) {
-    state->failed = true;
     state->errorCode = code;
     state->error = message;
   }
@@ -200,7 +199,6 @@ bool VideoExportFrameImpl::readPixels(void* dstPixels, size_t dstRowBytes) {
     }
     auto width = cpuPixels->width();
     if (width <= 0 || dstRowBytes < static_cast<size_t>(width) * 4) {
-      fail(VideoExportError::InvalidArgument, "invalid destination row bytes");
       return false;
     }
     auto destination =
@@ -226,8 +224,10 @@ bool VideoExportFrameImpl::readPixels(void* dstPixels, size_t dstRowBytes) {
   if (pollLocked(context) == VideoExportFrameStatus::Ready) {
     auto width = readback->info().width();
     if (width <= 0 || dstRowBytes < static_cast<size_t>(width) * 4) {
-      fail(VideoExportError::InvalidArgument, "invalid destination row bytes");
-    } else if (copyGPUPixelsLocked(context, dstPixels, dstRowBytes)) {
+      device->unlock();
+      return false;
+    }
+    if (copyGPUPixelsLocked(context, dstPixels, dstRowBytes)) {
       success = true;
     } else {
       fail(VideoExportError::ReadbackFailed, "failed to copy the export frame pixels");

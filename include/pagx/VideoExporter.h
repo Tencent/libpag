@@ -129,7 +129,9 @@ struct VideoExportOptions {
   /**
    * Whether to pad the output width and height up to even numbers. This is a layout capability;
    * the host decides whether its selected pixel format requires it. Defaults to false, which keeps
-   * `ceil(documentSize * scale)`.
+   * `ceil(documentSize * scale)`. Cannot be combined with outputWidth/outputHeight: an explicit
+   * size already decides the layout, so Make() rejects the combination instead of ignoring this
+   * flag.
    */
   bool padToEvenSize = false;
 
@@ -142,8 +144,11 @@ struct VideoExportOptions {
 
   /**
    * Optional explicit output dimensions. Both values must be positive to take effect; leaving both
-   * at zero derives dimensions from documentSize * scale. Hosts with their own even rounding and
-   * texture/pixel-budget clamping can use these fields without changing the scene zoom scale.
+   * at zero derives dimensions from documentSize * scale. A partially specified pair, a negative
+   * value, or a combination with padToEvenSize is rejected by Make() before any scene or GPU
+   * resource is created. Hosts with their own even rounding and texture/pixel-budget clamping can
+   * use these fields without changing the scene zoom scale, which means content larger than the
+   * explicit size is cropped instead of being scaled to fit.
    */
   int outputWidth = 0;
   int outputHeight = 0;
@@ -153,7 +158,7 @@ struct VideoExportOptions {
 enum class VideoExportStartStatus {
   /** A new frame was started and carried in the result. */
   FrameStarted,
-  /** The previously started frame is not consumed yet; the result carries no frame. */
+  /** The previously started frame is not consumed yet; the result carries that pending frame. */
   Busy,
   /** Every frame of the sequence was consumed; the result carries no frame. */
   End,
@@ -207,7 +212,10 @@ class VideoExportFrame {
   /** The sequential frame index, fixed when the frame is started. */
   int64_t index() const;
 
-  /** Returns the current state without waiting for the GPU. Consumed frames remain Ready. */
+  /**
+   * Returns the current state without waiting for the GPU. Consumed frames remain Ready. Polling
+   * advances the pending readback, so this method is not const and must run on the device thread.
+   */
   VideoExportFrameStatus status();
 
   /** Returns the failure reason, or an empty string when the frame has not failed. */
@@ -226,7 +234,9 @@ class VideoExportFrame {
    * @return true when the pixels were copied. The first successful call consumes the frame and
    *         commits its index to the exporter. Returns false while Pending, after consumption,
    *         when a parameter is invalid, or when the frame has failed; no index is committed
-   *         twice and a failed read does not skip the frame.
+   *         twice and a failed read does not skip the frame. An invalid destination is a caller
+   *         error only: the frame stays Ready and no exporter state changes, so the caller can
+   *         retry with a correct buffer.
    */
   bool readPixels(void* dstPixels, size_t dstRowBytes);
 
@@ -240,9 +250,9 @@ class VideoExportFrame {
 
 /** The explicit result of VideoExporter::startNextFrame(). */
 struct VideoExportStartResult {
-  /** Outcome of the start attempt. Only FrameStarted carries a frame. */
+  /** Outcome of the start attempt. FrameStarted and Busy carry a frame. */
   VideoExportStartStatus status = VideoExportStartStatus::Failed;
-  /** The started frame, or null for Busy, End and Failed. */
+  /** The new or pending frame, or null for End and Failed. */
   std::shared_ptr<VideoExportFrame> frame = nullptr;
   /** Human-readable failure description for Failed, empty otherwise. */
   std::string error = {};
@@ -372,7 +382,10 @@ class VideoExporter {
   int64_t frameCount() const;
 
   /**
-   * Returns the index of the next frame to be rendered, i.e. the number of frames rendered so far.
+   * Returns the number of committed frames, which is also the index of the next frame to be
+   * rendered. A synchronous frame is committed by a successful nextFrame(); an asynchronous frame
+   * is committed by the first successful VideoExportFrame::readPixels(), so a frame that was
+   * drawn or read but not consumed does not advance this value.
    */
   int64_t currentFrame() const;
 
@@ -393,28 +406,36 @@ class VideoExporter {
    * a terminal usage error reported as Failed with VideoExportError::MixedMode.
    *
    * Only one uncommitted frame may exist at a time. While the previously started frame is
-   * unconsumed the result is Busy and carries no frame: the exporter keeps the pending frame
-   * internally, so dropping the caller's reference does not release the sequence. The caller must
-   * keep its own reference and either read the frame or call cancel(); a dropped frame otherwise
-   * leaves every later start Busy forever.
+   * unconsumed the result is Busy, and the result carries that same pending frame so the caller can
+   * still read it even after dropping its own reference; a dropped frame therefore never leaves a
+   * later start stuck in Busy. The caller reads the frame or calls cancel() to end the sequence.
+   *
+   * Drawing or readback failures are reported as Failed without ending the sequence: the index is
+   * not advanced and the next start retries the same frame, which matches the recoverable behavior
+   * of nextFrame(). Only cancel() and MixedMode are terminal.
    *
    * @return the start result. FrameStarted carries the new frame, whose status() must be polled on
-   *         this thread until Ready or Failed before the next start is allowed.
+   *         this thread until Ready before the next start is allowed. Busy carries the previously
+   *         started frame that is still pending.
    */
   VideoExportStartResult startNextFrame();
 
   /**
    * Cancels the sequence and abandons any pending frame. This is terminal: later asynchronous
    * starts return Failed with VideoExportError::Cancelled. A pending frame that was not consumed
-   * is marked Failed with the same code. Cancelling an already failed exporter keeps the original
-   * failure code and message. Must run on the device-owning thread.
+   * is marked Failed with the same code. Cancelling an exporter that already ended on a usage
+   * error keeps that original code and message. Must run on the device-owning thread.
    */
   void cancel();
 
-  /** Returns the terminal error or the last synchronous read error, if any. */
+  /**
+   * Returns the last failure reason, or an empty string. The value is cleared by the next
+   * successful frame. Draw and readback failures are retryable, so this describes the most recent
+   * problem rather than a terminal state.
+   */
   std::string error() const;
 
-  /** Returns the stable code matching error(), or None when the exporter has not failed. */
+  /** Returns the stable code matching error(), or None when the last frame succeeded. */
   VideoExportError errorCode() const;
 
   /**
