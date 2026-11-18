@@ -1,7 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Tests: A TextModifier scale.x stretches each glyph horizontally.
      Target: TextModifier  Channel: scale.x  Type: float
-     modifier-scale-calibration：0.934，与文本质感差异叠加，待标定
+     Ceiling: the horizontal stretch magnifies an edge difference the two rasterisers already
+     have at rest - 3.3x more faint (>0-20% coverage) edge pixels and 5.8% more ink, present at
+     t=0 (scale 1.06) where the case still measures 0.9933. Measured limits: a frozen static
+     state scores 0.897 against the animated 0.903, and re-rasterising at a larger size
+(font-size K with scaleY 1/K) is pixel-identical to scaleX K - so Chromium already rasterises
+     at the final scale and no CSS hint moves it. Mid-ramp tops out around 0.94 by design;
+     geometry itself agrees to 1-2px.
      Ref: - -->
 <pagx width="320" height="200">
   <Layer left="0" right="0" top="0" bottom="0">
