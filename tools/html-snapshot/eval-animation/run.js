@@ -1123,7 +1123,7 @@ function writePagxMarkdown(rows, outPath, label) {
   lines.push('');
   lines.push('## Restore fidelity');
   lines.push('');
-  lines.push('Grades: `>= 0.999` 完全还原 / `>= 0.99` 略有差异 / below that 差异较大 for documents without text, and `>= 0.99` / `>= 0.97` for documents with text (glyph outlines differ between the renderers). Applied to both the per-frame mean and the worst frame of animSSIM (`grade(mean)` / `grade(min)`) and taking the stricter one, so a case with one badly reproduced frame cannot pass on a good mean. `animSSIM` (the `ssim mean` column) diffs an animated PAGX render against the exported HTML seeked to the same time; there is no static-instance baseline any more. Attribution `exporter` means the animation path carries the error, `renderer-gap` means the reference renderer itself does not draw a code the fixture declares, `known-limit` means the corpus header already declares the channel unsupported.');
+  lines.push('Grades: `>= 0.999` 完全还原 / `>= 0.99` 略有差异 / below that 差异较大 for documents without text, and `>= 0.99` / `>= 0.97` for documents with text (glyph outlines differ between the renderers). Applied to the per-frame mean of animSSIM. `animSSIM` (the `ssim mean` column) diffs an animated PAGX render against the exported HTML seeked to the same time; there is no static-instance baseline any more. Attribution `exporter` means the animation path carries the error, `renderer-gap` means the reference renderer itself does not draw a code the fixture declares, `known-limit` means the corpus header already declares the channel unsupported.');
   lines.push('');
   lines.push('| grade | cases |');
   lines.push('| --- | --- |');
