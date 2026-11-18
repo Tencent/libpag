@@ -3588,14 +3588,13 @@ std::string RangeGlyphDecls(const RangeSelectorGlyph& glyph, double factor) {
                    CssFloatToString(1.0f + (modifier->scale.y - 1.0f) * f) + ")";
     }
     if (hasSkew) {
-      bool hasAxis = !FloatNearlyZero(modifier->skewAxis);
-      if (hasAxis) {
-        transform += " rotate(" + CssFloatToString(-modifier->skewAxis) + "deg)";
-      }
+      // Both rotations are always emitted, even at axis 0: a keyframe list whose functions differ
+      // between stops cannot be interpolated per function, so Chromium decomposes the matrices and
+      // blends the axis rotation linearly instead of the authored R(-a)*K*R(a) - text/20 measured
+      // 0.856 mid-ramp that way. An identity rotation costs nothing when the axis is 0.
+      transform += " rotate(" + CssFloatToString(-modifier->skewAxis) + "deg)";
       transform += " skewX(" + CssFloatToString(-modifier->skew * f) + "deg)";
-      if (hasAxis) {
-        transform += " rotate(" + CssFloatToString(modifier->skewAxis) + "deg)";
-      }
+      transform += " rotate(" + CssFloatToString(modifier->skewAxis) + "deg)";
     }
     transform +=
         " translate(" + CssFloatToString(-pivotX) + "px, " + CssFloatToString(-pivotY) + "px)";
@@ -3663,14 +3662,10 @@ std::string ModifierGlyphDecls(const RangeSelectorGlyph& glyph, const BundleChan
                    CssFloatToString(1.0f + (scaleY - 1.0f) * absF) + ")";
     }
     if (hasSkew) {
-      bool hasAxis = !FloatNearlyZero(skewAxis);
-      if (hasAxis) {
-        transform += " rotate(" + CssFloatToString(-skewAxis) + "deg)";
-      }
+      // Keep the function list identical at every stop (see the modifier branch above).
+      transform += " rotate(" + CssFloatToString(-skewAxis) + "deg)";
       transform += " skewX(" + CssFloatToString(-skew * absF) + "deg)";
-      if (hasAxis) {
-        transform += " rotate(" + CssFloatToString(skewAxis) + "deg)";
-      }
+      transform += " rotate(" + CssFloatToString(skewAxis) + "deg)";
     }
     transform +=
         " translate(" + CssFloatToString(-pivotX) + "px, " + CssFloatToString(-pivotY) + "px)";
