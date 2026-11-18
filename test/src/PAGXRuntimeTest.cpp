@@ -19,6 +19,7 @@
 #include <algorithm>
 #include <cmath>
 #include <limits>
+#include <string>
 #include <vector>
 #include "pagx/PAGAnimation.h"
 #include "pagx/PAGScene.h"
@@ -1074,6 +1075,112 @@ PAGX_TEST(PAGXRuntimeTest, SpringSettleDuration) {
   normalized.bounce = 0.5f;
   normalized.model = pagx::SpringEasingModel::NormalizedV1;
   EXPECT_DOUBLE_EQ(pagx::EvaluateSpringSettleDurationSeconds(normalized), 0.0);
+}
+
+/**
+ * Test case: a PAGX document using normalized, overdamped and physical springs evaluates to the
+ * expected channel values at the same frame positions an editor would sample.
+ */
+PAGX_TEST(PAGXRuntimeTest, SpringEasingPAGXEndToEnd) {
+  const std::string xml = R"PAGX(<?xml version="1.0" encoding="UTF-8"?>
+<pagx width="640" height="240">
+  <Layer id="normalized" x="20" y="80">
+    <Rectangle position="40,40" size="80,80"/>
+    <Fill color="#4C8DFF"/>
+  </Layer>
+  <Layer id="normalizedOverdamped" x="220" y="80">
+    <Rectangle position="40,40" size="80,80"/>
+    <Fill color="#38C172"/>
+  </Layer>
+  <Layer id="physical" x="420" y="80">
+    <Rectangle position="40,40" size="80,80"/>
+    <Fill color="#F2994A"/>
+  </Layer>
+  <Animations>
+    <Animation id="springDemo" duration="60" frameRate="60" loop="once">
+      <Object target="normalized">
+        <Channel name="x" type="float">
+          <Key time="0" value="20" interpolation="spring"
+               springBounce="0.5" springModel="normalized-v1"/>
+          <Key time="60" value="180"/>
+        </Channel>
+        <Channel name="alpha" type="float">
+          <Key time="0" value="0.3" interpolation="spring"
+               springBounce="0.9" springModel="normalized-v1"/>
+          <Key time="60" value="1"/>
+        </Channel>
+      </Object>
+      <Object target="normalizedOverdamped">
+        <Channel name="x" type="float">
+          <Key time="0" value="20" interpolation="spring"
+               springBounce="-0.3" springModel="normalized-v1"/>
+          <Key time="60" value="180"/>
+        </Channel>
+      </Object>
+      <Object target="physical">
+        <Channel name="x" type="float">
+          <Key time="0" value="20" interpolation="spring" springModel="physical-v1"
+               springStiffness="120" springDamping="15" springMass="1"/>
+          <Key time="60" value="180"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>)PAGX";
+
+  auto doc = pagx::PAGXImporter::FromXML(xml);
+  ASSERT_TRUE(doc != nullptr);
+  ASSERT_TRUE(doc->errors.empty());
+  ASSERT_EQ(doc->animations.size(), 1u);
+  auto* animation = static_cast<pagx::Animation*>(doc->animations[0]);
+
+  auto findChannel = [&](const std::string& target,
+                         const std::string& name) -> pagx::TypedChannel<float>* {
+    for (auto* object : animation->objects) {
+      if (object->target != target) {
+        continue;
+      }
+      for (auto* channel : object->channels) {
+        if (channel->name == name) {
+          return static_cast<pagx::TypedChannel<float>*>(channel);
+        }
+      }
+    }
+    return nullptr;
+  };
+
+  auto* normalizedX = findChannel("normalized", "x");
+  auto* normalizedAlpha = findChannel("normalized", "alpha");
+  auto* overdampedX = findChannel("normalizedOverdamped", "x");
+  auto* physicalX = findChannel("physical", "x");
+  ASSERT_TRUE(normalizedX != nullptr);
+  ASSERT_TRUE(normalizedAlpha != nullptr);
+  ASSERT_TRUE(overdampedX != nullptr);
+  ASSERT_TRUE(physicalX != nullptr);
+
+  auto valueAt = [](pagx::TypedChannel<float>* channel, pagx::Frame frame) {
+    return std::get<float>(channel->evaluateAt(frame));
+  };
+
+  EXPECT_NEAR(valueAt(normalizedX, pagx::Frame{0}), 20.0f, 1.0e-4);
+  EXPECT_NEAR(valueAt(normalizedX, pagx::Frame{15}), 204.710f, 0.01f);
+  EXPECT_NEAR(valueAt(normalizedX, pagx::Frame{30}), 176.715f, 0.01f);
+  EXPECT_NEAR(valueAt(normalizedX, pagx::Frame{45}), 180.304f, 0.01f);
+  EXPECT_NEAR(valueAt(normalizedX, pagx::Frame{60}), 180.0f, 1.0e-4);
+
+  EXPECT_NEAR(valueAt(overdampedX, pagx::Frame{15}), 141.191f, 0.01f);
+  EXPECT_NEAR(valueAt(overdampedX, pagx::Frame{30}), 172.831f, 0.01f);
+  EXPECT_NEAR(valueAt(overdampedX, pagx::Frame{45}), 178.854f, 0.01f);
+  EXPECT_NEAR(valueAt(overdampedX, pagx::Frame{60}), 180.0f, 1.0e-4);
+
+  EXPECT_NEAR(valueAt(physicalX, pagx::Frame{15}), 169.128f, 0.01f);
+  EXPECT_NEAR(valueAt(physicalX, pagx::Frame{30}), 185.139f, 0.01f);
+  EXPECT_NEAR(valueAt(physicalX, pagx::Frame{45}), 179.605f, 0.01f);
+  EXPECT_NEAR(valueAt(physicalX, pagx::Frame{60}), 180.0f, 1.0e-4);
+
+  EXPECT_NEAR(valueAt(normalizedAlpha, pagx::Frame{0}), 0.3f, 1.0e-4);
+  EXPECT_GT(valueAt(normalizedAlpha, pagx::Frame{15}), 1.0f);
+  EXPECT_NEAR(valueAt(normalizedAlpha, pagx::Frame{60}), 1.0f, 1.0e-4);
 }
 
 /**
