@@ -72,6 +72,10 @@ class VideoExportFrameImpl {
   bool readPixels(void* dstPixels, size_t dstRowBytes);
   void fail(VideoExportError code, const std::string& message);
 
+  bool hasEnded() const {
+    return consumed || failed;
+  }
+
   bool consumed = false;
 
  private:

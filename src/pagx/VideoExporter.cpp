@@ -602,7 +602,7 @@ VideoExportStartResult VideoExporter::startNextFrame() {
     return {VideoExportStartStatus::Failed, nullptr, state->error, state->errorCode};
   }
   if (pendingFrame != nullptr) {
-    if (pendingFrame->impl->consumed || pendingFrame->impl->failed) {
+    if (pendingFrame->impl->hasEnded()) {
       pendingFrame = nullptr;
     } else {
       return {VideoExportStartStatus::Busy, pendingFrame, "", VideoExportError::None};
