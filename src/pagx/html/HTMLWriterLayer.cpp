@@ -1112,6 +1112,38 @@ void HTMLWriter::appendTextBoxContainerStyle(std::string& style, const TextBox* 
   }
 }
 
+// Placement for the block that holds a TextBox's text. It carries PAGX's own line advance and the
+// offset that puts the browser's baseline on PAGX's row.
+//
+// The offset is a `position:relative` shift, never a `transform`: a transformed text block is
+// rasterised on whole device pixels, so a fractional shift there degrades into a full-pixel jump and
+// moves the glyphs further than the correction it was meant to apply (measured on the 14px justify
+// box in text_box.pagx: 0.86px of drift from a 0.23px shift).
+//
+// PAGX snaps its baseline row to a whole pixel, and the row it snaps to depends on the box height,
+// which the browser decides from its own line count. A correction below half that quantum is inside
+// PAGX's own rounding error and is left out; a larger one is a whole number of rows away, because
+// both renderers snap.
+static std::string TextBoxBlockStyle(const TextBox* tb, const Text* firstText) {
+  if (tb == nullptr || firstText == nullptr) {
+    return {};
+  }
+  float lineHeight = 0.0f;
+  float baselineShift = 0.0f;
+  if (!TextBlockPlacement(firstText->fontFamily, firstText->fontStyle, firstText->renderFontSize(),
+                          tb->lineHeight, tb->paragraphAlign == ParagraphAlign::Near, &lineHeight,
+                          &baselineShift)) {
+    return {};
+  }
+  constexpr float kBaselineQuantum = 0.5f;
+  float applied = std::abs(baselineShift) >= kBaselineQuantum ? roundf(baselineShift) : 0.0f;
+  std::string style = "position:relative;line-height:" + CssFloatToString(lineHeight) + "px";
+  if (!FloatNearlyZero(applied)) {
+    style += ";top:" + CssFloatToString(applied) + "px";
+  }
+  return style;
+}
+
 void HTMLWriter::renderTextBoxWithSpans(HTMLBuilder& out, const TextBox* tb) {
   // TextBox with child elements: render as a positioned container with text styling.
   auto tbBounds = tb->layoutBounds();
@@ -1199,6 +1231,11 @@ void HTMLWriter::renderTextBoxWithSpans(HTMLBuilder& out, const TextBox* tb) {
     anchorTransform = "translate(" + tx + "," + ty + ")";
   }
   appendTextBoxContainerStyle(style, tb, anchorTransform);
+  // A TextBox whose height is known wraps its text in a block carrying PAGX's line advance and the
+  // baseline offset (see TextBoxBlockStyle); flex still centres that block, which keeps the
+  // correction independent of the line count. Vertical writing mode keeps the old path: there the
+  // line box runs along the inline axis, so PAGX's column advance is not a CSS line-height.
+  bool positionedBlock = layoutH && tbH > 0.0f && tb->writingMode != WritingMode::Vertical;
   if (tb->paragraphAlign != ParagraphAlign::Near) {
     style += ";display:flex;flex-direction:column";
     if (tb->paragraphAlign == ParagraphAlign::Middle) {
@@ -1264,7 +1301,9 @@ void HTMLWriter::renderTextBoxWithSpans(HTMLBuilder& out, const TextBox* tb) {
     // along with Text::fontLineHeight(), so when no lineHeight is authored Chromium falls
     // back to its own line-height:normal (read from the font's OS/2 metrics).
     float lineH = tb->lineHeight > 0 ? tb->lineHeight : 0.0f;
-    if (lineH > 0) {
+    if (lineH > 0 && !positionedBlock) {
+      // The block below carries its own line-height (PAGX's rounded advance, or this authored value),
+      // so the container must not compete with it.
       style += ";line-height:" + CssFloatToString(lineH) + "px";
     }
     // Translate PAGX Overflow::Hidden with a simple pixel clip. tgfx's TextLayout drops
@@ -1298,9 +1337,14 @@ void HTMLWriter::renderTextBoxWithSpans(HTMLBuilder& out, const TextBox* tb) {
     }
     out.addAttr("style", style);
     out.closeTagStart();
-    bool needsInnerWrap = tb->paragraphAlign != ParagraphAlign::Near;
+    bool needsInnerWrap = tb->paragraphAlign != ParagraphAlign::Near || positionedBlock;
+    std::string blockStyle =
+        positionedBlock ? TextBoxBlockStyle(tb, tbSpans.front().text) : std::string();
     if (needsInnerWrap) {
       out.openTag("div");
+      if (!blockStyle.empty()) {
+        out.addAttr("style", blockStyle);
+      }
       out.closeTagStart();
     }
     // Track the previous span's trailing newline count and font-size so we can wrap
@@ -1449,6 +1493,10 @@ void HTMLWriter::renderTextBoxAsRichText(HTMLBuilder& out, const TextBox* tb,
     style += ";padding:" + PaddingToCSS(tb->padding);
     style += ";box-sizing:border-box";
   }
+  // Same contract as the tbSpans branch above: a box with a known height wraps its text in a block
+  // carrying PAGX's line advance and baseline offset, and flex still centres that block.
+  bool positionedBlock =
+      !std::isnan(tb->height) && tb->height > 0.0f && tb->writingMode != WritingMode::Vertical;
   if (tb->paragraphAlign != ParagraphAlign::Near) {
     style += ";display:flex;flex-direction:column";
     if (tb->paragraphAlign == ParagraphAlign::Middle) {
@@ -1473,7 +1521,7 @@ void HTMLWriter::renderTextBoxAsRichText(HTMLBuilder& out, const TextBox* tb,
   // container line-height from per-glyph fontLineHeight metrics; that path was removed
   // along with Text::fontLineHeight().
   float rtLineH = tb->lineHeight > 0 ? tb->lineHeight : 0.0f;
-  if (rtLineH > 0) {
+  if (rtLineH > 0 && !positionedBlock) {
     style += ";line-height:" + CssFloatToString(rtLineH) + "px";
   }
   if (tb->overflow == Overflow::Hidden) {
@@ -1488,9 +1536,15 @@ void HTMLWriter::renderTextBoxAsRichText(HTMLBuilder& out, const TextBox* tb,
   }
   out.addAttr("style", style);
   out.closeTagStart();
-  bool needsInnerWrap = tb->paragraphAlign != ParagraphAlign::Near;
+  bool needsInnerWrap = tb->paragraphAlign != ParagraphAlign::Near || positionedBlock;
+  std::string blockStyle = positionedBlock && !richTextSpans.empty()
+                               ? TextBoxBlockStyle(tb, richTextSpans.front().text)
+                               : std::string();
   if (needsInnerWrap) {
     out.openTag("div");
+    if (!blockStyle.empty()) {
+      out.addAttr("style", blockStyle);
+    }
     out.closeTagStart();
   }
   // Same between-span <br> handling as the tbSpans branch above: empty-line <br>s
