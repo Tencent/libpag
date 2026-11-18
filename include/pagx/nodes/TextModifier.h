@@ -85,7 +85,7 @@ class TextModifier : public Element {
 
   /**
    * The line justification factor compensating the tracking-induced line growth: each line
-   * starts shifted by -totalTracking * factor. 0 keeps the line start, -0.5 keeps the line
+   * starts shifted by totalTracking * factor. 0 keeps the line start, -0.5 keeps the line
    * centered, -1 keeps the line end. The default value is 0.
    */
   float trackingJustify = 0.0f;
