@@ -64,6 +64,11 @@ std::shared_ptr<Data> SequenceCodec::EncodeVideoSequence(const VideoSequenceCont
     stream.writeEncodedUint32(frame.frameIndex);
     WriteDataBlock(&stream, frame.data);
   }
+  stream.writeEncodedUint32(static_cast<uint32_t>(container.staticRanges.size()));
+  for (auto& range : container.staticRanges) {
+    stream.writeEncodedUint32(range.start);
+    stream.writeEncodedUint32(range.end);
+  }
   auto bytes = stream.release();
   if (bytes == nullptr) {
     return nullptr;
@@ -104,6 +109,20 @@ bool SequenceCodec::DecodeVideoSequence(const std::shared_ptr<Data>& data,
       return false;
     }
     outContainer->frames.push_back(std::move(frame));
+  }
+  outContainer->staticRanges.clear();
+  // The static range list trails the frame list; containers written before it existed end here.
+  if (stream.bytesAvailable() > 0) {
+    auto rangeCount = stream.readEncodedUint32();
+    if (rangeCount > MAX_SEQUENCE_ITEMS) {
+      return false;
+    }
+    for (uint32_t i = 0; i < rangeCount; i++) {
+      SequenceStaticRange range = {};
+      range.start = stream.readEncodedUint32();
+      range.end = stream.readEncodedUint32();
+      outContainer->staticRanges.push_back(range);
+    }
   }
   return true;
 }

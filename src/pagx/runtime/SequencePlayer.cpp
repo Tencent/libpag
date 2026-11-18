@@ -89,6 +89,7 @@ std::shared_ptr<SequencePlayer> BuildVideoPlayer(
   player->_isVideo = true;
   player->_alphaStartX = container.alphaStartX;
   player->_alphaStartY = container.alphaStartY;
+  player->staticRanges = container.staticRanges;
   return player;
 }
 
@@ -125,6 +126,23 @@ std::shared_ptr<SequencePlayer> BuildBitmapPlayer(
   player->_frameCount = static_cast<uint32_t>(container.frames.size());
   player->_width = static_cast<int>(container.width);
   player->_height = static_cast<int>(container.height);
+  // Bitmap sequences encode a repeated frame as an empty frame; the static ranges are derived
+  // exactly like pag::BitmapComposition::updateStaticTimeRanges (at the sequence frame rate).
+  uint32_t start = 0;
+  uint32_t end = 0;
+  for (size_t index = 0; index < sequence->frames.size(); index++) {
+    if (sequence->isEmptyBitmapFrame(index)) {
+      end = static_cast<uint32_t>(index);
+    } else {
+      if (end > start) {
+        player->staticRanges.push_back({start, end});
+      }
+      start = end = static_cast<uint32_t>(index);
+    }
+  }
+  if (end > start) {
+    player->staticRanges.push_back({start, end});
+  }
   return player;
 }
 
@@ -160,6 +178,13 @@ std::shared_ptr<tgfx::Image> SequencePlayer::frameAt(double compositionTime) {
   auto rawFrame = static_cast<int64_t>(floor(seconds * static_cast<double>(_frameRate)));
   auto targetFrame =
       static_cast<pag::Frame>(std::min<int64_t>(rawFrame, static_cast<int64_t>(_frameCount) - 1));
+  for (auto& range : staticRanges) {
+    if (targetFrame >= static_cast<pag::Frame>(range.start) &&
+        targetFrame <= static_cast<pag::Frame>(range.end)) {
+      targetFrame = static_cast<pag::Frame>(range.start);
+      break;
+    }
+  }
   auto generator = std::make_shared<pag::SequenceFrameGenerator>(reader, targetFrame, nullptr);
   auto image = tgfx::Image::MakeFrom(std::move(generator));
   if (image != nullptr && _isVideo) {

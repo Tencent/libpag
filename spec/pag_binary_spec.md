@@ -328,6 +328,10 @@ s32 alphaStartX, alphaStartY   alpha 裁剪起点
   u8 flags                 bit0 = isKeyframe
   varuint frameIndex       presentation 帧序号
   varuint byteLength + byte[byteLength]   帧数据原样（H.264 NAL）
+varuint staticRangeCount   静态区间数（可选尾段：旧容器到帧列表即结束，读取端按 0 处理）
+重复 staticRangeCount 次：
+  varuint start, end       闭区间 [start, end] 内的帧均显示 start 帧（对齐旧版
+                           Sequence::toSequenceFrame 的 ConvertFrameByStaticTimeRanges）
 ```
 
 mediaType = 3（位图序列）时，条目 `data` 为：

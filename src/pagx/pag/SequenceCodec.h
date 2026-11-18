@@ -35,6 +35,15 @@ struct VideoSequenceFrame {
   std::shared_ptr<Data> data = nullptr;
 };
 
+/**
+ * An inclusive range of sequence frames whose content does not change: every frame inside it shows
+ * the range's first frame (the encoder does not store meaningful pictures for the rest).
+ */
+struct SequenceStaticRange {
+  uint32_t start = 0;
+  uint32_t end = 0;
+};
+
 struct VideoSequenceContainer {
   float frameRate = 30.0f;
   uint32_t width = 0;
@@ -43,6 +52,7 @@ struct VideoSequenceContainer {
   int32_t alphaStartY = 0;
   std::vector<std::shared_ptr<Data>> headers = {};
   std::vector<VideoSequenceFrame> frames = {};
+  std::vector<SequenceStaticRange> staticRanges = {};
 };
 
 /**

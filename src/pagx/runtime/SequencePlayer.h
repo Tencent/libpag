@@ -20,6 +20,8 @@
 
 #include <memory>
 #include <string>
+#include <vector>
+#include "pagx/pag/SequenceCodec.h"
 #include "tgfx/core/Image.h"
 
 namespace pag {
@@ -80,6 +82,9 @@ class SequencePlayer {
   bool _isVideo = false;
   int32_t _alphaStartX = 0;
   int32_t _alphaStartY = 0;
+  // Frames inside a static range show the range's first frame (legacy Sequence::toSequenceFrame
+  // through ConvertFrameByStaticTimeRanges).
+  std::vector<SequenceStaticRange> staticRanges = {};
 
   friend std::shared_ptr<SequencePlayer> BuildVideoPlayer(
       const VideoSequenceContainer& container, const std::shared_ptr<LegacySequenceHolder>& holder);

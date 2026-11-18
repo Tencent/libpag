@@ -1411,6 +1411,12 @@ Composition* ConvertSequenceComposition(ConvertState* state, pag::Composition* l
         }
         container.frames.push_back(containerFrame);
       }
+      for (auto& range : sequence->staticTimeRanges) {
+        if (range.start >= 0 && range.end >= range.start) {
+          container.staticRanges.push_back(
+              {static_cast<uint32_t>(range.start), static_cast<uint32_t>(range.end)});
+        }
+      }
       auto* image = MakeSequenceImage(
           state, SequenceCodec::EncodeVideoSequence(container), container.frameRate,
           static_cast<uint32_t>(container.frames.size()), container.width, container.height, 2);
