@@ -56,11 +56,16 @@ struct VideoFrameRate {
   /** Floating-point frame rates must be converted to an exact rational explicitly. */
   VideoFrameRate(double) = delete;
 
+  /** Returns true for the automatic {0, 1} rate, which follows the document frame rate. */
+  bool isAutomatic() const {
+    return frameRateNumerator == 0 && frameRateDenominator == 1;
+  }
+
   /** Returns the numeric frame rate, or zero when the denominator is zero. */
   double framesPerSecond() const {
-    return frameRateDenominator == 0
-               ? 0.0
-               : static_cast<double>(frameRateNumerator) / static_cast<double>(frameRateDenominator);
+    return frameRateDenominator == 0 ? 0.0
+                                     : static_cast<double>(frameRateNumerator) /
+                                           static_cast<double>(frameRateDenominator);
   }
 
   /**
@@ -73,8 +78,7 @@ struct VideoFrameRate {
     }
     auto quotient = frameRateNumerator / frameRateDenominator;
     auto remainder = frameRateNumerator % frameRateDenominator;
-    return quotient >= minValue && quotient <= maxValue &&
-           (quotient != maxValue || remainder == 0);
+    return quotient >= minValue && quotient <= maxValue && (quotient != maxValue || remainder == 0);
   }
 
   /** Frame-rate numerator. Zero is the automatic sentinel only when the denominator is 1. */
@@ -320,9 +324,9 @@ class VideoExporter {
    *         the offscreen surface cannot be created.
    */
   static std::shared_ptr<VideoExporter> Make(std::shared_ptr<PAGXDocument> document,
-                                            const Options& options = {},
-                                            std::string* errorMsg = nullptr,
-                                            VideoExportError* errorCode = nullptr);
+                                             const Options& options = {},
+                                             std::string* errorMsg = nullptr,
+                                             VideoExportError* errorCode = nullptr);
 
   /**
    * Creates an exporter that renders into a host-provided surface. The surface dimensions must
@@ -344,10 +348,10 @@ class VideoExporter {
    *         device or context, or the document playback plan cannot be resolved.
    */
   static std::shared_ptr<VideoExporter> MakeWithSurface(std::shared_ptr<PAGXDocument> document,
-                                                       std::shared_ptr<PAGSurface> surface,
-                                                       const Options& options = {},
-                                                       std::string* errorMsg = nullptr,
-                                                       VideoExportError* errorCode = nullptr);
+                                                        std::shared_ptr<PAGSurface> surface,
+                                                        const Options& options = {},
+                                                        std::string* errorMsg = nullptr,
+                                                        VideoExportError* errorCode = nullptr);
 
   ~VideoExporter();
 
@@ -477,8 +481,8 @@ class VideoExporter {
   static bool CollectNestedPlayback(PAGComposition* composition, PlaybackPlan* plan,
                                     std::string* errorMsg, VideoExportError* errorCode);
   static bool ResolveSampling(const Options& options, const PlaybackPlan& plan,
-                              VideoFrameRate* frameRate, int64_t* frameCount,
-                              std::string* errorMsg, VideoExportError* errorCode);
+                              VideoFrameRate* frameRate, int64_t* frameCount, std::string* errorMsg,
+                              VideoExportError* errorCode);
   static std::shared_ptr<VideoExporter> MakeInternal(std::shared_ptr<PAGXDocument> document,
                                                      std::shared_ptr<PAGSurface> surface,
                                                      const Options& options, std::string* errorMsg,
@@ -491,7 +495,6 @@ class VideoExporter {
   std::shared_ptr<PAGScene> scene = {};
   std::shared_ptr<PAGSurface> surface = {};
   std::vector<std::shared_ptr<PAGTimeline>> timelines = {};
-  std::shared_ptr<tgfx::Bitmap> bitmap = {};
   std::shared_ptr<tgfx::Pixmap> pixmap = {};
   int outputWidth = 0;
   int outputHeight = 0;

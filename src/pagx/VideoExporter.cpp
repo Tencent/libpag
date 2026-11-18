@@ -101,7 +101,7 @@ bool ValidateOptions(const std::shared_ptr<PAGXDocument>& document,
     return false;
   }
   const auto& rate = options.frameRate;
-  auto automaticFrameRate = rate.frameRateNumerator == 0 && rate.frameRateDenominator == 1;
+  auto automaticFrameRate = rate.isAutomatic();
   if (!automaticFrameRate &&
       !rate.isWithin(VideoExporter::MIN_FRAME_RATE, VideoExporter::MAX_FRAME_RATE)) {
     SetError(errorMsg, errorCode, VideoExportError::InvalidArgument,
@@ -309,7 +309,7 @@ bool VideoExporter::ResolvePlaybackPlan(const std::shared_ptr<PAGScene>& scene,
 bool VideoExporter::ResolveSampling(const Options& options, const PlaybackPlan& plan,
                                     VideoFrameRate* frameRate, int64_t* frameCount,
                                     std::string* errorMsg, VideoExportError* errorCode) {
-  auto automaticFrameRate = options.frameRate.frameRateNumerator == 0;
+  auto automaticFrameRate = options.frameRate.isAutomatic();
   if (automaticFrameRate && plan.hasMixedFrameRates) {
     SetError(errorMsg, errorCode, VideoExportError::MixedFrameRates,
              "animations have mixed frame rates; set an explicit sampling frame rate");
@@ -476,8 +476,8 @@ std::shared_ptr<VideoExporter> VideoExporter::MakeInternal(std::shared_ptr<PAGXD
   exporter->scene = std::move(scene);
   exporter->surface = std::move(surface);
   exporter->timelines = std::move(plan.timelines);
-  exporter->bitmap = std::move(bitmap);
-  exporter->pixmap = std::make_shared<tgfx::Pixmap>(*exporter->bitmap);
+  // The pixmap holds the pixel reference, so the bitmap only has to live until this point.
+  exporter->pixmap = std::make_shared<tgfx::Pixmap>(*bitmap);
   exporter->outputWidth = width;
   exporter->outputHeight = height;
   exporter->samplingFrameRate = frameRate;

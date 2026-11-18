@@ -172,13 +172,16 @@ bool VideoExportFrameImpl::copyGPUPixelsLocked(tgfx::Context* context, void* dst
     return false;
   }
   tgfx::Pixmap source(readback->info(), pixels);
+  if (staticCache != nullptr && !staticCache->info().isEmpty()) {
+    // The static frame cache is an optimization: fill it before the caller's buffer so that a cache
+    // failure can never leave the destination partially written, and ignore the failure instead of
+    // ending the sequence.
+    source.readPixels(staticCache->info(), staticCache->writablePixels());
+  }
   auto destination =
       tgfx::ImageInfo::Make(source.width(), source.height(), tgfx::ColorType::RGBA_8888,
                             tgfx::AlphaType::Premultiplied, dstRowBytes);
   auto success = !destination.isEmpty() && source.readPixels(destination, dstPixels);
-  if (success && staticCache != nullptr) {
-    success = source.readPixels(staticCache->info(), staticCache->writablePixels());
-  }
   readback->unlockPixels(context);
   return success;
 }

@@ -151,7 +151,8 @@ std::shared_ptr<pagx::PAGXDocument> MakeStateMachineDocument() {
 }
 
 std::shared_ptr<pagx::PAGXDocument> MakeAnimatedDocument(const std::string& loop,
-                                                         const std::string& frameRate = "10") {
+                                                         const std::string& frameRate = "10",
+                                                         const std::string& duration = "10") {
   return pagx::PAGXImporter::FromXML(
       "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
       "<pagx width=\"200\" height=\"200\">\n"
@@ -160,8 +161,8 @@ std::shared_ptr<pagx::PAGXDocument> MakeAnimatedDocument(const std::string& loop
       "    <Fill color=\"#FF0000\"/>\n"
       "  </Layer>\n"
       "  <Animations>\n"
-      "    <Animation id=\"animation\" duration=\"10\" frameRate=\"" +
-      frameRate + "\" loop=\"" + loop +
+      "    <Animation id=\"animation\" duration=\"" +
+      duration + "\" frameRate=\"" + frameRate + "\" loop=\"" + loop +
       "\">\n"
       "      <Object target=\"animated\">\n"
       "        <Channel name=\"x\" type=\"float\">\n"
@@ -277,12 +278,20 @@ bool WaitAsyncFrame(const std::shared_ptr<pagx::VideoExportFrame>& frame) {
   return frame->status() == pagx::VideoExportFrameStatus::Ready;
 }
 
+size_t AsyncRowBytes(int width) {
+  return static_cast<size_t>(width) * 4 + 16;
+}
+
+const uint8_t* SamplePixel(const std::vector<uint8_t>& pixels, size_t rowBytes, int x, int y) {
+  return pixels.data() + static_cast<size_t>(y) * rowBytes + static_cast<size_t>(x) * 4;
+}
+
 bool ConsumeAsyncFrame(const std::shared_ptr<pagx::VideoExportFrame>& frame, int width, int height,
                        std::vector<uint8_t>* pixels) {
   if (!WaitAsyncFrame(frame)) {
     return false;
   }
-  auto rowBytes = static_cast<size_t>(width) * 4 + 16;
+  auto rowBytes = AsyncRowBytes(width);
   pixels->assign(rowBytes * static_cast<size_t>(height), 0);
   return frame->readPixels(pixels->data(), rowBytes);
 }
@@ -439,6 +448,27 @@ PAGX_TEST(PAGXVideoExporterTest, RejectsAmbiguousOutputSizeOptions) {
   errorCode = pagx::VideoExportError::None;
   EXPECT_EQ(pagx::VideoExporter::Make(document, options, nullptr, &errorCode), nullptr);
   EXPECT_EQ(errorCode, pagx::VideoExportError::InvalidArgument);
+}
+
+PAGX_TEST(PAGXVideoExporterTest, MakeRejectsAnimationsWithoutDuration) {
+  std::string errorMsg = {};
+  auto errorCode = pagx::VideoExportError::None;
+  auto exporter =
+      pagx::VideoExporter::Make(MakeAnimatedDocument("once", "10", "0"), {}, &errorMsg, &errorCode);
+  EXPECT_EQ(exporter, nullptr);
+  EXPECT_EQ(errorCode, pagx::VideoExportError::NoDuration);
+  EXPECT_FALSE(errorMsg.empty());
+}
+
+PAGX_TEST(PAGXVideoExporterTest, MakeRejectsAnOverlongSequence) {
+  pagx::VideoExportOptions options = {};
+  options.duration = 1e18f;
+  std::string errorMsg = {};
+  auto errorCode = pagx::VideoExportError::None;
+  EXPECT_EQ(pagx::VideoExporter::Make(MakeStaticDocument(), options, &errorMsg, &errorCode),
+            nullptr);
+  EXPECT_EQ(errorCode, pagx::VideoExportError::TooLong);
+  EXPECT_FALSE(errorMsg.empty());
 }
 
 PAGX_TEST(PAGXVideoExporterTest, MakeWithSurfaceKeepsTheHostSurfaceAlive) {
@@ -664,14 +694,13 @@ PAGX_TEST(PAGXVideoExporterTest, HostSurfacePreservesPixelsAcrossFormatsAndColor
     ASSERT_EQ(started.status, pagx::VideoExportStartStatus::FrameStarted) << started.error;
     std::vector<uint8_t> pixels = {};
     ASSERT_TRUE(ConsumeAsyncFrame(started.frame, 200, 200, &pixels)) << started.frame->error();
-    auto rowBytes = static_cast<size_t>(200) * 4 + 16;
-    auto redOffset = 50 * rowBytes + 100 * 4;
-    EXPECT_EQ(pixels[redOffset], 255);
-    EXPECT_EQ(pixels[redOffset + 1], 0);
-    EXPECT_EQ(pixels[redOffset + 2], 0);
-    EXPECT_EQ(pixels[redOffset + 3], 255);
-    auto transparentOffset = 150 * rowBytes + 100 * 4;
-    EXPECT_EQ(pixels[transparentOffset + 3], 0);
+    auto rowBytes = AsyncRowBytes(200);
+    auto red = SamplePixel(pixels, rowBytes, 100, 50);
+    EXPECT_EQ(red[0], 255);
+    EXPECT_EQ(red[1], 0);
+    EXPECT_EQ(red[2], 0);
+    EXPECT_EQ(red[3], 255);
+    EXPECT_EQ(SamplePixel(pixels, rowBytes, 100, 150)[3], 0);
     for (int row = 0; row < 200; ++row) {
       for (size_t byte = 200 * 4; byte < rowBytes; ++byte) {
         ASSERT_EQ(pixels[row * rowBytes + byte], 0);
@@ -691,12 +720,12 @@ PAGX_TEST(PAGXVideoExporterTest, HostSurfaceOutputsPremultipliedRGBA) {
   ASSERT_EQ(started.status, pagx::VideoExportStartStatus::FrameStarted) << started.error;
   std::vector<uint8_t> pixels = {};
   ASSERT_TRUE(ConsumeAsyncFrame(started.frame, 200, 200, &pixels)) << started.frame->error();
-  auto rowBytes = static_cast<size_t>(200) * 4 + 16;
-  auto offset = 100 * rowBytes + 100 * 4;
-  EXPECT_NEAR(pixels[offset], 128, 1);
-  EXPECT_EQ(pixels[offset + 1], 0);
-  EXPECT_EQ(pixels[offset + 2], 0);
-  EXPECT_NEAR(pixels[offset + 3], 128, 1);
+  auto rowBytes = AsyncRowBytes(200);
+  auto pixel = SamplePixel(pixels, rowBytes, 100, 100);
+  EXPECT_NEAR(pixel[0], 128, 1);
+  EXPECT_EQ(pixel[1], 0);
+  EXPECT_EQ(pixel[2], 0);
+  EXPECT_NEAR(pixel[3], 128, 1);
 }
 
 PAGX_TEST(PAGXVideoExporterTest, ReadbackCreationFailureDoesNotCommit) {
@@ -743,19 +772,21 @@ PAGX_TEST(PAGXVideoExporterTest, BusyAndStaticCacheDoNotRenderAgain) {
   ASSERT_TRUE(exporter != nullptr);
   auto first = exporter->startNextFrame();
   ASSERT_EQ(first.status, pagx::VideoExportStartStatus::FrameStarted) << first.error;
-  EXPECT_EQ(*calls, 3);  // Constructor validation, first draw, and first readback creation.
+  // Pin the ordering contract (Busy and the static cache must not redraw) without hard-coding how
+  // many surface queries construction, drawing and readback creation each perform.
+  auto queriesAfterStart = *calls;
   EXPECT_EQ(exporter->startNextFrame().status, pagx::VideoExportStartStatus::Busy);
-  EXPECT_EQ(*calls, 3);
+  EXPECT_EQ(*calls, queriesAfterStart);
   std::vector<uint8_t> pixels = {};
   ASSERT_TRUE(ConsumeAsyncFrame(first.frame, 200, 200, &pixels));
-  EXPECT_EQ(*calls, 3);
+  EXPECT_EQ(*calls, queriesAfterStart);
 
   auto second = exporter->startNextFrame();
   ASSERT_EQ(second.status, pagx::VideoExportStartStatus::FrameStarted);
   EXPECT_EQ(second.frame->status(), pagx::VideoExportFrameStatus::Ready);
-  EXPECT_EQ(*calls, 3);
+  EXPECT_EQ(*calls, queriesAfterStart);
   ASSERT_TRUE(ConsumeAsyncFrame(second.frame, 200, 200, &pixels));
-  EXPECT_EQ(*calls, 3);
+  EXPECT_EQ(*calls, queriesAfterStart);
   EXPECT_EQ(exporter->startNextFrame().status, pagx::VideoExportStartStatus::End);
 }
 
@@ -780,10 +811,10 @@ PAGX_TEST(PAGXVideoExporterTest, HostSurfaceBottomLeftOriginKeepsTopLeftOutput) 
     ASSERT_EQ(started.status, pagx::VideoExportStartStatus::FrameStarted) << started.error;
     std::vector<uint8_t> pixels = {};
     ASSERT_TRUE(ConsumeAsyncFrame(started.frame, 200, 200, &pixels));
-    auto rowBytes = static_cast<size_t>(200) * 4 + 16;
-    EXPECT_EQ(pixels[50 * rowBytes + 100 * 4], 255);
-    EXPECT_EQ(pixels[50 * rowBytes + 100 * 4 + 3], 255);
-    EXPECT_EQ(pixels[150 * rowBytes + 100 * 4 + 3], 0);
+    auto rowBytes = AsyncRowBytes(200);
+    EXPECT_EQ(SamplePixel(pixels, rowBytes, 100, 50)[0], 255);
+    EXPECT_EQ(SamplePixel(pixels, rowBytes, 100, 50)[3], 255);
+    EXPECT_EQ(SamplePixel(pixels, rowBytes, 100, 150)[3], 0);
   }
   DeviceLockScope lock(device);
   ASSERT_TRUE(static_cast<bool>(lock));
@@ -976,7 +1007,7 @@ PAGX_TEST(PAGXVideoExporterTest, AsyncFramesMatchSynchronousOutput) {
   ASSERT_EQ(asynchronous->width(), width);
   ASSERT_EQ(asynchronous->height(), height);
   auto rowBytes = static_cast<size_t>(width) * 4;
-  auto asyncRowBytes = rowBytes + 16;
+  auto asyncRowBytes = AsyncRowBytes(width);
   auto frameBytes = rowBytes * static_cast<size_t>(height);
   std::vector<uint8_t> syncPixels = {};
   std::vector<uint8_t> asyncPixels = {};
@@ -1082,9 +1113,11 @@ PAGX_TEST(PAGXVideoExporterTest, MakeRequiresConsistentDocumentFrameRatesByDefau
 
   for (const auto& secondFrameRate : {"29.97", "30"}) {
     std::string errorMsg = {};
-    auto exporter =
-        pagx::VideoExporter::Make(MakeMultiAnimationDocument("60", secondFrameRate), {}, &errorMsg);
+    auto errorCode = pagx::VideoExportError::None;
+    auto exporter = pagx::VideoExporter::Make(MakeMultiAnimationDocument("60", secondFrameRate), {},
+                                              &errorMsg, &errorCode);
     EXPECT_EQ(exporter, nullptr);
+    EXPECT_EQ(errorCode, pagx::VideoExportError::MixedFrameRates);
     EXPECT_NE(errorMsg.find("mixed frame rates"), std::string::npos);
   }
 
