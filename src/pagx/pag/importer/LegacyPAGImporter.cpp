@@ -697,8 +697,42 @@ static void ShiftAnimatedPoint(ConvertState* state, const std::string& targetId,
   }
 }
 
+static bool IsLegacyPaint(pag::ShapeType type) {
+  return type == pag::ShapeType::Fill || type == pag::ShapeType::Stroke ||
+         type == pag::ShapeType::GradientFill || type == pag::ShapeType::GradientStroke;
+}
+
+static pag::CompositeOrder LegacyPaintOrder(pag::ShapeElement* element) {
+  switch (element->type()) {
+    case pag::ShapeType::Fill:
+      return static_cast<pag::FillElement*>(element)->composite;
+    case pag::ShapeType::Stroke:
+      return static_cast<pag::StrokeElement*>(element)->composite;
+    case pag::ShapeType::GradientFill:
+      return static_cast<pag::GradientFillElement*>(element)->composite;
+    case pag::ShapeType::GradientStroke:
+      return static_cast<pag::GradientStrokeElement*>(element)->composite;
+    default:
+      return pag::CompositeOrder::BelowPreviousInSameGroup;
+  }
+}
+
+// Trim and merge consume the accumulated geometry in order, so the order in which child groups
+// contribute their geometry matters to them.
+static bool IsOrderSensitiveModifier(pag::ShapeType type) {
+  return type == pag::ShapeType::TrimPaths || type == pag::ShapeType::MergePaths;
+}
+
+static void ConvertShapeElementList(ConvertState* state,
+                                    const std::vector<pag::ShapeElement*>& elements,
+                                    std::vector<Element*>* contents, pag::Frame startFrame,
+                                    bool orderSensitiveAfter);
+
+// Converts one legacy shape element. orderSensitiveAfter tells a group whether a trim or merge
+// later in an enclosing list consumes its geometry in order (see ConvertShapeElementList).
 void ConvertShapeElement(ConvertState* state, pag::ShapeElement* element,
-                         std::vector<Element*>* contents, pag::Frame startFrame) {
+                         std::vector<Element*>* contents, pag::Frame startFrame,
+                         bool orderSensitiveAfter) {
   if (element == nullptr) {
     return;
   }
@@ -865,9 +899,8 @@ void ConvertShapeElement(ConvertState* state, pag::ShapeElement* element,
           }
         }
       }
-      for (auto* child : legacy->elements) {
-        ConvertShapeElement(state, child, &group->elements, startFrame);
-      }
+      ConvertShapeElementList(state, legacy->elements, &group->elements, startFrame,
+                              orderSensitiveAfter);
       if (bakeTranslate && (bakeX != 0.0f || bakeY != 0.0f)) {
         for (auto* element : group->elements) {
           if (element == nullptr) {
@@ -1032,6 +1065,98 @@ void ConvertShapeElement(ConvertState* state, pag::ShapeElement* element,
     default:
       state->warn(PAGExportWarning::UnsupportedColorSource, "unsupported shape element");
       break;
+  }
+}
+
+// Converts a legacy shape content list and restores the legacy paint stacking. The legacy renderer
+// stacks the render items of a list (paints and child groups) by insertion: a child group and a
+// BelowPreviousInSameGroup paint go to the BOTTOM, an AbovePreviousInSameGroup paint to the top.
+// PAGX paints in document order (later on top) with otherwise identical accumulation semantics,
+// so the converted elements are permuted into the legacy bottom-to-top order where that is exact:
+// a contiguous run of paints after all geometry and modifiers (every paint sees the same
+// geometry), or a list whose only render items are child groups (no painter consumes their
+// geometry here, and no trim or merge consumes it in order further up). Other mixes would need a
+// paint to sit below a group while still painting its geometry, which document order cannot
+// express; they keep document order and are reported.
+static void ConvertShapeElementList(ConvertState* state,
+                                    const std::vector<pag::ShapeElement*>& elements,
+                                    std::vector<Element*>* contents, pag::Frame startFrame,
+                                    bool orderSensitiveAfter) {
+  std::vector<bool> sensitiveAfter(elements.size(), false);
+  bool laterSensitive = false;
+  for (size_t i = elements.size(); i > 0; i--) {
+    sensitiveAfter[i - 1] = orderSensitiveAfter || laterSensitive;
+    if (elements[i - 1] != nullptr && IsOrderSensitiveModifier(elements[i - 1]->type())) {
+      laterSensitive = true;
+    }
+  }
+  std::vector<std::pair<size_t, size_t>> ranges = {};
+  for (size_t i = 0; i < elements.size(); i++) {
+    auto begin = contents->size();
+    ConvertShapeElement(state, elements[i], contents, startFrame, sensitiveAfter[i]);
+    ranges.emplace_back(begin, contents->size());
+  }
+
+  std::vector<size_t> renderItems = {};
+  std::vector<size_t> stack = {};
+  bool hasGroup = false;
+  bool hasPaint = false;
+  bool hasModifier = false;
+  size_t firstPaint = elements.size();
+  size_t lastPaint = 0;
+  for (size_t i = 0; i < elements.size(); i++) {
+    if (elements[i] == nullptr) {
+      continue;
+    }
+    auto type = elements[i]->type();
+    if (type == pag::ShapeType::ShapeGroup) {
+      hasGroup = true;
+      renderItems.push_back(i);
+      stack.insert(stack.begin(), i);
+    } else if (IsLegacyPaint(type)) {
+      hasPaint = true;
+      firstPaint = std::min(firstPaint, i);
+      lastPaint = i;
+      renderItems.push_back(i);
+      if (LegacyPaintOrder(elements[i]) == pag::CompositeOrder::AbovePreviousInSameGroup) {
+        stack.push_back(i);
+      } else {
+        stack.insert(stack.begin(), i);
+      }
+    } else if (type != pag::ShapeType::Rectangle && type != pag::ShapeType::Ellipse &&
+               type != pag::ShapeType::PolyStar && type != pag::ShapeType::ShapePath) {
+      hasModifier = true;
+    }
+  }
+  if (stack == renderItems) {
+    return;
+  }
+  bool paintRunContiguous = hasPaint;
+  for (size_t i = firstPaint; hasPaint && i <= lastPaint; i++) {
+    if (elements[i] == nullptr || !IsLegacyPaint(elements[i]->type())) {
+      paintRunContiguous = false;
+    }
+  }
+  bool groupsOnly = !hasPaint && !hasModifier && !orderSensitiveAfter;
+  if ((hasGroup || !paintRunContiguous) && !groupsOnly) {
+    state->warn(PAGExportWarning::AnimatedContentSkipped,
+                "legacy shape paint stacking order approximated");
+    return;
+  }
+  // Both exact cases permute the render items between their own slots: collect the converted
+  // elements in the legacy bottom-to-top order, then write them back over the render-item slots
+  // in document order (geometry and modifiers between groups stay where they are).
+  std::vector<Element*> stacked = {};
+  for (auto index : stack) {
+    for (auto k = ranges[index].first; k < ranges[index].second; k++) {
+      stacked.push_back((*contents)[k]);
+    }
+  }
+  size_t next = 0;
+  for (auto index : renderItems) {
+    for (auto k = ranges[index].first; k < ranges[index].second; k++) {
+      (*contents)[k] = stacked[next++];
+    }
   }
 }
 
@@ -2055,9 +2180,8 @@ Layer* ConvertLayer(ConvertState* state, pag::Layer* legacyLayer, float parentFr
       layer->visible = legacyLayer->isActive;
       layer->blendMode = ConvertBlendMode(legacyLayer->blendMode);
       ConvertTransform2D(state, legacyLayer->transform, layer, legacyLayer->startTime);
-      for (auto* element : legacy->contents) {
-        ConvertShapeElement(state, element, &layer->contents, legacyLayer->startTime);
-      }
+      ConvertShapeElementList(state, legacy->contents, &layer->contents, legacyLayer->startTime,
+                              false);
       ConvertLayerMasks(state, legacyLayer, layer);
       ConvertLayerEffects(state, legacyLayer, layer);
       ConvertLayerStyles(state, legacyLayer, layer);

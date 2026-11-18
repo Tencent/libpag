@@ -80,6 +80,97 @@ void CollectAnimatedShapeElements(const std::vector<pag::ShapeElement*>& element
   }
 }
 
+bool IsLegacyPaint(pag::ShapeType type) {
+  return type == pag::ShapeType::Fill || type == pag::ShapeType::Stroke ||
+         type == pag::ShapeType::GradientFill || type == pag::ShapeType::GradientStroke;
+}
+
+// Classifies the paint stacking of every content list: "same" when the legacy stacking (Below
+// paints and child groups insert at the bottom, Above paints at the top) already matches PAGX
+// document order, "paintBlock" when only a contiguous run of paints needs reordering, and
+// "complex" otherwise (paints interleaved with geometry, or groups that must move).
+void ClassifyPaintOrder(const std::vector<pag::ShapeElement*>& elements, int* same, int* paintBlock,
+                        int* complex) {
+  std::vector<int> stack = {};
+  std::vector<int> renderItems = {};
+  int firstPaint = -1;
+  int lastPaint = -1;
+  bool hasGroup = false;
+  for (int i = 0; i < static_cast<int>(elements.size()); i++) {
+    auto* element = elements[static_cast<size_t>(i)];
+    auto type = element->type();
+    if (type == pag::ShapeType::ShapeGroup) {
+      ClassifyPaintOrder(static_cast<pag::ShapeGroupElement*>(element)->elements, same, paintBlock,
+                         complex);
+      hasGroup = true;
+      renderItems.push_back(i);
+      stack.insert(stack.begin(), i);
+      continue;
+    }
+    if (!IsLegacyPaint(type)) {
+      continue;
+    }
+    if (firstPaint < 0) {
+      firstPaint = i;
+    }
+    lastPaint = i;
+    renderItems.push_back(i);
+    pag::CompositeOrder order = pag::CompositeOrder::BelowPreviousInSameGroup;
+    if (type == pag::ShapeType::Fill) {
+      order = static_cast<pag::FillElement*>(element)->composite;
+    } else if (type == pag::ShapeType::Stroke) {
+      order = static_cast<pag::StrokeElement*>(element)->composite;
+    } else if (type == pag::ShapeType::GradientFill) {
+      order = static_cast<pag::GradientFillElement*>(element)->composite;
+    } else {
+      order = static_cast<pag::GradientStrokeElement*>(element)->composite;
+    }
+    if (order == pag::CompositeOrder::AbovePreviousInSameGroup) {
+      stack.push_back(i);
+    } else {
+      stack.insert(stack.begin(), i);
+    }
+  }
+  if (stack == renderItems) {
+    (*same)++;
+    return;
+  }
+  if (getenv("PAG_DUMP_EQ_PATTERNS") != nullptr) {
+    std::string pattern = {};
+    for (auto* element : elements) {
+      auto type = element->type();
+      if (type == pag::ShapeType::ShapeGroup) {
+        pattern += "S";
+      } else if (IsLegacyPaint(type)) {
+        auto above =
+            (type == pag::ShapeType::Fill && static_cast<pag::FillElement*>(element)->composite ==
+                                                 pag::CompositeOrder::AbovePreviousInSameGroup) ||
+            (type == pag::ShapeType::Stroke &&
+             static_cast<pag::StrokeElement*>(element)->composite ==
+                 pag::CompositeOrder::AbovePreviousInSameGroup);
+        pattern += above ? "A" : "P";
+      } else if (type == pag::ShapeType::TrimPaths || type == pag::ShapeType::RoundCorners ||
+                 type == pag::ShapeType::MergePaths || type == pag::ShapeType::Repeater) {
+        pattern += "M";
+      } else {
+        pattern += "G";
+      }
+    }
+    fprintf(stderr, "[paint-pattern] %s\n", pattern.c_str());
+  }
+  bool interleaved = false;
+  for (int i = firstPaint; i >= 0 && i <= lastPaint; i++) {
+    if (!IsLegacyPaint(elements[static_cast<size_t>(i)]->type())) {
+      interleaved = true;
+    }
+  }
+  if (!hasGroup && !interleaved) {
+    (*paintBlock)++;
+  } else {
+    (*complex)++;
+  }
+}
+
 void DumpLegacyLayerTree(pag::Layer* layer, int depth, FILE* out) {
   if (layer == nullptr || out == nullptr) {
     return;
@@ -110,6 +201,12 @@ void DumpLegacyLayerTree(pag::Layer* layer, int depth, FILE* out) {
     if (!animated.empty()) {
       fprintf(out, " animShapeElems=%s", animated.c_str());
     }
+    int same = 0;
+    int paintBlock = 0;
+    int complex = 0;
+    ClassifyPaintOrder(static_cast<pag::ShapeLayer*>(layer)->contents, &same, &paintBlock,
+                       &complex);
+    fprintf(out, " paintOrder[same=%d block=%d complex=%d]", same, paintBlock, complex);
   }
   if (layer->type() == pag::LayerType::Image) {
     auto* imageLayer = static_cast<pag::ImageLayer*>(layer);
