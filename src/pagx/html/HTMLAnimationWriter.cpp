@@ -3613,8 +3613,13 @@ std::string RangeGlyphDecls(const RangeSelectorGlyph& glyph, double factor) {
 std::string ModifierGlyphDecls(const RangeSelectorGlyph& glyph, const BundleChannelSet& chSet,
                                Frame t) {
   const TextModifier* modifier = glyph.modifier;
+  // The static writer baked `modifier value * selector factor` per glyph, where the factor is the
+  // selector's value at the authored state. An animated selector changes that factor every frame,
+  // so re-derive it here whenever the glyph carries its selector - not only on the composed path.
+  // With no range channel bound the evaluation falls back to the selector's own attributes and
+  // returns the same factor the static writer used.
   float f = glyph.factor;
-  if (glyph.composed && glyph.selector != nullptr) {
+  if (glyph.selector != nullptr) {
     const auto* selector = glyph.selector;
     f = ComputeRangeSelectorFactor(selector, glyph.glyphIndex, glyph.totalGlyphs,
                                    EvalFloatChannel(chSet.rangeStartCh, t, selector->start),
@@ -3674,22 +3679,17 @@ std::string ModifierGlyphDecls(const RangeSelectorGlyph& glyph, const BundleChan
   AppendCssDecl(decls, "transform", transform);
   // An HTML span paints its text with `color` (and -webkit-text-stroke for the outline), an SVG
   // <text> with `fill` / `stroke`.
-  if (chSet.modFillColorCh != nullptr || (glyph.composed && modifier->fillColor.has_value())) {
+  if (chSet.modFillColorCh != nullptr ||
+      (modifier->fillColor.has_value() && (glyph.composed || glyph.selector != nullptr))) {
     Color tint = EvalColorChannel(chSet.modFillColorCh, t, modifier->fillColor.value_or(Color()));
+    // The static writer blends the modifier colour into the text's own fill by the glyph factor and
+    // paints the untouched base colour at factor 0 (HTMLWriterText.cpp:1779). Mirror both branches
+    // with this frame's factor: painting the modifier colour at factor 0 would tint a glyph the
+    // modifier does not reach.
+    Color painted = glyph.hasBaseFillColor ? LerpColor(glyph.baseFillColor, tint, absF) : tint;
     if (glyph.htmlSpan) {
-      // The static span blends the modifier colour into the text's own fill by the glyph factor;
-      // painting the modifier colour alone shifts the whole glyph.
-      Color painted = (glyph.hasBaseFillColor && glyph.factor > 0.0f)
-                          ? LerpColor(glyph.baseFillColor, tint, glyph.factor)
-                          : tint;
-      if (glyph.composed && glyph.hasBaseFillColor) {
-        painted = LerpColor(glyph.baseFillColor, tint, absF);
-      }
       AppendCssDecl(decls, "color", ColorToRGBA(painted));
     } else {
-      Color painted = (glyph.hasBaseFillColor && glyph.factor > 0.0f)
-                          ? LerpColor(glyph.baseFillColor, tint, glyph.factor)
-                          : tint;
       AppendCssDecl(decls, "fill", ColorToSVGHex(painted));
     }
   }
@@ -3956,11 +3956,42 @@ std::string EmitModifierGlyphStops(const BundleChannelSet& chSet, const BundleTi
   }
   times.insert(windowStart);
   times.insert(windowEnd);
+  // A selector-driven factor is not linear in time: it bends where a range edge crosses a glyph
+  // edge and is clamped to [0, 1] outside the range, so the keys alone would let the browser
+  // interpolate straight across the bend. Cut the window at those crossings - the same edges the
+  // composed path uses - and sample inside each cut, so every stop pair stays on one monotonic
+  // stretch of the curve.
+  const bool selectorDriven = glyph.selector != nullptr &&
+                              (chSet.rangeStartCh != nullptr || chSet.rangeEndCh != nullptr ||
+                               chSet.rangeOffsetCh != nullptr || chSet.rangeEaseInCh != nullptr ||
+                               chSet.rangeEaseOutCh != nullptr || chSet.rangeWeightCh != nullptr);
+  if (selectorDriven) {
+    std::vector<Frame> keyCuts(times.begin(), times.end());
+    for (size_t k = 0; k + 1 < keyCuts.size(); ++k) {
+      double from[kRangeGlyphEdgeCount];
+      double to[kRangeGlyphEdgeCount];
+      RangeGlyphEdgeDistances(chSet, keyCuts[k], from);
+      RangeGlyphEdgeDistances(chSet, keyCuts[k + 1] - 1e-9, to);
+      for (int e = 0; e < kRangeGlyphEdgeCount; ++e) {
+        if (!RangeGlyphEdgeMatters(glyph.selector->shape, e)) {
+          continue;
+        }
+        if ((from[e] < 0.0 && to[e] > 0.0) || (from[e] > 0.0 && to[e] < 0.0)) {
+          double crossing =
+              keyCuts[k] + (keyCuts[k + 1] - keyCuts[k]) * from[e] / (from[e] - to[e]);
+          times.insert(static_cast<Frame>(std::llround(crossing)));
+        }
+      }
+    }
+  }
   bool mixed = !chSet.mixedEasingTimes.empty();
-  if (mixed) {
+  if (mixed || selectorDriven) {
     constexpr Frame kStep = 3;
-    for (Frame t = windowStart; t <= windowEnd; t += kStep) {
-      times.insert(t);
+    std::vector<Frame> cuts(times.begin(), times.end());
+    for (size_t k = 0; k + 1 < cuts.size(); ++k) {
+      for (Frame t = cuts[k] + kStep; t < cuts[k + 1]; t += kStep) {
+        times.insert(t);
+      }
     }
   }
   std::string stops = {};

@@ -3,7 +3,13 @@
      the selector sweeps its window, while the colour re-tints per glyph. Nothing here changes the
      text's layout, so the baked glyph positions stay valid.
      Target: Composite  Channel: position.y,rotation,fillColor,start,end,easeIn,easeOut,weight  Type: mixed
-     Ref: - -->
+     Ref: -
+     Ceiling: the browser places these 56px glyphs about 1.6px lower than the reference and draws
+     them one row taller (ink 3802 vs 3554 px at t=0), so the same state rendered with the animation
+     stripped out still scores only 0.9275. That offset is independent of the animation - it is
+     identical before and after the factor fix, and identical with no animation at all - so this
+     case cannot reach the 0.99 band the others do. Its per-frame score is expected to sit around
+     0.90-0.93; anything near 0.93 comes from an accidental match, not from a faithful factor. -->
 <pagx width="320" height="200">
   <Layer left="0" right="0" top="0" bottom="0">
     <Rectangle left="0" right="0" top="0" bottom="0"/>
