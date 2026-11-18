@@ -3920,11 +3920,14 @@ CLI_TEST(PAGXCliTest, Embed_MissingFontFile_FailsLoud) {
 }
 
 CLI_TEST(PAGXCliTest, Embed_FontFile_ReembedPreservesNode) {
+  auto tempDir = TempSubdir("embed_reembed");
   auto tempPagx = CopyToTemp("embed_font_file.pagx", "embed_font_file.pagx", "embed_reembed");
   CopyResourceToTemp("resources/font/NotoSansSC-Regular.otf", "NotoSansSC-Regular.otf",
                      "embed_reembed");
-  auto pass1 = TempDir() + "/embed_reembed_pass1.pagx";
-  auto pass2 = TempDir() + "/embed_reembed_pass2.pagx";
+  // The font reference stays relative, so the re-embed pass resolves it against the input file's
+  // directory. Keep the intermediate files next to the copied font.
+  auto pass1 = tempDir + "/embed_reembed_pass1.pagx";
+  auto pass2 = tempDir + "/embed_reembed_pass2.pagx";
   auto ret1 = CallRun(pagx::cli::RunEmbed, {"embed", tempPagx, "-o", pass1});
   EXPECT_EQ(ret1, 0);
   auto ret2 = CallRun(pagx::cli::RunEmbed, {"embed", pass1, "-o", pass2});
