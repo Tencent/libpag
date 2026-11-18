@@ -195,6 +195,22 @@ void DumpLegacyLayerTree(pag::Layer* layer, int depth, FILE* out) {
   if (!layer->effects.empty() || !layer->layerStyles.empty()) {
     fprintf(out, " effects=%zu styles=%zu", layer->effects.size(), layer->layerStyles.size());
   }
+  if (layer->type() == pag::LayerType::Text) {
+    auto document = static_cast<pag::TextLayer*>(layer)->getTextDocument();
+    auto position = layer->transform->position->getValueAt(0);
+    auto anchor = layer->transform->anchorPoint->getValueAt(0);
+    if (document != nullptr) {
+      fprintf(out,
+              " text[pos=%.1f,%.1f anchor=%.1f,%.1f box=%d boxPos=%.1f,%.1f boxSize=%.1f,%.1f "
+              "firstBaseLine=%.2f baselineShift=%.1f just=%d dir=%d size=%.1f leading=%.1f "
+              "tracking=%.1f]",
+              position.x, position.y, anchor.x, anchor.y, document->boxText, document->boxTextPos.x,
+              document->boxTextPos.y, document->boxTextSize.x, document->boxTextSize.y,
+              document->firstBaseLine, document->baselineShift,
+              static_cast<int>(document->justification), static_cast<int>(document->direction),
+              document->fontSize, document->leading, document->tracking);
+    }
+  }
   if (layer->type() == pag::LayerType::Shape) {
     std::string animated = {};
     CollectAnimatedShapeElements(static_cast<pag::ShapeLayer*>(layer)->contents, &animated);
@@ -442,6 +458,13 @@ void CompareSample(const std::string& path, SampleResult* result) {
   int width = 0;
   int height = 0;
   ScaleToFit(pagFile->width(), pagFile->height(), &width, &height);
+  // Both pipelines render with an identity matrix, so the default surface only covers the
+  // top-left kMaxFrameSize crop of large documents. PAG_EQ_FULL_FRAME renders the whole document
+  // instead (diagnosis only: the reported metrics are defined on the crop).
+  if (getenv("PAG_EQ_FULL_FRAME") != nullptr) {
+    width = pagFile->width();
+    height = pagFile->height();
+  }
 
   auto legacySurface = PAGSurface::MakeOffscreen(width, height);
   if (legacySurface == nullptr) {

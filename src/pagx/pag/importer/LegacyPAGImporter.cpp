@@ -2261,35 +2261,23 @@ Layer* ConvertLayer(ConvertState* state, pag::Layer* legacyLayer, float parentFr
           text->baseline = TextBaseline::Alphabetic;
         }
         // The legacy baselineShift lifts every line's baseline (drawY = baseline - shift) and the
-        // box-text firstBaseLine anchors the first baseline relative to the layer origin; the
-        // box-local conversion subtracts boxTextPos.y. Both act on the rotated frame's baseline
-        // axis for vertical text (a column-position shift in visual space), which the native
-        // vertical layout places differently - defer those to the vertical-geometry round.
+        // box-text firstBaseLine anchors the first baseline relative to the layer origin. Vertical
+        // text lays out in a frame rotated by 90 degrees whose box top is the box's right edge
+        // (TextRenderer CreateTextLayout: layout firstBaseLine = boxRight - firstBaseLine), so
+        // the box-local distance is measured from the right edge there.
         auto isVerticalText = textDocument->direction == pag::TextDirection::Vertical;
-        if (textDocument->baselineShift != 0) {
-          if (isVerticalText) {
-            state->warn(PAGExportWarning::UnsupportedColorSource,
-                        "vertical text baselineShift (column offset) not migrated");
-          } else {
-            text->baselineShift = textDocument->baselineShift;
-          }
-        }
+        text->baselineShift = textDocument->baselineShift;
         if (textDocument->boxText && textDocument->firstBaseLine != 0) {
           if (isVerticalText) {
-            state->warn(PAGExportWarning::UnsupportedColorSource,
-                        "vertical text firstBaseLine (column baseline) not migrated");
+            text->firstBaseLine = textDocument->boxTextPos.x + textDocument->boxTextSize.x -
+                                  textDocument->firstBaseLine;
           } else {
             text->firstBaseLine = textDocument->firstBaseLine - textDocument->boxTextPos.y;
           }
         }
         if (textDocument->backgroundAlpha > 0) {
-          if (isVerticalText) {
-            state->warn(PAGExportWarning::UnsupportedColorSource,
-                        "vertical text background not migrated");
-          } else {
-            text->backgroundColor = ConvertColor(textDocument->backgroundColor);
-            text->backgroundAlpha = textDocument->backgroundAlpha / 255.0f;
-          }
+          text->backgroundColor = ConvertColor(textDocument->backgroundColor);
+          text->backgroundAlpha = textDocument->backgroundAlpha / 255.0f;
         }
         textBox->elements.push_back(text);
         MigrateTextAnimators(state, legacyText, textBox);

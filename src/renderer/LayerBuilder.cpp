@@ -3034,18 +3034,21 @@ class LayerBuilderContext {
     // Painters capture every geometry accumulated in their own context, and a group's geometries
     // merge into the parent context after the group applies. Sibling groups keep the background
     // geometry out of the text painters' capture scope and vice versa; a flat list would let the
-    // text's painters re-paint the background shape.
+    // text's painters re-paint the background shape. Both siblings live INSIDE the TextBox group:
+    // the background path is in the box's local coordinates, so it must ride the box transform
+    // (position, rotation, ...) that the group carries and its bound channels animate.
     std::vector<std::shared_ptr<tgfx::VectorElement>> backgroundElements = {};
     backgroundElements.push_back(shape);
     backgroundElements.push_back(fill);
     auto backgroundGroup = tgfx::VectorGroup::Make();
     backgroundGroup->setElements(std::move(backgroundElements));
-    std::vector<std::shared_ptr<tgfx::VectorElement>> outerElements = {};
-    outerElements.push_back(backgroundGroup);
-    outerElements.push_back(group);
-    auto outer = tgfx::VectorGroup::Make();
-    outer->setElements(std::move(outerElements));
-    return outer;
+    auto contentGroup = tgfx::VectorGroup::Make();
+    contentGroup->setElements(group->elements());
+    std::vector<std::shared_ptr<tgfx::VectorElement>> boxElements = {};
+    boxElements.push_back(backgroundGroup);
+    boxElements.push_back(contentGroup);
+    group->setElements(std::move(boxElements));
+    return group;
   }
 
   virtual std::shared_ptr<tgfx::VectorGroup> convertTextBox(const TextBox* node) {

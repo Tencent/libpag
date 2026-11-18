@@ -20,6 +20,7 @@
 #include <algorithm>
 #include <cctype>
 #include <cmath>
+#include <limits>
 #include "LayoutContext.h"
 #include "TextLayoutParams.h"
 #include "base/utils/MathUtil.h"
@@ -1209,12 +1210,15 @@ class TextLayoutContext {
     float fontSize = 0;
   };
 
-  // The legacy text background: one rectangle per line (a uniform ascent/descent band across
-  // all lines), outset by fontSize * 0.4, overlapping outset rectangles merged into a continuous
-  // band, corners rounded by min(whole-path min(w, h) / 3, 25). The renderer paints the path
-  // below the glyphs. The legacy margin also grows to the text stroke width when that is wider;
-  // the layout does not see painters, so that term is dropped (no corpus sample combines a
-  // stroke wider than 40 percent of the font size with a background).
+  // The legacy text background (TextRenderer RenderBackgroundPath): one rectangle per line (a
+  // uniform ink band across all lines), outset by fontSize * 0.4. Consecutive rectangles separated
+  // by a gap each grow by half of it towards the next one (the following line inherits the
+  // growth on its facing edge, and the last line keeps the previous growth), so a ragged
+  // paragraph forms a staircase rather than one bounding box; vertical columns run right to left
+  // and grow along x. Edges are rounded, corners rounded by min(whole-path min(w, h) / 3, 25).
+  // The renderer paints the path below the glyphs. The legacy margin also grows to the text
+  // stroke width when that is wider; the layout does not see painters, so that term is dropped
+  // (no corpus sample combines a stroke wider than 40 percent of the font size with a background).
   static void BuildTextBackgroundPath(const std::vector<BackgroundLine>& lines,
                                       const TextLayoutParams& params, TextLayoutResult* result) {
     if (lines.empty() || params.backgroundAlpha <= 0.0f ||
@@ -1229,35 +1233,45 @@ class TextLayoutContext {
       maxDescent = std::max(maxDescent, line.descent);
       fontSize = std::max(fontSize, line.fontSize);
     }
-    float margin = fontSize * 0.4f;
-    struct Band {
-      float left = 0;
-      float top = 0;
-      float right = 0;
-      float bottom = 0;
-    };
-    std::vector<Band> bands = {};
+    std::vector<tgfx::Rect> rects = {};
     for (auto& line : lines) {
-      Band band = {};
-      band.left = line.left - margin;
-      band.top = line.baseline - maxAscent - margin;
-      band.right = line.left + line.width + margin;
-      band.bottom = line.baseline + maxDescent + margin;
-      if (!bands.empty()) {
-        auto& last = bands.back();
-        if (band.top <= last.bottom) {
-          last.left = std::min(last.left, band.left);
-          last.right = std::max(last.right, band.right);
-          last.bottom = std::max(last.bottom, band.bottom);
-          continue;
-        }
-      }
-      bands.push_back(band);
+      rects.push_back(tgfx::Rect::MakeLTRB(line.left, line.baseline - maxAscent,
+                                           line.left + line.width, line.baseline + maxDescent));
+    }
+    BuildBackgroundPathFromRects(std::move(rects), false, fontSize * 0.4f, result);
+  }
+
+  static void BuildBackgroundPathFromRects(std::vector<tgfx::Rect> rects, bool vertical,
+                                           float margin, TextLayoutResult* result) {
+    if (rects.empty()) {
+      return;
     }
     auto path = std::make_shared<tgfx::Path>();
-    for (auto& band : bands) {
-      path->addRect(tgfx::Rect::MakeLTRB(roundf(band.left), roundf(band.top), roundf(band.right),
-                                         roundf(band.bottom)));
+    float topInset = 0.0f;
+    float bottomInset = 0.0f;
+    float leftInset = 0.0f;
+    float rightInset = 0.0f;
+    for (auto& rect : rects) {
+      rect.outset(margin, margin);
+    }
+    for (size_t i = 0; i < rects.size(); i++) {
+      auto rect = rects[i];
+      if (i + 1 < rects.size()) {
+        auto& next = rects[i + 1];
+        if (vertical) {
+          leftInset = rect.left > next.right ? (rect.left - next.right) * 0.5f : 0.0f;
+        } else {
+          bottomInset = rect.bottom < next.top ? (next.top - rect.bottom) * 0.5f : 0.0f;
+        }
+      }
+      rect.left -= leftInset;
+      rect.right += rightInset;
+      rect.top -= topInset;
+      rect.bottom += bottomInset;
+      topInset = bottomInset;
+      rightInset = leftInset;
+      path->addRect(tgfx::Rect::MakeLTRB(roundf(rect.left), roundf(rect.top), roundf(rect.right),
+                                         roundf(rect.bottom)));
     }
     auto bounds = path->getBounds();
     float maxRadius = std::min(std::min(bounds.width(), bounds.height()) / 3.0f, 25.0f);
@@ -1572,11 +1586,26 @@ class TextLayoutContext {
       }
     }
 
+    // The baseline attributes act on the block-flow axis, which points right in vertical mode
+    // (the legacy lays vertical text out in a frame rotated by 90 degrees): firstBaseLine is the
+    // distance from the box's right edge to the first column's center line, and a positive
+    // baselineShift moves every column right.
+    if (!std::isnan(params.boxWidth) && !std::isnan(params.firstBaseLine)) {
+      xStart = params.boxWidth - params.firstBaseLine + columns.front().maxColumnWidth / 2;
+    }
+    xStart += params.baselineShift;
+
     // Use result.verticalGlyphs to collect positioned glyphs grouped by source Text element.
 
     bool overflowHidden = params.overflow == Overflow::Hidden;
     float boxLeft = 0;
     float columnX = xStart;
+    // Text background inputs (see BuildBackgroundPathFromRects): each column's center and glyph
+    // run extent, plus the ink extent across all glyphs relative to the column center.
+    std::vector<tgfx::Rect> backgroundColumns = {};
+    float inkLeft = std::numeric_limits<float>::max();
+    float inkRight = std::numeric_limits<float>::lowest();
+    float backgroundFontSize = 0.0f;
 
     for (size_t colIdx = 0; colIdx < columns.size(); colIdx++) {
       auto& column = columns[colIdx];
@@ -1630,6 +1659,8 @@ class TextLayoutContext {
       }
 
       float currentY = inlineOffset;
+      float columnTop = NAN;
+      float columnBottom = NAN;
 
       for (size_t glyphIdx = 0; glyphIdx < column.glyphs.size(); glyphIdx++) {
         auto& vg = column.glyphs[glyphIdx];
@@ -1651,6 +1682,9 @@ class TextLayoutContext {
           float tx = columnCenterX - (absAscent - g.descent) / 2;
           float ty = currentY - vg.leadingSquash;
           vpg.xform = tgfx::RSXform::Make(0, 1, tx, ty);
+          auto ink = g.font.getBounds(g.glyphID);
+          inkLeft = std::min(inkLeft, tx - ink.bottom - columnCenterX);
+          inkRight = std::max(inkRight, tx - ink.top - columnCenterX);
           result.verticalGlyphs[g.sourceText].push_back(vpg);
         } else {
           // With HarfBuzz vert shaping, use getVerticalOffset() for all upright glyphs.
@@ -1663,10 +1697,18 @@ class TextLayoutContext {
           auto offset = g.font.getVerticalOffset(g.glyphID);
           float glyphX = columnCenterX + offset.x;
           float glyphY = currentY - vg.leadingSquash + offset.y;
+          auto ink = g.font.getBounds(g.glyphID);
+          inkLeft = std::min(inkLeft, offset.x + ink.left);
+          inkRight = std::max(inkRight, offset.x + ink.right);
           vpg.position = tgfx::Point::Make(glyphX, glyphY);
           result.verticalGlyphs[g.sourceText].push_back(vpg);
         }
 
+        if (std::isnan(columnTop)) {
+          columnTop = currentY - vg.leadingSquash;
+        }
+        columnBottom = currentY - vg.leadingSquash + vg.height;
+        backgroundFontSize = std::max(backgroundFontSize, vg.glyphs.front().fontSize);
         currentY += vg.height;
         // Update per-Text linebox bounds in layout coordinate system for vertical layout.
         auto* sourceText = vg.glyphs.front().sourceText;
@@ -1690,6 +1732,18 @@ class TextLayoutContext {
           currentY += justifyGap;
         }
       }
+      if (!std::isnan(columnTop)) {
+        backgroundColumns.push_back(
+            tgfx::Rect::MakeLTRB(columnCenterX, columnTop, columnCenterX, columnBottom));
+      }
+    }
+    if (params.backgroundAlpha > 0.0f && !backgroundColumns.empty()) {
+      for (auto& rect : backgroundColumns) {
+        rect.left += inkLeft;
+        rect.right += inkRight;
+      }
+      BuildBackgroundPathFromRects(std::move(backgroundColumns), true, backgroundFontSize * 0.4f,
+                                   &result);
     }
   }
 
