@@ -1275,9 +1275,9 @@ function pagxScoredRows(rows) {
 // ---------------------------------------------------------------------------------------------
 
 const GRADE_COMPLETE = '完全还原';
-const GRADE_BASIC = '基本还原';
+const GRADE_BASIC = '略有差异';
 const GRADE_STATIC_LIMITED = '静态受限';
-const GRADE_DISTORTED = '失真';
+const GRADE_DISTORTED = '差异较大';
 
 // A static route that scores this much worse than the animated one on the same state is not the
 // font-shape ceiling the grade is about; it is a defect of the static path itself.
@@ -1882,9 +1882,9 @@ function writeIndexHtml(rows, outDir, label) {
   if (pagxSource) {
     const p = summarizePagx(rows);
     gradeSummaryItems = `
-    <li>grade — complete <b>${p.grades[GRADE_COMPLETE]}</b>, basic <b>${p.grades[GRADE_BASIC]}</b>, static-limited <b>${p.grades[GRADE_STATIC_LIMITED]}</b>, distorted <b>${p.grades[GRADE_DISTORTED]}</b></li>
-    <li><b>without text</b> (complete 0.999 / basic 0.99) — ${p.nonText.cases} cases &middot; ssim mean <b>${fmt(p.nonText.ssimMean, 4)}</b> &middot; complete <b>${p.nonText.grades[GRADE_COMPLETE]}</b>, basic <b>${p.nonText.grades[GRADE_BASIC]}</b>, static-limited <b>${p.nonText.grades[GRADE_STATIC_LIMITED]}</b>, distorted <b>${p.nonText.grades[GRADE_DISTORTED]}</b></li>
-    <li><b>with text</b> (complete 0.99 / basic 0.97; glyph outlines differ between the renderers) — ${p.text.cases} cases &middot; ssim mean <b>${fmt(p.text.ssimMean, 4)}</b> &middot; complete <b>${p.text.grades[GRADE_COMPLETE]}</b>, basic <b>${p.text.grades[GRADE_BASIC]}</b>, static-limited <b>${p.text.grades[GRADE_STATIC_LIMITED]}</b>, distorted <b>${p.text.grades[GRADE_DISTORTED]}</b></li>
+    <li>档位 — 完全还原 <b>${p.grades[GRADE_COMPLETE]}</b>，略有差异 <b>${p.grades[GRADE_BASIC]}</b>，静态受限 <b>${p.grades[GRADE_STATIC_LIMITED]}</b>，差异较大 <b>${p.grades[GRADE_DISTORTED]}</b></li>
+    <li><b>无 text 节点</b>（完全 ≥0.999 / 略有差异 ≥0.99）— ${p.nonText.cases} 例 &middot; SSIM 均值 <b>${fmt(p.nonText.ssimMean, 4)}</b> &middot; 完全还原 <b>${p.nonText.grades[GRADE_COMPLETE]}</b>，略有差异 <b>${p.nonText.grades[GRADE_BASIC]}</b>，静态受限 <b>${p.nonText.grades[GRADE_STATIC_LIMITED]}</b>，差异较大 <b>${p.nonText.grades[GRADE_DISTORTED]}</b></li>
+    <li><b>带 text 节点</b>（完全 ≥0.99 / 略有差异 ≥0.97；字形轮廓两侧不同）— ${p.text.cases} 例 &middot; SSIM 均值 <b>${fmt(p.text.ssimMean, 4)}</b> &middot; 完全还原 <b>${p.text.grades[GRADE_COMPLETE]}</b>，略有差异 <b>${p.text.grades[GRADE_BASIC]}</b>，静态受限 <b>${p.text.grades[GRADE_STATIC_LIMITED]}</b>，差异较大 <b>${p.text.grades[GRADE_DISTORTED]}</b></li>
     <li>static baseline — <b>${p.staticStats.available}</b> available / <b>${p.staticStats.unavailable}</b> unavailable &middot; staticSSIM mean <b>${fmt(p.staticStats.ssimMean, 4)}</b> &middot; animLoss mean <b>${fmt(p.staticStats.animLossMean, 4)}</b> &middot; freeze self-check mean <b>${fmt(p.staticStats.freezeMean, 4)}</b></li>`;
   }
 
@@ -1898,6 +1898,13 @@ function writeIndexHtml(rows, outDir, label) {
   h1 { margin-top: 0; }
   .summary { background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 8px; padding: 14px 18px; margin: 12px 0 24px; }
   .summary ul { margin: 0; padding-left: 18px; font-size: 13px; }
+  .summary table.criteria { margin: 10px 0 6px; border-collapse: collapse; font-size: 12.5px; }
+  .summary table.criteria th, .summary table.criteria td { border: 1px solid #e2e8f0; padding: 6px 12px; text-align: left; vertical-align: top; }
+  .summary table.criteria thead th { background: #f1f5f9; font-weight: 600; }
+  .summary table.criteria thead th.good { background: #dcfce7; color: #166534; }
+  .summary table.criteria thead th.mid  { background: #fef9c3; color: #854d0e; }
+  .summary table.criteria thead th.bad  { background: #fee2e2; color: #991b1b; }
+  .summary p.note { margin: 6px 0 0; font-size: 12px; color: #475569; line-height: 1.6; }
   .toolbar { display: flex; align-items: center; gap: 12px; margin: 12px 0 4px; }
   .toolbar button { font-size: 13px; padding: 6px 14px; border: 1px solid #cbd5e1; border-radius: 6px; background: #fff; cursor: pointer; }
   .toolbar button:hover { background: #f1f5f9; }
@@ -1946,6 +1953,30 @@ function writeIndexHtml(rows, outDir, label) {
     <li>animations captured — <b>${s.animCaptured}</b> (dropped at import: <b>${s.animDropped}</b>)</li>
     <li>perspective elements that kept the function form — <b>${s.cameraSkips}</b></li>
   </ul>
+  <table class="criteria">
+    <thead>
+      <tr><th></th><th class="good">完全还原</th><th class="mid">略有差异</th><th class="bad">差异较大</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <th>无 text 节点</th>
+        <td>SSIM ≥ <b>0.999</b><br/>anim-loss ≤ 0.001</td>
+        <td>SSIM ≥ <b>0.99</b><br/>anim-loss ≤ 0.01</td>
+        <td>SSIM <b>&lt; 0.99</b><br/>或 anim-loss &gt; 0.01</td>
+      </tr>
+      <tr>
+        <th>带 text 节点</th>
+        <td>SSIM ≥ <b>0.99</b><br/>anim-loss ≤ 0.001</td>
+        <td>SSIM ≥ <b>0.97</b><br/>anim-loss ≤ 0.01</td>
+        <td>SSIM <b>&lt; 0.97</b><br/>或 anim-loss &gt; 0.01</td>
+      </tr>
+    </tbody>
+  </table>
+  <p class="note">SSIM 取 <code>mean</code> 与 <code>min</code> 中更严的一档。带 text 节点用更宽的一条曲线：两套渲染器
+    的字形轮廓本就不同（PAGX 填充带 hint 的轮廓、fauxBold 时再并一个描边；浏览器用自己的字面栅格化、
+    fauxBold 用 <code>-webkit-text-stroke</code>），文本用例的静态天花板通常落在 0.95–0.99。
+    anim-loss = 同一时刻 <code>staticSSIM − animSSIM</code>，衡量动画写入本身引入的误差。
+    <b>静态受限</b>（灰色）表示静态上限已低于动画得分档位、且 anim-loss ≤ 0.01，即剩余差异来自字形轮廓而非动画。</p>
 </div>
 <div class="toolbar">
   <button id="play-all" type="button">▶ Play all</button>
