@@ -250,6 +250,18 @@ bool WriteStringToFile(const std::string& content, const std::string& filePath,
       return false;
     }
   }
+#ifdef _WIN32
+  auto source = UTF8ToWide(tempPath);
+  auto destination = UTF8ToWide(filePath);
+  if (source.empty() || destination.empty() ||
+      !MoveFileExW(source.c_str(), destination.c_str(),
+                   MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)) {
+    std::cerr << command << ": failed to write '" << filePath
+              << "' (replacing output file failed)\n";
+    std::remove(tempPath.c_str());
+    return false;
+  }
+#else
   std::error_code ec;
   std::filesystem::rename(tempPath, filePath, ec);
   if (ec) {
@@ -258,6 +270,7 @@ bool WriteStringToFile(const std::string& content, const std::string& filePath,
     std::remove(tempPath.c_str());
     return false;
   }
+#endif
   std::cout << command << ": wrote " << filePath << "\n";
   return true;
 }

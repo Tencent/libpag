@@ -90,17 +90,27 @@ void UnsetTestEnv(const char* name) {
 }  // namespace
 using namespace tgfx;
 
-static std::string CopyToTemp(const std::string& resourceName, const std::string& tempName) {
+static std::string TempSubdir(const std::string& subdir) {
+  auto dir = TempDir();
+  if (!subdir.empty()) {
+    dir += "/" + subdir;
+    std::filesystem::create_directories(dir);
+  }
+  return dir;
+}
+
+static std::string CopyToTemp(const std::string& resourceName, const std::string& tempName,
+                              const std::string& subdir = {}) {
   auto src = TestResourcePath(resourceName);
-  auto dst = TempDir() + "/" + tempName;
+  auto dst = TempSubdir(subdir) + "/" + tempName;
   std::filesystem::copy_file(src, dst, std::filesystem::copy_options::overwrite_existing);
   return dst;
 }
 
 static std::string CopyResourceToTemp(const std::string& resourceRelPath,
-                                      const std::string& tempName) {
+                                      const std::string& tempName, const std::string& subdir = {}) {
   auto src = ProjectPath::Absolute(resourceRelPath);
-  auto dst = TempDir() + "/" + tempName;
+  auto dst = TempSubdir(subdir) + "/" + tempName;
   std::filesystem::copy_file(src, dst, std::filesystem::copy_options::overwrite_existing);
   return dst;
 }
@@ -2044,7 +2054,7 @@ CLI_TEST(PAGXCliTest, Export_PagxToPptx_MultipleInputs) {
                                             "--output", outputPath});
   EXPECT_EQ(ret, 0);
   ASSERT_TRUE(std::filesystem::exists(outputPath));
-  auto bytes = ReadTextFile(outputPath);
+  auto bytes = ReadBinaryTestFile(outputPath);
   EXPECT_NE(bytes.find("ppt/slides/slide1.xml"), std::string::npos);
   EXPECT_NE(bytes.find("ppt/slides/slide2.xml"), std::string::npos);
   EXPECT_EQ(bytes.find("ppt/slides/slide3.xml"), std::string::npos);
@@ -2061,7 +2071,7 @@ CLI_TEST(PAGXCliTest, Export_PagxToPptx_ThreeInputsDefaultOutput) {
   EXPECT_EQ(ret, 0);
   auto defaultOutput = TempDir() + "/ExportPPTXThree.pptx";
   ASSERT_TRUE(std::filesystem::exists(defaultOutput));
-  auto bytes = ReadTextFile(defaultOutput);
+  auto bytes = ReadBinaryTestFile(defaultOutput);
   EXPECT_NE(bytes.find("ppt/slides/slide3.xml"), std::string::npos);
   EXPECT_EQ(bytes.find("ppt/slides/slide4.xml"), std::string::npos);
 }
@@ -2074,7 +2084,7 @@ CLI_TEST(PAGXCliTest, Export_PagxToPptx_SingleInputOneSlide) {
   auto ret =
       CallRun(pagx::cli::RunExport, {"export", "--input", inputPath, "--output", outputPath});
   EXPECT_EQ(ret, 0);
-  auto bytes = ReadTextFile(outputPath);
+  auto bytes = ReadBinaryTestFile(outputPath);
   EXPECT_NE(bytes.find("ppt/slides/slide1.xml"), std::string::npos);
   EXPECT_EQ(bytes.find("ppt/slides/slide2.xml"), std::string::npos);
 }
@@ -3833,8 +3843,9 @@ CLI_TEST(PAGXCliTest, Embed_BothSkipFlags_ExitsWithError) {
 }
 
 CLI_TEST(PAGXCliTest, Embed_FontFile_AutoRegistersAndEmbeds) {
-  auto tempPagx = CopyToTemp("embed_font_file.pagx", "embed_font_file.pagx");
-  CopyResourceToTemp("resources/font/NotoSansSC-Regular.otf", "NotoSansSC-Regular.otf");
+  auto tempPagx = CopyToTemp("embed_font_file.pagx", "embed_font_file.pagx", "embed_fontfile_auto");
+  CopyResourceToTemp("resources/font/NotoSansSC-Regular.otf", "NotoSansSC-Regular.otf",
+                     "embed_fontfile_auto");
   auto outPagx = TempDir() + "/embed_fontfile_out.pagx";
   StreamCapture outCapture(std::cout);
   auto ret = CallRun(pagx::cli::RunEmbed, {"embed", tempPagx, "-o", outPagx});
@@ -3909,8 +3920,9 @@ CLI_TEST(PAGXCliTest, Embed_MissingFontFile_FailsLoud) {
 }
 
 CLI_TEST(PAGXCliTest, Embed_FontFile_ReembedPreservesNode) {
-  auto tempPagx = CopyToTemp("embed_font_file.pagx", "embed_font_file.pagx");
-  CopyResourceToTemp("resources/font/NotoSansSC-Regular.otf", "NotoSansSC-Regular.otf");
+  auto tempPagx = CopyToTemp("embed_font_file.pagx", "embed_font_file.pagx", "embed_reembed");
+  CopyResourceToTemp("resources/font/NotoSansSC-Regular.otf", "NotoSansSC-Regular.otf",
+                     "embed_reembed");
   auto pass1 = TempDir() + "/embed_reembed_pass1.pagx";
   auto pass2 = TempDir() + "/embed_reembed_pass2.pagx";
   auto ret1 = CallRun(pagx::cli::RunEmbed, {"embed", tempPagx, "-o", pass1});
