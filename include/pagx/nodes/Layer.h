@@ -266,6 +266,10 @@ class Layer : public Node, public LayoutNode {
    * Externally loaded PAGX document used as this layer's composition content. When set, the
    * composition's layers and animations point into this document, and runtime timeline target lookup
    * is resolved against this document instead of the owner document.
+   *
+   * The sub-document is a separate, read-only domain: editing it reaches the owner only through a
+   * full runtime rebuild (which resets state machines, ViewModel values and all layer/timeline
+   * handles), and structural edits do not take effect. Flatten it before editing.
    */
   std::shared_ptr<PAGXDocument> externalDoc = nullptr;
 
@@ -349,8 +353,14 @@ class Layer : public Node, public LayoutNode {
   // ── Import directives (resolved by `pagx resolve`) ──
 
   /**
-   * Describes an import directive on this Layer. When source or content is non-empty, the Layer
-   * contains unresolved imported content that must be expanded by `pagx resolve`.
+   * Describes imported content on this Layer. An explicit source takes precedence over inline
+   * content. A composition declaration also takes precedence over inline content, but declaring
+   * both a composition and an import source is invalid and rejected by the importer.
+   *
+   * Inline SVG is mounted on first layout as a read-only sub-document. It renders through the
+   * composition reference but is not part of the owner's editable node domain. Flatten imported
+   * content with `pagx resolve` before editing the resulting native nodes. Detaching and re-parsing
+   * an import only replaces its read-only mount; it does not flatten it.
    */
   struct ImportDirective {
     /**

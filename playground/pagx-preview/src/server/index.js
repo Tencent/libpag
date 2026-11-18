@@ -54,7 +54,7 @@ function randomSessionId() {
 function readViewerInfo() {
   if (!fs.existsSync(VIEWER_INFO_PATH)) {
     throw new Error(
-      `pagx preview: viewer artifacts not found at ${GENERATED_DIR}/viewer. Run "npm run prebuild" first.`
+      `pagx preview: viewer artifacts not found at ${GENERATED_DIR}/viewer. Run "npm run build" first.`
     );
   }
   return JSON.parse(fs.readFileSync(VIEWER_INFO_PATH, 'utf8'));
