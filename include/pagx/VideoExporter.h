@@ -10,7 +10,7 @@
 //      http://www.apache.org/licenses/LICENSE-2.0
 //
 //  unless required by applicable law or agreed to in writing, software distributed under the
-//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
+//  license is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
 //  either express or implied. see the license for the specific language governing permissions
 //  and limitations under the license.
 //
@@ -22,247 +22,14 @@
 #include <cstdint>
 #include <memory>
 #include <string>
-#include <vector>
-#include "pagx/PAGDisplayOptions.h"
-#include "pagx/types/Color.h"
-
-namespace tgfx {
-class Bitmap;
-class Pixmap;
-}  // namespace tgfx
+#include "pagx/VideoExportFrame.h"
+#include "pagx/VideoExportTypes.h"
 
 namespace pagx {
 
-class PAGAnimation;
-class PAGComposition;
-class PAGScene;
 class PAGSurface;
-class PAGTimeline;
 class PAGXDocument;
-struct VideoExportState;
-
-/** A rational sampling rate in frames per second. Zero numerator with denominator 1 means auto. */
-struct VideoFrameRate {
-  /** Creates a frame rate from an exact numerator and denominator. */
-  constexpr VideoFrameRate(int64_t frameRateNumerator = 0, int64_t frameRateDenominator = 1)
-      : frameRateNumerator(frameRateNumerator), frameRateDenominator(frameRateDenominator) {
-  }
-
-  /** Creates an integer frame rate without ambiguity with the deleted floating-point overload. */
-  constexpr VideoFrameRate(int frameRateNumerator)
-      : VideoFrameRate(static_cast<int64_t>(frameRateNumerator)) {
-  }
-
-  /** Floating-point frame rates must be converted to an exact rational explicitly. */
-  VideoFrameRate(double) = delete;
-
-  /** Returns true for the automatic {0, 1} rate, which follows the document frame rate. */
-  bool isAutomatic() const {
-    return frameRateNumerator == 0 && frameRateDenominator == 1;
-  }
-
-  /** Returns the numeric frame rate, or zero when the denominator is zero. */
-  double framesPerSecond() const {
-    return frameRateDenominator == 0 ? 0.0
-                                     : static_cast<double>(frameRateNumerator) /
-                                           static_cast<double>(frameRateDenominator);
-  }
-
-  /**
-   * Checks an exact positive rational range without floating-point rounding or multiplication
-   * overflow.
-   */
-  bool isWithin(int minValue, int maxValue) const {
-    if (frameRateNumerator <= 0 || frameRateDenominator <= 0) {
-      return false;
-    }
-    auto quotient = frameRateNumerator / frameRateDenominator;
-    auto remainder = frameRateNumerator % frameRateDenominator;
-    return quotient >= minValue && quotient <= maxValue && (quotient != maxValue || remainder == 0);
-  }
-
-  /** Frame-rate numerator. Zero is the automatic sentinel only when the denominator is 1. */
-  int64_t frameRateNumerator = 0;
-
-  /** Frame-rate denominator. Explicit rates must use a positive denominator. */
-  int64_t frameRateDenominator = 1;
-};
-
-/**
- * Export options for VideoExporter.
- *
- * This struct is part of the public API but does not promise binary ABI stability. Callers and
- * the library must use compatible headers. Changes to the field layout require recompilation.
- */
-struct VideoExportOptions {
-  /**
-   * Sampling frame rate in frames per second. The default {0, 1} uses the document animation frame
-   * rate, falling back to 60 when the document does not declare one. A non-integer document frame
-   * rate is rejected in this mode instead of being guessed or rounded; use an explicit ratio such
-   * as {30000, 1001} for NTSC content. All declared top-level animation frame rates must match in
-   * automatic mode. Explicit rates must be in [1, 120] with a positive denominator.
-   */
-  VideoFrameRate frameRate = {0, 1};
-
-  /**
-   * Sequence length in seconds. Values <= 0 mean "use the longest mounted animation's effective
-   * playback period". Once animations include any nested delay or trimming from their evaluation
-   * offset; Loop and PingPong offsets only change phase and do not alter the period. A document
-   * without active timelines produces one static frame by default; a positive duration
-   * repeats that frame. Documents containing a state machine require an explicit positive duration
-   * because state machines have no finite playback period. Must be finite. The frame count is
-   * derived as `llround(duration * frameRate)`.
-   */
-  float duration = -1.0f;
-
-  /**
-   * Output scale factor applied to the document size. The exporter renders at
-   * `ceil(documentSize * scale)` pixels. Must be finite and greater than zero; Make() rejects
-   * invalid values instead of hiding host parameter errors.
-   */
-  float scale = 1.0f;
-
-  /**
-   * Background color drawn under the content when alpha is greater than zero. Defaults to fully
-   * transparent. Whether an opaque background is required is decided by the output container, not
-   * here. Frames are always premultiplied RGBA, so an opaque background makes premultiplication a
-   * no-op and lets the host pass the pixels through unchanged.
-   */
-  Color background = {0.0f, 0.0f, 0.0f, 0.0f, ColorSpace::SRGB};
-
-  /**
-   * Whether to pad the output width and height up to even numbers. This is a layout capability;
-   * the host decides whether its selected pixel format requires it. Defaults to false, which keeps
-   * `ceil(documentSize * scale)`. Cannot be combined with outputWidth/outputHeight: an explicit
-   * size already decides the layout, so Make() rejects the combination instead of ignoring this
-   * flag.
-   */
-  bool padToEvenSize = false;
-
-  /**
-   * Rendering mode used for every frame. Defaults to Partial to preserve the existing display-list
-   * behavior. Hosts exporting animations can select Direct to bypass partial-frame caching and
-   * match a full-frame readback pipeline.
-   */
-  PAGRenderMode renderMode = PAGRenderMode::Partial;
-
-  /**
-   * Optional explicit output dimensions. Both values must be positive to take effect; leaving both
-   * at zero derives dimensions from documentSize * scale. A partially specified pair, a negative
-   * value, or a combination with padToEvenSize is rejected by Make() before any scene or GPU
-   * resource is created. Hosts with their own even rounding and texture/pixel-budget clamping can
-   * use these fields without changing the scene zoom scale, which means content larger than the
-   * explicit size is cropped instead of being scaled to fit.
-   */
-  int outputWidth = 0;
-  int outputHeight = 0;
-};
-
-/** Result of attempting to start an asynchronous frame. */
-enum class VideoExportStartStatus {
-  /** A new frame was started and carried in the result. */
-  FrameStarted,
-  /** The previously started frame is not consumed yet; the result carries that pending frame. */
-  Busy,
-  /** Every frame of the sequence was consumed; the result carries no frame. */
-  End,
-  /** A failure ended the sequence; the result describes it with a message and a code. */
-  Failed,
-};
-
-/** Current state of an asynchronous export frame. */
-enum class VideoExportFrameStatus {
-  /** The pixels are not available yet; poll again later. */
-  Pending,
-  /** The pixels are available, or the frame was already consumed. */
-  Ready,
-  /** The frame will never become readable. */
-  Failed,
-};
-
-/**
- * Stable reason code for a failed export, independent of the human-readable message. Hosts map
- * these values onto their own user-facing errors instead of parsing text.
- */
-enum class VideoExportError {
-  None,
-  InvalidArgument,
-  NoDuration,
-  StateMachineRequiresDuration,
-  MixedFrameRates,
-  TooLong,
-  OutOfMemory,
-  RenderFailed,
-  ReadbackFailed,
-  DeviceLost,
-  MixedMode,
-  Cancelled,
-};
-
-class VideoExportFrameImpl;
-
-/**
- * A single frame started by VideoExporter::startNextFrame(). Frames may be backed by an
- * asynchronous GPU readback or a cached static CPU image. All operations must run on the thread
- * that owns the exporter's GPU device.
- */
-class VideoExportFrame {
- public:
-  ~VideoExportFrame();
-
-  VideoExportFrame(const VideoExportFrame&) = delete;
-  VideoExportFrame& operator=(const VideoExportFrame&) = delete;
-
-  /** The sequential frame index, fixed when the frame is started. */
-  int64_t index() const;
-
-  /**
-   * Returns the current state without waiting for the GPU. Consumed frames remain Ready. Polling
-   * advances the pending readback, so this method is not const and must run on the device thread.
-   */
-  VideoExportFrameStatus status();
-
-  /** Returns the failure reason, or an empty string when the frame has not failed. */
-  std::string error() const;
-
-  /** Returns the stable failure code of this frame, or None when it has not failed. */
-  VideoExportError errorCode() const;
-
-  /**
-   * Copies premultiplied RGBA_8888 pixels into the caller's buffer.
-   *
-   * @param dstPixels the destination buffer, which must hold at least height * dstRowBytes bytes.
-   * @param dstRowBytes the byte distance between consecutive destination rows; must be at least
-   *                    width * 4 and may be larger, so containers with a fixed stride need no
-   *                    repacking before a copy.
-   * @return true when the pixels were copied. The first successful call consumes the frame and
-   *         commits its index to the exporter. Returns false while Pending, after consumption,
-   *         when a parameter is invalid, or when the frame has failed; no index is committed
-   *         twice and a failed read does not skip the frame. An invalid destination is a caller
-   *         error only: the frame stays Ready and no exporter state changes, so the caller can
-   *         retry with a correct buffer.
-   */
-  bool readPixels(void* dstPixels, size_t dstRowBytes);
-
- private:
-  explicit VideoExportFrame(std::shared_ptr<VideoExportFrameImpl> impl);
-
-  std::shared_ptr<VideoExportFrameImpl> impl = nullptr;
-
-  friend class VideoExporter;
-};
-
-/** The explicit result of VideoExporter::startNextFrame(). */
-struct VideoExportStartResult {
-  /** Outcome of the start attempt. FrameStarted and Busy carry a frame. */
-  VideoExportStartStatus status = VideoExportStartStatus::Failed;
-  /** The new or pending frame, or null for End and Failed. */
-  std::shared_ptr<VideoExportFrame> frame = nullptr;
-  /** Human-readable failure description for Failed, empty otherwise. */
-  std::string error = {};
-  /** Stable failure code for Failed, None otherwise. */
-  VideoExportError errorCode = VideoExportError::None;
-};
+class VideoExporterImpl;
 
 /**
  * VideoExporter produces an RGBA frame sequence from a document's animations or static scene. The
@@ -454,54 +221,16 @@ class VideoExporter {
   const uint8_t* pixels() const;
 
   /**
-   * Returns the number of bytes between the start of consecutive pixel rows. May be larger than
+   * Returns the number of bytes between the start of two consecutive pixel rows. May be larger than
    * `width() * 4`, in which case raw frame sinks must repack the rows. Returns 0 after
    * startNextFrame() has been used, since asynchronous frames do not use the internal buffer.
    */
   size_t rowBytes() const;
 
  private:
-  struct PlaybackPlan {
-    std::vector<std::shared_ptr<PAGTimeline>> timelines = {};
-    int64_t longestDurationUs = 0;
-    float documentFrameRate = 0.0f;
-    bool hasMixedFrameRates = false;
-    bool hasDynamicContent = false;
-    bool hasStateMachine = false;
-  };
+  explicit VideoExporter(std::shared_ptr<VideoExporterImpl> exporterImpl);
 
-  VideoExporter();
-
-  static bool ResolvePlaybackPlan(const std::shared_ptr<PAGScene>& scene,
-                                  const std::shared_ptr<PAGXDocument>& document, PlaybackPlan* plan,
-                                  std::string* errorMsg, VideoExportError* errorCode);
-  static bool AddAnimation(const std::shared_ptr<PAGAnimation>& animation, int64_t offsetUs,
-                           bool includeInFrameRate, PlaybackPlan* plan, std::string* errorMsg,
-                           VideoExportError* errorCode);
-  static bool CollectNestedPlayback(PAGComposition* composition, PlaybackPlan* plan,
-                                    std::string* errorMsg, VideoExportError* errorCode);
-  static bool ResolveSampling(const Options& options, const PlaybackPlan& plan,
-                              VideoFrameRate* frameRate, int64_t* frameCount, std::string* errorMsg,
-                              VideoExportError* errorCode);
-  static std::shared_ptr<VideoExporter> MakeInternal(std::shared_ptr<PAGXDocument> document,
-                                                     std::shared_ptr<PAGSurface> surface,
-                                                     const Options& options, std::string* errorMsg,
-                                                     VideoExportError* errorCode);
-
-  bool drawNextFrame(std::string* errorMsg, VideoExportError* errorCode);
-
-  std::shared_ptr<VideoExportState> state = {};
-  std::shared_ptr<VideoExportFrame> pendingFrame = {};
-  std::shared_ptr<PAGScene> scene = {};
-  std::shared_ptr<PAGSurface> surface = {};
-  std::vector<std::shared_ptr<PAGTimeline>> timelines = {};
-  std::shared_ptr<tgfx::Pixmap> pixmap = {};
-  int outputWidth = 0;
-  int outputHeight = 0;
-  VideoFrameRate samplingFrameRate = {60, 1};
-  int64_t totalFrames = 0;
-  int64_t previousFrameTimeUs = 0;
-  bool reuseStaticFrame = false;
+  std::shared_ptr<VideoExporterImpl> impl = nullptr;
 };
 
 }  // namespace pagx

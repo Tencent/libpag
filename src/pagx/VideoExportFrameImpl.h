@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "pagx/VideoExporter.h"
+#include "pagx/VideoExportInternal.h"
 
 namespace tgfx {
 class Context;
@@ -29,30 +29,13 @@ class SurfaceReadback;
 
 namespace pagx {
 
-enum class VideoExportMode {
-  None,
-  Sync,
-  Async,
-};
-
-/** Shared by the exporter and its current frame without creating an ownership cycle. */
-struct VideoExportState {
-  VideoExportMode mode = VideoExportMode::None;
-  int64_t currentFrame = 0;
-  bool failed = false;
-  bool cancelled = false;
-  VideoExportError errorCode = VideoExportError::None;
-  std::string error = {};
-};
-
 class VideoExportFrameImpl {
  public:
   static std::shared_ptr<VideoExportFrameImpl> MakeGPU(std::shared_ptr<VideoExportState> state,
                                                        int64_t index,
                                                        std::shared_ptr<PAGSurface> surface,
                                                        std::shared_ptr<tgfx::Pixmap> staticCache,
-                                                       std::string* errorMsg,
-                                                       VideoExportError* errorCode);
+                                                       VideoExportFailure* failure);
   static std::shared_ptr<VideoExportFrameImpl> MakeCPU(std::shared_ptr<VideoExportState> state,
                                                        int64_t index,
                                                        std::shared_ptr<tgfx::Pixmap> pixels);

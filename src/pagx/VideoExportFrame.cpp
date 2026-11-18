@@ -16,59 +16,43 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "pagx/VideoExportFrame.h"
 #include "pagx/PAGSurface.h"
+#include "pagx/VideoExportFrameImpl.h"
 #include "pagx/runtime/Drawable.h"
 #include "rendering/utils/AsyncReadback.h"
 #include "tgfx/core/Pixmap.h"
 
 namespace pagx {
 
+std::shared_ptr<Drawable> GetSurfaceDrawable(const PAGSurface& surface) {
+  return surface.drawable;
+}
+
 std::shared_ptr<VideoExportFrameImpl> VideoExportFrameImpl::MakeGPU(
     std::shared_ptr<VideoExportState> state, int64_t index, std::shared_ptr<PAGSurface> surface,
-    std::shared_ptr<tgfx::Pixmap> staticCache, std::string* errorMsg, VideoExportError* errorCode) {
+    std::shared_ptr<tgfx::Pixmap> staticCache, VideoExportFailure* failure) {
   auto impl = std::make_shared<VideoExportFrameImpl>(std::move(state), index);
   impl->surface = std::move(surface);
   impl->staticCache = std::move(staticCache);
   if (impl->surface == nullptr || impl->surface->drawable == nullptr) {
-    if (errorMsg != nullptr) {
-      *errorMsg = "the export surface is null";
-    }
-    if (errorCode != nullptr) {
-      *errorCode = VideoExportError::InvalidArgument;
-    }
+    failure->set(VideoExportError::InvalidArgument, "the export surface is null");
     return nullptr;
   }
   impl->device = impl->surface->drawable->getDevice();
   if (impl->device == nullptr) {
-    if (errorMsg != nullptr) {
-      *errorMsg = "the export surface has no GPU device";
-    }
-    if (errorCode != nullptr) {
-      *errorCode = VideoExportError::DeviceLost;
-    }
+    failure->set(VideoExportError::DeviceLost, "the export surface has no GPU device");
     return nullptr;
   }
   auto* context = impl->device->lockContext();
   if (context == nullptr) {
-    if (errorMsg != nullptr) {
-      *errorMsg = "failed to lock the export device";
-    }
-    if (errorCode != nullptr) {
-      *errorCode = VideoExportError::DeviceLost;
-    }
+    failure->set(VideoExportError::DeviceLost, "failed to lock the export device");
     return nullptr;
   }
   auto tgfxSurface = impl->surface->drawable->getSurface(context);
   impl->readback = pag::StartAsyncReadback(context, tgfxSurface, &impl->flipY);
   impl->device->unlock();
   if (impl->readback == nullptr) {
-    if (errorMsg != nullptr) {
-      *errorMsg = "failed to start asynchronous surface readback";
-    }
-    if (errorCode != nullptr) {
-      *errorCode = VideoExportError::ReadbackFailed;
-    }
+    failure->set(VideoExportError::ReadbackFailed, "failed to start asynchronous surface readback");
     return nullptr;
   }
   return impl;

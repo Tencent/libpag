@@ -355,7 +355,7 @@ PAGX_TEST(PAGXVideoExporterTest, MakeSupportsFractionalFrameRate) {
   EXPECT_EQ(exporter->frameCount(), 30);
   ASSERT_TRUE(exporter->nextFrame());
   ASSERT_TRUE(exporter->nextFrame());
-  EXPECT_EQ(exporter->previousFrameTimeUs, 33367);
+  EXPECT_EQ(exporter->impl->previousFrameTimeUs, 33367);
 }
 
 PAGX_TEST(PAGXVideoExporterTest, MakeExportsStaticDocumentAsSingleFrameByDefault) {
@@ -1248,7 +1248,7 @@ PAGX_TEST(PAGXVideoExporterTest, OutputDimensionsAreAllOrNothing) {
 PAGX_TEST(PAGXVideoExporterTest, NextFrameReportsDrawingFailure) {
   auto exporter = pagx::VideoExporter::Make(MakeStaticDocument());
   ASSERT_TRUE(exporter != nullptr);
-  exporter->surface = nullptr;
+  exporter->impl->surface = nullptr;
   std::string errorMsg = {};
   EXPECT_FALSE(exporter->nextFrame(&errorMsg));
   EXPECT_EQ(exporter->currentFrame(), 0);
