@@ -18,6 +18,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <limits>
 #include "pagx/runtime/BezierEasing.h"
 #include "pagx/runtime/KeyframeEvaluator.h"
 
@@ -153,6 +154,28 @@ double EvaluateKeyframeInterpolationProgress(KeyframeInterpolationType interpola
       return SolveSpringEasing(spring, progress, segmentDurationSeconds);
   }
   return progress;
+}
+
+double EvaluateSpringSettleDurationSeconds(const SpringEasing& spring) {
+  if (spring.model != SpringEasingModel::PhysicalV1) {
+    return 0.0;
+  }
+  double stiffness = spring.stiffness;
+  double damping = spring.damping;
+  double mass = spring.mass;
+  if (!std::isfinite(stiffness) || !std::isfinite(damping) || !std::isfinite(mass) ||
+      stiffness <= 0.0 || damping < 0.0 || mass <= 0.0) {
+    return 0.0;
+  }
+  double zeta = damping / (2.0 * std::sqrt(stiffness * mass));
+  double omega = std::sqrt(stiffness / mass);
+  if (!std::isfinite(zeta) || !std::isfinite(omega) || omega <= 0.0) {
+    return 0.0;
+  }
+  if (zeta <= 0.0) {
+    return std::numeric_limits<double>::infinity();
+  }
+  return SpringNaturalFrequency(zeta) / omega;
 }
 
 }  // namespace pagx

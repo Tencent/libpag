@@ -842,6 +842,28 @@ PAGX_TEST(PAGXRuntimeTest, PhysicalSpringInvalidParametersFallBackToLinear) {
 }
 
 /**
+ * Test case: the settle duration helper reports the time at which the response envelope reaches
+ * the settle tolerance, and distinguishes undamped, invalid and normalized springs.
+ */
+PAGX_TEST(PAGXRuntimeTest, SpringSettleDuration) {
+  EXPECT_NEAR(pagx::EvaluateSpringSettleDurationSeconds(MakePhysicalSpring(100.0f, 20.0f, 1.0f)),
+              0.6638, 1.0e-4);
+  EXPECT_NEAR(pagx::EvaluateSpringSettleDurationSeconds(MakePhysicalSpring(100.0f, 10.0f, 1.0f)),
+              1.3276, 1.0e-4);
+  EXPECT_NEAR(pagx::EvaluateSpringSettleDurationSeconds(MakePhysicalSpring(100.0f, 40.0f, 1.0f)),
+              2.4777, 1.0e-4);
+  EXPECT_TRUE(std::isinf(
+      pagx::EvaluateSpringSettleDurationSeconds(MakePhysicalSpring(100.0f, 0.0f, 1.0f))));
+  EXPECT_DOUBLE_EQ(pagx::EvaluateSpringSettleDurationSeconds(MakePhysicalSpring(0.0f, 20.0f, 1.0f)),
+                   0.0);
+
+  pagx::SpringEasing normalized = {};
+  normalized.bounce = 0.5f;
+  normalized.model = pagx::SpringEasingModel::NormalizedV1;
+  EXPECT_DOUBLE_EQ(pagx::EvaluateSpringSettleDurationSeconds(normalized), 0.0);
+}
+
+/**
  * Test case: spring overshoot is preserved for continuous values and clamped per channel for
  * colors, which cannot represent components outside [0, 1].
  */

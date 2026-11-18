@@ -74,4 +74,18 @@ KeyValue EvaluateKeyframeSegment(const KeyValue& leftValue, const KeyValue& righ
                                  const SpringEasing* spring = nullptr,
                                  double segmentDurationSeconds = 0.0);
 
+/**
+ * Returns the time in seconds after which a physical spring's response envelope stays within the
+ * settle tolerance used by the normalized model (about 1% of the span).
+ *
+ * Only PhysicalV1 has a real-time base; NormalizedV1 returns 0 because its duration is defined by
+ * the keyframe interval. Undamped physical springs never settle and return positive infinity.
+ * Invalid spring parameters also return 0.
+ *
+ * @param spring the spring parameters to measure.
+ * @return the settle duration in seconds, 0 when no real-time base applies, or positive infinity
+ *         for an undamped spring.
+ */
+double EvaluateSpringSettleDurationSeconds(const SpringEasing& spring);
+
 }  // namespace pagx
