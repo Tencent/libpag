@@ -252,6 +252,12 @@ std::shared_ptr<tgfx::ImageBuffer> HardwareDecoder::onRenderFrame() {
   return imageReader->acquireNextBuffer();
 }
 
+void HardwareDecoder::setTargetFrameTimestamp(int64_t timestamp) {
+  if (imageReader != nullptr) {
+    imageReader->setTargetFrameTimestamp(timestamp);
+  }
+}
+
 bool HardwareDecoder::releaseOutputBuffer(bool render) {
   if (lastOutputBufferIndex != -1) {
     if (AMediaCodec_releaseOutputBuffer(videoDecoder, lastOutputBufferIndex, render) == AMEDIA_OK) {

@@ -66,6 +66,14 @@ class VideoDecoder {
    */
   virtual int64_t presentationTime() = 0;
 
+  /**
+   * Sets the presentation timestamp, in nanoseconds, of the frame the next generated texture must
+   * show, so the caller can wait for it instead of drawing an older queued frame. Decoders whose
+   * output cannot lag behind ignore it.
+   */
+  virtual void setTargetFrameTimestamp(int64_t /*timestamp*/) {
+  }
+
  private:
   bool hardwareBacked = false;
 

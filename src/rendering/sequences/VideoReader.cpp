@@ -79,6 +79,9 @@ std::shared_ptr<tgfx::ImageBuffer> VideoReader::onMakeBuffer(
   }
   auto targetTime = FrameToTime(targetFrame, frameRate);
   auto sampleTime = demuxer->getSampleTimeAt(targetTime);
+  if (videoDecoder != nullptr) {
+    videoDecoder->setTargetFrameTimestamp(sampleTime * 1000);
+  }
   if (sampleTime == currentRenderedTime) {
     return lastBuffer;
   }

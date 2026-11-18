@@ -44,6 +44,8 @@ class HardwareDecoder : public VideoDecoder {
 
   std::shared_ptr<tgfx::ImageBuffer> onRenderFrame() override;
 
+  void setTargetFrameTimestamp(int64_t timestamp) override;
+
   bool releaseOutputBuffer(bool render);
 
  private:
