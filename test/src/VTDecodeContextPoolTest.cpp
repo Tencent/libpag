@@ -126,7 +126,6 @@ TEST(VTDecodeContextPoolTest, GraveyardSelfDrainsUnderStress) {
 
   GraveyardStressState state;
   const unsigned producerCount = 4;
-  const size_t totalContexts = static_cast<size_t>(producerCount) * 150 * 40;
 
   std::thread deliveryThread(RunDeliveryThread, &state);
   std::vector<std::thread> producers;
@@ -143,8 +142,10 @@ TEST(VTDecodeContextPoolTest, GraveyardSelfDrainsUnderStress) {
   SweepGraveyard();
   EXPECT_EQ(VTDecodeGraveyardSize(), baseline);
 
-  // The graveyard held only pending bounded-delay frames at any instant, never the whole run.
-  EXPECT_LT(state.peakGraveyard.load(), baseline + totalContexts);
+  // At any instant a producer can park at most one pool's worth (40) of still-pending late
+  // contexts before the delivery thread sweeps them, so across producerCount producers the peak
+  // stays well under producerCount * 40; a graveyard that stopped reclaiming would blow past it.
+  EXPECT_LT(state.peakGraveyard.load(), baseline + static_cast<size_t>(producerCount) * 40);
 }
 }  // namespace pag
 
