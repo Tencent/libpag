@@ -3694,7 +3694,10 @@ std::string ModifierGlyphDecls(const RangeSelectorGlyph& glyph, const BundleChan
     }
   }
   if (glyph.htmlSpan) {
-    if (chSet.modStrokeColorCh != nullptr) {
+    // A modifier only modulates a stroke the text already has: without a Stroke painter the runtime
+    // draws nothing, so emitting one here would invent an outline (composite/15 was authored
+    // without one and the reference has zero stroke pixels).
+    if (chSet.modStrokeColorCh != nullptr && glyph.hasBaseStrokeWidth) {
       Color strokeColor =
           EvalColorChannel(chSet.modStrokeColorCh, t, modifier->strokeColor.value_or(Color()));
       float width =
@@ -3705,7 +3708,7 @@ std::string ModifierGlyphDecls(const RangeSelectorGlyph& glyph, const BundleChan
       }
     }
   } else {
-    if (chSet.modStrokeColorCh != nullptr) {
+    if (chSet.modStrokeColorCh != nullptr && glyph.hasBaseStrokeColor) {
       Color tint =
           EvalColorChannel(chSet.modStrokeColorCh, t, modifier->strokeColor.value_or(Color()));
       // The glyph keeps its own outline and the modifier colour is mixed in by the selector factor:
@@ -3715,7 +3718,7 @@ std::string ModifierGlyphDecls(const RangeSelectorGlyph& glyph, const BundleChan
                           : tint;
       AppendCssDecl(decls, "stroke", ColorToSVGHex(painted));
     }
-    if (chSet.modStrokeWidthCh != nullptr) {
+    if (chSet.modStrokeWidthCh != nullptr && glyph.hasBaseStrokeWidth) {
       float width =
           EvalFloatChannel(chSet.modStrokeWidthCh, t, modifier->strokeWidth.value_or(0.0f));
       if (glyph.hasBaseStrokeWidth) {
