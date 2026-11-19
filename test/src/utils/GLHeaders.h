@@ -18,9 +18,13 @@
 
 #pragma once
 
+#include <cstdio>
+
 #ifdef TGFX_USE_OPENGL
 
-#if defined(PAG_USE_SWIFTSHADER) || defined(__EMSCRIPTEN__)
+#if defined(PAG_USE_SWIFTSHADER) || defined(__EMSCRIPTEN__) || \
+    (defined(_WIN32) && defined(PAG_USE_ANGLE))
+// SwiftShader, Emscripten and the Windows ANGLE build all provide GLES 3 entry points directly.
 #include <GLES3/gl3.h>
 #elif defined(_WIN32)
 // Windows ships only the OpenGL 1.1 headers. The tests need a few GL 3.0 framebuffer entry
@@ -61,42 +65,63 @@ inline PROC GetGLProc(const char* name) {
   return wglGetProcAddress(name);
 }
 
+inline void ReportMissingGLProc(const char* name) {
+  static const char* lastReported = nullptr;
+  if (lastReported != name) {
+    lastReported = name;
+    fprintf(stderr, "[GLHeaders] %s is unavailable; the GL 3 framebuffer calls are incomplete.\n",
+            name);
+  }
+}
+
 inline void glGenFramebuffers(GLsizei n, GLuint* framebuffers) {
   using Proc = void(APIENTRY*)(GLsizei, GLuint*);
-  static auto proc = reinterpret_cast<Proc>(GetGLProc("glGenFramebuffers"));
+  auto proc = reinterpret_cast<Proc>(GetGLProc("glGenFramebuffers"));
   if (proc != nullptr) {
     proc(n, framebuffers);
+  } else {
+    ReportMissingGLProc("glGenFramebuffers");
   }
 }
 
 inline void glBindFramebuffer(GLenum target, GLuint framebuffer) {
   using Proc = void(APIENTRY*)(GLenum, GLuint);
-  static auto proc = reinterpret_cast<Proc>(GetGLProc("glBindFramebuffer"));
+  auto proc = reinterpret_cast<Proc>(GetGLProc("glBindFramebuffer"));
   if (proc != nullptr) {
     proc(target, framebuffer);
+  } else {
+    ReportMissingGLProc("glBindFramebuffer");
   }
 }
 
 inline void glFramebufferTexture2D(GLenum target, GLenum attachment, GLenum textarget,
                                    GLuint texture, GLint level) {
   using Proc = void(APIENTRY*)(GLenum, GLenum, GLenum, GLuint, GLint);
-  static auto proc = reinterpret_cast<Proc>(GetGLProc("glFramebufferTexture2D"));
+  auto proc = reinterpret_cast<Proc>(GetGLProc("glFramebufferTexture2D"));
   if (proc != nullptr) {
     proc(target, attachment, textarget, texture, level);
+  } else {
+    ReportMissingGLProc("glFramebufferTexture2D");
   }
 }
 
 inline GLenum glCheckFramebufferStatus(GLenum target) {
   using Proc = GLenum(APIENTRY*)(GLenum);
-  static auto proc = reinterpret_cast<Proc>(GetGLProc("glCheckFramebufferStatus"));
-  return proc != nullptr ? proc(target) : 0;
+  auto proc = reinterpret_cast<Proc>(GetGLProc("glCheckFramebufferStatus"));
+  if (proc != nullptr) {
+    return proc(target);
+  }
+  ReportMissingGLProc("glCheckFramebufferStatus");
+  return 0;
 }
 
 inline void glDeleteFramebuffers(GLsizei n, const GLuint* framebuffers) {
   using Proc = void(APIENTRY*)(GLsizei, const GLuint*);
-  static auto proc = reinterpret_cast<Proc>(GetGLProc("glDeleteFramebuffers"));
+  auto proc = reinterpret_cast<Proc>(GetGLProc("glDeleteFramebuffers"));
   if (proc != nullptr) {
     proc(n, framebuffers);
+  } else {
+    ReportMissingGLProc("glDeleteFramebuffers");
   }
 }
 #else
