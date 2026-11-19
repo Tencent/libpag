@@ -26,6 +26,7 @@ namespace pagx {
 
 class Drawable;
 class PAGScene;
+class VideoExportSurfaceAccess;
 
 /**
  * PAGSurface is a render target that PAGScene draws into. It is a thin opaque wrapper around an
@@ -107,7 +108,7 @@ class PAGSurface {
   std::shared_ptr<Drawable> drawable = nullptr;
 
   friend class PAGScene;
-  friend std::shared_ptr<Drawable> GetSurfaceDrawable(const PAGSurface& surface);
+  friend class VideoExportSurfaceAccess;
 };
 
 }  // namespace pagx

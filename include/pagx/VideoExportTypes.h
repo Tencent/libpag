@@ -149,10 +149,10 @@ struct VideoExportOptions {
 
 /**
  * Stable reason code for a failed export, independent of the human-readable message. Hosts map
- * these values onto their own user-facing errors instead of parsing text. Except for MixedMode and
- * Cancelled every code describes one failed attempt: the exporter keeps the uncommitted frame index
- * and can be retried, although the codes below marked as document problems only stop repeating once
- * the document or the options change.
+ * these values onto their own errors instead of parsing text. Except for MixedMode and Cancelled,
+ * every code describes one failed call. Failures from Make() or MakeWithSurface() leave nothing to
+ * retry and clear once the document, the options or the surface are valid; failures while pulling
+ * frames keep the frame index uncommitted, so the next start retries the same index.
  */
 enum class VideoExportError {
   /** No failure happened. */
@@ -169,7 +169,10 @@ enum class VideoExportError {
   TooLong,
   /** The full-frame readback buffer could not be allocated; a lower resolution can be retried. */
   OutOfMemory,
-  /** Drawing a frame failed; the same index is retried by the next start. */
+  /**
+   * A scene, surface or frame could not be rendered. A drawing failure retries the same index on
+   * the next start, while a construction failure only clears once the input is valid.
+   */
   RenderFailed,
   /** The asynchronous surface readback failed; the same index is retried by the next start. */
   ReadbackFailed,

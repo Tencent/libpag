@@ -24,7 +24,7 @@
 
 namespace pagx {
 
-std::shared_ptr<Drawable> GetSurfaceDrawable(const PAGSurface& surface) {
+std::shared_ptr<Drawable> VideoExportSurfaceAccess::drawable(const PAGSurface& surface) {
   return surface.drawable;
 }
 
@@ -38,7 +38,7 @@ std::shared_ptr<VideoExportFrameImpl> VideoExportFrameImpl::MakeGPU(
     failure->set(VideoExportError::InvalidArgument, "the export surface is null");
     return nullptr;
   }
-  auto drawable = GetSurfaceDrawable(*impl->surface);
+  auto drawable = VideoExportSurfaceAccess::drawable(*impl->surface);
   if (drawable == nullptr) {
     failure->set(VideoExportError::InvalidArgument, "the export surface has no render target");
     return nullptr;

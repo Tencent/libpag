@@ -88,7 +88,8 @@ class VideoExporter {
    *
    * @param document the source document, which is retained for the lifetime of the returned
    *                 exporter. Must be non-null.
-   * @param options sampling frame rate, duration, scale, background and render mode.
+   * @param options sampling frame rate, duration, scale, background, render mode and the optional
+   *                explicit output size.
    * @param errorMsg optional pointer that receives a human-readable description on failure.
    * @param errorCode optional pointer that receives the stable failure code on failure.
    * @return a new exporter, or nullptr when the document or options are invalid, an animation has

@@ -73,8 +73,11 @@ struct VideoExportState {
   std::string error = {};
 };
 
-/** Returns the render target adapter of a surface without exposing it through the public API. */
-std::shared_ptr<Drawable> GetSurfaceDrawable(const PAGSurface& surface);
+/** Grants the video exporter read access to the render target adapter of a surface. */
+class VideoExportSurfaceAccess {
+ public:
+  static std::shared_ptr<Drawable> drawable(const PAGSurface& surface);
+};
 
 /** Computes scaled and optionally even-padded video dimensions without exposing a public API. */
 bool ComputeVideoOutputDimensions(float documentWidth, float documentHeight, float scale,

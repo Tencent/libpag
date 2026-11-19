@@ -168,7 +168,7 @@ bool VideoExporterImpl::validateHostSurface(const std::shared_ptr<PAGSurface>& h
                      std::to_string(width) + "x" + std::to_string(height));
     return false;
   }
-  auto drawable = GetSurfaceDrawable(*hostSurface);
+  auto drawable = VideoExportSurfaceAccess::drawable(*hostSurface);
   if (drawable == nullptr) {
     failure->set(VideoExportError::DeviceLost, "the export surface has no render target");
     return false;
