@@ -3073,11 +3073,13 @@ std::vector<DomTargetBundle> GroupObjectsIntoDomBundles(
     PAGXDocument& doc, const Animation* anim, HTMLWriterContext& ctx,
     const std::unordered_map<const SolidColor*, const Node*>& solidToPainter,
     const std::unordered_map<const LayerFilter*, const Layer*>& filterToLayer,
-    const std::unordered_map<const Path*, Layer*>& maskPathToLayer) {
+    const std::unordered_map<const Path*, Layer*>& maskPathToLayer,
+    const std::vector<AnimationObject*>* objectsOverride = nullptr) {
   std::vector<DomTargetBundle> bundles = {};
   std::unordered_map<std::string, size_t> bundleIndex = {};
 
-  for (auto* obj : anim->objects) {
+  const auto& sourceObjects = objectsOverride != nullptr ? *objectsOverride : anim->objects;
+  for (auto* obj : sourceObjects) {
     if (obj == nullptr || obj->channels.empty()) {
       continue;
     }
@@ -4895,13 +4897,51 @@ std::string HTMLAnimationSession::emitKeyframesAndWeave(std::string& bodyHtml) {
   const auto tagIndexByNode = BuildAnimatedTagIndex(_ctx);
   std::map<std::pair<const Text*, size_t>, std::pair<const Animation*, Frame>> mixedMounts;
 
+  // Mounts that share a timeline (duration, frame rate, loop mode, offset, scope and play state) are
+  // grouped before bundling. Two separate animations driving one element each produced their own
+  // rule, and two rules that both write `transform` do not compose: CSS keeps the last one, so a
+  // slide and a spin authored as two animations lost the slide entirely. Merging the object lists
+  // lets the bundle see every channel of that element at once and emit one transform list.
+  struct MountGroup {
+    const Animation* animation = nullptr;
+    size_t scope = 0;
+    int64_t offset = 0;
+    bool playing = true;
+    std::vector<AnimationObject*> objects = {};
+    std::unordered_set<const AnimationObject*> seen = {};
+  };
+  std::vector<MountGroup> groups = {};
+  std::map<std::tuple<int64_t, float, int, size_t, int64_t, bool>, size_t> groupIndex = {};
   for (const auto& mount : mounts) {
     const auto* anim = mount.animation;
     if (anim->duration <= 0 || anim->frameRate <= 0.0f || anim->objects.empty()) {
       continue;
     }
+    auto key =
+        std::make_tuple(static_cast<int64_t>(anim->duration), anim->frameRate,
+                        static_cast<int>(anim->loop), mount.scope, mount.offset, mount.playing);
+    auto it = groupIndex.find(key);
+    if (it == groupIndex.end()) {
+      it = groupIndex.emplace(key, groups.size()).first;
+      MountGroup group = {};
+      group.animation = anim;
+      group.scope = mount.scope;
+      group.offset = mount.offset;
+      group.playing = mount.playing;
+      groups.push_back(std::move(group));
+    }
+    auto& group = groups[it->second];
+    for (auto* obj : anim->objects) {
+      if (obj != nullptr && group.seen.insert(obj).second) {
+        group.objects.push_back(obj);
+      }
+    }
+  }
+
+  for (const auto& mount : groups) {
+    const auto* anim = mount.animation;
     auto bundles = GroupObjectsIntoDomBundles(_doc, anim, _ctx, _solidToPainter, _filterToLayer,
-                                              _maskPathToLayer);
+                                              _maskPathToLayer, &mount.objects);
     MergeBundlesByDomId(bundles);
     // Identical stops share one rule, even across bundles: a per-glyph fan-out where every glyph
     // ends up with the same keyframes (a uniform modifier colour, say) must not emit N copies.

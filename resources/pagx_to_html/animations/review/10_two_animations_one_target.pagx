@@ -1,0 +1,28 @@
+<pagx width="320" height="200">
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F8FAFC"/>
+  </Layer>
+  <Layer id="box" left="0" top="0" width="80" height="80">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#BE123C"/>
+  </Layer>
+  <Animations>
+    <Animation id="slide" duration="60" frameRate="60" loop="once">
+      <Object target="box">
+        <Channel name="x" type="float">
+          <Key time="0" value="0" interpolation="linear"/>
+          <Key time="60" value="100"/>
+        </Channel>
+      </Object>
+    </Animation>
+    <Animation id="spin" duration="60" frameRate="60" loop="once">
+      <Object target="box">
+        <Channel name="rotation.z" type="float">
+          <Key time="0" value="0" interpolation="linear"/>
+          <Key time="60" value="90"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>
