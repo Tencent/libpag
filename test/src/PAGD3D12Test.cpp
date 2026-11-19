@@ -24,6 +24,7 @@
 #include <dxgiformat.h>
 #include <wrl/client.h>
 #include <cstdint>
+#include <thread>
 #include <vector>
 #include "base/utils/TGFXCast.h"
 #include "pag/pag.h"
@@ -116,6 +117,12 @@ PAG_TEST(D3D12Test, SameNativeDeviceReturnsSameDevice) {
   auto defaultDevice = Devices::MakeDefault();
   ASSERT_TRUE(defaultDevice != nullptr);
   EXPECT_EQ(defaultDevice.get(), firstDevice.get());
+}
+
+PAG_TEST(D3D12Test, HealthyDeviceReportsHealthy) {
+  DeviceLockScope scope;
+  ASSERT_TRUE(static_cast<bool>(scope));
+  EXPECT_TRUE(Devices::IsDeviceHealthy(scope.context()));
 }
 
 PAG_TEST(D3D12Test, ResourceUsageValidation) {
@@ -391,6 +398,70 @@ void TransitionResource(ID3D12GraphicsCommandList* commandList, ID3D12Resource* 
 }
 
 }  // namespace
+
+/**
+ * Covers concurrent resolution of the same native device: every worker must receive the canonical
+ * registry entry instead of creating a second tgfx device for the same ID3D12Device.
+ */
+PAG_TEST(D3D12Test, DeviceRegistryIsThreadSafe) {
+  auto texture = MakeRenderableTexture(8, 8);
+  ASSERT_TRUE(texture != nullptr);
+  auto backendTexture = texture->getBackendTexture();
+  auto expected = Devices::MakeDefault();
+  ASSERT_TRUE(expected != nullptr);
+
+  constexpr int ThreadCount = 8;
+  std::vector<tgfx::Device*> results(ThreadCount, nullptr);
+  std::vector<std::thread> threads = {};
+  for (int i = 0; i < ThreadCount; i++) {
+    threads.emplace_back([&backendTexture, &results, i]() {
+      auto device = Devices::MakeForTexture(backendTexture);
+      results[static_cast<size_t>(i)] = device.get();
+    });
+  }
+  for (auto& thread : threads) {
+    thread.join();
+  }
+  for (auto* result : results) {
+    EXPECT_EQ(result, expected.get());
+  }
+}
+
+/**
+ * Covers the forAsyncThread surface path: the worker renders through the independently created
+ * device context, and the caller observes the submitted frame after waitUntilCompleted().
+ */
+PAG_TEST(D3D12Test, AsyncSurfaceRendersOnWorkerThread) {
+  const int size = 32;
+  auto texture = MakeRenderableTexture(size, size);
+  ASSERT_TRUE(texture != nullptr);
+  auto surface =
+      PAGSurface::MakeFrom(ToPAG(texture->getBackendTexture()), ImageOrigin::TopLeft, true);
+  ASSERT_TRUE(surface != nullptr);
+
+  bool flushed = false;
+  std::thread worker([&surface, &flushed, size]() {
+    auto composition = PAGComposition::Make(size, size);
+    auto solid = PAGSolidLayer::Make(1000000, size, size, Red);
+    composition->addLayer(solid);
+    auto player = std::make_shared<PAGPlayer>();
+    player->setSurface(surface);
+    player->setComposition(composition);
+    player->setMatrix(Matrix::I());
+    flushed = player->flush();
+  });
+  worker.join();
+  ASSERT_TRUE(flushed);
+  ASSERT_TRUE(surface->waitUntilCompleted());
+
+  std::vector<uint8_t> pixels(size * size * 4);
+  ASSERT_TRUE(
+      surface->readPixels(ColorType::RGBA_8888, AlphaType::Premultiplied, pixels.data(), size * 4));
+  EXPECT_EQ(pixels[0], 255);
+  EXPECT_EQ(pixels[1], 0);
+  EXPECT_EQ(pixels[2], 0);
+  EXPECT_EQ(pixels[3], 255);
+}
 
 /**
  * Covers external render targets on both origins. readPixels() normalizes BottomLeft surfaces, so
