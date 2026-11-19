@@ -47,16 +47,15 @@ node third_party/vendor_tools/ms-build -a x64 win/Win32Demo.sln /p:Configuration
 
 ## 运行
 
-构建产物是 `win\x64\Release\WinPAGDemo.exe`。示例按工作目录解析资源，因此要在 `win\Win32Demo`
-目录下启动（Visual Studio 调试器默认也使用该目录）：
+构建产物是 `win\x64\Release\WinPAGDemo.exe`。示例会先按可执行文件所在位置查找 `assets/test2.pag` 和兜底字体，
+找不到时再按当前工作目录查找，因此可以从任意目录启动：
 
 ```powershell
-cd win\Win32Demo
-..\x64\Release\WinPAGDemo.exe
+.\win\x64\Release\WinPAGDemo.exe
 ```
 
-示例加载 `../../assets/test2.pag` 和 `../../resources/font` 下的兜底字体。从终端启动时，libpag 的日志会输出到
-stdout，首帧渲染时会打印当前生效的后端。
+从终端启动可以看到 libpag 的 stdout：首帧的后端日志、实际解析到的资源路径，以及资源缺失时的明确报错。
+`assets/test2.pag` 缺失时示例没有内容可画，窗口会保持黑屏。
 
 ## 运行时
 

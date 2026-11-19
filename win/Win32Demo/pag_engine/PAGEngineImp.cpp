@@ -32,8 +32,16 @@ bool PAGEngineImpl::InitOnscreenRender(PAGEngineInitData init_data) {
 
   auto drawable = pag::GPUDrawable::FromWindow(render_window_);
   pag_drawable_ = std::shared_ptr<pag::GPUDrawable>(drawable);
+  if (pag_drawable_ == nullptr) {
+    std::cerr << "[PAGDemo] failed to create the GPU drawable for the window" << std::endl;
+    return false;
+  }
 
   pag_surface_ = pag::PAGSurface::MakeFrom(pag_drawable_);
+  if (pag_surface_ == nullptr) {
+    std::cerr << "[PAGDemo] failed to create the PAG surface" << std::endl;
+    return false;
+  }
 
   pag_player_ = std::make_shared<pag::PAGPlayer>();
   pag_player_->setSurface(pag_surface_);
@@ -78,7 +86,7 @@ bool PAGEngineImpl::SetPagFileBuffer(const byte* file_buffer, int buffer_length)
 
   pag_file_ = file;
   pag_player_->setComposition(pag_file_);
-  return false;
+  return true;
 }
 
 bool PAGEngineImpl::IsPagFileValid() {

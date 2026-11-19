@@ -52,18 +52,17 @@ Notes on the `ms-build` commands:
 
 ## Run
 
-The build writes `win\x64\Release\WinPAGDemo.exe`. The demo resolves its assets relative to the
-working directory, so start it from `win\Win32Demo` (the same directory the Visual Studio debugger
-uses):
+The build writes `win\x64\Release\WinPAGDemo.exe`. The demo looks for `assets/test2.pag` and the
+fallback fonts next to the executable first and falls back to the working directory, so it can be
+started from any directory:
 
 ```powershell
-cd win\Win32Demo
-..\x64\Release\WinPAGDemo.exe
+.\win\x64\Release\WinPAGDemo.exe
 ```
 
-The demo loads `../../assets/test2.pag` and the fallback fonts under `../../resources/font`. When
-launched from a terminal, libpag log lines are printed to stdout, including the backend line on the
-first rendered frame.
+Launch it from a terminal to see libpag's stdout: the backend line on the first frame, the resolved
+asset path, and an explicit error when a resource is missing. A missing `assets/test2.pag` leaves
+the window black because the demo has nothing to draw.
 
 ## Runtime
 
