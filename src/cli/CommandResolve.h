@@ -43,10 +43,9 @@ ResolveStats ResolveDocument(PAGXDocument* doc, const std::string& baseDir,
                              const ImportFormatOptions& formatOptions);
 
 /**
- * Clears any import directive still set on a Layer (its `source`/`content`/`format`) after a
- * resolve pass could not expand it — e.g. an external SVG `<img>` whose source was unreachable.
- * The Layer is kept (its box/id/position survive) but becomes an empty, directive-free node so the
- * document stays fully flattened and renderable (`pagx render` rejects any leftover directive).
+ * Clears active unresolved directives after a failed resolve pass, such as an unreachable SVG
+ * source. Mounted imports and inline content overridden by a declared composition are preserved.
+ * The Layer's box, id and position survive; the failed directive no longer blocks rendering.
  * Returns the number of directives dropped.
  */
 int DropUnresolvedDirectives(PAGXDocument* doc);

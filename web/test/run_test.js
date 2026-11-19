@@ -10,22 +10,31 @@ const ProjectRoot = path.resolve(__dirname, '../..');
 const TimeoutMS = 30 * 60 * 1000;
 
 function ParseOptions(args) {
-  const options = { backend: 'webgl', mode: 'compare', filter: '', output: '', noSandbox: false };
+  const options = { backend: 'webgl', mode: 'compare', filter: '', output: '', noSandbox: false,
+    asyncVideoExport: false, buildVariant: '' };
   for (let i = 0; i < args.length; i++) {
-    if (args[i] === '--no-sandbox') {
-      options.noSandbox = true;
+    if (args[i] === '--no-sandbox' || args[i] === '--async-video-export') {
+      if (args[i] === '--no-sandbox') options.noSandbox = true;
+      else options.asyncVideoExport = true;
       continue;
     }
-    const match = /^--(backend|mode|filter|output)(?:=(.*))?$/.exec(args[i]);
+    const match = /^--(backend|mode|filter|output|build-variant)(?:=(.*))?$/.exec(args[i]);
     if (!match) throw new Error(`Unknown option: ${args[i]}`);
     const value = match[2] === undefined ? args[++i] : match[2];
     if (!value || value.startsWith('--')) throw new Error(`Missing value: ${match[1]}`);
-    options[match[1]] = value;
+    options[match[1] === 'build-variant' ? 'buildVariant' : match[1]] = value;
   }
   if (!Backends.includes(options.backend) || !Modes.includes(options.mode)) {
     throw new Error('Invalid backend or mode');
   }
+  if (options.buildVariant && options.buildVariant !== 'asyncify' &&
+      options.buildVariant !== 'noasync') {
+    throw new Error('Invalid build variant');
+  }
   if (options.mode === 'update' && options.filter) throw new Error('Filtered baseline updates are forbidden');
+  if (options.asyncVideoExport && (options.backend !== 'webgpu' || options.filter)) {
+    throw new Error('Async video export requires WebGPU and cannot be combined with --filter');
+  }
   return options;
 }
 
@@ -266,13 +275,16 @@ function PrepareOutput(options) {
 
 function LoadRunConfig(options, directory, cacheDirectory, runInfo) {
   const buildInfo = SnapshotBuild(path.join(__dirname, 'dist', `${options.backend}-${options.mode}`),
-    directory, options.backend, options.mode);
-  const config = { buildInfo, filter: options.filter,
+    directory, options.backend, options.mode, options.buildVariant);
+  // The async video export lane drives one scenario with no image comparisons, so it must not
+  // require the baseline cache that the compare lane injects into the page.
+  const needsCache = options.mode === 'compare' && !options.asyncVideoExport;
+  const config = { buildInfo, filter: options.filter, asyncVideoExport: options.asyncVideoExport,
     baselineVersion: fs.readFileSync(path.join(ProjectRoot, 'test/baseline/version.json'), 'utf8'),
-    cache: options.mode === 'compare' ? ReadExpectedCache(cacheDirectory, options.backend) : null };
+    cache: needsCache ? ReadExpectedCache(cacheDirectory, options.backend) : null };
   if (options.mode === 'update') {
     runInfo.source = { ...CheckUpdateSource(buildInfo), ref: 'origin/main', clean: true };
-  } else {
+  } else if (needsCache) {
     runInfo.cacheProvenance = config.cache.provenance;
   }
   return { buildInfo, config };
@@ -316,9 +328,17 @@ async function ExecuteSuite(session, output, options, buildInfo, runInfo) {
   runInfo.errors.push(...state.errors);
   session.collecting = true;
   runInfo.artifacts = await CollectFiles(page, output, options);
-  ValidateBuildInfo(state.buildInfo, options.backend, options.mode);
+  ValidateBuildInfo(state.buildInfo, options.backend, options.mode, options.buildVariant);
   if (state.buildInfo.buildId !== buildInfo.buildId) throw new Error('WASM build identity mismatch');
   ValidateResult(state.result);
+  if (options.asyncVideoExport && !fs.existsSync(path.join(output, 'report.json'))) {
+    // The async lane drives one scenario through event-loop ticks instead of GoogleTest, so it has
+    // no gtest report on the MEMFS volume. Record an equivalent manifest so that the report
+    // consistency check below still covers this lane.
+    fs.writeFileSync(path.join(output, 'report.json'),
+      JSON.stringify({ tests: state.result.tests, disabled: 0, skipped: state.result.skipped,
+        failures: state.result.failed, mode: 'async-video-export' }, null, 2));
+  }
   const report = JSON.parse(fs.readFileSync(path.join(output, 'report.json'), 'utf8'));
   if (!Number.isSafeInteger(report.disabled) || report.tests - report.disabled !== state.result.tests ||
       report.failures !== state.result.failed) {

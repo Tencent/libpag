@@ -62,6 +62,24 @@ class DataBindRuntime {
   // the node defaults, so the VM-driven values must be re-applied or they would be lost.
   void markAllDirty();
 
+  // Re-applies the ViewModel's current values to every binding whose target is the given node,
+  // immediately through the borrowed RuntimeBinding instead of the dirty queue (mirrors the
+  // markDirtyForValue immediate-apply path, so condition evaluation right after the call observes
+  // the ViewModel values without waiting for the next draw). Once-direction bindings are re-armed
+  // (onceApplied cleared) first, matching a fresh bind() pass. Used after a state-machine reset or
+  // instance replacement drops the target's bound inputs back to their declared defaults. Several
+  // bindings can cover the same source node at once (a top-level pre-created instance plus
+  // composition-spawned ones), so the caller must scope the call to one instance's binding —
+  // see PAGScene::reapplyDataBindsForTarget.
+  void reapplyForTarget(const Node* targetNode);
+
+  // The RuntimeBinding this runtime bound against (bind()'s argument), or nullptr before bind().
+  // Compare against a timeline's effectiveBinding() to tell whether this runtime's scope covers
+  // that timeline's instance of a shared source node.
+  RuntimeBinding* getBoundBinding() const {
+    return boundBinding;
+  }
+
   // Applies pending dirty bindings to their target nodes through the RuntimeBinding (ViewModel →
   // render node). Each dirty source value is run through its converter and written to the target
   // channel with the given mix weight. Once bindings apply a single time and are then skipped.

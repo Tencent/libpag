@@ -33,6 +33,7 @@ class PAGScene;
 class PAGXDocument;
 class Node;
 class Channel;
+class VideoExporterImpl;
 
 /**
  * PAGAnimation controls the playback of a single animation in a PAGScene. It holds the current
@@ -161,7 +162,7 @@ class PAGAnimation : public PAGTimeline {
   friend class PAGScene;
   friend class PAGComposition;
   friend class PAGStateMachine;
-  friend class VideoExporter;
+  friend class VideoExporterImpl;
 };
 
 }  // namespace pagx

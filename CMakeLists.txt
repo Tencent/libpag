@@ -233,8 +233,9 @@ if (PAG_BUILD_TESTS)
 endif ()
 
 # VideoExporter is native-only. CLI and tests require it, so explicitly disabling it for those
-# builds is rejected rather than silently overriding the user's choice.
-if (WEB)
+# builds is rejected rather than silently overriding the user's choice. The wasm test binary is the
+# one web build that needs the exporter, because its async video export lane drives it directly.
+if (WEB AND NOT PAG_BUILD_WEB_VIDEO_EXPORT_TESTS)
     set(PAG_BUILD_VIDEO_EXPORTER OFF)
 elseif ((PAG_BUILD_CLI OR PAG_BUILD_TESTS) AND NOT PAG_BUILD_VIDEO_EXPORTER)
     message(FATAL_ERROR "PAG_BUILD_CLI and PAG_BUILD_TESTS require PAG_BUILD_VIDEO_EXPORTER=ON")
@@ -335,9 +336,11 @@ list(APPEND PAG_FILES ${SRC_FILES} ${PAG_GPU_BACKEND_FILES} ${PAG_CAST_BACKEND_F
 if (PAG_BUILD_PAGX)
     # pagx core + utils + xml (always included with PAGX)
     file(GLOB PAGX_CORE_SOURCES CONFIGURE_DEPENDS src/pagx/*.cpp)
-    list(FILTER PAGX_CORE_SOURCES EXCLUDE REGEX "/VideoExporter\\.cpp$")
+    list(REMOVE_ITEM PAGX_CORE_SOURCES
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/pagx/VideoExporter.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/pagx/VideoExportFrame.cpp)
     if (PAG_BUILD_VIDEO_EXPORTER)
-        list(APPEND PAGX_CORE_SOURCES src/pagx/VideoExporter.cpp)
+        list(APPEND PAGX_CORE_SOURCES src/pagx/VideoExporter.cpp src/pagx/VideoExportFrame.cpp)
     endif ()
     file(GLOB PAGX_NODES_SOURCES CONFIGURE_DEPENDS src/pagx/nodes/*.cpp)
     list(APPEND PAGX_CORE_SOURCES ${PAGX_NODES_SOURCES})
@@ -489,7 +492,8 @@ if (PAG_USE_QT)
     list(APPEND PAG_FILES ${PLATFORM_FILES})
     list(APPEND PAG_DEFINES GL_SILENCE_DEPRECATION)
     if (MACOS)
-        file(GLOB CGL_PLATFORM_FILES src/platform/mac/private/HardwareDecoder.mm)
+        file(GLOB CGL_PLATFORM_FILES src/platform/mac/private/HardwareDecoder.mm
+                src/platform/cocoa/private/HardwareDecodeContext.mm)
         list(APPEND PAG_FILES ${CGL_PLATFORM_FILES})
     endif ()
 elseif (PAG_USE_SWIFTSHADER)
@@ -1139,6 +1143,11 @@ if (PAG_BUILD_CLI)
     message("PAGX_CLI_VERSION: ${PAGX_CLI_VERSION}")
 
     # Generate pagx_xsd.h from spec/pagx.xsd
+    # The schema is embedded into a generated header at configure time. Declare the source as a
+    # configure dependency so an XSD edit re-runs CMake instead of leaving 'cmake --build'
+    # validating documents against a stale schema.
+    set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
+                 "${CMAKE_CURRENT_SOURCE_DIR}/spec/pagx.xsd")
     # Use HEX encoding to avoid MSVC string literal length limit (C2026)
     file(READ "${CMAKE_CURRENT_SOURCE_DIR}/spec/pagx.xsd" PAGX_XSD_CONTENT HEX)
     string(LENGTH "${PAGX_XSD_CONTENT}" PAGX_XSD_HEX_LEN)
@@ -1275,7 +1284,10 @@ if (PAG_BUILD_TESTS)
         list(FILTER SRC_FILES EXCLUDE REGEX "PAGD3D12Test\\.cpp$")
     endif ()
     if (NOT APPLE OR NOT USE_NATIVE_PLATFORM)
-        list(FILTER SRC_FILES EXCLUDE REGEX "PAG(Metal(Surface|Texture|Atlas)|CocoaSurface(Header)?)Test\\.mm$")
+        # VTDecodeContextPoolTest links the VideoToolbox decode-context pool, which only the native
+        # Apple platforms compile; the swiftshader/non-native builds omit src/platform/cocoa.
+        list(FILTER SRC_FILES EXCLUDE REGEX
+                "PAG(Metal(Surface|Texture|Atlas)|CocoaSurface(Header)?)Test\\.mm$|VTDecodeContextPoolTest\\.cpp$")
     else ()
         set_source_files_properties(test/src/PAGCocoaSurfaceTest.mm test/src/PAGCocoaSurfaceHeaderTest.mm
                 PROPERTIES COMPILE_OPTIONS "-fobjc-arc")

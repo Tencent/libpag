@@ -24,6 +24,7 @@
 #include "rendering/drawables/Drawable.h"
 #include "rendering/gpu/Devices.h"
 #include "rendering/graphics/Recorder.h"
+#include "rendering/utils/AsyncReadback.h"
 #include "rendering/utils/LockGuard.h"
 #include "rendering/utils/shaper/TextShaper.h"
 #include "tgfx/core/Clock.h"
@@ -32,7 +33,6 @@
 #include "tgfx/gpu/CommandQueue.h"
 #include "tgfx/gpu/Context.h"
 #include "tgfx/gpu/GPU.h"
-#include "tgfx/gpu/GPUBuffer.h"
 
 namespace pag {
 
@@ -73,7 +73,7 @@ ReadbackStatus PAGSurfaceReadback::status() {
   if (context == nullptr) {
     return ReadbackStatus::Failed;
   }
-  auto result = ToPAGReadbackStatus(readback->status(context));
+  auto result = ToPAGReadbackStatus(PollAsyncReadback(context, readback));
   pagSurface->unlockContext();
   return result;
 }
@@ -291,8 +291,8 @@ std::shared_ptr<PAGSurfaceReadback> AsyncReadPixels(std::shared_ptr<PAGSurface> 
     surface->unlockContext();
     return nullptr;
   }
-  auto readback =
-      tgfxSurface->asyncReadPixels(tgfx::Rect::MakeWH(tgfxSurface->width(), tgfxSurface->height()));
+  bool flipY = false;
+  auto readback = StartAsyncReadback(context, tgfxSurface, &flipY);
   if (readback == nullptr) {
     LOGE(
         "AsyncReadPixels() The surface does not support readback. Canvas-backed "
@@ -301,16 +301,6 @@ std::shared_ptr<PAGSurfaceReadback> AsyncReadPixels(std::shared_ptr<PAGSurface> 
     surface->unlockContext();
     return nullptr;
   }
-  context->flushAndSubmit();
-  auto buffer = readback->getGPUBuffer(context);
-  if (buffer == nullptr) {
-    surface->unlockContext();
-    return nullptr;
-  }
-  // WebGPU does not start the buffer mapping on its own; without this call isReady() would stay
-  // false forever. On backends with blocking readback this is a no-op.
-  buffer->requestMapAsync();
-  auto flipY = tgfxSurface->origin() == tgfx::ImageOrigin::BottomLeft;
   surface->unlockContext();
   return std::shared_ptr<PAGSurfaceReadback>(
       new PAGSurfaceReadback(std::move(surface), std::move(readback), flipY));
