@@ -18,7 +18,6 @@
 
 #pragma once
 
-#include <atomic>
 #include <list>
 #include <memory>
 #include <mutex>
@@ -29,6 +28,7 @@
 
 namespace pag {
 class FileInfo;
+class ConfigSaveState;
 
 class DiskCache {
  public:
@@ -53,6 +53,11 @@ class DiskCache {
    */
   static bool WriteFile(const std::string& key, std::shared_ptr<tgfx::Data> data);
 
+  /**
+   * Registers a nonempty platform default directory and applies it unless a custom directory is set.
+   */
+  static void SetDefaultCacheDir(const std::string& dir);
+
  private:
   static constexpr uint32_t InitialFileID = 1;
 
@@ -67,6 +72,8 @@ class DiskCache {
 
   std::mutex locker = {};
   std::string customCacheDir;
+  std::string defaultCacheDir;
+  bool hasDefaultCacheDir = false;
   std::string configPath;
   std::string cacheFolder;
   uint32_t fileIDCount = InitialFileID;
@@ -87,9 +94,13 @@ class DiskCache {
   static DiskCache* GetInstance();
 
   std::string getCacheDir();
+  std::string getDefaultCacheDir();
   void setCacheDir(const std::string& dir);
+  void setDefaultCacheDir(const std::string& dir);
+  bool applyCacheDir(const std::string& dir);
 
   DiskCache();
+  explicit DiskCache(const std::string& defaultDir);
   size_t getMaxDiskSize();
   void setMaxDiskSize(size_t size);
   void removeAll();
@@ -106,12 +117,15 @@ class DiskCache {
   void removeFromCachedFiles(std::shared_ptr<FileInfo> fileInfo);
   void moveToFront(std::shared_ptr<FileInfo> fileInfo);
   void moveToBeforeOpenedFiles(std::shared_ptr<FileInfo> fileInfo);
-  bool readConfig();
-  void saveConfig();
+  bool reloadConfig();
+  void saveConfig(bool synchronous = false);
   uint32_t getFileID(const std::string& key);
   void changeToTemporary(uint32_t fileID);
   std::string fileIDToPath(uint32_t fileID);
-  uint32_t filePathToID(const std::string& path);
+  static bool ParseFileID(const std::string& path, uint32_t* fileID);
+  static void RemoveCacheFile(const std::string& path, size_t fileSize);
+  void removeClosedCacheFile(const std::string& path, size_t fileSize);
+  void reconcileCacheFile(const std::string& path, size_t fileSize);
   void notifyFileClosed(uint32_t fileID, const std::shared_ptr<SequenceFileHandle>& handle);
   void notifyFileSizeChanged(uint32_t fileID, size_t fileSize);
 
@@ -122,16 +136,13 @@ class DiskCache {
   static void RemoveFileAsync(const std::string& filePath);
 
   static void WriteConfigTask(const std::string& path, const std::string& tempPath,
-                              std::shared_ptr<tgfx::Buffer> data, uint32_t currentVersion);
+                              std::shared_ptr<tgfx::Buffer> data,
+                              std::shared_ptr<ConfigSaveState> state, uint64_t currentVersion);
 
   static void CloseFileTask(std::shared_ptr<SequenceFileHandle> handle, DiskCache* cache,
                             uint32_t id);
 
-  /**
-   * Version counter for saveConfig(). Incremented on each call to allow coalescing multiple
-   * rapid saves into a single disk write. Atomic to allow safe access from the IO thread.
-   */
-  std::atomic<uint32_t> configSaveVersion{0};
+  std::shared_ptr<ConfigSaveState> configSaveState = nullptr;
 
   friend class SequenceFile;
   friend class PAGDiskCache;
