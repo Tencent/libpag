@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: A fauxItalic channel slants the glyphs without swapping the font face.
+     Target: Text  Channel: fauxItalic  Type: bool
+     Three typical texts (Arial 72 / Times New Roman 44 / Courier New 28) drive the same channel,
+     so a rule that only holds for one family or one size cannot pass.
+     Ref: - -->
+<pagx width="320" height="200">
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F8FAFC"/>
+  </Layer>
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Text id="big" text="Ag" fontFamily="Arial" fontStyle="Regular" fontSize="72"
+          letterSpacing="0" position="20,80"/>
+    <Text id="mid" text="Ag" fontFamily="Times New Roman" fontStyle="Regular" fontSize="44"
+          letterSpacing="0" position="190,70"/>
+    <Text id="small" text="Ag" fontFamily="Courier New" fontStyle="Regular" fontSize="28"
+          letterSpacing="0" position="190,140"/>
+    <Fill color="#BE123C"/>
+  </Layer>
+  <Animations>
+    <Animation id="textAnim" duration="60" frameRate="60" loop="once">
+      <Object target="big">
+        <Channel name="fauxItalic" type="bool">
+          <Key time="0" value="false" interpolation="hold"/>
+          <Key time="30" value="true" interpolation="hold"/>
+          <Key time="60" value="true"/>
+        </Channel>
+      </Object>
+      <Object target="mid">
+        <Channel name="fauxItalic" type="bool">
+          <Key time="0" value="false" interpolation="hold"/>
+          <Key time="30" value="true" interpolation="hold"/>
+          <Key time="60" value="true"/>
+        </Channel>
+      </Object>
+      <Object target="small">
+        <Channel name="fauxItalic" type="bool">
+          <Key time="0" value="false" interpolation="hold"/>
+          <Key time="30" value="true" interpolation="hold"/>
+          <Key time="60" value="true"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>

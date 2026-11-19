@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: Two Layer level switches at once: blendMode changes the compositing of a translucent card over
+     the backdrop, and visible hides the second card in the middle of the timeline. Both are held
+     rather than interpolated, so the exporter has to emit step stops and keep them per channel.
+     Target: Layer  Channel: blendMode,visible  Type: int,bool
+     Ref: - -->
+<pagx width="320" height="200">
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Polystar position="120,100" type="star" pointCount="6" outerRadius="70" rotation="-90"/>
+    <Fill color="#F59E0B"/>
+  </Layer>
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Ellipse position="210,100" size="130,130"/>
+    <Fill color="#0EA5E9"/>
+  </Layer>
+  <Layer id="blendCard" x="40" y="50" width="120" height="100" blendMode="normal" alpha="0.85">
+    <Rectangle position="60,50" size="120,100" roundness="14"/>
+    <Fill color="#DB2777"/>
+  </Layer>
+  <Layer id="visibleCard" x="180" y="60" width="100" height="80" visible="true">
+    <Rectangle position="50,40" size="100,80" roundness="14"/>
+    <Fill color="#334155"/>
+  </Layer>
+  <Animations>
+    <Animation id="layerState" duration="60" frameRate="60" loop="once">
+      <Object target="blendCard">
+        <Channel name="blendMode" type="int">
+          <Key time="0" value="0" interpolation="hold"/>
+          <Key time="30" value="2" interpolation="hold"/>
+          <Key time="60" value="2"/>
+        </Channel>
+      </Object>
+      <Object target="visibleCard">
+        <Channel name="visible" type="bool">
+          <Key time="0" value="true" interpolation="hold"/>
+          <Key time="30" value="false" interpolation="hold"/>
+          <Key time="60" value="true"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>

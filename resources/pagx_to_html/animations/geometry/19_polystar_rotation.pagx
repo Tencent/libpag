@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: A Polystar rotation spins the star in place, so each spike takes the next one's place.
+     Target: Polystar  Channel: rotation  Type: float
+     Ref: - -->
+<pagx width="320" height="200">
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F8FAFC"/>
+  </Layer>
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Polystar id="starSpin" position="160,100" type="star" pointCount="5" outerRadius="85"
+              innerRadius="30" rotation="-90"/>
+    <Fill color="#B45309"/>
+  </Layer>
+  <Animations>
+    <Animation id="geoAnim" duration="60" frameRate="60" loop="once">
+      <Object target="starSpin">
+        <Channel name="rotation" type="float">
+          <Key time="0" value="-90" interpolation="linear"/>
+          <Key time="60" value="-18"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>

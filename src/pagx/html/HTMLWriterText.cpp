@@ -24,6 +24,7 @@
 #include <random>
 #include <string>
 #include "base/utils/MathUtil.h"
+#include "pagx/SystemFonts.h"
 #include "pagx/TextLayout.h"
 #include "pagx/html/FontSignature.h"
 #include "pagx/html/HTMLWriter.h"
@@ -45,6 +46,7 @@
 #include "pagx/types/TrimType.h"
 #include "pagx/utils/ColorSpaceUtils.h"
 #include "pagx/utils/StringParser.h"
+#include "tgfx/core/Font.h"
 #include "tgfx/core/UTF.h"
 
 namespace pagx {
@@ -286,8 +288,40 @@ static float CalculateTriangleFactorBezier(float textCenter, float rangeStart, f
                             t * t * t * y4);
 }
 
+// True when a per-glyph keyframes rule can reproduce an animated selector exactly: a single
+// RangeSelector whose shape is piecewise rational in its range values (so every monotonic piece is
+// one fitted cubic-bezier), and a modifier whose glyph style is linear in the factor.
+static bool RangeSelectorGlyphsAnimatable(const TextModifier* modifier) {
+  if (modifier == nullptr || modifier->selectors.size() != 1 || modifier->selectors[0] == nullptr ||
+      modifier->selectors[0]->nodeType() != NodeType::RangeSelector) {
+    return false;
+  }
+  auto* selector = static_cast<const RangeSelector*>(modifier->selectors[0]);
+  // Every shape is supported now: the rational ones fit one bezier per piece, the others (triangle,
+  // round, smooth) are sampled by the keyframe emitter.
+  bool rationalShape = true;
+  // Color and stroke-width blends are not emitted per frame; weight below zero flips the factor
+  // sign, which the static path folds through |f| and a linear easing cannot.
+  return rationalShape && !selector->randomOrder && selector->weight >= 0.0f &&
+         !modifier->fillColor.has_value() && !modifier->strokeColor.has_value() &&
+         !modifier->strokeWidth.has_value();
+}
+
 float ComputeRangeSelectorFactor(const RangeSelector* selector, size_t glyphIndex,
                                  size_t totalGlyphs) {
+  return ComputeRangeSelectorFactor(selector, glyphIndex, totalGlyphs, selector->start,
+                                    selector->end, selector->offset);
+}
+
+float ComputeRangeSelectorFactor(const RangeSelector* selector, size_t glyphIndex,
+                                 size_t totalGlyphs, float start, float end, float offset) {
+  return ComputeRangeSelectorFactor(selector, glyphIndex, totalGlyphs, start, end, offset,
+                                    selector->easeIn, selector->easeOut, selector->weight);
+}
+
+float ComputeRangeSelectorFactor(const RangeSelector* selector, size_t glyphIndex,
+                                 size_t totalGlyphs, float start, float end, float offset,
+                                 float easeIn, float easeOut, float weight) {
   if (totalGlyphs == 0) {
     return 0.0f;
   }
@@ -296,13 +330,12 @@ float ComputeRangeSelectorFactor(const RangeSelector* selector, size_t glyphInde
   auto textEnd = static_cast<float>(glyphIndex + 1) / textCount;
   auto textCenter = (textStart + textEnd) * 0.5f;
 
-  float rangeStart = selector->start;
-  float rangeEnd = selector->end;
+  float rangeStart = start;
+  float rangeEnd = end;
   if (selector->unit == SelectorUnit::Index) {
     rangeStart = rangeStart / textCount;
     rangeEnd = rangeEnd / textCount;
   }
-  float offset = selector->offset;
   if (selector->unit == SelectorUnit::Index) {
     offset = offset / textCount;
   }
@@ -335,8 +368,7 @@ float ComputeRangeSelectorFactor(const RangeSelector* selector, size_t glyphInde
         // tgfx does — linear-triangle * post-multiplicative easing is a cheaper approximation
         // that fails to reproduce the flattened peak and compressed transition visible e.g.
         // in selector_advanced.pagx EASED MOTION (easeIn=easeOut=0.8).
-        factor = CalculateTriangleFactorBezier(textCenter, rangeStart, rangeEnd, selector->easeOut,
-                                               selector->easeIn);
+        factor = CalculateTriangleFactorBezier(textCenter, rangeStart, rangeEnd, easeOut, easeIn);
         break;
       }
       case SelectorShape::Round: {
@@ -411,7 +443,7 @@ float ComputeRangeSelectorFactor(const RangeSelector* selector, size_t glyphInde
   // Triangle handles easeIn/easeOut inside CalculateTriangleFactorBezier via bezier control
   // points. Other shapes are untouched by easeIn/easeOut in tgfx — see TextSelector.cpp where
   // only CalculateTriangleFactor consumes those attributes — so no post-scale is applied here.
-  return factor * selector->weight;
+  return factor * weight;
 }
 
 //==============================================================================
@@ -655,6 +687,144 @@ void SampleArcLengthLUT(const ArcLengthLUT& lut, float arcLength, Point* outPos,
 // HTMLWriter – text methods
 //==============================================================================
 
+// CSS translate() that combines a horizontal anchor percentage with an optional vertical shift.
+static std::string CssTextTranslate(const char* xPercent, float dy) {
+  if (FloatNearlyZero(dy)) {
+    return std::string("translateX(") + xPercent + ")";
+  }
+  return std::string("translate(") + xPercent + "," + CssFloatToString(dy) + "px)";
+}
+
+// CSS line box settings that put browser-rendered text on the same rows as PAGX's own layout.
+struct CssLineBoxAlignment {
+  // False when the family cannot be resolved, in which case the default line box has to be kept.
+  bool hasFont = false;
+  // Distance the browser's baseline sits below PAGX's under the default `line-height: normal`.
+  float baselineDelta = 0;
+  // Line height matching PAGX's line advance, used to keep multi-line spacing identical.
+  float lineHeight = 0;
+  // Line height that puts a single line's baseline exactly on PAGX's baseline row.
+  float singleLineHeight = 0;
+};
+
+// Returns the metrics PAGX lays text out with. The macOS adjustment mirrors the one in
+// TextLayout.cpp: Chromium and Safari raise the ascent of Helvetica, Times and Courier by 15% of
+// (ascent + descent) so their line boxes match the Microsoft counterparts they are substituted for.
+static tgfx::FontMetrics GetTextLayoutMetrics(const tgfx::Font& font) {
+  auto metrics = font.getMetrics();
+#ifdef __APPLE__
+  auto typeface = font.getTypeface();
+  if (typeface != nullptr) {
+    auto family = typeface->fontFamily();
+    if (family == "Helvetica" || family == "Times" || family == "Courier") {
+      float ascent = roundf(fabsf(metrics.ascent));
+      float descent = roundf(metrics.descent);
+      metrics.ascent -= floorf((ascent + descent) * 0.15f + 0.5f);
+    }
+  }
+#endif
+  return metrics;
+}
+
+// A CSS line box centres the font's content area inside the line height and splits the leading
+// around it, while PAGX counts the leading as content and puts the baseline at the ascent, then
+// rounds it to whole pixels. The PAGX side below mirrors TextLayout.cpp's line box model
+// (maxLineHeight = roundf(ascent + descent + leading), baseline = roundf((halfLeading + ascent) *
+// roundingRatio)), so a change there has to be mirrored here.
+static CssLineBoxAlignment ComputeLineBoxAlignment(const std::string& fontFamily,
+                                                   const std::string& fontStyle, float fontSize) {
+  CssLineBoxAlignment result = {};
+  if (fontFamily.empty() || fontSize <= 0.0f) {
+    return result;
+  }
+  auto typeface = SystemFonts::ResolveTypeface(fontFamily, fontStyle);
+  if (typeface == nullptr) {
+    return result;
+  }
+  auto metrics = GetTextLayoutMetrics(tgfx::Font(typeface, fontSize));
+  float ascent = fabsf(metrics.ascent);
+  float leading = std::max(0.0f, metrics.leading);
+  float metricsHeight = ascent + metrics.descent + leading;
+  if (metricsHeight <= 0.0f) {
+    return result;
+  }
+  float lineBox = roundf(metricsHeight);
+  float halfLeading = (lineBox - metricsHeight) / 2;
+  float pagxBaseline = roundf((halfLeading + ascent) * lineBox / metricsHeight);
+  // The browser rounds ascent and descent to whole pixels to size the content area, so the leading
+  // ends up split around a slightly different box than the raw metrics.
+  float cssAscent = roundf(ascent);
+  float cssDescent = roundf(metrics.descent);
+  float contentHeight = cssAscent + cssDescent;
+  float normalLineBox = contentHeight + roundf(leading);
+  float cssBaseline = (normalLineBox - contentHeight) / 2 + cssAscent;
+
+  result.hasFont = true;
+  result.baselineDelta = cssBaseline - pagxBaseline;
+  result.lineHeight = lineBox;
+  result.singleLineHeight = 2 * (pagxBaseline - cssAscent) + contentHeight;
+  return result;
+}
+
+float TextLineHeightForCSS(const std::string& fontFamily, const std::string& fontStyle,
+                           float fontSize, bool singleLine) {
+  auto alignment = ComputeLineBoxAlignment(fontFamily, fontStyle, fontSize);
+  if (!alignment.hasFont) {
+    return 0.0f;
+  }
+  return singleLine ? alignment.singleLineHeight : alignment.lineHeight;
+}
+
+bool TextBlockPlacement(const std::string& fontFamily, const std::string& fontStyle, float fontSize,
+                        float authoredLineHeight, bool anchorToTop, float* lineHeight,
+                        float* baselineShift) {
+  if (lineHeight == nullptr || baselineShift == nullptr) {
+    return false;
+  }
+  auto alignment = ComputeLineBoxAlignment(fontFamily, fontStyle, fontSize);
+  if (!alignment.hasFont) {
+    return false;
+  }
+  auto typeface = SystemFonts::ResolveTypeface(fontFamily, fontStyle);
+  if (typeface == nullptr) {
+    return false;
+  }
+  auto metrics = GetTextLayoutMetrics(tgfx::Font(typeface, fontSize));
+  float ascent = fabsf(metrics.ascent);
+  float leading = std::max(0.0f, metrics.leading);
+  float metricsHeight = ascent + metrics.descent + leading;
+  if (metricsHeight <= 0.0f) {
+    return false;
+  }
+  // An authored lineHeight replaces PAGX's rounded advance and also drops the rounding ratio
+  // (TextLayout.cpp FinishLine sets roundingRatio = 1 in that branch).
+  float box = authoredLineHeight > 0.0f ? authoredLineHeight : alignment.lineHeight;
+  float ratio = authoredLineHeight > 0.0f ? 1.0f : box / metricsHeight;
+  float halfLeading = (box - metricsHeight) / 2;
+  // PAGX's line box counts the leading as content and puts the baseline at the ascent (scaled by
+  // the rounding ratio); a CSS line box centres the content area and splits the leading around it.
+  float relative = (halfLeading + ascent) * ratio;
+  // PAGX snaps the finished row with `roundf(yOffset + relative)`. A top-anchored line has
+  // yOffset = 0, so that row is exactly `roundf(relative)` and can be reproduced here. Middle/Far
+  // centre the block by a yOffset that follows the browser's own line count, which CSS cannot see,
+  // so there the unrounded relative row is the best available estimate.
+  float pagxBaseline = anchorToTop ? roundf(relative) : relative;
+  float cssBaseline = (box - (ascent + metrics.descent)) / 2 + ascent;
+  *lineHeight = box;
+  *baselineShift = pagxBaseline - cssBaseline;
+  return true;
+}
+
+// PAGX fakes bold by stroking the Regular outline with a width of `fontSize * FauxBoldScale`, and
+// `-webkit-text-stroke-width` is also the total width of a band centred on the outline, so the PAGX
+// width transfers one to one. `font-weight: bold` would swap the face instead and change the
+// advance (measured: a fauxBold line came out 5px wider than the reference).
+float FauxBoldStrokeWidth(float fontSize) {
+  // Measured against the renderer: a 64px glyph matches at 4.5px (0.070em). The tgfx constant
+  // (1/32em from 36px up) is about half that, which left every fauxBold line visibly thin.
+  return fontSize * 0.07f;
+}
+
 void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
                            const Stroke* stroke, const TextBox* tb, float alpha) {
   if (!text->glyphRuns.empty()) {
@@ -855,6 +1025,26 @@ void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
       style += ";line-height:1";
     }
     style += ";white-space:pre";
+    bool singleLine = text->text.find('\n') == std::string::npos;
+    // A CSS line box centres the font's content area inside the line height and splits the leading
+    // around it, while PAGX counts the leading as content and puts the baseline at the ascent (then
+    // rounds it). Placing the span top at PAGX's origin therefore renders the glyphs about
+    // leading/2 lower in a browser. A single line can absorb that by shrinking its line box onto
+    // PAGX's baseline row; a multi-line block keeps PAGX's line advance (its spacing must stay
+    // intact) and is shifted as a whole through `transform`.
+    float baselineShift = 0.0f;
+    if (!usesGlyphRunPosition) {
+      auto alignment =
+          ComputeLineBoxAlignment(text->fontFamily, text->fontStyle, text->renderFontSize());
+      if (alignment.hasFont) {
+        if (singleLine) {
+          style += ";line-height:" + CssFloatToString(alignment.singleLineHeight) + "px";
+        } else {
+          style += ";line-height:" + CssFloatToString(alignment.lineHeight) + "px";
+          baselineShift = -alignment.baselineDelta;
+        }
+      }
+    }
     // Multi-line text with a non-Start anchor needs per-line alignment relative to the anchor
     // point. The single-line path below uses `width:posX*2` (center) or `width:posX` (end)
     // which only positions one line correctly — posX here is glyphRuns[0]'s x, i.e. the
@@ -863,25 +1053,31 @@ void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
     // a span whose anchor is the origin, shifted with `transform:translateX`. tgfx centres
     // each line around anchor x=0 in the layer's coordinate space; mirror that by placing
     // the span at `text->position.x` and using translateX(-50%) for Center / -100% for End.
-    bool multiLineAnchor =
-        text->text.find('\n') != std::string::npos && text->textAnchor != TextAnchor::Start;
+    bool multiLineAnchor = !singleLine && text->textAnchor != TextAnchor::Start;
     if (multiLineAnchor) {
       float anchorX = text->position.x;
       if (text->textAnchor == TextAnchor::Center) {
         style += ";left:" + CssFloatToString(anchorX) +
-                 "px;transform:translateX(-50%);text-align:center";
+                 "px;transform:" + CssTextTranslate("-50%", baselineShift) + ";text-align:center";
       } else {
         style += ";left:" + CssFloatToString(anchorX) +
-                 "px;transform:translateX(-100%);text-align:right";
+                 "px;transform:" + CssTextTranslate("-100%", baselineShift) + ";text-align:right";
       }
     } else if (text->textAnchor == TextAnchor::Center) {
-      style +=
-          ";left:" + CssFloatToString(posX) + "px;transform:translateX(-50%);text-align:center";
+      style += ";left:" + CssFloatToString(posX) +
+               "px;transform:" + CssTextTranslate("-50%", baselineShift) + ";text-align:center";
     } else if (text->textAnchor == TextAnchor::End) {
-      style +=
-          ";left:" + CssFloatToString(posX) + "px;transform:translateX(-100%);text-align:right";
+      style += ";left:" + CssFloatToString(posX) +
+               "px;transform:" + CssTextTranslate("-100%", baselineShift) + ";text-align:right";
     } else {
       style += ";left:" + CssFloatToString(posX) + "px";
+      if (!FloatNearlyZero(baselineShift)) {
+        style += ";transform:translateY(" + CssFloatToString(baselineShift) + "px)";
+      }
+    }
+    if (!text->id.empty()) {
+      // The frame list shifts this anchor when the x/y channel is animated.
+      _ctx->animation.textOrigins[text] = {posX, ty};
     }
   }
   if (text->fauxItalic) {
@@ -913,7 +1109,11 @@ void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
     }
   }
   if (text->fauxBold) {
-    style += ";font-weight:bold";
+    // PAGX bolds by stroking the outline; `font-weight: bold` swaps the face, which changes the
+    // advance and makes the line wider than the reference.
+    style +=
+        ";-webkit-text-stroke:" + CssFloatToString(FauxBoldStrokeWidth(text->renderFontSize())) +
+        "px currentColor";
   }
   if (fill && fill->color) {
     auto ct = fill->color->nodeType();
@@ -963,6 +1163,11 @@ void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
     out.emitBreaks(HTMLBuilder::CountLeadingBreaks(text->text));
   }
   out.openTag("span");
+  // The span is the only tag a Text renders into, so font-size / letter-spacing keyframes land here.
+  auto animId = _ctx->claimAnimatedDomId({tb, fill, text});
+  if (!animId.empty()) {
+    out.addAttr("id", animId);
+  }
   out.addAttr("style", style);
   // Inside a TextBox the container uses word-wrap not white-space:pre, so U+000A
   // newlines would be folded by the browser. Convert them to <br> explicitly.
@@ -996,12 +1201,22 @@ static void AppendUTF8(std::string& out, uint32_t cp);
 
 void HTMLWriter::writeTextModifier(HTMLBuilder& out, const std::vector<GeoInfo>& geos,
                                    const TextModifier* modifier, const Fill* fill,
-                                   const Stroke* stroke, const TextBox* /*tb*/, float alpha) {
+                                   const Stroke* stroke, const TextBox* tb, float alpha) {
   for (auto& g : geos) {
     if (g.type != NodeType::Text) {
       continue;
     }
     auto text = static_cast<const Text*>(g.element);
+    bool layoutAnimated = _ctx->animation.layoutAnimatedTexts.count(text) > 0;
+    if (layoutAnimated &&
+        (tb != nullptr || !text->glyphRuns.empty() || fill == nullptr || fill->color == nullptr ||
+         fill->color->nodeType() != NodeType::SolidColor ||
+         text->textAnchor != TextAnchor::Start)) {
+      _ctx->animationError =
+          "Unsupported mixed text layout (requires standalone solid start-anchor text): " +
+          text->id;
+      return;
+    }
     size_t totalGlyphs = 0;
     if (!text->glyphRuns.empty()) {
       for (auto* run : text->glyphRuns) {
@@ -1221,13 +1436,48 @@ void HTMLWriter::writeTextModifier(HTMLBuilder& out, const std::vector<GeoInfo>&
                                  !(modifier->fillColor.has_value()) && text->glyphData != nullptr &&
                                  !text->glyphData->layoutRuns.empty();
 
+      // Per-glyph SVG <text> is also the only exact layout for a TextModifier: it places every glyph
+      // at the position PAGX's shaper produced (baseline coordinates), while inline-block spans let
+      // the browser re-lay the run out. That costs the shaper's kerning (2-3px per kerned pair) and
+      // shifts the baseline by a half-leading that depends on the font metrics.
+      bool usesSVGTextForModifier = !layoutAnimated && fill && fill->color &&
+                                    fill->color->nodeType() == NodeType::SolidColor &&
+                                    modifier != nullptr && !(modifier->fillColor.has_value()) &&
+                                    text->glyphData != nullptr &&
+                                    !text->glyphData->layoutRuns.empty();
+
+      if (usesSVGTextForModifier) {
+        usesSVGTextGradient = true;
+      }
+
       if (usesSVGTextGradient) {
         // --- SVG <text> path for gradient fills ---
         // Use layoutRuns for precise per-glyph positions. Each glyph's (x, y) is in the
         // text's layout coordinate system; the SVG viewport is positioned at renderPos so
         // glyph coordinates are relative to that origin.
+        const RangeSelector* animatedSelector = nullptr;
+        // A modifier channel animates the pose of every glyph the modifier reaches, so the glyphs
+        // need ids and rules just like an animated selector does.
+        const TextModifier* animatedModifier = nullptr;
+        if (modifier != nullptr && !modifier->id.empty() &&
+            _ctx->animation.animatedModifiers.count(modifier) > 0) {
+          animatedModifier = modifier;
+        }
+        if (RangeSelectorGlyphsAnimatable(modifier)) {
+          auto* selector = static_cast<const RangeSelector*>(modifier->selectors[0]);
+          if (_ctx->animation.animatedRangeSelectors.count(selector) > 0 && !selector->id.empty()) {
+            animatedSelector = selector;
+          }
+        }
         std::string svgStyle = "position:absolute;left:" + CssFloatToString(renderPos.x) +
                                "px;top:" + CssFloatToString(ty) + "px;overflow:visible";
+        if (animatedSelector != nullptr) {
+          // Per-glyph keyframes move each glyph by fractions of a pixel. Unhinted outline
+          // rasterisation keeps those glyphs on the pixels PAGX draws (measured: hinting lands them
+          // one pixel taller). It is not applied to static text: there the effect depends on the
+          // content, and stroked glyphs measured worse with it.
+          svgStyle += ";text-rendering:geometricPrecision";
+        }
         if (alpha < 1.0f) {
           svgStyle += ";opacity:" + CssFloatToString(alpha);
         }
@@ -1235,14 +1485,18 @@ void HTMLWriter::writeTextModifier(HTMLBuilder& out, const std::vector<GeoInfo>&
         out.addAttr("style", svgStyle);
         out.closeTagStart();
 
-        // Write gradient definition into an inline <defs> block.
-        std::string gradId = _ctx->nextId("tmgrad");
-        out.openTag("defs");
-        out.closeTagStart();
-        writeSVGGradientDefInto(out, fill->color, gradId);
-        out.closeTag();  // </defs>
-
-        std::string fillRef = "url(#" + gradId + ")";
+        // A solid fill needs no <defs>; only a gradient is defined per text block.
+        std::string fillRef;
+        if (fill->color->nodeType() != NodeType::SolidColor) {
+          std::string gradId = _ctx->nextId("tmgrad");
+          out.openTag("defs");
+          out.closeTagStart();
+          writeSVGGradientDefInto(out, fill->color, gradId);
+          out.closeTag();  // </defs>
+          fillRef = "url(#" + gradId + ")";
+        } else {
+          fillRef = ColorToSVGHex(static_cast<const SolidColor*>(fill->color)->color);
+        }
         float fillAlpha = fill->alpha;
 
         // Build shared font attributes.
@@ -1315,11 +1569,11 @@ void HTMLWriter::writeTextModifier(HTMLBuilder& out, const std::vector<GeoInfo>&
           }
           if (!FloatNearlyZero(modifier->skew * absF)) {
             if (!FloatNearlyZero(modifier->skewAxis)) {
-              svgTransform += "rotate(" + CssFloatToString(modifier->skewAxis) + ") ";
+              svgTransform += "rotate(" + CssFloatToString(-modifier->skewAxis) + ") ";
             }
             svgTransform += "skewX(" + CssFloatToString(-modifier->skew * absF) + ") ";
             if (!FloatNearlyZero(modifier->skewAxis)) {
-              svgTransform += "rotate(" + CssFloatToString(-modifier->skewAxis) + ") ";
+              svgTransform += "rotate(" + CssFloatToString(modifier->skewAxis) + ") ";
             }
           }
           // Move back from pivot.
@@ -1327,6 +1581,39 @@ void HTMLWriter::writeTextModifier(HTMLBuilder& out, const std::vector<GeoInfo>&
                           CssFloatToString(-modAnchorY) + ") ";
 
           out.openTag("text");
+          if (animatedSelector != nullptr || animatedModifier != nullptr) {
+            // The keyframes rebuild this glyph's modifier pose per frame; the static transform
+            // below stays as the pre-animation fallback.
+            const std::string& hostId =
+                animatedSelector != nullptr ? animatedSelector->id : animatedModifier->id;
+            std::string glyphId = hostId + "_g" + std::to_string(charIdx);
+            out.addAttr("id", glyphId);
+            HTMLWriterContext::AnimationState::RangeSelectorGlyph record = {};
+            record.selector = animatedSelector;
+            record.modifier = modifier;
+            record.glyphIndex = charIdx;
+            record.totalGlyphs = factors.size();
+            record.glyphX = glyphX;
+            record.glyphY = glyphY;
+            record.pivotX = pivotX;
+            record.fontSize = renderFont;
+            record.factor = f;
+            record.fromModifier = animatedModifier != nullptr;
+            if (fill && fill->color && fill->color->nodeType() == NodeType::SolidColor) {
+              record.hasBaseFillColor = true;
+              record.baseFillColor = static_cast<const SolidColor*>(fill->color)->color;
+            }
+            if (stroke != nullptr) {
+              record.hasBaseStrokeWidth = true;
+              record.baseStrokeWidth = stroke->width;
+              if (stroke->color && stroke->color->nodeType() == NodeType::SolidColor) {
+                record.hasBaseStrokeColor = true;
+                record.baseStrokeColor = static_cast<const SolidColor*>(stroke->color)->color;
+              }
+            }
+            record.id = glyphId;
+            _ctx->animation.rangeSelectorGlyphs.push_back(record);
+          }
           if (!fontFamily.empty()) {
             out.addAttr("font-family", fontFamily);
           }
@@ -1406,6 +1693,50 @@ void HTMLWriter::writeTextModifier(HTMLBuilder& out, const std::vector<GeoInfo>&
         out.addAttr("style", containerStyle);
         out.closeTagStart();
         std::string fontSizeStr = CssFloatToString(renderFont) + "px";
+        // PAGX lays the glyphs out itself. Flatten the runs so each span sits at the pen position
+        // PAGX measured: inline-block flow picks its own advances, which drift ~2px per glyph and
+        // added up to 8px over four glyphs on composite/18.
+        std::vector<tgfx::Point> glyphPositions;
+        if (text->glyphData != nullptr) {
+          for (auto& run : text->glyphData->layoutRuns) {
+            for (size_t gi = 0; gi < run.positions.size(); gi++) {
+              glyphPositions.push_back(run.positions[gi]);
+            }
+          }
+        }
+        const RangeSelector* spanSelector = nullptr;
+        for (const auto* candidate : modifier->selectors) {
+          if (candidate->nodeType() == NodeType::RangeSelector &&
+              _ctx->animation.animatedRangeSelectors.count(
+                  static_cast<const RangeSelector*>(candidate)) > 0) {
+            spanSelector = static_cast<const RangeSelector*>(candidate);
+          }
+        }
+        bool composed = layoutAnimated;
+        // A random order permutes which glyphs a window value lands on, and the composed path
+        // evaluates the selector by glyph index - it would silently turn a shuffled window into a
+        // linear one. Refuse until the permutation is carried through.
+        bool randomOrder = false;
+        if (composed && modifier->selectors.size() == 1 && modifier->selectors[0] != nullptr &&
+            modifier->selectors[0]->nodeType() == NodeType::RangeSelector) {
+          randomOrder = static_cast<const RangeSelector*>(modifier->selectors[0])->randomOrder;
+        }
+        if (composed &&
+            (modifier->selectors.size() != 1 || randomOrder ||
+             modifier->selectors[0]->nodeType() != NodeType::RangeSelector ||
+             text->text.find('\n') != std::string::npos || glyphPositions.size() != totalGlyphs)) {
+          _ctx->animationError =
+              "Mixed text animation needs one line and one ordered RangeSelector: " + text->id;
+          return;
+        }
+        if (composed) {
+          spanSelector = static_cast<const RangeSelector*>(modifier->selectors[0]);
+          auto& positions = _ctx->animation.mixedTextPositions[text];
+          positions.clear();
+          for (const auto& position : glyphPositions) {
+            positions.push_back({position.x, position.y});
+          }
+        }
         const char* p = text->text.c_str();
         size_t charIdx = 0;
         while (*p) {
@@ -1421,7 +1752,14 @@ void HTMLWriter::writeTextModifier(HTMLBuilder& out, const std::vector<GeoInfo>&
           if (isSpace) {
             charStr = "\u00A0";
           }
-          std::string charStyle = "display:inline-block;font-size:" + fontSizeStr;
+          std::string charStyle = "";
+          if (charIdx < glyphPositions.size()) {
+            charStyle = "position:absolute;left:" + CssFloatToString(glyphPositions[charIdx].x) +
+                        "px;top:0;";
+          } else {
+            charStyle = "display:inline-block;";
+          }
+          charStyle += "font-size:" + fontSizeStr;
           std::string transform;
           if (!FloatNearlyZero(modifier->position.x * f) ||
               !FloatNearlyZero(modifier->position.y * f)) {
@@ -1448,13 +1786,9 @@ void HTMLWriter::writeTextModifier(HTMLBuilder& out, const std::vector<GeoInfo>&
             // CSS transform applies right-to-left on the point, so the equivalent sequence is
             // rotate(+axis) skewX(-skew) rotate(-axis). Skip the rotations when skewAxis is 0 to
             // keep the simpler output for the common pure-horizontal-skew case.
-            if (!FloatNearlyZero(modifier->skewAxis)) {
-              transform += "rotate(" + CssFloatToString(modifier->skewAxis) + "deg) ";
-            }
+            transform += "rotate(" + CssFloatToString(-modifier->skewAxis) + "deg) ";
             transform += "skewX(" + CssFloatToString(-modifier->skew * absF) + "deg) ";
-            if (!FloatNearlyZero(modifier->skewAxis)) {
-              transform += "rotate(" + CssFloatToString(-modifier->skewAxis) + "deg) ";
-            }
+            transform += "rotate(" + CssFloatToString(modifier->skewAxis) + "deg) ";
           }
           if (!FloatNearlyZero(anchorX) || !FloatNearlyZero(anchorY)) {
             transform += "translate(" + CssFloatToString(-anchorX) + "px," +
@@ -1500,8 +1834,12 @@ void HTMLWriter::writeTextModifier(HTMLBuilder& out, const std::vector<GeoInfo>&
             float strokeWidth = stroke->width;
             bool hasStroke = false;
             if (modifier->strokeColor.has_value() && absF > 0.0f) {
-              strokeColor = modifier->strokeColor.value();
-              strokeColor.alpha *= absF;
+              // The glyph keeps its own outline and the modifier colour is mixed in by the factor;
+              // scaling the alpha instead measured worse (0.917 vs 0.971 on the animated case).
+              Color base = (stroke->color && stroke->color->nodeType() == NodeType::SolidColor)
+                               ? static_cast<const SolidColor*>(stroke->color)->color
+                               : modifier->strokeColor.value();
+              strokeColor = LerpColor(base, modifier->strokeColor.value(), absF);
               hasStroke = true;
             } else if (stroke->color && stroke->color->nodeType() == NodeType::SolidColor) {
               strokeColor = static_cast<const SolidColor*>(stroke->color)->color;
@@ -1523,9 +1861,52 @@ void HTMLWriter::writeTextModifier(HTMLBuilder& out, const std::vector<GeoInfo>&
             }
           }
           if (text->fauxBold) {
-            charStyle += ";font-weight:bold";
+            charStyle += ";-webkit-text-stroke:" +
+                         CssFloatToString(FauxBoldStrokeWidth(text->renderFontSize())) +
+                         "px currentColor";
+          }
+          // A TextModifier channel animates every glyph it reaches; on the span path each glyph is
+          // its own element, so it needs an id and a record just like an SVG <text> would.
+          const TextModifier* spanModifier = nullptr;
+          if (modifier != nullptr && !modifier->id.empty() &&
+              _ctx->animation.animatedModifiers.count(modifier) > 0) {
+            spanModifier = modifier;
           }
           out.openTag("span");
+          if (spanModifier != nullptr || composed) {
+            std::string spanId = composed ? _ctx->nextId("mixedGlyph")
+                                          : spanModifier->id + "_g" + std::to_string(charIdx);
+            out.addAttr("id", spanId);
+            HTMLWriterContext::AnimationState::RangeSelectorGlyph record = {};
+            record.modifier = modifier;
+            record.ownerText = text;
+            record.scope = _ctx->animation.scope;
+            record.composed = composed;
+            // Keep the selector even when the layout is not composed: the frame re-derives the
+            // glyph factor from it, so an animated window retints and re-poses every glyph without
+            // needing a per-frame layout pass.
+            record.selector = spanSelector;
+            record.layoutY = glyphPositions.empty() ? 0.0f : glyphPositions[0].y;
+            record.glyphIndex = charIdx;
+            record.totalGlyphs = totalGlyphs;
+            record.factor = absF;
+            record.fromModifier = true;
+            record.htmlSpan = true;
+            if (fill && fill->color && fill->color->nodeType() == NodeType::SolidColor) {
+              record.hasBaseFillColor = true;
+              record.baseFillColor = static_cast<const SolidColor*>(fill->color)->color;
+            }
+            if (stroke != nullptr) {
+              record.hasBaseStrokeWidth = true;
+              record.baseStrokeWidth = stroke->width;
+              if (stroke->color && stroke->color->nodeType() == NodeType::SolidColor) {
+                record.hasBaseStrokeColor = true;
+                record.baseStrokeColor = static_cast<const SolidColor*>(stroke->color)->color;
+              }
+            }
+            record.id = spanId;
+            _ctx->animation.rangeSelectorGlyphs.push_back(record);
+          }
           out.addAttr("style", charStyle);
           out.closeTagWithText(charStr);
           p += len;
@@ -1935,7 +2316,8 @@ void HTMLWriter::applyTrimAttrs(HTMLBuilder& builder, const TrimPath* trim) {
   if (!trim) {
     return;
   }
-  if (trim->start == 0.0f && trim->end == 1.0f && FloatNearlyZero(trim->offset)) {
+  bool animatedEnd = _ctx->animation.elementIds.find(trim) != _ctx->animation.elementIds.end();
+  if (trim->start == 0.0f && trim->end == 1.0f && FloatNearlyZero(trim->offset) && !animatedEnd) {
     return;
   }
   builder.addAttr("pathLength", "1");

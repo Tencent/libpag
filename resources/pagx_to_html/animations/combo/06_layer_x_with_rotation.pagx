@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: A Layer whose x and rotation.z animate together. The position channel and the pose channel
+     share one transform list, so the frame must emit the full chain (translate + rotate) and drop the
+     tag's left/top; emitting only the position delta loses both the base position and the rotation.
+     Target: Layer  Channel: x, rotation.z  Type: float
+     Ref: PAGXHtmlTest.AnimationLayerPositionAndPoseShareOneTransform -->
+<pagx width="320" height="200">
+  <Layer left="0" right="0" top="0" bottom="0"><Rectangle left="0" right="0" top="0" bottom="0"/><Fill color="#F8FAFC"/></Layer>
+  <Layer id="bar" x="120" y="80" width="90" height="40" anchor="45,20">
+    <Rectangle position="45,20" size="90,40" roundness="8"/><Fill color="#0E7490"/>
+  </Layer>
+  <Animations><Animation id="a" duration="60" frameRate="60" loop="once"><Object target="bar">
+    <Channel name="x" type="float"><Key time="0" value="120" interpolation="linear"/><Key time="60" value="200"/></Channel>
+    <Channel name="rotation.z" type="float"><Key time="0" value="0" interpolation="linear"/><Key time="60" value="40"/></Channel>
+  </Object></Animation></Animations>
+</pagx>

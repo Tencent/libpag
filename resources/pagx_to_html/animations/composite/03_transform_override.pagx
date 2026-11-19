@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: Two Layers pin the transform priority chain: the first animates x / y next to a matrix channel (the
+     matrix must win, the translate lives inside it), the second animates x / rotation.z next to a static
+     matrix3D (that pose must win while alpha still applies).
+     Target: Composite  Channel: x,y,matrix,x,rotation.z,alpha,matrix3D  Type: mixed
+     Ref: - -->
+<pagx width="320" height="200">
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F8FAFC"/>
+  </Layer>
+  <Layer id="matrixWins" x="30" y="40" width="100" height="90">
+    <Rectangle position="50,45" size="100,90" roundness="10"/>
+    <Fill color="#C026D3"/>
+  </Layer>
+  <Layer id="matrix3dWins" x="180" y="40" width="100" height="90" matrix3D="0.9,0,0.436,0,0,1,0,0,-0.436,0,0.9,0,0,0,0,1" perspective="600">
+    <Rectangle position="50,45" size="100,90" roundness="10"/>
+    <Fill color="#475569"/>
+  </Layer>
+  <Layer id="matrix3dAnimated" x="60" y="130" width="200" height="60" perspective="600">
+    <Rectangle position="100,30" size="200,60" roundness="10"/>
+    <Fill color="#15803D"/>
+  </Layer>
+  <Animations>
+    <Animation id="composite" duration="60" frameRate="60" loop="once">
+      <Object target="matrixWins">
+        <Channel name="x" type="float">
+          <Key time="0" value="30" interpolation="linear"/>
+          <Key time="60" value="90"/>
+        </Channel>
+        <Channel name="y" type="float">
+          <Key time="0" value="40" interpolation="linear"/>
+          <Key time="60" value="70"/>
+        </Channel>
+        <Channel name="matrix" type="matrix">
+          <Key time="0" value="1,0,0,1,30,40" interpolation="linear"/>
+          <Key time="60" value="1.2,0.2,-0.2,1.2,90,70"/>
+        </Channel>
+      </Object>
+      <Object target="matrix3dWins">
+        <Channel name="x" type="float">
+          <Key time="0" value="180" interpolation="linear"/>
+          <Key time="60" value="120"/>
+        </Channel>
+        <Channel name="rotation.z" type="float">
+          <Key time="0" value="0" interpolation="linear"/>
+          <Key time="60" value="30"/>
+        </Channel>
+        <Channel name="alpha" type="float">
+          <Key time="0" value="1" interpolation="linear"/>
+          <Key time="60" value="0.5"/>
+        </Channel>
+      </Object>
+      <Object target="matrix3dAnimated">
+        <Channel name="matrix3D" type="matrix3D">
+          <Key time="0" value="1,0,0,0,0,1,0,0,0,0,1,0,60,130,0,1" interpolation="linear"/>
+          <Key time="60" value="0.94,0,-0.34,0,0,1,0,0,0.34,0,0.94,0,60,130,0,1"/>
+        </Channel>
+        <Channel name="alpha" type="float">
+          <Key time="0" value="1" interpolation="linear"/>
+          <Key time="60" value="0.6"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>

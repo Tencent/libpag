@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: RangeSelector end widens the rampUp range from the first quarter to the whole word, so each
+     glyph's lift shrinks as the ramp stretches across it.
+     Target: RangeSelector  Channel: end  Type: float
+     Note: 文本类用例按 README §6.1：显式 letterSpacing，逐字几何以 PAGX layoutRuns 为准。
+     Ref: PAGXHtmlTest.AnimationRangeSelectorStartFansOutToGlyphs -->
+<pagx width="320" height="200">
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F8FAFC"/>
+  </Layer>
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Text text="WAVE" fontFamily="Arial" fontStyle="Bold" fontSize="56" position="70,120" letterSpacing="0"/>
+    <TextModifier id="widenModifier" position="0,-18">
+      <RangeSelector id="widenSelector" start="0" end="0.25" offset="0" unit="percentage" shape="rampUp"/>
+    </TextModifier>
+    <Fill color="#0E7490"/>
+  </Layer>
+  <Animations>
+    <Animation id="widenRange" duration="60" frameRate="60" loop="once">
+      <Object target="widenSelector">
+        <Channel name="end" type="float">
+          <Key time="0" value="0.25" interpolation="linear"/>
+          <Key time="60" value="1"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>

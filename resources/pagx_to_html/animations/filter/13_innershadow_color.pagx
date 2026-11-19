@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: InnerShadowFilter color shifts the rim from deep navy to bright amber, so the whole inner shadow re-tints.
+     Target: InnerShadowFilter  Channel: color  Type: color
+     Ref: - -->
+<pagx width="320" height="200">
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F8FAFC"/>
+  </Layer>
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Ellipse position="90,90" size="120,120"/>
+    <Fill color="#BFDBFE"/>
+  </Layer>
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Ellipse position="230,120" size="110,110"/>
+    <Fill color="#FBCFE8"/>
+  </Layer>
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle position="160,100" size="190,130" roundness="18"/>
+    <Fill color="#FFFFFF"/>
+    <InnerShadowFilter id="innerShadow" offsetX="0" offsetY="6" blurX="10" blurY="10"
+                       color="#1E1B4B"/>
+  </Layer>
+  <Animations>
+    <Animation id="innerAnim" duration="60" frameRate="60" loop="once">
+      <Object target="innerShadow">
+        <Channel name="color" type="color">
+          <Key time="0" value="#1E1B4B" interpolation="linear"/>
+          <Key time="60" value="#F59E0B"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>

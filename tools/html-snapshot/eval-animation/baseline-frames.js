@@ -69,6 +69,7 @@ function parseArgs(argv) {
     viewportHeight: 900,
     waitMs: 800,
     selector: '',
+    timesJson: '',
     browserEngine: resolveEngine(undefined),
   };
   const positional = [];
@@ -78,6 +79,8 @@ function parseArgs(argv) {
       opts.outDir = argv[++i];
     } else if (a === '--samples') {
       opts.samples = parseNumber('--samples', argv[++i], { min: 1, fail });
+    } else if (a === '--times-json') {
+      opts.timesJson = path.resolve(argv[++i]);
     } else if (a === '--viewport-width') {
       opts.viewportWidth = parseNumber('--viewport-width', argv[++i], { min: 1, fail });
     } else if (a === '--viewport-height') {
@@ -104,6 +107,11 @@ function parseArgs(argv) {
     fail('-o <out-dir> is required');
   }
   opts.outDir = path.resolve(opts.outDir);
+  // Validate the sample grid file here so a typo fails immediately instead of silently falling back
+  // to computed samples after the browser has started.
+  if (opts.timesJson && !fs.existsSync(opts.timesJson)) {
+    fail(`times file not found: ${opts.timesJson}`);
+  }
   return opts;
 }
 
@@ -221,9 +229,26 @@ async function main() {
     // Measure + seek via the shared clock (lib/animation-clock.ts) so the
     // baseline and the animation capture sample on one timeline. The functions
     // are self-contained browser-side code injected with `page.evaluate(fn)`.
-    const globalDurationMs = await page.evaluate(pagxMeasureGlobalDurationMs);
+    let globalDurationMs = await page.evaluate(pagxMeasureGlobalDurationMs);
     await page.evaluate(pagxCaptureAnimeInstances);
-    const timesMs = pagxSampleTimesMs(globalDurationMs, opts.samples);
+    let timesMs;
+    if (opts.timesJson) {
+      // A missing or unreadable times file used to fall back to computed samples, which silently
+      // scored the run against a different sample grid than the caller asked for.
+      if (!fs.existsSync(opts.timesJson)) {
+        fail(`times file not found: ${opts.timesJson}`);
+      }
+      const refMeta = JSON.parse(fs.readFileSync(opts.timesJson, 'utf8'));
+      if (Array.isArray(refMeta.samples) && refMeta.samples.length > 0) {
+        timesMs = refMeta.samples.map((s) => (typeof s.timeSec === 'number' ? s.timeSec * 1000 : 0));
+      }
+      if (typeof refMeta.globalDurationMs === 'number' && refMeta.globalDurationMs > 0) {
+        globalDurationMs = refMeta.globalDurationMs;
+      }
+    }
+    if (!timesMs) {
+      timesMs = pagxSampleTimesMs(globalDurationMs, opts.samples);
+    }
 
     const samples = [];
     for (let i = 0; i < timesMs.length; i++) {

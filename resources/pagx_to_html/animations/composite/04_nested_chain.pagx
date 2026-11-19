@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: A Layer, a Group and a TextBox each animate their own position / rotation / scale / skew / anchor /
+     alpha, so three transform chains and three opacity factors stack on one element tree.
+     Target: Composite  Channel: alpha,position.x,position.y,rotation,scale.x,scale.y,skew,skewAxis,anchor.x,anchor.y,alpha  Type: mixed
+     Ref: - -->
+<pagx width="320" height="200">
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F8FAFC"/>
+  </Layer>
+  <Layer id="chainLayer" x="0" y="0" width="320" height="200" alpha="1">
+    <Group id="chainGroup" position="90,50" anchor="0,0" rotation="6" scale="1,1" skew="0" skewAxis="0" alpha="1">
+      <Rectangle position="60,45" size="120,90" roundness="12"/>
+      <Fill color="#EA580C"/>
+      <TextBox id="chainBox" position="10,20" width="100" height="50" textAlign="center" alpha="1"
+               rotation="0" scale="1,1" anchor="0,0">
+        <Text text="AB" fontFamily="Arial" fontStyle="Bold" fontSize="30" letterSpacing="0"/>
+        <Fill color="#7C3AED"/>
+      </TextBox>
+    </Group>
+  </Layer>
+  <Animations>
+    <Animation id="composite" duration="60" frameRate="60" loop="once">
+      <Object target="chainLayer">
+        <Channel name="alpha" type="float">
+          <Key time="0" value="1" interpolation="linear"/>
+          <Key time="60" value="0.7"/>
+        </Channel>
+      </Object>
+      <Object target="chainGroup">
+        <Channel name="position.x" type="float">
+          <Key time="0" value="90" interpolation="linear"/>
+          <Key time="30" value="110"/>
+          <Key time="60" value="95"/>
+        </Channel>
+        <Channel name="position.y" type="float">
+          <Key time="0" value="50" interpolation="linear"/>
+          <Key time="40" value="70"/>
+          <Key time="60" value="55"/>
+        </Channel>
+        <Channel name="rotation" type="float">
+          <Key time="0" value="6" interpolation="linear"/>
+          <Key time="60" value="-8"/>
+        </Channel>
+        <Channel name="scale.x" type="float">
+          <Key time="0" value="1" interpolation="linear"/>
+          <Key time="60" value="1.15"/>
+        </Channel>
+        <Channel name="scale.y" type="float">
+          <Key time="0" value="1" interpolation="linear"/>
+          <Key time="45" value="0.85"/>
+          <Key time="60" value="1"/>
+        </Channel>
+        <Channel name="skew" type="float">
+          <Key time="0" value="0" interpolation="linear"/>
+          <Key time="60" value="10"/>
+        </Channel>
+        <Channel name="skewAxis" type="float">
+          <Key time="0" value="0" interpolation="linear"/>
+          <Key time="60" value="40"/>
+        </Channel>
+        <Channel name="anchor.x" type="float">
+          <Key time="0" value="0" interpolation="linear"/>
+          <Key time="30" value="20"/>
+          <Key time="60" value="0"/>
+        </Channel>
+        <Channel name="anchor.y" type="float">
+          <Key time="0" value="0" interpolation="linear"/>
+          <Key time="40" value="12"/>
+          <Key time="60" value="0"/>
+        </Channel>
+        <Channel name="alpha" type="float">
+          <Key time="0" value="1" interpolation="linear"/>
+          <Key time="60" value="0.8"/>
+        </Channel>
+      </Object>
+      <Object target="chainBox">
+        <Channel name="position.x" type="float">
+          <Key time="0" value="10" interpolation="linear"/>
+          <Key time="60" value="30"/>
+        </Channel>
+        <Channel name="rotation" type="float">
+          <Key time="0" value="0" interpolation="linear"/>
+          <Key time="30" value="8"/>
+          <Key time="60" value="0"/>
+        </Channel>
+        <Channel name="scale.x" type="float">
+          <Key time="0" value="1" interpolation="linear"/>
+          <Key time="60" value="0.85"/>
+        </Channel>
+        <Channel name="anchor.x" type="float">
+          <Key time="0" value="0" interpolation="linear"/>
+          <Key time="60" value="30"/>
+        </Channel>
+        <Channel name="alpha" type="float">
+          <Key time="0" value="1" interpolation="linear"/>
+          <Key time="50" value="0.6"/>
+          <Key time="60" value="0.9"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>
