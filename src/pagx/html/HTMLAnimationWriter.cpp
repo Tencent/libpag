@@ -2814,6 +2814,22 @@ void EmitGeometryCssAtFrame(const DomTargetBundle& bundle, const BundleChannelSe
   AppendCssDecl(decls, "height", CssFloatToString(height) + "px");
 }
 
+// A stop's timing function drives every property in its rule. Attached from one place so the
+// opacity-only rule (which returns before the transform/paint half) gets it too - it used to return
+// early and lose the hold, so a held value played as a ramp.
+void AppendStopTimingFunction(const BundleChannelSet& chSet, const BundleTimingInfo& timing,
+                              Frame t, std::string& decls) {
+  auto easeIt = chSet.stopEasings.find(t);
+  // A hold keeps `steps(1, end)` even when another channel forced the linear fallback: sampling
+  // approximates curves, but a hold is a discontinuity.
+  const bool holdStop =
+      easeIt != chSet.stopEasings.end() && easeIt->second.type == KeyframeInterpolationType::Hold;
+  if (easeIt != chSet.stopEasings.end() && (chSet.mixedEasingTimes.empty() || holdStop) &&
+      (easeIt->second.type != KeyframeInterpolationType::Linear || !timing.uniformEasing)) {
+    AppendCssDecl(decls, "animation-timing-function", easeIt->second.toCss());
+  }
+}
+
 std::string EvaluateKeyframeCssDecls(const DomTargetBundle& bundle, const BundleChannelSet& chSet,
                                      const BundleTimingInfo& timing, const std::string& tagName,
                                      Frame t, bool& needsZeroOrigin,
@@ -2901,6 +2917,7 @@ std::string EvaluateKeyframeCssDecls(const DomTargetBundle& bundle, const Bundle
     AppendCssDecl(decls, "-webkit-text-stroke-color", "currentColor");
   }
   if (!wantsRest) {
+    AppendStopTimingFunction(chSet, timing, t, decls);
     // A stepped rule carries only its discrete property; pose and paint belong to the continuous one.
     return decls;
   }
@@ -2941,16 +2958,7 @@ std::string EvaluateKeyframeCssDecls(const DomTargetBundle& bundle, const Bundle
   // A stop's timing function drives every property in its rule. When the channels behind this rule
   // disagree on the curve the stop is split into linear pieces instead (see the mixedEasingTimes
   // handling in EmitBundleKeyframeStops), so no easing goes here.
-  auto easeIt = chSet.stopEasings.find(t);
-  // A hold keeps `steps(1, end)` even when another channel in the same rule forced the linear
-  // fallback: sampling approximates curves, but a hold is a discontinuity - replayed as a ramp the
-  // opacity sits at a value the reference never shows.
-  const bool holdStop =
-      easeIt != chSet.stopEasings.end() && easeIt->second.type == KeyframeInterpolationType::Hold;
-  if (easeIt != chSet.stopEasings.end() && (chSet.mixedEasingTimes.empty() || holdStop) &&
-      (easeIt->second.type != KeyframeInterpolationType::Linear || !timing.uniformEasing)) {
-    AppendCssDecl(decls, "animation-timing-function", easeIt->second.toCss());
-  }
+  AppendStopTimingFunction(chSet, timing, t, decls);
   return decls;
 }
 
