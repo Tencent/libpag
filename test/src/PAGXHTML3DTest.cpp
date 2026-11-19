@@ -115,6 +115,66 @@ std::vector<pagx::Layer*> LayersWithNonIdentityMatrix3D(
   return layers;
 }
 
+void CollectCameraLayers(pagx::Layer* layer, std::vector<pagx::Layer*>* out) {
+  if (layer == nullptr || out == nullptr) {
+    return;
+  }
+  if (layer->perspective > 0.0f) {
+    out->push_back(layer);
+  }
+  for (auto* child : layer->children) {
+    CollectCameraLayers(child, out);
+  }
+}
+
+std::vector<pagx::Layer*> CameraLayers(const std::shared_ptr<pagx::PAGXDocument>& doc) {
+  std::vector<pagx::Layer*> layers = {};
+  if (doc == nullptr) {
+    return layers;
+  }
+  for (auto* layer : doc->layers) {
+    CollectCameraLayers(layer, &layers);
+  }
+  return layers;
+}
+
+pagx::Layer* CameraWrapperOf(pagx::Layer* layer, const pagx::Layer* target) {
+  if (layer == nullptr || target == nullptr) {
+    return nullptr;
+  }
+  for (auto* child : layer->children) {
+    if (child == target && layer->perspective > 0.0f) {
+      return layer;
+    }
+    if (auto* found = CameraWrapperOf(child, target)) {
+      return found;
+    }
+  }
+  return nullptr;
+}
+
+pagx::Layer* CameraWrapperOf(const std::shared_ptr<pagx::PAGXDocument>& doc,
+                             const pagx::Layer* target) {
+  if (doc == nullptr) {
+    return nullptr;
+  }
+  for (auto* layer : doc->layers) {
+    if (auto* found = CameraWrapperOf(layer, target)) {
+      return found;
+    }
+  }
+  return nullptr;
+}
+
+bool HasProjectionRow(const pagx::Layer* layer) {
+  if (layer == nullptr) {
+    return false;
+  }
+  return std::fabs(layer->matrix3D.getRowColumn(3, 0)) > 1e-6f ||
+         std::fabs(layer->matrix3D.getRowColumn(3, 1)) > 1e-6f ||
+         std::fabs(layer->matrix3D.getRowColumn(3, 2)) > 1e-6f;
+}
+
 pagx::Animation* FirstAnimation(const std::shared_ptr<pagx::PAGXDocument>& doc) {
   if (doc == nullptr || doc->animations.empty()) {
     return nullptr;
@@ -384,11 +444,13 @@ PAG_TEST(PAGXHTML3DTest, ZeroParentPerspectiveClampsToOnePixel) {
   EXPECT_FALSE(HasDiagnosticContaining(doc, "perspective"));
   auto* card = FindLayerById(doc, "card");
   ASSERT_NE(card, nullptr);
-  const auto& pose = card->matrix3D;
-  // The projection row is `-1 / 1px` times the rotation's Z row: (sin30, 0, -cos30, 1). A value of
-  // 600px would read 0.000833 / -0.001443 instead.
-  EXPECT_TRUE(NearlyEqual(pose.getRowColumn(3, 0), 0.5f, 1e-5f));
-  EXPECT_TRUE(NearlyEqual(pose.getRowColumn(3, 2), -0.866025f, 1e-5f));
+  // `perspective: 0` clamps to a 1px camera. The camera lives on a wrapper layer now, so the child's
+  // pose stays a plain rotation and the projection is applied outside interpolation.
+  auto* wrapper = CameraWrapperOf(doc, card);
+  ASSERT_NE(wrapper, nullptr) << "a zero distance must clamp to a 1px camera wrapper";
+  EXPECT_TRUE(NearlyEqual(wrapper->perspective, 1.0f, 1e-4f));
+  EXPECT_FALSE(HasProjectionRow(card)) << "the camera must not be folded into the child pose";
+  EXPECT_TRUE(NearlyEqual(card->matrix3D.getRowColumn(0, 0), 0.866025f, 1e-4f));
 }
 
 /**
@@ -799,15 +861,16 @@ PAG_TEST(PAGXHTML3DTest, PAGXTextHostKeepsParentPerspective) {
   )HTML");
   ASSERT_NE(doc, nullptr);
   EXPECT_FALSE(HasDiagnosticContaining(doc, "vanishing point"));
+  // The parent camera is carried by exactly one wrapper layer; the restored text host keeps its own
+  // (unprojected) pose inside it, so the camera cannot drift with the host's animation.
+  auto cameras = CameraLayers(doc);
+  ASSERT_EQ(cameras.size(), 1u) << "the parent camera must live on a single wrapper layer";
+  EXPECT_TRUE(NearlyEqual(cameras.front()->perspective, 600.0f, 0.01f));
   auto layers = LayersWithNonIdentityMatrix3D(doc);
   ASSERT_FALSE(layers.empty()) << "the restored text host must carry its 3D pose";
-  bool sawProjection = false;
   for (auto* layer : layers) {
-    if (std::fabs(layer->matrix3D.getRowColumn(3, 2)) > 1e-6f) {
-      sawProjection = true;
-    }
+    EXPECT_FALSE(HasProjectionRow(layer)) << "the camera must not be folded into the host pose";
   }
-  EXPECT_TRUE(sawProjection) << "the parent perspective must reach the text host pose";
 }
 
 /**
@@ -836,23 +899,22 @@ PAG_TEST(PAGXHTML3DTest, Preserve3DWithoutOwnTransformCarriesTheParentCamera) {
   ASSERT_NE(stage, nullptr);
   ASSERT_NE(card, nullptr);
   ASSERT_TRUE(stage->preserve3D);
-  // The intermediate layer materialises the bare projection. Its `perspective-origin` is the parent
-  // box's top-left corner and the layer sits on it, so the conjugation leaves the plain `P`.
-  EXPECT_TRUE(NearlyEqual(stage->matrix3D.getRowColumn(3, 2), -1.0f / 600.0f, 1e-6f));
-  EXPECT_TRUE(NearlyEqual(stage->matrix3D.getRowColumn(3, 0), 0.0f, 1e-6f));
-  EXPECT_TRUE(NearlyEqual(stage->matrix3D.getRowColumn(3, 1), 0.0f, 1e-6f));
-  EXPECT_TRUE(NearlyEqual(stage->matrix3D.getRowColumn(3, 3), 1.0f, 1e-6f));
-  // The bare projection is pivot-free, so it must not claim an anchor.
+  // The camera is a static property of the wrapper that sits above the intermediate layer, so it is
+  // never interpolated with a pose and needs no materialisation on the layer itself.
+  auto* wrapper = CameraWrapperOf(doc, stage);
+  ASSERT_NE(wrapper, nullptr) << "the parent camera must wrap the intermediate layer";
+  EXPECT_TRUE(NearlyEqual(wrapper->perspective, 600.0f, 0.01f));
+  EXPECT_TRUE(NearlyEqual(wrapper->left, 0.0f, 1e-4f)) << "perspective-origin is the parent corner";
+  EXPECT_TRUE(NearlyEqual(wrapper->top, 0.0f, 1e-4f));
+  EXPECT_TRUE(stage->matrix3D.isIdentity()) << "the layer keeps its own (absent) pose";
+  // The pivot is skipped with a pose that does not exist, so nothing claims an anchor.
   EXPECT_TRUE(HasZeroAnchor(stage));
-  EXPECT_TRUE(pagx::IsInvertibleMatrix3D(stage->matrix3D))
-      << "the materialised camera has to be a legal PAGX pose";
-  // The card keeps its own pose and the camera reaches it through the intermediate layer.
+  // The card keeps its own pose and stays inside the camera wrapper's 3D context.
   EXPECT_TRUE(NearlyEqual(card->matrix3D.getRowColumn(0, 0), 0.707106f, 0.001f));
   EXPECT_TRUE(NearlyEqual(card->matrix3D.getRowColumn(2, 0), -0.707106f, 0.001f));
-  const auto composed = MultiplyPose(stage->matrix3D, card->matrix3D);
-  // `-1/600` times the pose's Z row: the grandchild is projected, not merely rotated.
-  EXPECT_TRUE(NearlyEqual(composed.getRowColumn(3, 0), 0.0011785f, 1e-5f));
-  EXPECT_TRUE(NearlyEqual(composed.getRowColumn(3, 2), -0.0011785f, 1e-5f));
+  EXPECT_FALSE(HasProjectionRow(card)) << "the camera must not be folded into the grandchild pose";
+  ASSERT_EQ(wrapper->children.size(), 1u) << "one wrapper carries exactly the projected layer";
+  EXPECT_EQ(wrapper->children.front(), stage);
 }
 
 /**
@@ -875,14 +937,16 @@ PAG_TEST(PAGXHTML3DTest, MaterializedCameraConjugatesPerspectiveOrigin) {
   ASSERT_NE(doc, nullptr);
   auto* stage = FindLayerById(doc, "stage");
   ASSERT_NE(stage, nullptr);
-  // The layer sits at the parent's origin, so the camera centre is the parent box centre (100, 60):
-  // `T(o) * P * T(-o)` shears x / y by `-o/d` and keeps the projection in the bottom row.
-  EXPECT_TRUE(NearlyEqual(stage->matrix3D.getRowColumn(0, 2), -100.0f / 600.0f, 1e-5f));
-  EXPECT_TRUE(NearlyEqual(stage->matrix3D.getRowColumn(1, 2), -60.0f / 600.0f, 1e-5f));
-  EXPECT_TRUE(NearlyEqual(stage->matrix3D.getRowColumn(2, 2), 1.0f, 1e-6f));
-  EXPECT_TRUE(NearlyEqual(stage->matrix3D.getRowColumn(3, 2), -1.0f / 600.0f, 1e-6f));
-  EXPECT_TRUE(NearlyEqual(stage->matrix3D.getRowColumn(0, 3), 0.0f, 1e-6f));
-  EXPECT_TRUE(NearlyEqual(stage->matrix3D.getRowColumn(1, 3), 0.0f, 1e-6f));
+  // `perspective-origin` is where the wrapper sits: PAGX projects about the layer origin, so the
+  // wrapper is translated to the parent box centre (100, 60) and the child is offset by `-o`.
+  auto* wrapper = CameraWrapperOf(doc, stage);
+  ASSERT_NE(wrapper, nullptr);
+  EXPECT_TRUE(NearlyEqual(wrapper->perspective, 600.0f, 0.01f));
+  EXPECT_TRUE(NearlyEqual(wrapper->left, 100.0f, 1e-4f));
+  EXPECT_TRUE(NearlyEqual(wrapper->top, 60.0f, 1e-4f));
+  EXPECT_TRUE(NearlyEqual(stage->left, -100.0f, 1e-4f)) << "the child is offset back by the origin";
+  EXPECT_TRUE(NearlyEqual(stage->top, -60.0f, 1e-4f));
+  EXPECT_TRUE(stage->matrix3D.isIdentity()) << "the pose stays unprojected";
 }
 
 /**
@@ -982,15 +1046,21 @@ PAG_TEST(PAGXHTML3DTest, IdentityTransformKeepsTheBarePreserve3DCamera) {
     ASSERT_NE(card, nullptr) << value;
     EXPECT_TRUE(stage->preserve3D) << value;
     EXPECT_TRUE(stage->matrix.isIdentity()) << value;
-    EXPECT_TRUE(pagx::IsInvertibleMatrix3D(stage->matrix3D)) << value;
-    EXPECT_TRUE(NearlyEqual(stage->matrix3D.getRowColumn(3, 2), -1.0f / 600.0f, 1e-6f)) << value;
+    // The camera rides on the wrapper above the identity layer, so the layer itself keeps no pose and
+    // the projection is applied outside any animation of its children.
+    auto* wrapper = CameraWrapperOf(doc, stage);
+    ASSERT_NE(wrapper, nullptr) << value;
+    EXPECT_TRUE(NearlyEqual(wrapper->perspective, 600.0f, 0.01f)) << value;
+    EXPECT_TRUE(NearlyEqual(wrapper->left, 0.0f, 1e-4f)) << value;
+    EXPECT_TRUE(NearlyEqual(wrapper->top, 0.0f, 1e-4f)) << value;
+    EXPECT_TRUE(stage->matrix3D.isIdentity()) << value;
     // The skipped pivot must not leave a residue behind.
     EXPECT_TRUE(NearlyEqual(stage->anchor.x, 0.0f)) << value;
     EXPECT_TRUE(NearlyEqual(stage->anchor.y, 0.0f)) << value;
     EXPECT_TRUE(NearlyEqual(stage->anchorZ, 0.0f)) << value;
-    // The grandchild keeps its own pose; only the camera rides on the intermediate layer.
+    // The grandchild keeps its own pose.
     EXPECT_TRUE(NearlyEqual(card->matrix3D.getRowColumn(0, 0), 0.70710678f, 0.001f)) << value;
-    EXPECT_TRUE(NearlyEqual(card->matrix3D.getRowColumn(3, 2), 0.0f, 1e-6f)) << value;
+    EXPECT_FALSE(HasProjectionRow(card)) << value;
   }
 
   // An identity pose is no pose, so a flat but non-identity one must not take the bare camera route:
@@ -1014,6 +1084,8 @@ PAG_TEST(PAGXHTML3DTest, IdentityTransformKeepsTheBarePreserve3DCamera) {
   EXPECT_TRUE(scaleZeroStage->matrix3D.isIdentity()) << "must not materialise the bare camera";
   EXPECT_TRUE(NearlyEqual(scaleZeroStage->matrix.a, 0.0f, 1e-6f));
   EXPECT_TRUE(NearlyEqual(scaleZeroStage->matrix.d, 0.0f, 1e-6f));
+  EXPECT_NE(CameraWrapperOf(scaleZero, scaleZeroStage), nullptr)
+      << "the camera still wraps the layer; only the flat pose stays on the 2D channel";
 
   // The pivot is skipped with the pose, so a bad `transform-origin` is not reported on a layer that
   // has no transform of its own.
@@ -1496,9 +1568,11 @@ PAG_TEST(PAGXHTML3DTest, BodyPerspectiveReachesItsChildren) {
   EXPECT_FALSE(HasDiagnosticContaining(doc, "vanishing point"));
   auto* card = FindLayerById(doc, "card");
   ASSERT_NE(card, nullptr);
-  const float projection =
-      std::fabs(card->matrix3D.getRowColumn(3, 0)) + std::fabs(card->matrix3D.getRowColumn(3, 2));
-  EXPECT_GT(projection, 1e-5f) << "the body camera must reach the child pose";
+  // The camera is carried by a wrapper layer, so the child pose itself is never projected.
+  auto* wrapper = CameraWrapperOf(doc, card);
+  ASSERT_NE(wrapper, nullptr) << "the body camera must reach a wrapper above the child";
+  EXPECT_TRUE(NearlyEqual(wrapper->perspective, 600.0f, 0.01f));
+  EXPECT_FALSE(HasProjectionRow(card)) << "the camera must not be folded into the child pose";
 
   // Without the camera the same pose stays a plain rotation.
   auto plain = ParseHtml(R"HTML(
@@ -1545,8 +1619,15 @@ PAG_TEST(PAGXHTML3DTest, SingularFlatStopKeepsThePopInOnMatrix3D) {
   // `scale(0)` renders nothing; the collapsed linear block keeps that while staying invertible.
   EXPECT_LT(std::fabs(channel->keyframes.front().value.getRowColumn(0, 0)), 1e-3f);
   EXPECT_GT(std::fabs(channel->keyframes.front().value.getRowColumn(0, 0)), 1e-6f);
-  EXPECT_GT(std::fabs(channel->keyframes.back().value.getRowColumn(3, 2)), 1e-6f)
-      << "the 3D stop still carries the parent projection";
+  // The camera is not part of the track any more: it lives on the wrapper, so every stop stays a pure
+  // pose and the projection is applied once, after interpolation.
+  for (const auto& key : channel->keyframes) {
+    EXPECT_TRUE(NearlyEqual(key.value.getRowColumn(3, 0), 0.0f, 1e-6f)) << "time " << key.time;
+    EXPECT_TRUE(NearlyEqual(key.value.getRowColumn(3, 2), 0.0f, 1e-6f)) << "time " << key.time;
+  }
+  auto* card = FindLayerById(doc, "card");
+  ASSERT_NE(card, nullptr);
+  ASSERT_NE(CameraWrapperOf(doc, card), nullptr) << "the camera must survive on a wrapper";
 }
 
 /**

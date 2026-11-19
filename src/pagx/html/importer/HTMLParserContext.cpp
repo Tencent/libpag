@@ -700,6 +700,32 @@ void HTMLParserContext::assignElementId(Layer* layer, const std::shared_ptr<DOMN
   }
 }
 
+// Places `child` inside a zero-size layer that carries the parent camera at the parent's
+// `perspective-origin`. The child keeps its own (un-projected) pose; only its offset changes, so the
+// composition stays `T(origin) * P * T(-origin) * T(child) * pose`, i.e. CSS's order.
+Layer* HTMLParserContext::wrapInCameraLayer(Layer* child, const HTMLParentCamera& camera) {
+  if (child == nullptr || !camera.HasOrigin()) {
+    return child;
+  }
+  auto* wrapper = _document->makeNode<Layer>();
+  wrapper->width = 0.0f;
+  wrapper->height = 0.0f;
+  wrapper->includeInLayout = false;
+  wrapper->left = camera.localOrigin.x;
+  wrapper->top = camera.localOrigin.y;
+  wrapper->perspective = camera.distancePx;
+  // Without a 3D context the runtime flattens the child before projecting, which drops the camera.
+  wrapper->preserve3D = true;
+  if (std::isfinite(child->left)) {
+    child->left -= camera.localOrigin.x;
+  }
+  if (std::isfinite(child->top)) {
+    child->top -= camera.localOrigin.y;
+  }
+  wrapper->children.push_back(child);
+  return wrapper;
+}
+
 //==================================================================================================
 // Body / element conversion
 //==================================================================================================
@@ -745,7 +771,13 @@ Layer* HTMLParserContext::convertBody(const std::shared_ptr<DOMNode>& body, floa
     if (child->type == DOMNodeType::Element) {
       auto* childLayer = convertElement(child, childInherited, 1);
       if (childLayer) {
-        contentHost->children.push_back(childLayer);
+        auto pending = _pendingChildCamera.find(child.get());
+        const HTMLParentCamera camera =
+            pending == _pendingChildCamera.end() ? HTMLParentCamera{} : pending->second;
+        if (pending != _pendingChildCamera.end()) {
+          _pendingChildCamera.erase(pending);
+        }
+        contentHost->children.push_back(wrapInCameraLayer(childLayer, camera));
       }
     } else if (child->type == DOMNodeType::Text) {
       // Stray text directly under <body> — match convertContainer's behaviour so authors
@@ -770,6 +802,17 @@ Layer* HTMLParserContext::convertBody(const std::shared_ptr<DOMNode>& body, floa
 void HTMLParserContext::attachParentCamera(HTMLBoxAttributes& box,
                                            const std::shared_ptr<DOMNode>& element,
                                            const HTMLInheritedStyle& inherited) {
+  // An absolutely positioned child can carry the parent camera on a wrapper layer instead of in its
+  // own pose. PAGX composes a layer's `perspective` outside its pose, so the camera stays static while
+  // the pose interpolates — folding it per keyframe is what made a fixed camera drift (the midpoint of
+  // `translateZ 0 -> 50` under `perspective: 100` came out at 114px instead of 133px). The wrapper also
+  // carries `perspective-origin`, which PAGX's projection (centred on the layer origin) cannot.
+  if (inherited.parentCamera.HasOrigin() && box.absolute && std::isfinite(box.leftPx) &&
+      std::isfinite(box.topPx)) {
+    _pendingChildCamera[element.get()] = inherited.parentCamera;
+    box.parentCamera = {};
+    return;
+  }
   // Classifying a keyframe set only answers a yes/no question about an animation the builder may not
   // even pick, so it must not write diagnostics into the document. The sink is local and every probe
   // parser is bound to it: the shared parser would still report em/rem units through its own sink.
@@ -954,7 +997,13 @@ Layer* HTMLParserContext::convertContainer(const std::shared_ptr<DOMNode>& eleme
           if (!std::isnan(childLayer->top)) childLayer->top += box.borderWidthPx;
           if (!std::isnan(childLayer->bottom)) childLayer->bottom += box.borderWidthPx;
         }
-        contentHost->children.push_back(childLayer);
+        auto pending = _pendingChildCamera.find(child.get());
+        const HTMLParentCamera camera =
+            pending == _pendingChildCamera.end() ? HTMLParentCamera{} : pending->second;
+        if (pending != _pendingChildCamera.end()) {
+          _pendingChildCamera.erase(pending);
+        }
+        contentHost->children.push_back(wrapInCameraLayer(childLayer, camera));
       }
     } else if (child->type == DOMNodeType::Text) {
       std::string trimmed = Trim(child->name);

@@ -313,6 +313,16 @@ class HTMLParserContext {
   bool _flowChildPerspectiveWarned = false;
 
   // Elements carrying an `animation` declaration, paired with their finalised outer Layer.
+  // Set by `attachParentCamera` when the parent camera will be carried by a wrapper layer instead of
+  // being folded into this element's pose; the caller that attaches the converted layer consumes it
+  // immediately. A wrapper keeps the camera static (it must not be interpolated with the pose) and
+  // lets the projection be centred on `perspective-origin` instead of the layer origin.
+  // Camera to wrap onto a child's layer, keyed by that child node: converting a child recurses, so a
+  // single slot would be overwritten by the grandchild before the child is attached.
+  std::unordered_map<const DOMNode*, HTMLParentCamera> _pendingChildCamera = {};
+
+  Layer* wrapInCameraLayer(Layer* child, const HTMLParentCamera& camera);
+
   // Recorded during `assignElementId` and processed after the whole tree is built (so background
   // fills used by `color` channels already exist).
   struct PendingAnimation {
