@@ -86,8 +86,9 @@ class Devices {
    *   Metal:  MetalDevice::Make()
 *   WebGPU: WebGPUDevice::Make() — reads the GPUDevice preinitialized on the JS side; only
 *           callable on the main runtime thread.
-*   Vulkan / D3D12: Not implemented yet — selecting those backends fails during CMake
-*           configuration.
+*   D3D12: D3D12Device from the default adapter, preferring hardware and falling back to WARP;
+*           the registry keeps one tgfx device per native ID3D12Device.
+*   Vulkan: Not implemented yet.
 */
   static std::shared_ptr<tgfx::Device> MakeDefault();
 
@@ -113,6 +114,8 @@ class Devices {
    *           forbids using a texture on a different MTLDevice, so the texture's device is the
    *           only valid choice for the worker. Falls back to MakeDefault() when the texture
    *           does not carry a valid Metal texture handle.
+   *   D3D12:  Same as MakeForTexture(texture); the registry device is shared with the caller and
+   *           access is serialized by its context mutex. There is no separate context.
    * Used by PAGSurface::MakeFrom(BackendTexture, forAsyncThread=true).
    */
   static std::shared_ptr<tgfx::Device> MakeForAsyncThread(const tgfx::BackendTexture& texture);
@@ -140,6 +143,7 @@ class Devices {
    *   OpenGL: GLDevice::Make(sharedContext) - the handle is a native GL context, so the new
    *           device joins its share group and both sides can see each other's textures. A null
    *           handle yields an independent device.
+   *   D3D12: Returns nullptr for a non-null handle; a null handle returns MakeDefault().
    *   Other backends: Equivalent to MakeDefault(); they have no share-group notion tied to an
    *           opaque context handle, so the parameter is unused but kept for signature parity.
    * Used by pag_surface_make_offscreen_double_buffered(), whose sharedContext parameter predates
@@ -201,10 +205,9 @@ class Devices {
    *   WebGPU:      Returns MakeDefault(); WGPUTexture carries no device back-reference, but Web
    *                runs on a single shared GPUDevice, so the default device is always the one
    *                that created the caller's texture.
-   *   Vulkan / D3D12: Not implemented yet — selecting those backends fails during CMake
-   *                configuration. Their texture types do not carry a device
-   *                back-reference; a SetSharedDevice-style API is planned to lift that once the
-   *                first of them lands.
+   *   D3D12:       Reads ID3D12Resource::GetDevice() and returns the registry device for that
+   *                native device, creating it on first use.
+   *   Vulkan:      Not implemented yet.
    * Used by PAGImage::FromTexture() for implicit device inference.
    */
   static std::shared_ptr<tgfx::Device> MakeForTexture(const tgfx::BackendTexture& texture);
@@ -213,8 +216,8 @@ class Devices {
    * Same as MakeForTexture(BackendTexture) but for BackendRenderTarget. Used by
    * PAGSurface::MakeFrom(BackendRenderTarget) on backends that need to reach back through the
    * render target to locate the owning GPU device (Metal). GL adopts the current context as
-   * usual; WebGPU returns MakeDefault() since Web runs on a single shared GPUDevice; CMake
-   * rejects selection of the remaining, unimplemented backends.
+   * usual; WebGPU returns MakeDefault() since Web runs on a single shared GPUDevice; D3D12
+   * resolves through the render target's resource.
    */
   static std::shared_ptr<tgfx::Device> MakeForTexture(
       const tgfx::BackendRenderTarget& renderTarget);
@@ -227,20 +230,18 @@ class Devices {
    *           creating context is current. The texture parameter is unused on this backend but
    *           kept for signature parity.
    *   Metal:  Reads MTLTexture.device and retains it in a backend-specific ExternalDeviceRef.
-   *   Others: Return nullptr; VulkanImageInfo / WebGPUTextureInfo do not expose a device
-   *           back-reference from the texture handle, and CanSampleFrom() will treat the null ref
-   *           as "trust the caller".
+   *   D3D12:  Retains the ID3D12Device identity from the resource.
+   *   Vulkan / WebGPU: Return nullptr; their texture handles expose no device back-reference, and
+   *           CanSampleFrom() treats the null ref as "trust the caller".
    * Used by Picture::BackendTextureProxy to remember the external device identity.
    */
   static std::shared_ptr<ExternalDeviceRef> CaptureFromTexture(const tgfx::BackendTexture& texture);
 
   /**
    * Returns true when Devices::CaptureFromTexture() being nullptr is treated as an error condition
-   * for the current backend, false otherwise. Only OpenGL (which has a thread-local "current
-   * context" concept) returns true — callers such as PAGImage::FromTexture use this to decide
-   * whether a null capture should be reported as a missing GPU context or accepted silently.
-   * Metal / Vulkan / D3D12 / WebGPU have no thread-local context, so a null capture is normal
-   * and must not fail the caller.
+   * for the current backend, false otherwise. OpenGL (thread-local current context) and D3D12
+   * (native device identity) return true; Metal / Vulkan / WebGPU have no such requirement, so a
+   * null capture is normal and must not fail the caller.
    */
   static bool RequiresCapturedIdentity();
 

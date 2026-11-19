@@ -402,13 +402,19 @@ bool Devices::IsDeviceHealthy(tgfx::Context* context) {
   if (context == nullptr) {
     return false;
   }
-  auto identity = CaptureIdentityFromContext(context);
-  if (identity == nullptr) {
-    return false;
-  }
   ID3D12Device* nativeDevice = nullptr;
-  identity->QueryInterface(IID_PPV_ARGS(&nativeDevice));
-  identity->Release();
+  auto entry = RegisterContextDevice(context);
+  if (entry != nullptr && entry->identity != nullptr) {
+    entry->identity->QueryInterface(IID_PPV_ARGS(&nativeDevice));
+  }
+  if (nativeDevice == nullptr) {
+    auto identity = CaptureIdentityFromContext(context);
+    if (identity == nullptr) {
+      return false;
+    }
+    identity->QueryInterface(IID_PPV_ARGS(&nativeDevice));
+    identity->Release();
+  }
   if (nativeDevice == nullptr) {
     return false;
   }
