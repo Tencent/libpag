@@ -361,6 +361,10 @@ class HTMLWriterContext {
     // Layers whose translation comes from an animated `matrix` channel. The matrix already carries
     // the position, so the tag must not also emit left/top from the layer's x/y.
     std::unordered_set<const Layer*> matrixDrivenLayers = {};
+    // Layers whose alpha is animated while `groupOpacity` is false: the runtime splits that alpha
+    // across the paint hosts, which the export does not do yet (R16). Recorded so the deviation
+    // stays visible instead of being hidden by rewriting the authored flag.
+    std::unordered_set<const Layer*> groupedAlphaLayers = {};
     // Layers whose animated pose carries the authored x/y inside the transform, so the tag must not
     // also emit them as left/top.
     std::unordered_set<const Layer*> poseDrivenLayers = {};

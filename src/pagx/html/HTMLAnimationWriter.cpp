@@ -4528,8 +4528,12 @@ void HTMLAnimationSession::ResolveAnimationTargets(
             _ctx.animation.visibleLayers.insert(layer);
           }
           if (role == TargetChannelRole::Opacity && !layer->groupOpacity) {
-            _restoredGroupOpacity.emplace_back(layer, layer->groupOpacity);
-            layer->groupOpacity = true;
+            // The authored `groupOpacity` is left alone: flipping it to true turned per-child alpha
+            // into one layer-wide opacity, which composites overlapping children differently from
+            // the runtime (0.5 over 0.5 instead of 0.75 in the overlap). The alpha animation is
+            // written to the layer's own box either way; distributing it to the paint hosts is the
+            // follow-up this flag records (R16 in the review).
+            _ctx.animation.groupedAlphaLayers.insert(layer);
           }
         }
       } else if (nType == NodeType::RangeSelector) {
@@ -4770,9 +4774,7 @@ HTMLAnimationSession::~HTMLAnimationSession() {
   for (auto& kv : _restoredNodeIds) {
     kv.first->id = kv.second;
   }
-  for (auto& kv : _restoredGroupOpacity) {
-    kv.first->groupOpacity = kv.second;
-  }
+
   // The whole animation state belongs to this session; dropping it as one unit cannot leave a
   // half-cleared scope or registry behind for the next export.
   _ctx.animation.Reset();
