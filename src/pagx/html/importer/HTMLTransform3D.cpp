@@ -182,33 +182,45 @@ bool ParseRotationDegrees(const std::string& token, float& out) {
   return std::isfinite(out);
 }
 
-// Resolves one `transform-origin` axis token to layer-local pixels. `dimension` is NaN when the
-// reference box size is unknown, which leaves percentage / keyword forms unresolvable. Returns false
-// only when the token is not a keyword / length / percentage at all; the caller then drops the whole
-// declaration the same way it drops a bad keyword pair.
-bool ResolveOriginAxis(const std::string& token, float dimension, HTMLValueParser& valueParser,
-                       float& out) {
+// One `transform-origin` axis token, resolved against a box of `dimension` px. The three outcomes must
+// stay distinct: a bad token invalidates the declaration, while a legal token whose box size is still
+// unknown is merely unresolvable — collapsing the two is what made `nan% 20px` report "unknown size".
+enum class OriginTokenAxis { Resolved, TokenInvalid, SizeUnknown };
+
+OriginTokenAxis ApplyOriginFraction(float dimension, float fraction, float& out) {
+  if (std::isnan(dimension)) {
+    out = NAN;
+    return OriginTokenAxis::SizeUnknown;
+  }
+  out = dimension * fraction;
+  return OriginTokenAxis::Resolved;
+}
+
+OriginTokenAxis ResolveOriginAxis(const std::string& token, float dimension, HTMLValueParser& valueParser,
+                             float& out) {
   if (token == "center") {
-    out = dimension * 0.5f;
-    return true;
+    return ApplyOriginFraction(dimension, 0.5f, out);
   }
   if (token == "left" || token == "top") {
     out = 0.0f;
-    return true;
+    return OriginTokenAxis::Resolved;
   }
   if (token == "right" || token == "bottom") {
-    out = dimension;
-    return true;
+    return ApplyOriginFraction(dimension, 1.0f, out);
   }
   float fraction = 0.0f;
   if (ParseCssPercentage(token, fraction)) {
-    out = dimension * fraction;
-    return true;
+    // `nan%` / `inf%` parse as a percentage but carry no value; the declaration is invalid rather
+    // than unresolvable, because a real box would not have saved it either.
+    if (!std::isfinite(fraction)) {
+      return OriginTokenAxis::TokenInvalid;
+    }
+    return ApplyOriginFraction(dimension, fraction, out);
   }
   // The caller reports the declaration itself as invalid, so the generic unit warning is suppressed
   // here: `10foo 20px` yields one diagnostic, not a unit warning plus a position warning.
   out = valueParser.parseAbsoluteLengthPx(token, /*warn=*/false);
-  return std::isfinite(out);
+  return std::isfinite(out) ? OriginTokenAxis::Resolved : OriginTokenAxis::TokenInvalid;
 }
 
 // Resolves one length argument: a plain px value or a percentage of `referencePx`. `referencePx` is
@@ -440,7 +452,9 @@ bool ParseRotate3D(const TransformCall& call) {
   const double axisY = static_cast<double>(y);
   const double axisZ = static_cast<double>(z);
   const double length = std::sqrt(axisX * axisX + axisY * axisY + axisZ * axisZ);
-  if (!(length > 1e-6)) {
+  // Only a true zero (or a non-finite sum) is degenerate: `rotate3d(1e-7, 0, 0, 60deg)` is a stable
+  // rotation about X, and rejecting it with a fixed length threshold silently dropped the function.
+  if (!std::isfinite(length) || length == 0.0) {
     call.diagnostics.warn("html: rotate3d axis is a zero vector; ignored");
     return false;
   }
@@ -736,24 +750,28 @@ HTMLTransformOrigin ResolveTransformOrigin(const std::string& value, float width
 
   float x = 0.0f;
   float y = 0.0f;
-  // A token that is not a keyword / length / percentage (a bad unit or a bad percentage) invalidates
-  // the declaration exactly like a bad keyword pair; pivoting at the top-left corner would be a
-  // silent, visible fallback that Chromium never takes.
-  if (!ResolveOriginAxis(tokenX, width, valueParser, x) ||
-      !ResolveOriginAxis(tokenY, height, valueParser, y)) {
+  float z = 0.0f;
+  // Every component is validated before any size-dependent early return: an unknown box only decides
+  // whether the value can be expressed in pixels, never whether the declaration is legal. Returning
+  // early on the axes used to skip the depth and silently drop a legal `30px` third value.
+  const OriginTokenAxis axisX = ResolveOriginAxis(tokenX, width, valueParser, x);
+  const OriginTokenAxis axisY = ResolveOriginAxis(tokenY, height, valueParser, y);
+  if (axisX == OriginTokenAxis::TokenInvalid || axisY == OriginTokenAxis::TokenInvalid) {
     return InvalidOrigin(width, height);
   }
-  if (!std::isfinite(x) || !std::isfinite(y)) {
-    // The tokens parsed, but their reference box size is unknown.
-    return origin;
-  }
-  float z = 0.0f;
   if (tokens.size() == 3) {
     // The third value is a bare depth; a percentage has no basis there.
     z = valueParser.parseAbsoluteLengthPx(tokens[2], /*warn=*/false);
     if (!std::isfinite(z)) {
       return InvalidOrigin(width, height);
     }
+  }
+  if (axisX == OriginTokenAxis::SizeUnknown || axisY == OriginTokenAxis::SizeUnknown) {
+    // Legal declaration, unknown box: keep `valid` (the author wrote something Chromium accepts) and
+    // let the caller report the single "cannot be resolved" diagnostic.
+    origin.valid = true;
+    origin.z = z;
+    return origin;
   }
   origin.point = Point{x, y};
   origin.z = z;

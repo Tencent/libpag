@@ -707,7 +707,9 @@ void HTMLLayerBuilder::applyBoxTransform(Layer* layer, const HTMLBoxAttributes& 
       ResolveElementAnchor(box.transform.originValue, box.transform.reference, layer, _valueParser);
   // The pivot only matters for a pose with a non-identity linear part: a pure translation or a pure
   // projection is unchanged by it, so an unresolved origin is not worth a diagnostic there.
-  if (!anchor.resolved && !IsLinearIdentity(box.transform.pose)) {
+  // A declaration that `transform-origin` itself rejected has already been reported by the cascade
+  // with the initial-value fallback; only an unresolvable-but-legal value is worth a second message.
+  if (!anchor.resolved && anchor.valid && !IsLinearIdentity(box.transform.pose)) {
     const std::string authored = box.transform.originValue.empty()
                                      ? std::string("50% 50% (default)")
                                      : box.transform.originValue;

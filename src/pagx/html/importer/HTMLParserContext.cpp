@@ -100,14 +100,12 @@ bool Animates3DTransform(const std::unordered_map<std::string, html::CssKeyframe
 // re-expresses the parent's `perspective-origin` in this element's local coordinates. Only an
 // absolutely positioned child knows its offset from the parent's box; a flow / flex child is placed
 // by layout, so its local origin is unknown here and the parent coordinates are used as-is.
-void ApplyParentPerspective(HTMLBoxAttributes& box, float distancePx, float originX, float originY,
+void ApplyParentPerspective(HTMLBoxAttributes& box, const HTMLParentCamera& parentCamera,
                             float parentBorderWidthPx, bool animatesTransform,
                             const std::string& elementName, HTMLDiagnosticSink& diagnostics,
                             bool& warnedFlowChild) {
-  box.parentCamera.distancePx = distancePx;
-  box.parentCamera.localOrigin.x = NAN;
-  box.parentCamera.localOrigin.y = NAN;
-  if (!(distancePx > 0.0f) || !std::isfinite(originX) || !std::isfinite(originY)) {
+  box.parentCamera = parentCamera;
+  if (!parentCamera.HasOrigin()) {
     // The declaring box had no absolute size; the projection step reports that once.
     return;
   }
@@ -131,14 +129,12 @@ void ApplyParentPerspective(HTMLBoxAttributes& box, float distancePx, float orig
     warnedFlowChild = true;
   }
   if (!resolvedOffset) {
-    box.parentCamera.localOrigin.x = originX;
-    box.parentCamera.localOrigin.y = originY;
     return;
   }
   // `perspective-origin` lives in the parent's border box, the child's `left` / `top` in its padding
   // box, so the border width sits between the two.
-  box.parentCamera.localOrigin.x = originX - (parentBorderWidthPx + box.leftPx);
-  box.parentCamera.localOrigin.y = originY - (parentBorderWidthPx + box.topPx);
+  box.parentCamera.localOrigin.x -= parentBorderWidthPx + box.leftPx;
+  box.parentCamera.localOrigin.y -= parentBorderWidthPx + box.topPx;
 }
 
 // Single mapping point between `HTMLImporter::Options` and `HTMLSubsetTransformer::Options`.
@@ -774,14 +770,24 @@ Layer* HTMLParserContext::convertBody(const std::shared_ptr<DOMNode>& body, floa
 void HTMLParserContext::attachParentCamera(HTMLBoxAttributes& box,
                                            const std::shared_ptr<DOMNode>& element,
                                            const HTMLInheritedStyle& inherited) {
-  ApplyParentPerspective(
-      box, inherited.parentCamera.distancePx, inherited.parentCamera.localOrigin.x,
-      inherited.parentCamera.localOrigin.y, inherited.parentBorderWidthPx,
-      inherited.parentCamera.distancePx > 0.0f &&
-          Animates3DTransform(_styleCascade->keyframes(), _styleCascade->getResolvedStyle(element),
-                              *_valueParser, _styleCascade->getTransformReferenceSize(element),
-                              box.transform.originZ),
-      element->name, *_diagnostics, _flowChildPerspectiveWarned);
+  // Classifying a keyframe set only answers a yes/no question about an animation the builder may not
+  // even pick, so it must not write diagnostics into the document. The sink is local and every probe
+  // parser is bound to it: the shared parser would still report em/rem units through its own sink.
+  HTMLDiagnosticSink silentDiagnostics(false);
+  HTMLValueParser silentParser(silentDiagnostics, _canvasWidth, _canvasHeight);
+  const auto& style = _styleCascade->getResolvedStyle(element);
+  const HTMLTransformReference reference = _styleCascade->getTransformReferenceSize(element);
+  // An element whose pose only exists in `@keyframes` never parsed a static origin, so its pivot depth
+  // has to come from the resolved style through the same fallback chain the animated pivot uses;
+  // reading `box.transform.originZ` would always give 0.
+  const HTMLElementAnchor animatedPivot =
+      ResolveElementAnchor(Trim(LookupProperty(style, "transform-origin")), reference, nullptr,
+                           silentParser);
+  const float pivotZ = box.transform.valid ? box.transform.originZ : animatedPivot.depth;
+  ApplyParentPerspective(box, inherited.parentCamera, inherited.parentBorderWidthPx,
+                         Animates3DTransform(_styleCascade->keyframes(), style, silentParser,
+                                             reference, pivotZ),
+                         element->name, *_diagnostics, _flowChildPerspectiveWarned);
 }
 
 void HTMLParserContext::forwardParentCamera(const HTMLBoxAttributes& box,
