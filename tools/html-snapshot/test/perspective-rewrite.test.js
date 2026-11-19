@@ -104,10 +104,25 @@ describe('rewritePerspectiveKeyframes', () => {
     delete globalThis.__pagxAnimCameras;
   });
 
+  test('keeps the block when the stops disagree on the distance', () => {
+    // `-0.00117851` is a 600px camera, `-0.00117772` a 600.4px one: different vanishing points, so
+    // merging them would retime one stop's projection. Only float noise (well under 0.01px) counts as
+    // the same camera; the earlier 0.5px window silently merged real differences like this pair.
+    const css =
+      '@keyframes mixedCamera { 0% { transform: ' + ROTATE_Y_45_PROJECTED + '; } ' +
+      '100% { transform: matrix3d(0.707107, 0, 0.707107, -0.0011777, 0, 1, 0, 0, -0.707107, 0, 0.707107, -0.0011777, 0, 0, 0, 1); } }';
+    const rewritten = rewritePerspectiveKeyframes(css);
+    expect(rewritten).toContain('-0.00117851');
+    expect(rewritten).toContain('-0.0011777');
+    expect(rewritten).not.toContain('__pagxCam');
+  });
+
   test('strips the projection from every stop and records the distance', () => {
+    // Both stops carry the same camera: the rewrite is only allowed when the distances agree, because
+    // a single wrapper cannot retime stops that disagree.
     const css =
       '@keyframes pagxAnim0 { 0% { transform: ' + ROTATE_Y_45_PROJECTED + '; } ' +
-      '100% { transform: matrix3d(0.5, 0, -0.866025, 0.001443, 0, 1, 0, 0, 0.866025, 0, 0.5, -0.000833, 0, 0, 0, 1); } }';
+      '100% { transform: matrix3d(0.707107, 0, 0.707107, -0.00117851, 0, 1, 0, 0, -0.707107, 0, 0.707107, -0.00117851, 20, 0, 0, 1); } }';
     const rewritten = rewritePerspectiveKeyframes(css);
     // The stripped copy is what a wrapped element plays; a `__pagxCam` clone keeps the projection for
     // elements whose wrapper is declined at render time.
@@ -284,6 +299,27 @@ describe('declined cameras keep their perspective', () => {
     );
     expect(wrapped).toContain(projected);
     expect(pagxCameraSkips()['depth-pivot']).toBe(1);
+  });
+});
+
+describe('mixed-only elements are still counted', () => {
+  beforeEach(() => {
+    delete globalThis.__pagxCameraSkips;
+    delete globalThis.__pagxAnimCameras;
+    delete globalThis.__pagxAnimProjected;
+  });
+
+  test('an element whose only camera comes from a kept keyframe block is recorded', () => {
+    // No `distance` can be separated from a block that keeps its projection, so the wrapper path
+    // returns early; the element still falls back to the function form and must be counted, or the
+    // eval report shows `camera-skips: 0` for a page that did fall back.
+    rewritePerspectiveKeyframes(
+      '@keyframes mixed { 0% { transform: ' + ROTATE_Y_45_PROJECTED + '; } 100% { transform: ' +
+        'matrix3d(0.707107, 0, 0.707107, -0.0011777, 0, 1, 0, 0, -0.707107, 0, 0.707107, -0.0011777, 0, 0, 0, 1); } }',
+    );
+    const html = '<div style="position: absolute; left: 0px; top: 0px">x</div>';
+    expect(withPerspectiveCamera(html, {}, { animationName: 'mixed' }, null)).toBe(html);
+    expect(pagxCameraSkips()['element-keyframes-mixed']).toBe(1);
   });
 });
 

@@ -1214,9 +1214,10 @@ function classify(el, computed) {
 // rendered div, the canvas for `<body>`), because the emitted px value is read back in that box's
 // local coordinates; a mismatch there would move the vanishing point instead of just dropping noise.
 function perspectiveOriginAtBoxCentre(value, boxWidth, boxHeight) {
-  // Chromium resolves the percentages to LayoutUnit precision, so allow half a CSS pixel of rounding
-  // slack before calling the point off-centre.
-  const epsilon = 0.5;
+  // Only a value that resolves to the centre *exactly* is the CSS initial `50% 50%`. A sub-pixel
+  // offset such as `100.25px` is a real vanishing point: dropping it magnifies the error near the
+  // projection plane, so the comparison keeps 1e-3px of float noise rather than half a pixel.
+  const epsilon = 1e-3;
   if (!(boxWidth > 0) || !(boxHeight > 0)) return false;
   const tokens = String(value || '').trim().split(/\s+/);
   if (tokens.length !== 2) return false;
@@ -2145,7 +2146,7 @@ function rewritePerspectiveKeyframes(cssText) {
       projectedCount++;
       if (distance === 0) {
         distance = split.distance;
-      } else if (Math.abs(distance - split.distance) > 0.5) {
+      } else if (Math.abs(distance - split.distance) > 1e-2) {
         consistent = false;
       }
       return split.affine;
@@ -4821,7 +4822,17 @@ function withPerspectiveCamera(html, opts, computed, staticCamera) {
   if (opts && opts._strippedTransform) return html;
   const distance =
     (staticCamera && staticCamera.distance) || cameraDistanceForElement(computed);
-  if (!distance) return html;
+  // A keyframe set that kept its own projection needs no wrapper, so the element can end up with no
+  // separable distance at all. It still falls back to the function form, which is an element-level
+  // outcome and must be counted here; otherwise a mixed-only element reports zero affected elements.
+  const projectedNames = pagxAnimProjectedNames();
+  const usesProjectedKeyframes = animationNamesFor(computed).some((name) => projectedNames[name]);
+  if (!distance) {
+    if (usesProjectedKeyframes) {
+      recordCameraSkip('element-keyframes-mixed');
+    }
+    return html;
+  }
   // The wrapper is the only encoding that keeps the projection exact, so an element that cannot get
   // one must keep the projection inside its own pose instead of silently turning orthographic.
   const declined = (reason) => {
@@ -4833,8 +4844,7 @@ function withPerspectiveCamera(html, opts, computed, staticCamera) {
   }
   // The same element can play several animations; a wrapper would add a second projection on top of
   // any keyframe set that kept its own `perspective()`, so decline instead of mixing the two modes.
-  const projected = pagxAnimProjectedNames();
-  if (animationNamesFor(computed).some((name) => projected[name])) {
+  if (usesProjectedKeyframes) {
     // Element-level key, distinct from the per-block 'keyframes-mixed' so the eval report does not
     // read one block plus one element as two affected elements.
     return declined('element-keyframes-mixed');
