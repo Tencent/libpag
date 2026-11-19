@@ -235,8 +235,12 @@ bool EmbedFonts(PAGXDocument* document, const std::vector<std::string>& fallback
 bool WriteStringToFile(const std::string& content, const std::string& filePath,
                        const std::string& command) {
   auto tempPath = filePath + ".tmp";
+  // Use filesystem::path for both creation and replacement so Windows converts the narrow path
+  // once, instead of creating through the ANSI CRT path and moving through a UTF-8 conversion.
+  std::filesystem::path tempNativePath = tempPath;
+  std::filesystem::path fileNativePath = filePath;
   {
-    std::ofstream out(tempPath);
+    std::ofstream out(tempNativePath);
     if (!out.is_open()) {
       std::cerr << command << ": failed to write '" << filePath
                 << "' (creating temp file failed)\n";
@@ -246,28 +250,28 @@ bool WriteStringToFile(const std::string& content, const std::string& filePath,
     out.close();
     if (out.fail()) {
       std::cerr << command << ": failed to write '" << filePath << "' (writing temp file failed)\n";
-      std::remove(tempPath.c_str());
+      std::error_code removeError = {};
+      std::filesystem::remove(tempNativePath, removeError);
       return false;
     }
   }
 #ifdef _WIN32
-  auto source = UTF8ToWide(tempPath);
-  auto destination = UTF8ToWide(filePath);
-  if (source.empty() || destination.empty() ||
-      !MoveFileExW(source.c_str(), destination.c_str(),
+  if (!MoveFileExW(tempNativePath.wstring().c_str(), fileNativePath.wstring().c_str(),
                    MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)) {
     std::cerr << command << ": failed to write '" << filePath
               << "' (replacing output file failed)\n";
-    std::remove(tempPath.c_str());
+    std::error_code removeError = {};
+    std::filesystem::remove(tempNativePath, removeError);
     return false;
   }
 #else
   std::error_code ec;
-  std::filesystem::rename(tempPath, filePath, ec);
+  std::filesystem::rename(tempNativePath, fileNativePath, ec);
   if (ec) {
     std::cerr << command << ": failed to write '" << filePath
               << "' (replacing output file failed)\n";
-    std::remove(tempPath.c_str());
+    std::error_code removeError = {};
+    std::filesystem::remove(tempNativePath, removeError);
     return false;
   }
 #endif
