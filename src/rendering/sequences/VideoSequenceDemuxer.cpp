@@ -66,7 +66,12 @@ bool VideoSequenceDemuxer::needSeeking(int64_t currentTime, int64_t targetTime) 
   auto current = TimeToFrame(currentTime, sequence->frameRate);
   auto target = TimeToFrame(targetTime, sequence->frameRate);
   if (target < current) {
-    return true;
+    // Decoding stops on the first frame at or past the requested one, so the decoder routinely sits
+    // one or two frames ahead of the next request. Seeking back for that gap makes the texture
+    // receive an older presentation time than the frame it already shows, which reads as the video
+    // jumping backwards. Only rebuild the decoder when the caller really jumped back.
+    static constexpr Frame SEEK_BACK_TOLERANCE = 2;
+    return current - target > SEEK_BACK_TOLERANCE;
   }
   if (target <= maxPTSFrame) {
     return false;
