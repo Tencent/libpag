@@ -31,7 +31,11 @@ namespace pag {
  * A dedicated background worker thread that executes disk IO tasks serially.
  * Tasks are queued and executed in order on a single thread, avoiding main thread blocking.
  *
- * Lock ordering: DiskIOWorker::locker must be acquired BEFORE DiskCache::locker.
+ * Lock ordering: DiskCache::locker must be acquired BEFORE DiskIOWorker::locker (taken by
+ * submit()) and BEFORE SequenceFileHandle::locker (taken when closing a pending handle). Never
+ * acquire DiskCache::locker while holding either of them, otherwise the orders form a cycle. It
+ * stays acyclic today only because runLoop() executes tasks with no worker lock held and
+ * CloseFileTask() releases the handle before it notifies DiskCache.
  * IMPORTANT: Never call waitAll() while holding DiskCache::locker, as tasks executed by
  * DiskIOWorker (e.g., CloseFileTask) may acquire DiskCache::locker, causing deadlock.
  */

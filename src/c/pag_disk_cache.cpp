@@ -19,6 +19,10 @@
 #include "pag/c/pag_disk_cache.h"
 #include "pag/pag.h"
 
+void pag_disk_cache_set_cache_dir(const char* dir) {
+  pag::PAGDiskCache::SetCacheDir(dir ? dir : "");
+}
+
 size_t pag_disk_cache_get_max_disk_size() {
   return pag::PAGDiskCache::MaxDiskSize();
 }

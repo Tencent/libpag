@@ -34,6 +34,10 @@ class PAGTest : public testing::Test {
   GTEST_TEST_(test_case_name, test_name, pag::PAGTest, \
               ::testing::internal::GetTypeId<pag::PAGTest>())
 
+// A release branch build compiles a single GPU backend, so a pixel comparison test needs no
+// backend registration and behaves exactly like a regular test here.
+#define PAG_PIXEL_TEST(test_case_name, test_name) PAG_TEST(test_case_name, test_name)
+
 #define PAG_SETUP(pagSurface, pagPlayer, pagFile)                                \
   auto pagFile = LoadPAGFile("resources/apitest/test.pag");                      \
   ASSERT_TRUE(pagFile != nullptr);                                               \

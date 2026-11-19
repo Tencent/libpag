@@ -20,6 +20,8 @@
 
 @interface PAGDiskCacheImpl : NSObject
 
++ (void)SetCacheDir:(NSString*)dir;
+
 + (size_t)MaxDiskSize;
 
 + (void)SetMaxDiskSize:(size_t)size;
