@@ -28,8 +28,11 @@
 #ifndef NOMINMAX
 #define NOMINMAX
 #endif
-#include <GL/gl.h>
+// clang-format off
+// windows.h must precede GL/gl.h because GL/gl.h depends on the WINGDIAPI and APIENTRY macros.
 #include <windows.h>
+#include <GL/gl.h>
+// clang-format on
 
 #ifndef GL_CLAMP_TO_EDGE
 #define GL_CLAMP_TO_EDGE 0x812F
