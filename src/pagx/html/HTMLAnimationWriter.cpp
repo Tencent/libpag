@@ -1725,10 +1725,23 @@ bool BindChannelToBundleSet(
   return false;
 }
 
+// A bundle's stop count and the key times it is sampled from are bounded by the playable window: a
+// legal but unreachable tail key (frame 1e9) used to walk every sampling loop across the whole
+// authored range, which allocated hundreds of millions of times before the window was ever applied.
+constexpr Frame kMaxBundleStops = 4096;
+
+// Inserts a sampled frame when it is inside the window and the bundle still has budget.
+static void AddBoundedSample(std::set<Frame>& times, Frame t, Frame limit) {
+  if (t < 0 || t > limit || times.size() >= kMaxBundleStops) {
+    return;
+  }
+  times.insert(t);
+}
+
 BundleChannelSet CollectBundleChannels(
     PAGXDocument& doc, const DomTargetBundle& bundle,
     const std::unordered_map<const SolidColor*, const Node*>& solidToPainter,
-    const std::unordered_map<const Path*, Layer*>& maskPathToLayer) {
+    const std::unordered_map<const Path*, Layer*>& maskPathToLayer, Frame samplingLimit) {
   BundleChannelSet result = {};
   for (auto* obj : bundle.objects) {
     Node* objTarget = ResolveTargetNode(doc, obj->target);
@@ -1822,10 +1835,14 @@ BundleChannelSet CollectBundleChannels(
         double ratio = (boundary - v0) / (v1 - v0);
         Frame crossing =
             keys[k].time + static_cast<Frame>(ratio * (keys[k + 1].time - keys[k].time));
+        if (crossing > samplingLimit) {
+          // Crossings grow with the boundary value, so every later one is out of the window too.
+          break;
+        }
         // Hold the old point count up to the crossing, then switch: CSS would otherwise morph the
         // two outlines into each other across the whole interval.
-        result.keyTimes.insert(crossing - kCrossingEpsilon);
-        result.keyTimes.insert(crossing + kCrossingEpsilon);
+        AddBoundedSample(result.keyTimes, crossing - kCrossingEpsilon, samplingLimit);
+        AddBoundedSample(result.keyTimes, crossing + kCrossingEpsilon, samplingLimit);
       }
     }
   }
@@ -1834,9 +1851,9 @@ BundleChannelSet CollectBundleChannels(
     // it; sampling every few frames keeps each segment straight enough to interpolate.
     constexpr Frame kRoundnessStep = 4;
     Frame first = *result.keyTimes.begin();
-    Frame last = *result.keyTimes.rbegin();
+    Frame last = std::min(*result.keyTimes.rbegin(), samplingLimit);
     for (Frame t = first; t <= last; t += kRoundnessStep) {
-      result.keyTimes.insert(t);
+      AddBoundedSample(result.keyTimes, t, samplingLimit);
     }
   }
   if ((result.repeaterScaleXCh != nullptr || result.repeaterScaleYCh != nullptr ||
@@ -1847,9 +1864,9 @@ BundleChannelSet CollectBundleChannels(
     // interpolated segment stays short.
     constexpr Frame kRepeaterStep = 4;
     Frame first = *result.keyTimes.begin();
-    Frame last = *result.keyTimes.rbegin();
+    Frame last = std::min(*result.keyTimes.rbegin(), samplingLimit);
     for (Frame t = first; t <= last; t += kRepeaterStep) {
-      result.keyTimes.insert(t);
+      AddBoundedSample(result.keyTimes, t, samplingLimit);
     }
   }
   // A Repeater copy bundle drives exactly one copy; the emitter needs its index to recompose the
@@ -1872,17 +1889,25 @@ BundleChannelSet CollectBundleChannels(
       }
       // A key that lands exactly on an integer starts a new copy count immediately after it, so the
       // frame right after the key already shows the shifted layout.
-      result.keyTimes.insert(keys[k].time + kCrossingEpsilon);
+      AddBoundedSample(result.keyTimes, keys[k].time + kCrossingEpsilon, samplingLimit);
       double lo = std::min(v0, v1);
       double hi = std::max(v0, v1);
       for (double boundary = std::floor(lo) + 1.0; boundary < hi; boundary += 1.0) {
         double ratio = (boundary - v0) / (v1 - v0);
         Frame crossing =
             keys[k].time + static_cast<Frame>(ratio * (keys[k + 1].time - keys[k].time));
-        result.keyTimes.insert(crossing);
-        result.keyTimes.insert(crossing + kCrossingEpsilon);
+        if (crossing > samplingLimit) {
+          break;
+        }
+        AddBoundedSample(result.keyTimes, crossing, samplingLimit);
+        AddBoundedSample(result.keyTimes, crossing + kCrossingEpsilon, samplingLimit);
       }
     }
+  }
+  // Keys past the window are unreachable; drop whatever the channel collection added beyond it so
+  // the stop emitter never sees an out-of-range time.
+  for (auto it = result.keyTimes.upper_bound(samplingLimit); it != result.keyTimes.end();) {
+    it = result.keyTimes.erase(it);
   }
   if (result.animatedMaskPath != nullptr) {
     auto maskIt = maskPathToLayer.find(result.animatedMaskPath);
@@ -4796,7 +4821,7 @@ std::string HTMLAnimationSession::emitKeyframesAndWeave(std::string& bodyHtml) {
         continue;
       }
       BundleChannelSet chSet =
-          CollectBundleChannels(_doc, bundle, _solidToPainter, _maskPathToLayer);
+          CollectBundleChannels(_doc, bundle, _solidToPainter, _maskPathToLayer, anim->duration);
       if (bundle.rangeGlyphIndex >= 0) {
         chSet.rangeGlyph = &_ctx.animation.rangeSelectorGlyphs[bundle.rangeGlyphIndex];
       }

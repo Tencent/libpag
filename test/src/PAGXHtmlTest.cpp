@@ -4155,6 +4155,38 @@ CLI_TEST(PAGXHtmlTest, AnimationRangeSelectorStartFansOutToGlyphs) {
 // the same polygon). The frame rebuilds `d` from the evaluated values instead of animating a
 // transform, and the bundle is sampled every few frames because CSS walks the two path() strings
 // point by point rather than rotating them.
+CLI_TEST(PAGXHtmlTest, UnreachableTailKeyDoesNotDriveTheSampling) {
+  // A tail key far beyond the animation's duration is legal and only acts as an interpolation
+  // target, but the roundness sampling used to walk from the first key to the last one: this
+  // document asked for 250 million stops before the playable window was applied.
+  const char* xml = R"(<pagx width="320" height="200">
+    <Layer left="0" right="0" top="0" bottom="0">
+      <Polystar id="star" position="160,100" pointCount="5" outerRadius="60" innerRadius="30"
+                outerRoundness="0"/>
+      <Fill color="#BE123C"/>
+    </Layer>
+    <Animations>
+      <Animation id="bend" duration="60" frameRate="60" loop="once">
+        <Object target="star">
+          <Channel name="outerRoundness" type="float">
+            <Key time="0" value="0" interpolation="linear"/>
+            <Key time="1000000000" value="1"/>
+          </Channel>
+        </Object>
+      </Animation>
+    </Animations>
+  </pagx>)";
+
+  pagx::HTMLExportOptions options;
+  options.extractStyleSheet = false;
+  auto html = LoadXMLAndConvert(xml, options);
+  ASSERT_FALSE(html.empty());
+  // Sampling is bounded by the 60-frame window (every 4 frames) plus the key stops.
+  auto stopCount = CountOccurrences(html, "% { transform:");
+  EXPECT_GT(stopCount, 0u) << html;
+  EXPECT_LT(stopCount, 32u) << html;
+}
+
 CLI_TEST(PAGXHtmlTest, AnimationPolystarRebuildsOutlinePerFrame) {
   const char* xml = R"(<pagx width="320" height="200">
     <Layer left="0" right="0" top="0" bottom="0">
