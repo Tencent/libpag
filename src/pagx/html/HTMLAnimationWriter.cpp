@@ -88,7 +88,21 @@ bool TextBaselineOffset(const Text* text, float* offset) {
   if (typeface == nullptr) {
     return false;
   }
-  auto metrics = tgfx::Font(typeface, text->renderFontSize()).getMetrics();
+  tgfx::Font font(typeface, text->renderFontSize());
+  auto metrics = font.getMetrics();
+#ifdef __APPLE__
+  // Same substitution adjustment the static span applies (GetTextLayoutMetrics): Chromium and
+  // Safari raise the ascent of Helvetica/Times/Courier by 15% of (ascent + descent), and the
+  // faux-italic shear axis has to sit on the baseline the span actually gets.
+  if (auto appleTypeface = font.getTypeface(); appleTypeface != nullptr) {
+    auto family = appleTypeface->fontFamily();
+    if (family == "Helvetica" || family == "Times" || family == "Courier") {
+      float roundedAscent = roundf(fabsf(metrics.ascent));
+      float roundedDescent = roundf(metrics.descent);
+      metrics.ascent -= floorf((roundedAscent + roundedDescent) * 0.15f + 0.5f);
+    }
+  }
+#endif
   auto ascent = fabsf(metrics.ascent);
   auto descent = metrics.descent;
   auto leading = std::max(0.0f, metrics.leading);
@@ -2840,6 +2854,15 @@ std::string EvaluateKeyframeCssDecls(const DomTargetBundle& bundle, const Bundle
     AppendCssDecl(
         decls, "transform",
         italic ? "skewX(" + CssFloatToString(FauxItalicSkewDegrees()) + "deg)" : "skewX(0deg)");
+    if (!italic && chSet.fontStyleCh == nullptr) {
+      // The static span chose `font-style: italic` because the document authored `fauxItalic`, and a
+      // keyframe that only resets `transform` leaves the italic face behind: the glyph stays slanted
+      // (and shears again on any frame that still applies the skew). Put the real face back.
+      auto authoredProps = ParseFontStyleToCSS(animatedText->fontStyle);
+      AppendCssDecl(
+          decls, "font-style",
+          authoredProps.italic ? "italic" : (authoredProps.oblique ? "oblique" : "normal"));
+    }
     float baselineOffset = 0.0f;
     if (italic && TextBaselineOffset(animatedText, &baselineOffset)) {
       AppendCssDecl(decls, "transform-origin", "0px " + CssFloatToString(baselineOffset) + "px");
