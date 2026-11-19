@@ -217,26 +217,40 @@ function findCorpusFiles(corpusDir, only, recursive, ext = '.html') {
 // Identity of a cached case run: the source file as it currently sits on disk plus the sampling that
 // produced the frames. Reusing frames across a changed source or a different sample grid would score
 // an old run against expectations it was never rendered for.
-function buildCaseCacheKey(sourcePath, opts) {
-  let source = { size: -1, mtimeMs: -1 };
+function statIdentity(target) {
   try {
-    const stat = fs.statSync(sourcePath);
-    source = { size: stat.size, mtimeMs: stat.mtimeMs };
+    const stat = fs.statSync(target);
+    return { size: stat.size, mtimeMs: stat.mtimeMs };
   } catch (err) {
-    source = { size: -1, mtimeMs: -1 };
+    return { size: -1, mtimeMs: -1 };
   }
-  return { source, samples: opts.samples, roundtrip: !!opts.roundtrip };
+}
+
+function buildCaseCacheKey(sourcePath, opts) {
+  // The frames on disk were produced by a specific exporter binary, browser engine and scale. Keying
+  // on the fixture alone let a rebuilt exporter keep scoring frames it no longer produces, which is
+  // exactly the case someone re-running after a code change is looking at.
+  return {
+    source: statIdentity(sourcePath),
+    bin: statIdentity(opts.pagxBin || ''),
+    samples: opts.samples,
+    roundtrip: !!opts.roundtrip,
+    scale: opts.scale,
+    browserEngine: opts.browserEngine || '',
+  };
 }
 
 function cacheKeyMatches(cacheKeyPath, expected) {
   try {
     const actual = JSON.parse(fs.readFileSync(cacheKeyPath, 'utf8'));
+    const sameStat = (a, b) => !!a && !!b && a.size === b.size && a.mtimeMs === b.mtimeMs;
     return (
-      actual.source &&
-      actual.source.size === expected.source.size &&
-      actual.source.mtimeMs === expected.source.mtimeMs &&
+      sameStat(actual.source, expected.source) &&
+      sameStat(actual.bin, expected.bin) &&
       actual.samples === expected.samples &&
-      !!actual.roundtrip === expected.roundtrip
+      !!actual.roundtrip === expected.roundtrip &&
+      actual.scale === expected.scale &&
+      (actual.browserEngine || '') === expected.browserEngine
     );
   } catch (err) {
     return false;
