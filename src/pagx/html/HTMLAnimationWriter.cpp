@@ -2393,15 +2393,22 @@ void EmitPaintCssAtFrame(const BundleChannelSet& chSet, const std::string& tagNa
         EvalFloatChannel(chSet.strokeAlphaCh, t, stroke != nullptr ? stroke->alpha : 1.0f);
     if (HasSolidPaint(source)) {
       Color color = EvalColorChannel(chSet.strokeColorCh, t, StaticPainterColor(source));
-      AppendCssDecl(decls, "stroke", ColorToSVGHex(color));
-      AppendCssDecl(decls, "stroke-opacity", CssFloatToString(color.alpha * painterAlpha));
-    } else {
+      if (isSvgShape) {
+        AppendCssDecl(decls, "stroke", ColorToSVGHex(color));
+        AppendCssDecl(decls, "stroke-opacity", CssFloatToString(color.alpha * painterAlpha));
+      } else {
+        // A span is not stroked by SVG properties: the static text path paints it with
+        // `-webkit-text-stroke`, which carries both the width and the colour.
+        AppendCssDecl(decls, "-webkit-text-stroke-color", ColorToRGBA(color, painterAlpha));
+      }
+    } else if (isSvgShape) {
       AppendCssDecl(decls, "stroke-opacity", CssFloatToString(painterAlpha));
     }
   }
   if (chSet.strokeWidthCh != nullptr) {
     float sw = EvalFloatChannel(chSet.strokeWidthCh, t, 1.0f);
-    AppendCssDecl(decls, "stroke-width", CssFloatToString(sw) + "px");
+    AppendCssDecl(decls, isSvgShape ? "stroke-width" : "-webkit-text-stroke-width",
+                  CssFloatToString(sw) + "px");
   }
   if (chSet.miterLimitCh != nullptr) {
     const Stroke* miterStroke = chSet.strokePainter;

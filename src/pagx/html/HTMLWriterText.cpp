@@ -1163,8 +1163,10 @@ void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
     out.emitBreaks(HTMLBuilder::CountLeadingBreaks(text->text));
   }
   out.openTag("span");
-  // The span is the only tag a Text renders into, so font-size / letter-spacing keyframes land here.
-  auto animId = _ctx->claimAnimatedDomId({tb, fill, text});
+  // The span is the only tag a Text renders into, so font-size / letter-spacing / paint keyframes
+  // land here. The Stroke is part of the claim: without it a `Stroke` channel on a plain Text had no
+  // DOM target at all, so the bundle resolved to nothing and no keyframes were written.
+  auto animId = _ctx->claimAnimatedDomId({tb, fill, stroke, text});
   if (!animId.empty()) {
     out.addAttr("id", animId);
   }
