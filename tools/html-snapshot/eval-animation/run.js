@@ -747,14 +747,35 @@ function parsePagxTiming(xml) {
 // PAGX runtime may round a sample sitting exactly on a key boundary to different sides.
 function pagxSampleTimes(timing, count) {
   const times = [];
-  if (!(timing.windowSec > 0)) return times;
+  if (!(timing.windowSec > 0) || count <= 0) return times;
+  const window = timing.windowSec;
+  const epsilon = Math.min(1e-6, window / (count * 8));
   for (let i = 0; i < count; i++) {
-    let t = (timing.windowSec * (i + 0.5)) / count;
+    // Strictly interior, strictly increasing grid: every sample belongs to the window and no two
+    // share a slot, so a short window cannot produce repeats or out-of-range times.
+    let t = (window * (i + 0.5)) / count;
+    // Sitting exactly on a frame boundary makes the two renderers round to different frames, so
+    // step half a frame forward - but only when that keeps the sample inside the window and ahead
+    // of the previous one. The old version always stepped, which is what pushed the last samples
+    // past the end and reordered short windows.
     for (const fr of timing.frameRates) {
       const f = t * fr;
-      if (Math.abs(f - Math.round(f)) < 0.25) t += 0.5 / fr;
+      if (Math.abs(f - Math.round(f)) < 0.25) {
+        const stepped = t + 0.5 / fr;
+        const previous = times.length ? times[times.length - 1] : -Infinity;
+        // Half a frame is only a small step when the grid is coarser than a frame; on a window
+        // shorter than one frame it would jump over the rest of the grid, so the sample stays put.
+        const spacing = window / count;
+        if (0.5 / fr < spacing / 2 && stepped < window - epsilon && stepped > previous) {
+          t = stepped;
+        }
+        break;
+      }
     }
-    times.push(Math.round(t * 1e6) / 1e6);
+    t = Math.min(Math.max(t, 0), window - epsilon);
+    t = Math.round(t * 1e6) / 1e6;
+    const previous = times.length ? times[times.length - 1] : -Infinity;
+    if (t > previous) times.push(t);
   }
   return times;
 }
