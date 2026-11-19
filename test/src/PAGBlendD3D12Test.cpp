@@ -26,33 +26,14 @@
 #include "tgfx/gpu/Context.h"
 #include "tgfx/gpu/GPU.h"
 #include "tgfx/gpu/Texture.h"
-#include "utils/DevicePool.h"
+#include "utils/D3D12TestUtils.h"
 #include "utils/TestUtils.h"
 
 namespace pag {
 namespace {
 
-std::shared_ptr<tgfx::Texture> MakeRenderableTexture(int width, int height) {
-  auto device = DevicePool::Make();
-  if (device == nullptr) {
-    return nullptr;
-  }
-  std::shared_ptr<tgfx::Texture> texture = nullptr;
-  {
-    DeviceLockScope scope(device);
-    if (!static_cast<bool>(scope)) {
-      return nullptr;
-    }
-    tgfx::TextureDescriptor descriptor(
-        width, height, tgfx::PixelFormat::RGBA_8888, false, 1,
-        tgfx::TextureUsage::TEXTURE_BINDING | tgfx::TextureUsage::RENDER_ATTACHMENT);
-    texture = scope.context()->gpu()->createTexture(descriptor);
-  }
-  return texture;
-}
-
 std::shared_ptr<tgfx::Texture> MakeBottomLeftImageTexture(int width, int height) {
-  auto texture = MakeRenderableTexture(width, height);
+  auto texture = MakeD3D12RenderableTexture(width, height);
   if (texture == nullptr) {
     return nullptr;
   }
@@ -85,7 +66,7 @@ std::shared_ptr<tgfx::Texture> MakeBottomLeftImageTexture(int width, int height)
 PAG_PIXEL_TEST(PAGBlendD3D12Test, CopyDstTexture) {
   const int width = 400;
   const int height = 400;
-  auto texture = MakeRenderableTexture(width, height);
+  auto texture = MakeD3D12RenderableTexture(width, height);
   ASSERT_TRUE(texture != nullptr);
   auto surface = PAGSurface::MakeFrom(ToPAG(texture->getBackendTexture()), ImageOrigin::BottomLeft);
   ASSERT_TRUE(surface != nullptr);
@@ -111,7 +92,7 @@ PAG_PIXEL_TEST(PAGBlendD3D12Test, TextureBottomLeft) {
   auto image =
       PAGImage::FromTexture(ToPAG(replacement->getBackendTexture()), ImageOrigin::BottomLeft);
   ASSERT_TRUE(image != nullptr);
-  auto texture = MakeRenderableTexture(width, height);
+  auto texture = MakeD3D12RenderableTexture(width, height);
   ASSERT_TRUE(texture != nullptr);
   auto surface = PAGSurface::MakeFrom(ToPAG(texture->getBackendTexture()), ImageOrigin::TopLeft);
   ASSERT_TRUE(surface != nullptr);
@@ -143,7 +124,7 @@ PAG_PIXEL_TEST(PAGBlendD3D12Test, BothBottomLeft) {
       PAGImage::FromTexture(BackendTexture(info, width / 2, height / 2), ImageOrigin::BottomLeft);
   ASSERT_TRUE(image != nullptr);
   image->setMatrix(Matrix::MakeTrans(width / 10, height / 5));
-  auto texture = MakeRenderableTexture(width, height);
+  auto texture = MakeD3D12RenderableTexture(width, height);
   ASSERT_TRUE(texture != nullptr);
   auto surface = PAGSurface::MakeFrom(ToPAG(texture->getBackendTexture()), ImageOrigin::BottomLeft);
   ASSERT_TRUE(surface != nullptr);

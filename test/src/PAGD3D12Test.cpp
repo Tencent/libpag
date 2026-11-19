@@ -35,15 +35,9 @@
 #include "tgfx/gpu/Context.h"
 #include "tgfx/gpu/GPU.h"
 #include "tgfx/gpu/Texture.h"
-#include "utils/DevicePool.h"
+#include "utils/D3D12TestUtils.h"
 
 namespace pag {
-
-static std::shared_ptr<tgfx::Texture> MakeTexture(tgfx::Context* context, int width, int height,
-                                                  uint32_t usage) {
-  tgfx::TextureDescriptor descriptor(width, height, tgfx::PixelFormat::RGBA_8888, false, 1, usage);
-  return context->gpu()->createTexture(descriptor);
-}
 
 /**
  * A native device that is intentionally not the registry's default entry. Tests use it to exercise
@@ -154,8 +148,8 @@ PAG_TEST(D3D12Test, SameNativeDeviceReturnsSameDevice) {
   DeviceLockScope scope;
   ASSERT_TRUE(static_cast<bool>(scope));
   auto context = scope.context();
-  auto first = MakeTexture(context, 8, 8, tgfx::TextureUsage::TEXTURE_BINDING);
-  auto second = MakeTexture(context, 8, 8, tgfx::TextureUsage::TEXTURE_BINDING);
+  auto first = MakeD3D12Texture(context, 8, 8, tgfx::TextureUsage::TEXTURE_BINDING);
+  auto second = MakeD3D12Texture(context, 8, 8, tgfx::TextureUsage::TEXTURE_BINDING);
   ASSERT_TRUE(first != nullptr);
   ASSERT_TRUE(second != nullptr);
   auto firstDevice = Devices::MakeForTexture(first->getBackendTexture());
@@ -179,7 +173,7 @@ PAG_TEST(D3D12Test, ResourceUsageValidation) {
   DeviceLockScope scope;
   ASSERT_TRUE(static_cast<bool>(scope));
   auto context = scope.context();
-  auto sampled = MakeTexture(context, 8, 8, tgfx::TextureUsage::TEXTURE_BINDING);
+  auto sampled = MakeD3D12Texture(context, 8, 8, tgfx::TextureUsage::TEXTURE_BINDING);
   ASSERT_TRUE(sampled != nullptr);
   auto sampledTexture = sampled->getBackendTexture();
   EXPECT_TRUE(Devices::ValidateExternalResource(sampledTexture, ExternalResourceUsage::Sampled));
@@ -201,7 +195,7 @@ PAG_TEST(D3D12Test, ResourceUsageValidation) {
   sampledOnly->Release();
   nativeDevice->Release();
 
-  auto renderTarget = MakeTexture(
+  auto renderTarget = MakeD3D12Texture(
       context, 8, 8, tgfx::TextureUsage::TEXTURE_BINDING | tgfx::TextureUsage::RENDER_ATTACHMENT);
   ASSERT_TRUE(renderTarget != nullptr);
   auto renderTargetTexture = renderTarget->getBackendTexture();
@@ -220,7 +214,7 @@ PAG_TEST(D3D12Test, TypelessResourceRejected) {
   DeviceLockScope scope;
   ASSERT_TRUE(static_cast<bool>(scope));
   auto context = scope.context();
-  auto source = MakeTexture(context, 8, 8, tgfx::TextureUsage::TEXTURE_BINDING);
+  auto source = MakeD3D12Texture(context, 8, 8, tgfx::TextureUsage::TEXTURE_BINDING);
   ASSERT_TRUE(source != nullptr);
   auto resource = GetNativeResource(source->getBackendTexture());
   ASSERT_TRUE(resource != nullptr);
@@ -256,9 +250,9 @@ PAG_TEST(D3D12Test, SurfaceFromTextureAndCompletion) {
   {
     DeviceLockScope scope(device);
     ASSERT_TRUE(static_cast<bool>(scope));
-    texture =
-        MakeTexture(scope.context(), 32, 32,
-                    tgfx::TextureUsage::TEXTURE_BINDING | tgfx::TextureUsage::RENDER_ATTACHMENT);
+    texture = MakeD3D12Texture(
+        scope.context(), 32, 32,
+        tgfx::TextureUsage::TEXTURE_BINDING | tgfx::TextureUsage::RENDER_ATTACHMENT);
   }
   ASSERT_TRUE(texture != nullptr);
   auto tgfxTexture = texture->getBackendTexture();
@@ -375,35 +369,6 @@ struct HostQueue {
     return SUCCEEDED(commandList->Reset(allocator.Get(), nullptr));
   }
 };
-
-std::shared_ptr<tgfx::Texture> MakeRenderableTexture(int width, int height) {
-  auto device = DevicePool::Make();
-  if (device == nullptr) {
-    return nullptr;
-  }
-  std::shared_ptr<tgfx::Texture> texture = nullptr;
-  {
-    DeviceLockScope scope(device);
-    if (!static_cast<bool>(scope)) {
-      return nullptr;
-    }
-    texture =
-        MakeTexture(scope.context(), width, height,
-                    tgfx::TextureUsage::TEXTURE_BINDING | tgfx::TextureUsage::RENDER_ATTACHMENT);
-  }
-  return texture;
-}
-
-BackendRenderTarget MakeRenderTarget(const std::shared_ptr<tgfx::Texture>& texture, int width,
-                                     int height) {
-  tgfx::D3D12TextureInfo textureInfo = {};
-  if (!texture->getBackendTexture().getD3D12TextureInfo(&textureInfo)) {
-    return BackendRenderTarget();
-  }
-  D3D12TextureInfo info = {};
-  info.resource = const_cast<void*>(textureInfo.resource);
-  return BackendRenderTarget(info, width, height);
-}
 
 bool DrawBottomRightQuadrant(const std::shared_ptr<PAGSurface>& surface, int size) {
   auto composition = PAGComposition::Make(size, size);
@@ -547,16 +512,16 @@ PAG_TEST(D3D12Test, AsyncSurfaceRendersOnWorkerThread) {
  */
 PAG_TEST(D3D12Test, ExternalRenderTargetOriginReadback) {
   const int size = 32;
-  auto topLeftTexture = MakeRenderableTexture(size, size);
+  auto topLeftTexture = MakeD3D12RenderableTexture(size, size);
   ASSERT_TRUE(topLeftTexture != nullptr);
-  auto bottomLeftTexture = MakeRenderableTexture(size, size);
+  auto bottomLeftTexture = MakeD3D12RenderableTexture(size, size);
   ASSERT_TRUE(bottomLeftTexture != nullptr);
 
   auto topLeftSurface =
-      PAGSurface::MakeFrom(MakeRenderTarget(topLeftTexture, size, size), ImageOrigin::TopLeft);
+      PAGSurface::MakeFrom(MakeD3D12RenderTarget(topLeftTexture, size, size), ImageOrigin::TopLeft);
   ASSERT_TRUE(topLeftSurface != nullptr);
-  auto bottomLeftSurface = PAGSurface::MakeFrom(MakeRenderTarget(bottomLeftTexture, size, size),
-                                                ImageOrigin::BottomLeft);
+  auto bottomLeftSurface = PAGSurface::MakeFrom(
+      MakeD3D12RenderTarget(bottomLeftTexture, size, size), ImageOrigin::BottomLeft);
   ASSERT_TRUE(bottomLeftSurface != nullptr);
 
   ASSERT_TRUE(DrawBottomRightQuadrant(topLeftSurface, size));
@@ -590,7 +555,7 @@ PAG_TEST(D3D12Test, ExternalRenderTargetOriginReadback) {
 PAG_TEST(D3D12Test, IndependentQueueCompletion) {
   const int size = 32;
   const UINT rowPitch = 256;
-  auto texture = MakeRenderableTexture(size, size);
+  auto texture = MakeD3D12RenderableTexture(size, size);
   ASSERT_TRUE(texture != nullptr);
   tgfx::D3D12TextureInfo textureInfo = {};
   ASSERT_TRUE(texture->getBackendTexture().getD3D12TextureInfo(&textureInfo));
