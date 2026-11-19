@@ -4207,8 +4207,9 @@ std::string EmitBundleKeyframeStops(const DomTargetBundle& bundle, const BundleC
     // A CSS stop carries one timing function for every property in the rule, so the whole window is
     // rewritten as evenly spaced linear pieces: the eased channel is sampled, the linear ones stay
     // exact. Key times inside the window remain stops, they just carry no easing of their own.
-    Frame span = windowEnd - windowStart;
-    int count = 2;
+    // Each conflicting segment is subdivided on its own span. Dividing the whole window instead
+    // gave a 10-frame eased move inside a 6000-frame timeline no interior stop at all, so that
+    // segment played linearly while the rest of the rule was sampled evenly.
     for (Frame mixed : chSet.mixedEasingTimes) {
       auto easeIt = chSet.stopEasings.find(mixed);
       if (easeIt == chSet.stopEasings.end() ||
@@ -4216,8 +4217,9 @@ std::string EmitBundleKeyframeStops(const DomTargetBundle& bundle, const BundleC
         continue;
       }
       const SegmentEasing& easing = easeIt->second;
+      int count = 2;
       for (int candidate = 2; candidate <= 32; candidate *= 2) {
-        count = std::max(count, candidate);
+        count = candidate;
         double worst = 0.0;
         for (int i = 1; i < 32; ++i) {
           double u = static_cast<double>(i) / 32.0;
@@ -4235,10 +4237,16 @@ std::string EmitBundleKeyframeStops(const DomTargetBundle& bundle, const BundleC
           break;
         }
       }
-    }
-    for (int k = 1; k < count; ++k) {
-      stopTimes.insert(windowStart +
-                       static_cast<Frame>(std::llround(static_cast<double>(span) * k / count)));
+      auto nextIt = chSet.keyTimes.upper_bound(mixed);
+      Frame segmentEnd = nextIt == chSet.keyTimes.end() ? windowEnd : std::min(*nextIt, windowEnd);
+      if (segmentEnd <= mixed) {
+        continue;
+      }
+      Frame span = segmentEnd - mixed;
+      for (int k = 1; k < count; ++k) {
+        stopTimes.insert(mixed +
+                         static_cast<Frame>(std::llround(static_cast<double>(span) * k / count)));
+      }
     }
   }
   for (Frame t : stopTimes) {
