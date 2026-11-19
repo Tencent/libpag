@@ -87,7 +87,18 @@ void HTMLWriter::writeRepeater(HTMLBuilder& out, const Repeater* rep,
                                const std::vector<GeoInfo>& geos, const Fill* fill,
                                const Stroke* stroke, float alpha, const TrimPath* trim,
                                bool applyCopyAlphaDecay) {
-  if (rep->copies <= 0 || !std::isfinite(rep->copies)) {
+  // An animated repeater can start at 0 and grow, so the authored count alone cannot decide whether
+  // there is anything to emit: the pre-scan recorded how many copies the channel reaches, and those
+  // tags have to exist before the first of them appears.
+  const bool animated = _ctx->animation.animatedRepeaters.count(rep) > 0;
+  int reachableCopies = 0;
+  if (animated) {
+    auto maxIt = _ctx->animation.repeaterMaxCopies.find(rep);
+    if (maxIt != _ctx->animation.repeaterMaxCopies.end()) {
+      reachableCopies = maxIt->second;
+    }
+  }
+  if ((rep->copies <= 0 || !std::isfinite(rep->copies)) && reachableCopies <= 0) {
     return;
   }
   float originOffsetX = _ctx->repeaterOriginOffsetX;
@@ -102,14 +113,10 @@ void HTMLWriter::writeRepeater(HTMLBuilder& out, const Repeater* rep,
   float frac = rep->copies - std::floor(rep->copies);
   // An animated repeater channel is fanned out per copy, so every copy needs a tag of its own; the
   // weaver later attaches one keyframes rule to each of them.
-  const bool animated = _ctx->animation.animatedRepeaters.count(rep) > 0;
   const int authoredCopies = n;
   if (animated) {
     // Emit every copy the channel can reach, so a copy that appears mid-playback already has a tag.
-    auto maxIt = _ctx->animation.repeaterMaxCopies.find(rep);
-    if (maxIt != _ctx->animation.repeaterMaxCopies.end()) {
-      n = std::max(n, maxIt->second);
-    }
+    n = std::max(n, reachableCopies);
   }
   for (int i = 0; i < n; i++) {
     int idx = (rep->order == RepeaterOrder::AboveOriginal) ? i : (n - 1 - i);
