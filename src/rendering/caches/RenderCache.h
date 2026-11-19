@@ -53,6 +53,14 @@ class RenderCache : public Performance {
 
   void beginFrame();
 
+  /**
+   * Returns the serial number of the frame being rendered. It increases once per beginFrame(), so
+   * the 3D filter can tell a new frame from another pass over the same frame.
+   */
+  uint64_t frameSerial() const {
+    return _frameSerial;
+  }
+
   void attachToContext(tgfx::Context* current, bool forDrawing = true);
 
   void detachFromContext();
@@ -176,6 +184,7 @@ class RenderCache : public Performance {
  private:
   ID _uniqueID = 0;
   PAGStage* stage = nullptr;
+  uint64_t _frameSerial = 0;
   uint32_t deviceID = 0;
   tgfx::Context* context = nullptr;
   std::queue<std::chrono::steady_clock::time_point> timestamps = {};

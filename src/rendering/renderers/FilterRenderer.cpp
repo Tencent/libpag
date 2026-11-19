@@ -252,7 +252,8 @@ static bool NeedToSkipClipBounds(const FilterList* filterList) {
 std::vector<FilterNode> FilterRenderer::MakeFilterNodes(const FilterList* filterList,
                                                         RenderCache* renderCache,
                                                         tgfx::Rect* contentBounds,
-                                                        const tgfx::Rect& clipRect) {
+                                                        const tgfx::Rect& clipRect,
+                                                        bool* skipLayer) {
   // 滤镜应用顺序：Effects->PAGFilter->motionBlur/3DLayer->LayerStyles
   std::vector<FilterNode> filterNodes = {};
   int clipIndex = -1;
@@ -284,8 +285,8 @@ std::vector<FilterNode> FilterRenderer::MakeFilterNodes(const FilterList* filter
     return {};
   }
 
-  if (!Make3DLayerNode(filterNodes, clipBounds, filterList, renderCache, filterBounds,
-                       effectScale)) {
+  if (!Make3DLayerNode(filterNodes, clipBounds, filterList, renderCache, filterBounds, effectScale,
+                       skipLayer)) {
     return {};
   }
 
@@ -430,9 +431,13 @@ void FilterRenderer::DrawWithFilter(Canvas* parentCanvas, const FilterModifier* 
   auto contentBounds = GetContentBounds(filterList.get(), content);
   // 相对于content Bounds的clip Bounds
   auto clipBounds = GetClipBounds(parentCanvas, filterList.get());
-  auto filterNodes = MakeFilterNodes(filterList.get(), cache, &contentBounds, clipBounds);
+  bool skipLayer = false;
+  auto filterNodes =
+      MakeFilterNodes(filterList.get(), cache, &contentBounds, clipBounds, &skipLayer);
   if (filterNodes.empty()) {
-    content->draw(parentCanvas);
+    if (!skipLayer) {
+      content->draw(parentCanvas);
+    }
     return;
   }
   if (filterList->useParentSizeInput) {

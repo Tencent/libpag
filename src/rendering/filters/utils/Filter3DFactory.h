@@ -23,9 +23,13 @@
 
 namespace pag {
 
+/**
+ * Appends the 3D transform of the layer to the filter nodes. Returns false and sets skipLayer when
+ * the layer has to be skipped instead of drawn as untransformed 2D content.
+ */
 bool Make3DLayerNode(std::vector<FilterNode>& filterNodes, tgfx::Rect& clipBounds,
                      const FilterList* filterList, RenderCache* renderCache,
-                     tgfx::Rect& filterBounds, tgfx::Point& effectScale);
+                     tgfx::Rect& filterBounds, tgfx::Point& effectScale, bool* skipLayer);
 
 Filter* Make3DFilter(tgfx::Context* context);
 

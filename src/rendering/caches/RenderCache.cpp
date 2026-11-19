@@ -159,6 +159,7 @@ void RenderCache::setSnapshotEnabled(bool value) {
 }
 
 void RenderCache::beginFrame() {
+  ++_frameSerial;
   usedAssets = {};
   usedSequences = {};
   resetPerformance();

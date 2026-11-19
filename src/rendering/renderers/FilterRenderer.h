@@ -66,7 +66,7 @@ class FilterRenderer {
   static std::vector<FilterNode> MakeFilterNodes(const FilterList* filterList,
                                                  RenderCache* renderCache,
                                                  tgfx::Rect* contentBounds,
-                                                 const tgfx::Rect& clipRect);
+                                                 const tgfx::Rect& clipRect, bool* skipLayer);
 
   static std::shared_ptr<Graphic> GetDisplacementMapGraphic(const FilterList* filterList,
                                                             Layer* mapLayer);
