@@ -648,14 +648,13 @@ PAG_TEST(PAGXHTML3DTest, ParentPerspectiveProjectsTheChildPose) {
   auto* card = FindLayerById(doc, "card");
   ASSERT_NE(card, nullptr);
   const auto& pose = card->matrix3D;
-  // T(60, 40) * P(600) * T(-60, -40) * rotateY(30): the projection is conjugated with the parent's
-  // `perspective-origin` (its centre by default), which also mixes into the linear rows.
-  EXPECT_TRUE(NearlyEqual(pose.getRowColumn(0, 0), 0.916025f, 0.001f));
-  EXPECT_TRUE(NearlyEqual(pose.getRowColumn(0, 2), 0.413397f, 0.001f));
-  // The projection row is `-1/600` times the rotation's Z row: (sin30, 0, -cos30) / 600.
-  EXPECT_TRUE(NearlyEqual(pose.getRowColumn(3, 0), 0.000833f, 1e-5f));
-  EXPECT_TRUE(NearlyEqual(pose.getRowColumn(3, 1), 0.0f, 1e-5f));
-  EXPECT_TRUE(NearlyEqual(pose.getRowColumn(3, 2), -0.001443f, 1e-5f));
+  // A flow child has no offset to subtract, so it cannot be wrapped: the projection is dropped
+  // instead of folded into the wrong point, and the case is reported once.
+  EXPECT_TRUE(HasDiagnosticContaining(doc, "vanishing point"));
+  EXPECT_TRUE(NearlyEqual(pose.getRowColumn(0, 0), 0.866025f, 0.001f));
+  EXPECT_TRUE(NearlyEqual(pose.getRowColumn(0, 2), 0.5f, 0.001f));
+  EXPECT_TRUE(NearlyEqual(pose.getRowColumn(3, 0), 0.0f, 1e-5f));
+  EXPECT_TRUE(NearlyEqual(pose.getRowColumn(3, 2), 0.0f, 1e-5f));
   EXPECT_TRUE(NearlyEqual(card->anchor.x, 0.0f));
   EXPECT_TRUE(NearlyEqual(card->anchor.y, 40.0f));
 }
@@ -679,8 +678,8 @@ PAG_TEST(PAGXHTML3DTest, AuthoredPerspectiveOriginMovesTheVanishingPoint) {
   ASSERT_NE(card, nullptr);
   EXPECT_TRUE(NearlyEqual(card->matrix3D.getRowColumn(0, 0), 0.866025f, 0.001f));
   EXPECT_TRUE(NearlyEqual(card->matrix3D.getRowColumn(0, 2), 0.5f, 0.001f));
-  EXPECT_TRUE(NearlyEqual(card->matrix3D.getRowColumn(3, 0), 0.000833f, 1e-5f));
-  EXPECT_TRUE(NearlyEqual(card->matrix3D.getRowColumn(3, 2), -0.001443f, 1e-5f));
+  EXPECT_FALSE(HasProjectionRow(card))
+      << "an unresolvable vanishing point cannot be applied, and must not be folded either";
 }
 
 /**
@@ -716,8 +715,9 @@ PAG_TEST(PAGXHTML3DTest, ParentPerspectiveProjectsAnimatedKeyframes) {
   EXPECT_TRUE(NearlyEqual(start.getRowColumn(0, 3), 0.0f, 1e-5f));
   EXPECT_TRUE(NearlyEqual(start.getRowColumn(2, 3), 0.0f, 1e-5f));
   const auto& end = channel->keyframes.back().value;
-  EXPECT_TRUE(NearlyEqual(end.getRowColumn(3, 0), 0.001443f, 1e-5f));
-  EXPECT_TRUE(NearlyEqual(end.getRowColumn(3, 2), -0.000833f, 1e-5f));
+  EXPECT_TRUE(NearlyEqual(end.getRowColumn(3, 0), 0.0f, 1e-5f))
+      << "the camera lives on the wrapper, not in the keyframes";
+  EXPECT_TRUE(NearlyEqual(end.getRowColumn(3, 2), 0.0f, 1e-5f));
   auto* target = FindLayerById(doc, ChannelTarget(animation, "matrix3D"));
   ASSERT_NE(target, nullptr);
   EXPECT_TRUE(NearlyEqual(target->anchor.y, 40.0f));
@@ -813,10 +813,10 @@ PAG_TEST(PAGXHTML3DTest, FlowChildrenUnderPerspectiveWarnOnce) {
     }
   }
   EXPECT_EQ(warnings, 1) << "a flex container with many children must not repeat the diagnostic";
-  // The projection itself still applies; only the centre is approximate.
+  // A flow child cannot be wrapped, so the projection is dropped rather than folded elsewhere.
   auto* a = FindLayerById(doc, "a");
   ASSERT_NE(a, nullptr);
-  EXPECT_NE(a->matrix3D.getRowColumn(3, 2), 0.0f);
+  EXPECT_TRUE(NearlyEqual(a->matrix3D.getRowColumn(3, 2), 0.0f, 1e-5f));
 }
 
 /**
@@ -839,8 +839,8 @@ PAG_TEST(PAGXHTML3DTest, UnknownCameraBoxSizeWarnsAboutTheVanishingPoint) {
   // The documented fallback is the layer origin, i.e. the plain projection: no centre conjugation.
   auto* card = FindLayerById(doc, "card");
   ASSERT_NE(card, nullptr);
-  EXPECT_TRUE(NearlyEqual(card->matrix3D.getRowColumn(3, 0), 0.000833f, 1e-5f));
-  EXPECT_TRUE(NearlyEqual(card->matrix3D.getRowColumn(3, 2), -0.001443f, 1e-5f));
+  EXPECT_FALSE(HasProjectionRow(card))
+      << "an unknown vanishing point is neither applied nor folded";
   EXPECT_TRUE(NearlyEqual(card->matrix3D.getRowColumn(0, 0), 0.866025f, 0.001f));
 }
 
@@ -1523,8 +1523,10 @@ PAG_TEST(PAGXHTML3DTest, AnimatedFlowChildUnderPerspectiveWarns) {
   auto* channel = FindMatrix3DChannel(animation);
   ASSERT_NE(channel, nullptr);
   ASSERT_GE(channel->keyframes.size(), 2u);
-  EXPECT_TRUE(NearlyEqual(channel->keyframes.front().value.getRowColumn(3, 2), 0.0f, 1e-6f));
-  EXPECT_GT(std::fabs(channel->keyframes.back().value.getRowColumn(3, 2)), 1e-6f);
+  for (const auto& key : channel->keyframes) {
+    EXPECT_TRUE(NearlyEqual(key.value.getRowColumn(3, 2), 0.0f, 1e-6f))
+        << "a flow child keeps its poses unprojected";
+  }
 }
 
 /**

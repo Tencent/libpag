@@ -100,43 +100,6 @@ bool Animates3DTransform(const std::unordered_map<std::string, html::CssKeyframe
 // re-expresses the parent's `perspective-origin` in this element's local coordinates. Only an
 // absolutely positioned child knows its offset from the parent's box; a flow / flex child is placed
 // by layout, so its local origin is unknown here and the parent coordinates are used as-is.
-void ApplyParentPerspective(HTMLBoxAttributes& box, const HTMLParentCamera& parentCamera,
-                            float parentBorderWidthPx, bool animatesTransform,
-                            const std::string& elementName, HTMLDiagnosticSink& diagnostics,
-                            bool& warnedFlowChild) {
-  box.parentCamera = parentCamera;
-  if (!parentCamera.HasOrigin()) {
-    // The declaring box had no absolute size; the projection step reports that once.
-    return;
-  }
-  // The camera only changes the result when the child's pose leaves the z = 0 plane (or its pivot
-  // sits in front of it); a plain child of a `perspective` flex container is unaffected.
-  const bool cameraAffectsPose =
-      (box.transform.valid &&
-       (!IsFlatTransform(box.transform.pose) || std::fabs(box.transform.originZ) > 0.0f)) ||
-      animatesTransform;
-  // An absolute child resolves its offset from the parent's padding box; a flow / flex child is
-  // placed by layout, and a `right` / `bottom` positioned one has no `left` / `top`, so neither has
-  // an offset that can be expressed here.
-  const bool resolvedOffset = box.absolute && std::isfinite(box.leftPx) && std::isfinite(box.topPx);
-  if (!resolvedOffset && cameraAffectsPose && !warnedFlowChild) {
-    // One diagnostic per document: a flex container with many children would otherwise repeat it.
-    diagnostics.warn(
-        "html: perspective on the parent of <" + elementName +
-        "> cannot be projected around the exact vanishing point: the child has no resolved offset "
-        "(flow / flex placement, or positioned by right / bottom), so the perspective centre "
-        "follows the parent origin");
-    warnedFlowChild = true;
-  }
-  if (!resolvedOffset) {
-    return;
-  }
-  // `perspective-origin` lives in the parent's border box, the child's `left` / `top` in its padding
-  // box, so the border width sits between the two.
-  box.parentCamera.localOrigin.x -= parentBorderWidthPx + box.leftPx;
-  box.parentCamera.localOrigin.y -= parentBorderWidthPx + box.topPx;
-}
-
 // Single mapping point between `HTMLImporter::Options` and `HTMLSubsetTransformer::Options`.
 // All importer-controlled transformer behaviour funnels through here so adding a new shared
 // option only edits one location instead of being mirrored at every parseDOM() call site.
@@ -469,8 +432,7 @@ std::shared_ptr<PAGXDocument> HTMLParserContext::parseDOM(const std::shared_ptr<
   for (auto& entry : _pendingAnimations) {
     const auto& style = _styleCascade->getResolvedStyle(entry.element);
     _animationBuilder->buildForElement(style, entry.layer,
-                                       _styleCascade->getTransformReferenceSize(entry.element),
-                                       entry.parentCamera);
+                                       _styleCascade->getTransformReferenceSize(entry.element));
   }
   // Inline-SVG shape animations (`fill` / `stroke` / `stroke-dashoffset` on `<path>` etc.). Their
   // painter nodes are synthesised by the SVG importer during resolve, so the emitted objects target
@@ -687,15 +649,14 @@ bool HTMLParserContext::resolveCanvasSize(const std::shared_ptr<DOMNode>& body, 
 // ID assignment with animation registration hook.
 //==================================================================================================
 
-void HTMLParserContext::assignElementId(Layer* layer, const std::shared_ptr<DOMNode>& element,
-                                        const HTMLParentCamera& parentCamera) {
+void HTMLParserContext::assignElementId(Layer* layer, const std::shared_ptr<DOMNode>& element) {
   _idAllocator->assign(layer, element);
   // Record elements that declare an animation so PAGX animations can be emitted once the whole
   // tree is built. Cheap lookup: the resolved style is cached by the cascade.
   if (layer != nullptr && element != nullptr) {
     const auto& style = _styleCascade->getResolvedStyle(element);
     if (style.count("animation") > 0 || style.count("animation-name") > 0) {
-      _pendingAnimations.push_back({element, layer, parentCamera});
+      _pendingAnimations.push_back({element, layer});
     }
   }
 }
@@ -795,47 +756,58 @@ Layer* HTMLParserContext::convertBody(const std::shared_ptr<DOMNode>& body, floa
     }
     child = child->getNextSibling();
   }
-  assignElementId(wrapper, body, HTMLParentCamera{});
+  assignElementId(wrapper, body);
   return wrapper;
 }
 
 void HTMLParserContext::attachParentCamera(HTMLBoxAttributes& box,
                                            const std::shared_ptr<DOMNode>& element,
                                            const HTMLInheritedStyle& inherited) {
-  // An absolutely positioned child can carry the parent camera on a wrapper layer instead of in its
-  // own pose. PAGX composes a layer's `perspective` outside its pose, so the camera stays static while
-  // the pose interpolates — folding it per keyframe is what made a fixed camera drift (the midpoint of
-  // `translateZ 0 -> 50` under `perspective: 100` came out at 114px instead of 133px). The wrapper also
-  // carries `perspective-origin`, which PAGX's projection (centred on the layer origin) cannot.
-  if (inherited.parentCamera.HasOrigin() && box.absolute && std::isfinite(box.leftPx) &&
-      std::isfinite(box.topPx)) {
-    _pendingChildCamera[element.get()] = inherited.parentCamera;
-    box.parentCamera = {};
+  const HTMLParentCamera& camera = inherited.parentCamera;
+  if (!camera.HasOrigin()) {
     return;
   }
-  // Classifying a keyframe set only answers a yes/no question about an animation the builder may not
-  // even pick, so it must not write diagnostics into the document. The sink is local and every probe
-  // parser is bound to it: the shared parser would still report em/rem units through its own sink.
+  // The camera is carried by a wrapper layer, never folded into a pose: PAGX composes a layer's
+  // `perspective` outside its pose, so a fixed camera stays static while the pose interpolates.
+  // Folding it per keyframe is what made `translateZ 0 -> 50` under `perspective: 100` settle at
+  // 114px instead of the CSS 133px, and the wrapper is also the only way to carry a
+  // `perspective-origin`, which PAGX projects about the layer origin.
+  if (box.absolute && std::isfinite(box.leftPx) && std::isfinite(box.topPx)) {
+    _pendingChildCamera[element.get()] = camera;
+    return;
+  }
+  if (_flowChildPerspectiveWarned) {
+    return;
+  }
+  // A flow / flex child is placed by layout, so it has no offset to subtract and cannot be wrapped.
+  // Report it once per document rather than folding the projection into the wrong point.
   HTMLDiagnosticSink silentDiagnostics(false);
   HTMLValueParser silentParser(silentDiagnostics, _canvasWidth, _canvasHeight);
   const auto& style = _styleCascade->getResolvedStyle(element);
   const HTMLTransformReference reference = _styleCascade->getTransformReferenceSize(element);
-  // An element whose pose only exists in `@keyframes` never parsed a static origin, so its pivot depth
-  // has to come from the resolved style through the same fallback chain the animated pivot uses;
-  // reading `box.transform.originZ` would always give 0.
   const HTMLElementAnchor animatedPivot = ResolveElementAnchor(
       Trim(LookupProperty(style, "transform-origin")), reference, nullptr, silentParser);
   const float pivotZ = box.transform.valid ? box.transform.originZ : animatedPivot.depth;
-  ApplyParentPerspective(
-      box, inherited.parentCamera, inherited.parentBorderWidthPx,
-      Animates3DTransform(_styleCascade->keyframes(), style, silentParser, reference, pivotZ),
-      element->name, *_diagnostics, _flowChildPerspectiveWarned);
+  const bool animatesTransform =
+      Animates3DTransform(_styleCascade->keyframes(), style, silentParser, reference, pivotZ);
+  const bool cameraAffectsPose =
+      (box.transform.valid &&
+       (!IsFlatTransform(box.transform.pose) || std::fabs(box.transform.originZ) > 0.0f)) ||
+      animatesTransform;
+  if (!cameraAffectsPose) {
+    return;
+  }
+  _diagnostics->warn(
+      "html: perspective on the parent of <" + element->name +
+      "> cannot be projected onto this child: it has no resolved offset (flow / flex "
+      "placement, or positioned by right / bottom), so its vanishing point is the "
+      "parent origin");
+  _flowChildPerspectiveWarned = true;
 }
 
 void HTMLParserContext::forwardParentCamera(const HTMLBoxAttributes& box,
                                             HTMLInheritedStyle& childInherited) {
   childInherited.parentCamera.distancePx = box.camera.distancePx;
-  childInherited.parentBorderWidthPx = box.borderWidthPx;
   const bool hasCamera = box.camera.distancePx > 0.0f && std::isfinite(box.camera.localOrigin.x) &&
                          std::isfinite(box.camera.localOrigin.y);
   childInherited.parentCamera.localOrigin.x = hasCamera ? box.camera.localOrigin.x : NAN;
@@ -1027,7 +999,7 @@ Layer* HTMLParserContext::convertContainer(const std::shared_ptr<DOMNode>& eleme
   // are rounded-clipped. Runs after `applyMaskOrClip` so its single-mask-slot check is accurate,
   // and is skipped for the folded single-image case (which returned early above).
   applyRoundedOverflowClip(layer, box);
-  assignElementId(wrapper, element, box.parentCamera);
+  assignElementId(wrapper, element);
   return wrapper;
 }
 
@@ -1044,7 +1016,7 @@ Layer* HTMLParserContext::convertTextLeaf(const std::shared_ptr<DOMNode>& elemen
   // assignment does not enqueue CSS animations for the post-tree animation pass. Without this,
   // animations on <span>/<a>/<p>/<h1>... elements are silently dropped while identical styles on
   // a <div> work, which is especially visible for per-character text animations.
-  assignElementId(layer, element, box.parentCamera);
+  assignElementId(layer, element);
   return layer;
 }
 

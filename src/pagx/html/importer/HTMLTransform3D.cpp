@@ -846,29 +846,11 @@ bool ParseCssTransformList(const std::string& value, HTMLValueParser& valueParse
   return true;
 }
 
-Matrix3D PushPerspective(const Matrix3D& pose, const HTMLParentCamera& camera) {
-  if (!camera.Has()) {
-    return pose;
-  }
-  // CSS projects about `perspective-origin` (the parent's centre by default), not about the parent's
-  // local origin, so the projection is conjugated with that point before it is folded into the pose.
-  const Matrix3D projection = MakePerspective(camera.distancePx);
-  if (!camera.HasOrigin() || (camera.localOrigin.x == 0.0f && camera.localOrigin.y == 0.0f)) {
-    return Multiply(projection, pose);
-  }
-  const Matrix3D toOrigin = MakeTranslation(camera.localOrigin.x, camera.localOrigin.y, 0.0f);
-  const Matrix3D fromOrigin = MakeTranslation(-camera.localOrigin.x, -camera.localOrigin.y, 0.0f);
-  return Multiply(Multiply(toOrigin, projection), Multiply(fromOrigin, pose));
-}
-
-PosePlacement PlacePose(const Matrix3D& pose, const HTMLParentCamera& camera, float anchorZ) {
+PosePlacement PlacePose(const Matrix3D& pose) {
   PosePlacement placement = {};
-  // The projection only divides by `1 - z / distance`, so it is the identity on the z = 0 plane.
-  // A flat pose whose pivot also sits on that plane is therefore unaffected by the parent camera;
-  // folding it in anyway would only add a projection row that makes a legal flat pose (`scale(0)`)
-  // non-invertible and gets the whole transform dropped.
-  const bool cameraAffectsPose = !IsFlatTransform(pose) || std::fabs(anchorZ) > 0.0f;
-  placement.pose = cameraAffectsPose ? PushPerspective(pose, camera) : pose;
+  // The parent camera is never folded into a pose: it lives on the wrapper layer that PAGX composes
+  // outside the pose, so a fixed camera stays fixed while the pose interpolates.
+  placement.pose = pose;
   placement.flat = IsFlatTransform(placement.pose);
   // PAGX requires a 3D pose to be invertible; a flat pose has no such constraint, because a zero
   // scale is a valid (if empty) 2D transform.

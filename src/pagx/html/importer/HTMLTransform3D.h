@@ -156,7 +156,6 @@ bool ParseCssTransformList(const std::string& value, HTMLValueParser& valueParse
  * `PlacePose` folds the camera into a child pose, and `HTMLLayerBuilder::applyBareParentCamera`
  * materialises it on a `preserve-3d` layer that has no pose of its own.
  */
-Matrix3D PushPerspective(const Matrix3D& pose, const HTMLParentCamera& camera);
 
 /**
  * Where a pose goes once its parent camera has been folded in. Both the static box path and the
@@ -186,7 +185,7 @@ struct PosePlacement {
   Matrix3D pose = {};
 };
 
-PosePlacement PlacePose(const Matrix3D& pose, const HTMLParentCamera& camera, float anchorZ);
+PosePlacement PlacePose(const Matrix3D& pose);
 
 /**
  * Returns true when the pose only acts on the z = 0 plane: no depth translation, no z-dependent

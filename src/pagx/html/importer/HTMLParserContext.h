@@ -159,8 +159,7 @@ class HTMLParserContext {
   // `animation` declaration so the post-tree-build animation pass can emit a PAGX animation
   // bound to this layer. All `<img>`, inline `<svg>`, and container conversion paths funnel
   // their final outer Layer through this helper to ensure animation capture is exhaustive.
-  void assignElementId(Layer* layer, const std::shared_ptr<DOMNode>& element,
-                       const HTMLParentCamera& parentCamera);
+  void assignElementId(Layer* layer, const std::shared_ptr<DOMNode>& element);
 
   // Rebuilds a PAGX mask layer from the element's CSS `mask-image` (alpha / luminance) or
   // `clip-path` (contour) — the latter from a `url(#id)` <clipPath> reference or a CSS basic
@@ -328,9 +327,6 @@ class HTMLParserContext {
   struct PendingAnimation {
     std::shared_ptr<DOMNode> element = nullptr;
     Layer* layer = nullptr;
-    // CSS `perspective` declared on the parent, folded into every keyframe pose, with its
-    // `perspective-origin` in the element's local coordinates.
-    HTMLParentCamera parentCamera = {};
   };
   std::vector<PendingAnimation> _pendingAnimations = {};
 

@@ -68,8 +68,7 @@ class HTMLAnimationBuilder {
    * reference it.
    */
   bool buildForElement(const std::unordered_map<std::string, std::string>& resolvedStyle,
-                       Layer* layer, const HTMLTransformReference& reference,
-                       const HTMLParentCamera& parentCamera);
+                       Layer* layer, const HTMLTransformReference& reference);
 
   /**
    * Builds and registers animations for a single inline-SVG shape (`<path>`, `<rect>`, …) that

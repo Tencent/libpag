@@ -226,17 +226,6 @@ Layer* HTMLTextFragmentBuilder::convertPAGXTextHost(const std::shared_ptr<DOMNod
     const float spanTop = std::isnan(spanBox.topPx) ? 0.0f : spanBox.topPx;
     box.leftPx = (std::isnan(containerBox.leftPx) ? 0.0f : containerBox.leftPx) + spanLeft;
     box.topPx = (std::isnan(containerBox.topPx) ? 0.0f : containerBox.topPx) + spanTop;
-    // The parent camera origin arrived in the container's local coordinates while the emitted
-    // layer now starts at the glyph offset, so the same camera point has to be re-expressed in the
-    // shifted coordinates. Only an absolutely positioned host is emitted at `left` / `top`.
-    if (box.absolute) {
-      if (std::isfinite(box.parentCamera.localOrigin.x)) {
-        box.parentCamera.localOrigin.x -= spanLeft;
-      }
-      if (std::isfinite(box.parentCamera.localOrigin.y)) {
-        box.parentCamera.localOrigin.y -= spanTop;
-      }
-    }
   }
   box.rightPx = NAN;
   box.bottomPx = NAN;

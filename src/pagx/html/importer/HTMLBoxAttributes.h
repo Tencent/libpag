@@ -77,9 +77,6 @@ struct HTMLInheritedStyle {
   // direct children only. The origin is the parent's `perspective-origin` in the parent's local
   // coordinates; the child subtracts its own offset to express it locally.
   HTMLParentCamera parentCamera = {};
-  // The parent's border width: `perspective-origin` is measured in the parent's border box, while an
-  // absolutely positioned child's `left` / `top` start at its padding box, so the offset needs this.
-  float parentBorderWidthPx = 0.0f;
   std::string color = {};
   std::string fontFamily = {};
   std::string fontSize = {};
@@ -316,12 +313,6 @@ struct HTMLBoxAttributes {
 
   // CSS `transform-style: preserve-3d`, forwarded onto `Layer.preserve3D`.
   bool preserve3D = false;
-
-  // CSS `perspective` declared on the parent (px), folded into this element's pose. Stored on the box
-  // so the transform write and the animation registration read the same value regardless of which
-  // element happens to be converting when they run. `parentCamera` is the parent's
-  // `perspective-origin` re-expressed in this element's local coordinates.
-  HTMLParentCamera parentCamera = {};
 
   // CSS `perspective: <d>` on this element: a camera that projects its **children**. PAGX keeps the
   // projection on the layer that owns the pose, so the parent value is pushed into each child pose
