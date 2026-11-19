@@ -54,8 +54,8 @@ node third_party/vendor_tools/ms-build -a x64 win/Win32Demo.sln /p:Configuration
 .\win\x64\Release\WinPAGDemo.exe
 ```
 
-从终端启动可以看到 libpag 的 stdout：首帧的后端日志、实际解析到的资源路径，以及资源缺失时的明确报错。
-`assets/test2.pag` 缺失时示例没有内容可画，窗口会保持黑屏。
+示例是 GUI 程序，日志写到可执行文件旁边的 `WinPAGDemo.log` 而不是控制台。日志里包含当前后端、
+实际解析到的资源路径，以及资源缺失时的明确报错；`assets/test2.pag` 缺失时示例没有内容可画，窗口会保持黑屏。
 
 ## 运行时
 

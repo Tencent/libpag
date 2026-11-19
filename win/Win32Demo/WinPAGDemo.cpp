@@ -21,6 +21,8 @@
 #include "WinPAGDemo.h"
 
 #include <algorithm>
+#include <cstdio>
+#include <filesystem>
 #include <iostream>
 #include <string>
 
@@ -29,8 +31,24 @@
 
 #define BUFSIZE MAX_PATH
 
+namespace {
+void RedirectStdioToLogFile(const std::filesystem::path& logPath) {
+  FILE* stdoutStream = nullptr;
+  _wfreopen_s(&stdoutStream, logPath.c_str(), L"w", stdout);
+}
+}  // namespace
+
 int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
                       _In_ LPWSTR lpCmdLine, _In_ int nCmdShow) {
+  wchar_t modulePath[MAX_PATH] = {};
+  auto modulePathLength = ::GetModuleFileNameW(nullptr, modulePath, MAX_PATH);
+  std::filesystem::path logPath = "WinPAGDemo.log";
+  if (modulePathLength != 0 && modulePathLength < MAX_PATH) {
+    logPath = std::filesystem::path(modulePath).parent_path() / "WinPAGDemo.log";
+  }
+  RedirectStdioToLogFile(logPath);
+  std::cout << "[PAGDemo] starting, log file: " << logPath.string() << std::endl;
+
   int width = 600;
   int height = 800;
   Win32Window::Point origin(0, 0);
@@ -38,8 +56,10 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 
   Win32ExampleWindow client_window;
   if (!client_window.CreateAndShow(L"PAG Viewer", origin, size)) {
+    std::cout << "[PAGDemo] failed to create the window" << std::endl;
     return -1;
   }
+  std::cout << "[PAGDemo] window created" << std::endl;
 
   HACCEL hAccelTable = LoadAccelerators(hInstance, MAKEINTRESOURCE(IDC_WINPAGDEMO));
 

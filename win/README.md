@@ -60,9 +60,10 @@ started from any directory:
 .\win\x64\Release\WinPAGDemo.exe
 ```
 
-Launch it from a terminal to see libpag's stdout: the backend line on the first frame, the resolved
-asset path, and an explicit error when a resource is missing. A missing `assets/test2.pag` leaves
-the window black because the demo has nothing to draw.
+The demo is a GUI application, so it writes `WinPAGDemo.log` next to the executable instead of
+printing to a console. The log contains the backend line, the resolved asset path, and an explicit
+error when a resource is missing. A missing `assets/test2.pag` leaves the window black because the
+demo has nothing to draw.
 
 ## Runtime
 

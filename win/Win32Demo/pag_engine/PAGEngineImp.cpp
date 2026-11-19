@@ -33,13 +33,13 @@ bool PAGEngineImpl::InitOnscreenRender(PAGEngineInitData init_data) {
   auto drawable = pag::GPUDrawable::FromWindow(render_window_);
   pag_drawable_ = std::shared_ptr<pag::GPUDrawable>(drawable);
   if (pag_drawable_ == nullptr) {
-    std::cerr << "[PAGDemo] failed to create the GPU drawable for the window" << std::endl;
+    std::cout << "[PAGDemo] failed to create the GPU drawable for the window" << std::endl;
     return false;
   }
 
   pag_surface_ = pag::PAGSurface::MakeFrom(pag_drawable_);
   if (pag_surface_ == nullptr) {
-    std::cerr << "[PAGDemo] failed to create the PAG surface" << std::endl;
+    std::cout << "[PAGDemo] failed to create the PAG surface" << std::endl;
     return false;
   }
 
@@ -148,7 +148,6 @@ bool PAGEngineImpl::DrawPAG(bool animating) {
       }
     }
 
-    std::cout << " progress : " << progress << std::endl;
     pag_player_->setProgress(progress);
     current_progress_ = progress;
     if (!is_loop_ && current_progress_ == 1) {
