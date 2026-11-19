@@ -2658,10 +2658,14 @@ void EmitGeometryCssAtFrame(const DomTargetBundle& bundle, const BundleChannelSe
     if (chSet.hasPolystarGeometry) {
       auto* star = static_cast<const Polystar*>(bundle.primaryHost);
       PolystarValues values = PolystarValuesFrom(star);
-      // The runtime floors pointCount (5.1 and 5.9 draw the same polygon), so the frame floors it
-      // too instead of building a partial vertex the reference never shows.
-      values.pointCount =
-          std::floor(EvalFloatChannel(chSet.starPointCountCh, t, values.pointCount));
+      // A Polygon quantises its point count (5.1 and 5.9 draw the same polygon), but a Star keeps
+      // the fraction: `BuildPolystarPath` turns the decimal part into a shortened last vertex and
+      // the runtime passes the float through, so flooring here changed a star's outline even when
+      // only its radius was animated.
+      values.pointCount = EvalFloatChannel(chSet.starPointCountCh, t, values.pointCount);
+      if (star->type == PolystarType::Polygon) {
+        values.pointCount = std::floor(values.pointCount);
+      }
       values.outerRadius = EvalFloatChannel(chSet.starOuterRadiusCh, t, values.outerRadius);
       values.innerRadius = EvalFloatChannel(chSet.starInnerRadiusCh, t, values.innerRadius);
       values.outerRoundness =
