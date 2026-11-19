@@ -201,7 +201,9 @@ if errorlevel 1 (
   call :Fail "Cannot read test\baseline\version.json from origin/main."
   goto :cleanup
 )
-if exist "%CACHE_DIR%\version.json" (
+rem Both files must exist: a failed refresh deletes md5.json before regenerating it, so a lone
+rem version.json can belong to a broken cache. This mirrors update_baseline.sh's `-f` checks.
+if exist "%CACHE_DIR%\version.json" if exist "%CACHE_DIR%\md5.json" (
   git diff --no-index --quiet --ignore-cr-at-eol -- "%TEMP%\pag_main_version.json" "%CACHE_DIR%\version.json" >nul 2>nul
   if not errorlevel 1 (
     echo Baseline cache for '%BACKEND_NAME%' is up to date.
