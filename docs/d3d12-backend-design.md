@@ -6,7 +6,7 @@
 - 日期：2026-11-17
 - 基线：`main` @ `9c968baea`
 - 分支：`feature/thunderllei_d3d12`
-- 状态：**评审问题已纳入方案，关键接口待确认，尚未实现**
+- 状态：**核心实现与本地验证已完成；基线接受与 CI 待合入 main 后补充**
 - 参考实现：Metal 适配提交 `ba9952640`（#3717）、`c0b63f058`（#3781）、`8a63822b0`（#3798）、`c52be7304`（#3804）、`e0815e9ca`（#3824）、`eb4412aa5`（#3828）
 
 本版不把设备归属、资源状态、队列同步或首次基线建立当作可延后的限制。正文中的新增接口、目标和脚本行为均为拟实施设计，不代表当前代码已支持；v1.0 的评审问题与修订位置见附录 C。
@@ -39,6 +39,23 @@
 - 不新增 Windows 硬件视频解码器；复用已有内置 libavc 和外部解码器注册机制。
 - 不把宿主显式提供的 tgfx Device 替换成另一个同适配器 Device；该集成路径仍由宿主保持精确的 contextID 和所有权。
 - 不自动运行基线生成/接受目标，不手改版本台账。首次接受和缓存制品的来源按 §6.3 处理。
+
+### 1.4 实现进展（2026-11-19）
+
+已完成并在本机验证：
+
+- C++/C API：`D3D12TextureInfo`、`BackendTexture`/`BackendRenderTarget` 创建与取值、`waitUntilCompleted()`（PAG/PAGX/C）。
+- 设备与资源：canonical COM 注册表、同原生设备复用、用途校验、`IsDeviceHealthy`、typed 2D 白名单、WARP/硬件策略。
+- 窗口：`GPUDrawable` 的 D3D12 交换链和客户区尺寸；D3D12 构建会输出实际后端日志。
+- 测试：`PAGD3D12Test` 9 例（含外部 render target 原点回读、独立宿主队列 COMMON 双向交接），`PAGBlendD3D12Test` 3 例；C 头在测试构建中以真实 C 编译器编译（`test/c/CApiCheck.c`），`PAG_USE_C=ON` 时同时校验链接。
+- MSVC 下 `PAGFullTest_D3D12` 全量通过（`PAGBlendD3D12Test` 的新 key 尚未接受）；Windows OpenGL 测试目标也已可编译运行。
+
+尚未完成：
+
+- 首次基线接受与可信缓存制品（§6.3）；D3D12 的 key 尚未进入 `test/baseline/version.json`。
+- CI lane、`update_baseline.sh` 的 D3D12 分支和 `autotest.sh` 的 D3D12 入口。
+- Win32Demo 只补充了系统库链接与后端日志，尚未在真实 D3D12 构建上跑窗口验证。
+- 设备丢失负例、注册表多线程竞争、`forAsyncThread`、视频/缓存首帧断言等 §6.2 用例仍未补齐。
 
 ---
 

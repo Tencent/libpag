@@ -40,6 +40,9 @@ std::shared_ptr<GPUDrawable> GPUDrawable::FromWindow(void* nativeWindow, void* s
 
 GPUDrawable::GPUDrawable(void* nativeWindow, void* sharedContext)
     : nativeWindow(nativeWindow), sharedContext(sharedContext) {
+#ifdef TGFX_USE_D3D12
+  LOGI("GPUDrawable: the window surface uses the D3D12 backend.");
+#endif
   GPUDrawable::updateSize();
 }
 

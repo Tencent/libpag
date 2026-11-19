@@ -22,6 +22,7 @@
 
 #include <d3d12.h>
 #include <dxgiformat.h>
+#include <wrl/client.h>
 #include <cstdint>
 #include <vector>
 #include "base/utils/TGFXCast.h"
@@ -32,6 +33,7 @@
 #include "tgfx/gpu/Context.h"
 #include "tgfx/gpu/GPU.h"
 #include "tgfx/gpu/Texture.h"
+#include "utils/DevicePool.h"
 
 namespace pag {
 
@@ -246,6 +248,293 @@ PAG_TEST(D3D12Test, OffscreenCompletion) {
   auto surface = PAGSurface::MakeOffscreen(16, 16);
   ASSERT_TRUE(surface != nullptr);
   EXPECT_TRUE(surface->waitUntilCompleted());
+}
+
+namespace {
+
+struct HostQueue {
+  Microsoft::WRL::ComPtr<ID3D12CommandQueue> queue = nullptr;
+  Microsoft::WRL::ComPtr<ID3D12CommandAllocator> allocator = nullptr;
+  Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> commandList = nullptr;
+  Microsoft::WRL::ComPtr<ID3D12Fence> fence = nullptr;
+  HANDLE event = nullptr;
+  UINT64 fenceValue = 0;
+
+  ~HostQueue() {
+    if (event != nullptr) {
+      CloseHandle(event);
+    }
+  }
+
+  bool init(ID3D12Device* device) {
+    D3D12_COMMAND_QUEUE_DESC queueDesc = {};
+    queueDesc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
+    if (FAILED(
+            device->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(queue.ReleaseAndGetAddressOf())))) {
+      return false;
+    }
+    if (FAILED(device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT,
+                                              IID_PPV_ARGS(allocator.ReleaseAndGetAddressOf())))) {
+      return false;
+    }
+    if (FAILED(device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, allocator.Get(),
+                                         nullptr,
+                                         IID_PPV_ARGS(commandList.ReleaseAndGetAddressOf())))) {
+      return false;
+    }
+    if (FAILED(device->CreateFence(0, D3D12_FENCE_FLAG_NONE,
+                                   IID_PPV_ARGS(fence.ReleaseAndGetAddressOf())))) {
+      return false;
+    }
+    event = CreateEvent(nullptr, FALSE, FALSE, nullptr);
+    return event != nullptr;
+  }
+
+  bool execute() {
+    if (FAILED(commandList->Close())) {
+      return false;
+    }
+    ID3D12CommandList* lists[] = {commandList.Get()};
+    queue->ExecuteCommandLists(1, lists);
+    ++fenceValue;
+    if (FAILED(queue->Signal(fence.Get(), fenceValue))) {
+      return false;
+    }
+    if (fence->GetCompletedValue() < fenceValue) {
+      if (FAILED(fence->SetEventOnCompletion(fenceValue, event))) {
+        return false;
+      }
+      if (WaitForSingleObject(event, 10000) != WAIT_OBJECT_0) {
+        return false;
+      }
+    }
+    if (FAILED(allocator->Reset())) {
+      return false;
+    }
+    return SUCCEEDED(commandList->Reset(allocator.Get(), nullptr));
+  }
+};
+
+std::shared_ptr<tgfx::Texture> MakeRenderableTexture(int width, int height) {
+  auto device = DevicePool::Make();
+  if (device == nullptr) {
+    return nullptr;
+  }
+  std::shared_ptr<tgfx::Texture> texture = nullptr;
+  {
+    DeviceLockScope scope(device);
+    if (!static_cast<bool>(scope)) {
+      return nullptr;
+    }
+    texture =
+        MakeTexture(scope.context(), width, height,
+                    tgfx::TextureUsage::TEXTURE_BINDING | tgfx::TextureUsage::RENDER_ATTACHMENT);
+  }
+  return texture;
+}
+
+BackendRenderTarget MakeRenderTarget(const std::shared_ptr<tgfx::Texture>& texture, int width,
+                                     int height) {
+  tgfx::D3D12TextureInfo textureInfo = {};
+  if (!texture->getBackendTexture().getD3D12TextureInfo(&textureInfo)) {
+    return BackendRenderTarget();
+  }
+  D3D12TextureInfo info = {};
+  info.resource = const_cast<void*>(textureInfo.resource);
+  return BackendRenderTarget(info, width, height);
+}
+
+bool DrawBottomRightQuadrant(const std::shared_ptr<PAGSurface>& surface, int size) {
+  auto composition = PAGComposition::Make(size, size);
+  auto solid = PAGSolidLayer::Make(1000000, size / 2, size / 2, Red);
+  solid->setMatrix(
+      Matrix::MakeTrans(static_cast<float>(size) / 2.0f, static_cast<float>(size) / 2.0f));
+  composition->addLayer(solid);
+  auto player = std::make_shared<PAGPlayer>();
+  player->setSurface(surface);
+  player->setComposition(composition);
+  player->setMatrix(Matrix::I());
+  return player->flush();
+}
+
+Microsoft::WRL::ComPtr<ID3D12Resource> CreateBuffer(ID3D12Device* device, UINT64 size,
+                                                    D3D12_HEAP_TYPE heapType,
+                                                    D3D12_RESOURCE_STATES initialState) {
+  D3D12_HEAP_PROPERTIES heap = {};
+  heap.Type = heapType;
+  D3D12_RESOURCE_DESC desc = {};
+  desc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+  desc.Width = size;
+  desc.Height = 1;
+  desc.DepthOrArraySize = 1;
+  desc.MipLevels = 1;
+  desc.SampleDesc.Count = 1;
+  desc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+  Microsoft::WRL::ComPtr<ID3D12Resource> buffer = nullptr;
+  if (FAILED(device->CreateCommittedResource(&heap, D3D12_HEAP_FLAG_NONE, &desc, initialState,
+                                             nullptr,
+                                             IID_PPV_ARGS(buffer.ReleaseAndGetAddressOf())))) {
+    return nullptr;
+  }
+  return buffer;
+}
+
+void TransitionResource(ID3D12GraphicsCommandList* commandList, ID3D12Resource* resource,
+                        D3D12_RESOURCE_STATES before, D3D12_RESOURCE_STATES after) {
+  D3D12_RESOURCE_BARRIER barrier = {};
+  barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+  barrier.Transition.pResource = resource;
+  barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+  barrier.Transition.StateBefore = before;
+  barrier.Transition.StateAfter = after;
+  commandList->ResourceBarrier(1, &barrier);
+}
+
+}  // namespace
+
+/**
+ * Covers external render targets on both origins. readPixels() normalizes BottomLeft surfaces, so
+ * the same composition must produce identical pixel rows for both origins.
+ */
+PAG_TEST(D3D12Test, ExternalRenderTargetOriginReadback) {
+  const int size = 32;
+  auto topLeftTexture = MakeRenderableTexture(size, size);
+  ASSERT_TRUE(topLeftTexture != nullptr);
+  auto bottomLeftTexture = MakeRenderableTexture(size, size);
+  ASSERT_TRUE(bottomLeftTexture != nullptr);
+
+  auto topLeftSurface =
+      PAGSurface::MakeFrom(MakeRenderTarget(topLeftTexture, size, size), ImageOrigin::TopLeft);
+  ASSERT_TRUE(topLeftSurface != nullptr);
+  auto bottomLeftSurface = PAGSurface::MakeFrom(MakeRenderTarget(bottomLeftTexture, size, size),
+                                                ImageOrigin::BottomLeft);
+  ASSERT_TRUE(bottomLeftSurface != nullptr);
+
+  ASSERT_TRUE(DrawBottomRightQuadrant(topLeftSurface, size));
+  ASSERT_TRUE(DrawBottomRightQuadrant(bottomLeftSurface, size));
+  ASSERT_TRUE(topLeftSurface->waitUntilCompleted());
+  ASSERT_TRUE(bottomLeftSurface->waitUntilCompleted());
+
+  std::vector<uint8_t> topLeftPixels(size * size * 4);
+  std::vector<uint8_t> bottomLeftPixels(size * size * 4);
+  ASSERT_TRUE(topLeftSurface->readPixels(ColorType::RGBA_8888, AlphaType::Premultiplied,
+                                         topLeftPixels.data(), size * 4));
+  ASSERT_TRUE(bottomLeftSurface->readPixels(ColorType::RGBA_8888, AlphaType::Premultiplied,
+                                            bottomLeftPixels.data(), size * 4));
+  EXPECT_EQ(topLeftPixels, bottomLeftPixels);
+
+  EXPECT_EQ(topLeftPixels[0], 0);
+  EXPECT_EQ(topLeftPixels[1], 0);
+  EXPECT_EQ(topLeftPixels[2], 0);
+  EXPECT_EQ(topLeftPixels[3], 0);
+  auto lastPixel = (size * size - 1) * 4;
+  EXPECT_EQ(topLeftPixels[lastPixel], 255);
+  EXPECT_EQ(topLeftPixels[lastPixel + 1], 0);
+  EXPECT_EQ(topLeftPixels[lastPixel + 2], 0);
+  EXPECT_EQ(topLeftPixels[lastPixel + 3], 255);
+}
+
+/**
+ * Covers the COMMON handoff contract with an independent host queue: the host writes the texture,
+ * PAG renders it after an explicit completion wait, and the host reads it back on its own queue.
+ */
+PAG_TEST(D3D12Test, IndependentQueueCompletion) {
+  const int size = 32;
+  const UINT rowPitch = 256;
+  auto texture = MakeRenderableTexture(size, size);
+  ASSERT_TRUE(texture != nullptr);
+  tgfx::D3D12TextureInfo textureInfo = {};
+  ASSERT_TRUE(texture->getBackendTexture().getD3D12TextureInfo(&textureInfo));
+  auto resource = static_cast<ID3D12Resource*>(const_cast<void*>(textureInfo.resource));
+  ASSERT_TRUE(resource != nullptr);
+  Microsoft::WRL::ComPtr<ID3D12Device> nativeDevice = nullptr;
+  ASSERT_TRUE(SUCCEEDED(resource->GetDevice(IID_PPV_ARGS(nativeDevice.ReleaseAndGetAddressOf()))));
+  auto format = static_cast<DXGI_FORMAT>(textureInfo.format);
+
+  HostQueue host = {};
+  ASSERT_TRUE(host.init(nativeDevice.Get()));
+  auto upload = CreateBuffer(nativeDevice.Get(), static_cast<UINT64>(rowPitch) * size,
+                             D3D12_HEAP_TYPE_UPLOAD, D3D12_RESOURCE_STATE_GENERIC_READ);
+  ASSERT_TRUE(upload.Get() != nullptr);
+  auto readback = CreateBuffer(nativeDevice.Get(), static_cast<UINT64>(rowPitch) * size,
+                               D3D12_HEAP_TYPE_READBACK, D3D12_RESOURCE_STATE_COPY_DEST);
+  ASSERT_TRUE(readback.Get() != nullptr);
+
+  uint8_t* uploadPixels = nullptr;
+  ASSERT_TRUE(SUCCEEDED(upload->Map(0, nullptr, reinterpret_cast<void**>(&uploadPixels))));
+  for (int y = 0; y < size; y++) {
+    for (int x = 0; x < size; x++) {
+      auto pixel = uploadPixels + y * rowPitch + x * 4;
+      pixel[0] = 0;
+      pixel[1] = 255;
+      pixel[2] = 0;
+      pixel[3] = 255;
+    }
+  }
+  upload->Unmap(0, nullptr);
+
+  D3D12_TEXTURE_COPY_LOCATION textureLocation = {};
+  textureLocation.pResource = resource;
+  textureLocation.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+  D3D12_TEXTURE_COPY_LOCATION uploadLocation = {};
+  uploadLocation.pResource = upload.Get();
+  uploadLocation.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
+  uploadLocation.PlacedFootprint.Footprint.Format = format;
+  uploadLocation.PlacedFootprint.Footprint.Width = size;
+  uploadLocation.PlacedFootprint.Footprint.Height = size;
+  uploadLocation.PlacedFootprint.Footprint.Depth = 1;
+  uploadLocation.PlacedFootprint.Footprint.RowPitch = rowPitch;
+  D3D12_TEXTURE_COPY_LOCATION readbackLocation = uploadLocation;
+  readbackLocation.pResource = readback.Get();
+
+  TransitionResource(host.commandList.Get(), resource, D3D12_RESOURCE_STATE_COMMON,
+                     D3D12_RESOURCE_STATE_COPY_DEST);
+  host.commandList->CopyTextureRegion(&textureLocation, 0, 0, 0, &uploadLocation, nullptr);
+  TransitionResource(host.commandList.Get(), resource, D3D12_RESOURCE_STATE_COPY_DEST,
+                     D3D12_RESOURCE_STATE_COMMON);
+  ASSERT_TRUE(host.execute());
+
+  TransitionResource(host.commandList.Get(), resource, D3D12_RESOURCE_STATE_COMMON,
+                     D3D12_RESOURCE_STATE_COPY_SOURCE);
+  host.commandList->CopyTextureRegion(&readbackLocation, 0, 0, 0, &textureLocation, nullptr);
+  TransitionResource(host.commandList.Get(), resource, D3D12_RESOURCE_STATE_COPY_SOURCE,
+                     D3D12_RESOURCE_STATE_COMMON);
+  ASSERT_TRUE(host.execute());
+
+  D3D12_RANGE readRange = {0, static_cast<SIZE_T>(rowPitch) * size};
+  uint8_t* readbackPixels = nullptr;
+  ASSERT_TRUE(SUCCEEDED(readback->Map(0, &readRange, reinterpret_cast<void**>(&readbackPixels))));
+  for (int y = 0; y < size; y++) {
+    for (int x = 0; x < size; x++) {
+      auto pixel = readbackPixels + y * rowPitch + x * 4;
+      EXPECT_EQ(pixel[1], 255);
+      EXPECT_EQ(pixel[3], 255);
+    }
+  }
+  readback->Unmap(0, nullptr);
+
+  auto surface = PAGSurface::MakeFrom(ToPAG(texture->getBackendTexture()), ImageOrigin::TopLeft);
+  ASSERT_TRUE(surface != nullptr);
+  ASSERT_TRUE(DrawBottomRightQuadrant(surface, size));
+  ASSERT_TRUE(surface->waitUntilCompleted());
+
+  TransitionResource(host.commandList.Get(), resource, D3D12_RESOURCE_STATE_COMMON,
+                     D3D12_RESOURCE_STATE_COPY_SOURCE);
+  host.commandList->CopyTextureRegion(&readbackLocation, 0, 0, 0, &textureLocation, nullptr);
+  TransitionResource(host.commandList.Get(), resource, D3D12_RESOURCE_STATE_COPY_SOURCE,
+                     D3D12_RESOURCE_STATE_COMMON);
+  ASSERT_TRUE(host.execute());
+
+  ASSERT_TRUE(SUCCEEDED(readback->Map(0, &readRange, reinterpret_cast<void**>(&readbackPixels))));
+  auto corner = readbackPixels;
+  EXPECT_EQ(corner[0], 0);
+  EXPECT_EQ(corner[3], 0);
+  auto last = readbackPixels + (size - 1) * rowPitch + (size - 1) * 4;
+  EXPECT_EQ(last[0], 255);
+  EXPECT_EQ(last[1], 0);
+  EXPECT_EQ(last[2], 0);
+  EXPECT_EQ(last[3], 255);
+  readback->Unmap(0, nullptr);
 }
 
 }  // namespace pag

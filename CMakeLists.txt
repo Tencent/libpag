@@ -1368,6 +1368,18 @@ if (PAG_BUILD_TESTS)
     target_compile_options(PAGFullTest_${TEST_TARGET_SUFFIX} PUBLIC ${PAG_TEST_COMPILE_OPTIONS})
     target_link_libraries(PAGFullTest_${TEST_TARGET_SUFFIX} ${PAG_TEST_LIBS})
 
+    # Compile the public C API headers with a real C compiler in every test build. When the C API
+    # is enabled, also link the D3D12 entry points so their ABI cannot regress silently.
+    add_library(pag-c-api-check OBJECT test/c/CApiCheck.c)
+    target_include_directories(pag-c-api-check PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+    if (PAG_USE_C)
+        target_compile_definitions(pag-c-api-check PRIVATE PAG_C_API_LINK_CHECK)
+    endif ()
+    foreach (C_API_TEST_TARGET UpdateBaseline_${TEST_TARGET_SUFFIX}
+            PAGUnitTest_${TEST_TARGET_SUFFIX} PAGFullTest_${TEST_TARGET_SUFFIX})
+        target_sources(${C_API_TEST_TARGET} PRIVATE $<TARGET_OBJECTS:pag-c-api-check>)
+    endforeach ()
+
     if (PAG_USE_METAL)
         # Only this object target sees tgfx's private atlas headers. Revalidate it on tgfx upgrades;
         # replace this private API when tgfx provides a supported test-reset hook.

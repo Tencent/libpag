@@ -51,6 +51,15 @@ cmake --build cmake-build-debug --target PAGFullTest_OpenGL
 
 当前保留测试及比较逻辑，不自动跳过缺失基线。后续独立 PR 将通过 `/accept-baseline` 流程审核并接受这 7 个截图基线，再运行 `PAGFullTest_Metal` 核验并移除本过渡说明。
 
+## D3D12 后端
+
+- 配置：Windows 上使用 `-DPAG_USE_D3D12=ON`；`-DPAG_D3D12_USE_WARP=ON` 固定 WARP，硬件优先时不加该选项。
+- 目标：`PAGFullTest_D3D12`、`PAGUnitTest_D3D12`、`UpdateBaseline_D3D12`。MSVC 可直接构建，但私有访问套件会被编译掉；完整覆盖使用 clang-cl。
+- 缓存：硬件优先为 `test/baseline/.cache/d3d12/`，固定 WARP 为 `test/baseline/.cache/d3d12-warp/`，由 `PAG_BACKEND_NAME` 决定。
+- 本机没有对应 `md5.json` 时，截图比较会按"版本变更"跳过，测试全绿不代表像素已校验。D3D12 的接受结果只能由用户执行 `/accept-baseline USE_D3D12` 或 `USE_D3D12_WARP` 生成。
+- `PAGBlendD3D12Test`、`D3D12Test` 的新 key 在未接受前应保持失败并在 `test/out` 输出截图，不要跳过。
+- `PAG_USE_C=ON` 时测试目标会编译并链接 `test/c/CApiCheck.c`，用于校验公共 C 头对真实 C 消费者的兼容性。
+
 ## HTML 测试集（浏览器保真度评测）
 
 `resources/html/` 收录 HTML 测试语料（`cases/`、`corpus/cli`、`corpus/websites`、
