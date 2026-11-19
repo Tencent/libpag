@@ -52,6 +52,7 @@ struct DOMNode {
   std::vector<DOMAttribute> attributes;
   DOMNodeType type = DOMNodeType::Element;
   int line = 0;
+  int endLine = 0;
 
   ~DOMNode();
 

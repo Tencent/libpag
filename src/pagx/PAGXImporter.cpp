@@ -300,12 +300,14 @@ static T* makeNodeFromXML(const DOMNode* xmlNode, PAGXDocument* doc) {
   if (existing) {
     ParseCustomData(xmlNode, existing);
     existing->sourceLine = xmlNode->line;
+    existing->endLine = xmlNode->endLine;
     return static_cast<T*>(existing);
   }
   auto* node = doc->makeNode<T>(id);
   if (node) {
     ParseCustomData(xmlNode, node);
     node->sourceLine = xmlNode->line;
+    node->endLine = xmlNode->endLine;
   }
   return node;
 }
