@@ -3130,6 +3130,8 @@ PAGX_PIXEL_TEST(PAGXViewModelTest, TextReshapeByViewModelBaseline) {
   EXPECT_TRUE(Baseline::Compare(surface, "PAGXViewModelTest/TextReshapeByViewModel"));
 }
 
+#endif  // PAG_TEST_ACCESS_PRIVATE
+
 // Baseline: a document Animation drives a standalone Text's content channel with a Hold keyframe;
 // after advancing past the keyframe and drawing, the rendered pixels must match the accepted
 // baseline for the animated text.
@@ -3185,6 +3187,5 @@ PAGX_PIXEL_TEST(PAGXViewModelTest, TextReshapeByAnimationBaseline) {
   EXPECT_TRUE(scene->draw(surface));
   EXPECT_TRUE(Baseline::Compare(surface, "PAGXViewModelTest/TextReshapeByAnimation"));
 }
-#endif
 
 }  // namespace pag
