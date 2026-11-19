@@ -18,23 +18,41 @@
 
 #include "HardwareDecoder.h"
 #import <UIKit/UIKit.h>
-#include <algorithm>
 #include <atomic>
+#include <chrono>
+#include <memory>
 #include <mutex>
+#include <utility>
 #include <vector>
 #include "base/utils/Log.h"
 #include "base/utils/USE.h"
 
 namespace pag {
 
+// A per-decoder liveness token held by shared_ptr. The decoder owns the only strong reference; the
+// registry keeps weak references so the willResignActive observer can take a snapshot under
+// GetActiveDecodersMutex, release it, and then invalidate each session off the mutex. mutex guards
+// decoder, which the destructor clears before tearing the session down, so an observer either runs
+// invalidateSession() on a live decoder or sees a null decoder and skips it, never racing
+// destruction.
+struct DecoderToken {
+  std::mutex mutex = {};
+  HardwareDecoder* decoder = nullptr;
+};
+
 namespace {
+// VTDecompressionSessionInvalidate may crash inside VideoToolbox when it runs while
+// VTDecompressionSessionDecodeFrame is still executing on the same session, so an in-flight decode
+// gets this long to return before the session is torn down underneath it.
+static constexpr int MAX_INVALIDATE_WAIT_TIME_MS = 200;
+
 std::mutex& GetActiveDecodersMutex() {
   static std::mutex m;
   return m;
 }
 
-std::vector<HardwareDecoder*>& GetActiveDecoders() {
-  static std::vector<HardwareDecoder*> list;
+std::vector<std::weak_ptr<DecoderToken>>& GetActiveDecoders() {
+  static std::vector<std::weak_ptr<DecoderToken>> list;
   return list;
 }
 
@@ -60,9 +78,27 @@ void RegisterAppLifecycleObserversOnce() {
                      queue:queue
                 usingBlock:^(NSNotification*) {
                   appInactive.store(true, std::memory_order_release);
-                  std::lock_guard<std::mutex> lock(GetActiveDecodersMutex());
-                  for (auto* decoder : GetActiveDecoders()) {
-                    decoder->invalidateSession();
+                  std::vector<std::shared_ptr<DecoderToken>> tokens;
+                  {
+                    std::lock_guard<std::mutex> lock(GetActiveDecodersMutex());
+                    for (auto& weakToken : GetActiveDecoders()) {
+                      auto token = weakToken.lock();
+                      if (token != nullptr) {
+                        tokens.push_back(std::move(token));
+                      }
+                    }
+                  }
+                  // One deadline for the whole batch so the total wait is capped at the budget
+                  // rather than the budget times the number of decoders, and the invalidate runs
+                  // off GetActiveDecodersMutex so it never blocks decoder construction or
+                  // destruction.
+                  auto deadline = std::chrono::steady_clock::now() +
+                                  std::chrono::milliseconds(MAX_INVALIDATE_WAIT_TIME_MS);
+                  for (auto& token : tokens) {
+                    std::lock_guard<std::mutex> lock(token->mutex);
+                    if (token->decoder != nullptr) {
+                      token->decoder->invalidateSession(deadline);
+                    }
                   }
                 }];
     [[NSNotificationCenter defaultCenter]
@@ -76,21 +112,25 @@ void RegisterAppLifecycleObserversOnce() {
 }
 }  // namespace
 
-void HardwareDecoder::invalidateSession() {
-  // Retain a reference under the lock so concurrent resetVideoToolBox()/dealloc cannot release
-  // the session pointer between our load and the VT call below. Then drop the lock before
-  // calling into VT to avoid blocking the worker thread that may also touch the session.
-  VTDecompressionSessionRef sessionToInvalidate = nullptr;
-  {
-    std::lock_guard<std::mutex> lock(sessionLocker);
+void HardwareDecoder::invalidateSession(std::chrono::steady_clock::time_point deadline) {
+  // VideoToolbox tears down the decoder state that VTDecompressionSessionDecodeFrame is still
+  // executing inside, which crashes inside the decoder plugin. Give a running decode until the
+  // shared deadline to return first, and only invalidate underneath it once it is really stuck,
+  // because unblocking a stuck decode is what this method exists for.
+  const bool hasDecodeLocker = decodeLocker.try_lock_until(deadline);
+  // sessionLocker is only ever held briefly now that teardown uses the non-blocking
+  // FinishDelayedFrames, but bound it with the same deadline so the observer's whole batch stays
+  // capped rather than blocking here if another thread is mid session swap.
+  if (sessionLocker.try_lock_until(deadline)) {
     if (session) {
-      CFRetain(session);
-      sessionToInvalidate = session;
+      VTDecompressionSessionInvalidate(session);
     }
+    sessionLocker.unlock();
+  } else {
+    LOGI("HardwareDecoder: skipped invalidate because the session stayed busy past the deadline");
   }
-  if (sessionToInvalidate) {
-    VTDecompressionSessionInvalidate(sessionToInvalidate);
-    CFRelease(sessionToInvalidate);
+  if (hasDecodeLocker) {
+    decodeLocker.unlock();
   }
 }
 
@@ -99,20 +139,46 @@ HardwareDecoder::HardwareDecoder(const VideoFormat& format)
       destinationColorSpace(format.colorSpace),
       maxNumReorder(format.maxReorderSize) {
   isInitialized = initVideoToolBox(format.headers, format.mimeType);
+  lifecycleToken = std::make_shared<DecoderToken>();
+  lifecycleToken->decoder = this;
   RegisterAppLifecycleObserversOnce();
   std::lock_guard<std::mutex> lock(GetActiveDecodersMutex());
-  GetActiveDecoders().push_back(this);
+  auto& list = GetActiveDecoders();
+  for (auto item = list.begin(); item != list.end();) {
+    if (item->expired()) {
+      item = list.erase(item);
+    } else {
+      ++item;
+    }
+  }
+  list.push_back(lifecycleToken);
 }
 
 HardwareDecoder::~HardwareDecoder() {
   {
-    std::lock_guard<std::mutex> lock(GetActiveDecodersMutex());
-    auto& list = GetActiveDecoders();
-    list.erase(std::remove(list.begin(), list.end(), this), list.end());
+    // Stop the observer from reaching this decoder before the session is torn down. A blocking
+    // invalidateSession() already in progress finishes here while this holds the token mutex.
+    std::lock_guard<std::mutex> lock(lifecycleToken->mutex);
+    lifecycleToken->decoder = nullptr;
   }
   {
-    std::lock_guard<std::mutex> lock(sessionLocker);
+    std::lock_guard<std::mutex> lock(GetActiveDecodersMutex());
+    auto& list = GetActiveDecoders();
+    for (auto item = list.begin(); item != list.end();) {
+      auto token = item->lock();
+      if (token == nullptr || token == lifecycleToken) {
+        item = list.erase(item);
+      } else {
+        ++item;
+      }
+    }
+  }
+  {
+    std::lock_guard<std::timed_mutex> lock(sessionLocker);
     if (session) {
+      // Non-blocking: asks VideoToolbox to emit any delayed frame but may return before it does,
+      // so this never stalls the ANR-sensitive teardown path the way a wait-for-frames barrier
+      // would. A still-pending context is handed to the graveyard below instead of waited on.
       VTDecompressionSessionFinishDelayedFrames(session);
       VTDecompressionSessionInvalidate(session);
       CFRelease(session);
@@ -126,6 +192,9 @@ HardwareDecoder::~HardwareDecoder() {
   }
 
   cleanResources();
+  // Resolved contexts are deleted; a context still pending (a bounded late callback not yet landed)
+  // moves to the graveyard so the callback has a live object to write into.
+  contextPool.drain();
 }
 
 void HardwareDecoder::cleanResources() {
@@ -152,14 +221,6 @@ void HardwareDecoder::cleanResources() {
   pendingFrames.clear();
   outputFrameCaches.clear();
   inputEndOfStream = false;
-}
-
-void DidDecompress(void*, void* sourceFrameRefCon, OSStatus status, VTDecodeInfoFlags,
-                   CVImageBufferRef pixelBuffer, CMTime, CMTime) {
-  if (status == noErr && pixelBuffer) {
-    CVPixelBufferRef* outputPixelBuffer = static_cast<CVPixelBufferRef*>(sourceFrameRefCon);
-    *outputPixelBuffer = CVPixelBufferRetain(pixelBuffer);
-  }
 }
 
 bool HardwareDecoder::initVideoToolBox(const std::vector<std::shared_ptr<tgfx::Data>>& headers,
@@ -209,15 +270,21 @@ bool HardwareDecoder::resetVideoToolBox() {
   // pointer that's mid-CFRelease. The new session is built into a local first and assigned to
   // the member only after creation succeeds, again under the lock.
   {
-    std::lock_guard<std::mutex> lock(sessionLocker);
+    std::lock_guard<std::timed_mutex> lock(sessionLocker);
     if (session) {
       auto old = session;
       session = nullptr;
+      // Non-blocking emit of any delayed frame, then tear down; a still-pending context is handed
+      // to the graveyard by drain() rather than waited on here.
       VTDecompressionSessionFinishDelayedFrames(old);
       VTDecompressionSessionInvalidate(old);
       CFRelease(old);
     }
   }
+
+  // Resolved contexts of the old session are deleted; a context still pending moves to the
+  // graveyard so a bounded late callback can still land safely.
+  contextPool.drain();
 
   // create decompression session
   CFDictionaryRef attrs = NULL;
@@ -293,7 +360,7 @@ bool HardwareDecoder::resetVideoToolBox() {
   }
 
   {
-    std::lock_guard<std::mutex> lock(sessionLocker);
+    std::lock_guard<std::timed_mutex> lock(sessionLocker);
     session = newSession;
   }
   return true;
@@ -357,9 +424,22 @@ pag::DecodingResult HardwareDecoder::onDecodeFrame() {
   if (sampleBuffer) {
     OSStatus status = 0;
     VTDecodeInfoFlags infoFlags = 0;
+    auto* context = contextPool.create();
 
-    status =
-        VTDecompressionSessionDecodeFrame(session, sampleBuffer, 0, &outputPixelBuffer, &infoFlags);
+    {
+      // Held so invalidateSession() can tell whether a decode is still running before tearing the
+      // session down.
+      std::lock_guard<std::timed_mutex> lock(decodeLocker);
+      status = VTDecompressionSessionDecodeFrame(session, sampleBuffer, 0, context, &infoFlags);
+    }
+
+    outputPixelBuffer = context->takeBuffer();
+    if (status != noErr) {
+      // VideoToolbox will not call back for a rejected frame, so the context needs no callback to
+      // become resolved and is reclaimed below instead of lingering in the graveyard.
+      context->abandon();
+    }
+    contextPool.reclaimResolved();
 
     if (status != noErr && !outputPixelBuffer) {
       if (status == kVTInvalidSessionErr) {
