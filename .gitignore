@@ -136,3 +136,4 @@ web/test/pag-test.js
 web/test/pag-test.wasm
 web/test/pag-test.data
 /build-autotest
+/build-update-baseline
