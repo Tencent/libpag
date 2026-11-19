@@ -41,6 +41,7 @@
 #include "pagx/tgfx.h"
 #include "pagx/types/Matrix.h"
 #include "pagx/utils/ImportFormat.h"
+#include "pagx/utils/RasterUtils.h"
 #include "renderer/LayerBuilder.h"
 #include "renderer/TextHolder.h"
 #include "renderer/ToTGFX.h"

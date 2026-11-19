@@ -381,9 +381,16 @@ static std::shared_ptr<PAGLayer> ResolveSelectionTarget(const std::shared_ptr<PA
   }
   // Shape hit testing: the editor selects by what is actually painted, so a click in the gap
   // between two glyphs, inside a stroke-only shape or on a fully transparent fill must fall
-  // through to whatever is behind it rather than grabbing the layer's bounding box.
-  auto layers = scene->getLayersUnderPoint(surfaceX, surfaceY, true);
-  const PAGLayer* shapeHit = layers.empty() ? nullptr : layers.front().get();
+  // through to whatever is behind it rather than grabbing the layer's bounding box. The scene query
+  // only tests bounding boxes, so each candidate (top-most first) is refined with a shape test.
+  auto layers = scene->getLayersUnderPoint(surfaceX, surfaceY);
+  const PAGLayer* shapeHit = nullptr;
+  for (const auto& layer : layers) {
+    if (layer != nullptr && layer->hitTestPoint(surfaceX, surfaceY, true)) {
+      shapeHit = layer.get();
+      break;
+    }
+  }
   auto target = FindTopMostSelectable(root, shapeHit, surfaceX, surfaceY);
   if (target == nullptr) {
     return nullptr;

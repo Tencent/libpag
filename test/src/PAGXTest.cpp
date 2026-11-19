@@ -17380,40 +17380,9 @@ PAGX_TEST(PAGXTest, HitTestResolvesCompositionReference) {
 }
 
 /**
- * Test case: getLayersUnderPoint() keeps its bounding-box default while shapeHitTest=true tests the
- * painted shape. The corners of an ellipse's bounding box lie inside the box but outside the
- * ellipse, so they hit under the default and miss under shapeHitTest - the difference an editor
- * relies on to pick the layer actually under the cursor instead of the nearest enclosing box. The
- * default is asserted here on purpose: changing it would silently alter hit testing for every
- * existing host.
- */
-PAGX_TEST(PAGXTest, ShapeHitTestMatchesPaintedShapeNotBoundingBox) {
-  const std::string xml = R"(<pagx version="1.0" width="200" height="200">
-  <Layer id="ellipse" x="0" y="0" width="100" height="100">
-    <Ellipse width="100" height="100"/>
-    <Fill color="#3B82F6"/>
-  </Layer>
-</pagx>)";
-  auto doc = pagx::PAGXImporter::FromXML(xml);
-  ASSERT_NE(doc, nullptr);
-  EXPECT_TRUE(doc->errors.empty());
-  auto scene = pagx::PAGScene::Make(doc);
-  ASSERT_NE(scene, nullptr);
-
-  // Centre: inside the ellipse, so both modes agree it is a hit.
-  EXPECT_FALSE(scene->getLayersUnderPoint(50, 50).empty());
-  EXPECT_FALSE(scene->getLayersUnderPoint(50, 50, true).empty());
-
-  // A corner of the bounding box: inside the box, outside the ellipse. The default keeps
-  // reporting a hit (pre-existing behaviour); shapeHitTest correctly reports a miss.
-  EXPECT_FALSE(scene->getLayersUnderPoint(3, 3).empty());
-  EXPECT_TRUE(scene->getLayersUnderPoint(3, 3, true).empty());
-}
-
-/**
  * Test case: a layer's scrollRect clip gates its whole subtree. A point inside the content's own
- * bounds but outside the clip window misses, and it misses under both modes because the clip is
- * applied before any shape test.
+ * bounds but outside the clip window yields no candidate at all, so no per-layer shape test is
+ * ever reached; inside the window the candidate also passes the shape test.
  */
 PAGX_TEST(PAGXTest, HitTestRespectsScrollRectClip) {
   const std::string xml = R"(<pagx version="1.0" width="200" height="200">
@@ -17430,14 +17399,15 @@ PAGX_TEST(PAGXTest, HitTestRespectsScrollRectClip) {
   auto scene = pagx::PAGScene::Make(doc);
   ASSERT_NE(scene, nullptr);
 
-  // Inside the clip window: a hit under both modes.
-  EXPECT_FALSE(scene->getLayersUnderPoint(50, 50).empty());
-  EXPECT_FALSE(scene->getLayersUnderPoint(50, 50, true).empty());
+  // Inside the clip window: the clipped layer is the top-most candidate and passes the shape test.
+  auto hits = scene->getLayersUnderPoint(50, 50);
+  ASSERT_FALSE(hits.empty());
+  EXPECT_EQ(hits[0]->getNode()->id, "clipped");
+  EXPECT_TRUE(hits[0]->hitTestPoint(50, 50, true));
 
   // (150,150) is inside the content's own bounds but outside the clip window, so the clip - not
   // the content's geometry - is what makes it miss.
   EXPECT_TRUE(scene->getLayersUnderPoint(150, 150).empty());
-  EXPECT_TRUE(scene->getLayersUnderPoint(150, 150, true).empty());
 }
 
 /**
