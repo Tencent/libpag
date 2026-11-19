@@ -2942,7 +2942,12 @@ std::string EvaluateKeyframeCssDecls(const DomTargetBundle& bundle, const Bundle
   // disagree on the curve the stop is split into linear pieces instead (see the mixedEasingTimes
   // handling in EmitBundleKeyframeStops), so no easing goes here.
   auto easeIt = chSet.stopEasings.find(t);
-  if (easeIt != chSet.stopEasings.end() && chSet.mixedEasingTimes.empty() &&
+  // A hold keeps `steps(1, end)` even when another channel in the same rule forced the linear
+  // fallback: sampling approximates curves, but a hold is a discontinuity - replayed as a ramp the
+  // opacity sits at a value the reference never shows.
+  const bool holdStop =
+      easeIt != chSet.stopEasings.end() && easeIt->second.type == KeyframeInterpolationType::Hold;
+  if (easeIt != chSet.stopEasings.end() && (chSet.mixedEasingTimes.empty() || holdStop) &&
       (easeIt->second.type != KeyframeInterpolationType::Linear || !timing.uniformEasing)) {
     AppendCssDecl(decls, "animation-timing-function", easeIt->second.toCss());
   }
@@ -5017,6 +5022,17 @@ std::string HTMLAnimationSession::emitKeyframesAndWeave(std::string& bodyHtml) {
           steppedSet.stopEasings = chSet.steppedGroupEasings;
           steppedSet.mixedEasingTimes = chSet.steppedGroupMixed;
           addRule(steppedSet);
+          // The stepped channels got their own rule; everything else in the bundle still has to be
+          // emitted. Without this the transform (or paint) group disappeared entirely whenever a
+          // hold key sat next to a linear channel - a sliding box simply stopped moving.
+          BundleChannelSet restAfterStepped = chSet;
+          restAfterStepped.propertyGroups = 2;
+          if (!chSet.transformGroupTimes.empty()) {
+            restAfterStepped.keyTimes = chSet.transformGroupTimes;
+            restAfterStepped.stopEasings = chSet.transformGroupEasings;
+            restAfterStepped.mixedEasingTimes = chSet.transformGroupMixed;
+          }
+          addRule(restAfterStepped);
         }
         if (chSet.crossGroupConflict) {
           BundleChannelSet opacitySet = chSet;
