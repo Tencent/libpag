@@ -321,8 +321,10 @@ void CollectKeyframeTimesAndEasing(const std::vector<Keyframe<T>>& keys, std::se
         }
         if (FloatNearlyZero(outPt.x) && FloatNearlyZero(outPt.y) && FloatNearlyZero(inPt.x) &&
             FloatNearlyZero(inPt.y)) {
-          outPt = {0.42f, 0.0f};
-          inPt = {0.58f, 1.0f};
+          // All-zero handles mean "no curve was authored": tgfx shortcuts that to a straight line
+          // between the keys, so the CSS equivalent is the identity bezier, not an ease-in-out.
+          outPt = {0.0f, 0.0f};
+          inPt = {1.0f, 1.0f};
         }
         seg.p1 = outPt;
         seg.p2 = inPt;
