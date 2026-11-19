@@ -1,5 +1,7 @@
 # Win32Demo
 
+English | [简体中文](./README.zh_CN.md)
+
 The Windows demo links the static `libpag.lib`, so the GPU backend is selected when libpag is
 built, not by the demo project. Build libpag for the backend you want, then build the demo.
 
