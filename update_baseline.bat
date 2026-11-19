@@ -5,7 +5,7 @@ rem Refresh the selected backend's local baseline cache on Windows.
 rem
 rem Usage:
 rem   update_baseline.bat [USE_OPENGL^|USE_OPENGL_SWIFTSHADER^|USE_D3D12^|USE_D3D12_WARP^|USE_VULKAN]
-rem                       [--skip-images] [--no-checkout]
+rem                       [--skip-images] [--no-checkout] [--no-fetch]
 rem
 rem By default the script mirrors update_baseline.sh: it stashes local changes, checks out the
 rem origin/main commit, builds and runs UpdateBaseline_<Backend>, then restores the original branch
@@ -26,11 +26,13 @@ set "STASH_CREATED=0"
 set "BACKEND="
 set "SKIP_IMAGES=0"
 set "NO_CHECKOUT=0"
+set "NO_FETCH=0"
 
 :parse_args
 if "%~1"=="" goto :args_done
 if /i "%~1"=="--skip-images" goto :arg_skip_images
 if /i "%~1"=="--no-checkout" goto :arg_no_checkout
+if /i "%~1"=="--no-fetch" goto :arg_no_fetch
 if /i "%~1"=="-h" goto :usage
 if /i "%~1"=="--help" goto :usage
 if defined BACKEND goto :too_many_backends
@@ -45,6 +47,11 @@ goto :parse_args
 
 :arg_no_checkout
 set "NO_CHECKOUT=1"
+shift
+goto :parse_args
+
+:arg_no_fetch
+set "NO_FETCH=1"
 shift
 goto :parse_args
 
@@ -166,11 +173,18 @@ if errorlevel 1 (
 
 if "%NO_CHECKOUT%"=="1" goto :skip_checkout
 
+if "%NO_FETCH%"=="1" goto :skip_fetch
 git fetch origin main
 if errorlevel 1 (
-  call :Fail "git fetch origin main failed."
+  call :Fail "git fetch origin main failed. Use --no-fetch to use the locally known origin/main."
   goto :cleanup
 )
+goto :fetch_done
+
+:skip_fetch
+echo Warning: --no-fetch uses the locally known origin/main, which may be stale.
+
+:fetch_done
 set "MAIN_COMMIT="
 for /f "delims=" %%i in ('git rev-parse --verify "origin/main^{commit}" 2^>nul') do set "MAIN_COMMIT=%%i"
 if not defined MAIN_COMMIT (
@@ -315,7 +329,7 @@ set "STATUS=0"
 goto :cleanup
 
 :usage
-echo Usage: update_baseline.bat [USE_OPENGL^|USE_OPENGL_SWIFTSHADER^|USE_D3D12^|USE_D3D12_WARP^|USE_VULKAN] [--skip-images] [--no-checkout]
+echo Usage: update_baseline.bat [USE_OPENGL^|USE_OPENGL_SWIFTSHADER^|USE_D3D12^|USE_D3D12_WARP^|USE_VULKAN] [--skip-images] [--no-checkout] [--no-fetch]
 echo.
 echo   USE_OPENGL             OpenGL (default backend).
 echo   USE_OPENGL_SWIFTSHADER OpenGL on SwiftShader.
@@ -325,13 +339,14 @@ echo   USE_VULKAN             Reserved for the Vulkan backend.
 echo.
 echo   --skip-images          Only refresh md5.json; do not generate _base.webp images.
 echo   --no-checkout          Build the current working tree instead of origin/main.
+echo   --no-fetch             Skip git fetch and use the locally known origin/main.
 echo.
 echo By default the script stashes local changes and checks out origin/main, then restores the
 echo original branch and stash. Run one backend at a time; test\out and version.json are shared.
 exit /b 0
 
 :usage_error
-echo Usage: update_baseline.bat [USE_OPENGL^|USE_OPENGL_SWIFTSHADER^|USE_D3D12^|USE_D3D12_WARP^|USE_VULKAN] [--skip-images] [--no-checkout]
+echo Usage: update_baseline.bat [USE_OPENGL^|USE_OPENGL_SWIFTSHADER^|USE_D3D12^|USE_D3D12_WARP^|USE_VULKAN] [--skip-images] [--no-checkout] [--no-fetch]
 exit /b 1
 
 :Fail
