@@ -2595,10 +2595,12 @@ void EmitFilterCssAtFrame(const DomTargetBundle& bundle, const BundleChannelSet&
       float bx = fc ? EvalFloatChannel(fc->blurX, t, ds->blurX) : ds->blurX;
       float by = fc ? EvalFloatChannel(fc->blurY, t, ds->blurY) : ds->blurY;
       Color col = fc ? EvalColorChannel(fc->color, t, ds->color) : ds->color;
-      float a = fc && fc->alpha ? EvalFloatChannel(fc->alpha, t, col.alpha) : col.alpha;
+      // `ColorToRGBA(color, extra)` already multiplies by `color.alpha`, and this filter has no
+      // separate alpha field (the runtime uses the colour as-is), so handing it `col.alpha` again
+      // squared a 0.5 shadow down to 0.25 whenever any channel of the chain was animated.
       if (!filterVal.empty()) filterVal += ' ';
       filterVal += "drop-shadow(" + CssFloatToString(ox) + "px " + CssFloatToString(oy) + "px " +
-                   CssFloatToString(std::max(bx, by)) + "px " + ColorToRGBA(col, a) + ")";
+                   CssFloatToString(std::max(bx, by)) + "px " + ColorToRGBA(col) + ")";
     }
   }
   // The stages CSS cannot rewrite per frame (a blend, an inner shadow) are NOT appended here. A
