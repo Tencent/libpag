@@ -21,6 +21,7 @@
 #if defined(TGFX_USE_D3D12)
 
 #include <d3d12.h>
+#include <dxgi1_4.h>
 #include <dxgiformat.h>
 #include <wrl/client.h>
 #include <cstdint>
@@ -43,6 +44,55 @@ static std::shared_ptr<tgfx::Texture> MakeTexture(tgfx::Context* context, int wi
   tgfx::TextureDescriptor descriptor(width, height, tgfx::PixelFormat::RGBA_8888, false, 1, usage);
   return context->gpu()->createTexture(descriptor);
 }
+
+/**
+ * A native device that is intentionally not the registry's default entry. Tests use it to exercise
+ * first-time registration and non-default device ownership instead of hitting the warm cache.
+ */
+struct SecondaryDeviceTexture {
+  Microsoft::WRL::ComPtr<ID3D12Device> device = nullptr;
+  Microsoft::WRL::ComPtr<ID3D12Resource> resource = nullptr;
+  tgfx::BackendTexture texture = {};
+
+  bool init(int width, int height) {
+    auto result = D3D12CreateDevice(nullptr, D3D_FEATURE_LEVEL_11_0,
+                                    IID_PPV_ARGS(device.ReleaseAndGetAddressOf()));
+    if (FAILED(result)) {
+      Microsoft::WRL::ComPtr<IDXGIFactory4> factory = nullptr;
+      Microsoft::WRL::ComPtr<IDXGIAdapter> warpAdapter = nullptr;
+      if (FAILED(CreateDXGIFactory1(IID_PPV_ARGS(factory.ReleaseAndGetAddressOf()))) ||
+          FAILED(factory->EnumWarpAdapter(IID_PPV_ARGS(warpAdapter.ReleaseAndGetAddressOf())))) {
+        return false;
+      }
+      result = D3D12CreateDevice(warpAdapter.Get(), D3D_FEATURE_LEVEL_11_0,
+                                 IID_PPV_ARGS(device.ReleaseAndGetAddressOf()));
+    }
+    if (FAILED(result)) {
+      return false;
+    }
+    D3D12_HEAP_PROPERTIES heap = {};
+    heap.Type = D3D12_HEAP_TYPE_DEFAULT;
+    D3D12_RESOURCE_DESC desc = {};
+    desc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+    desc.Width = static_cast<UINT64>(width);
+    desc.Height = static_cast<UINT>(height);
+    desc.DepthOrArraySize = 1;
+    desc.MipLevels = 1;
+    desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+    desc.SampleDesc.Count = 1;
+    desc.Flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
+    if (FAILED(device->CreateCommittedResource(&heap, D3D12_HEAP_FLAG_NONE, &desc,
+                                               D3D12_RESOURCE_STATE_COMMON, nullptr,
+                                               IID_PPV_ARGS(resource.ReleaseAndGetAddressOf())))) {
+      return false;
+    }
+    tgfx::D3D12TextureInfo info = {};
+    info.resource = resource.Get();
+    info.format = DXGI_FORMAT_R8G8B8A8_UNORM;
+    texture = tgfx::BackendTexture(info, width, height);
+    return true;
+  }
+};
 
 static ID3D12Resource* GetNativeResource(const tgfx::BackendTexture& texture) {
   tgfx::D3D12TextureInfo info = {};
@@ -231,21 +281,25 @@ PAG_TEST(D3D12Test, SurfaceFromTextureAndCompletion) {
   EXPECT_EQ(pixels[3], 0);
 }
 
+/**
+ * Covers the image's device ownership: after the caller drops its own reference, resolving the
+ * same native texture must still return the original device because the image holds it.
+ */
 PAG_TEST(D3D12Test, PAGXImageKeepsDeviceAlive) {
-  auto device = Devices::MakeDefault();
-  ASSERT_TRUE(device != nullptr);
-  std::shared_ptr<tgfx::Texture> texture = nullptr;
-  {
-    DeviceLockScope scope(device);
-    ASSERT_TRUE(static_cast<bool>(scope));
-    texture =
-        MakeTexture(scope.context(), 16, 16,
-                    tgfx::TextureUsage::TEXTURE_BINDING | tgfx::TextureUsage::RENDER_ATTACHMENT);
+  SecondaryDeviceTexture secondary = {};
+  if (!secondary.init(16, 16)) {
+    GTEST_SKIP() << "Failed to create a secondary D3D12 device.";
   }
-  ASSERT_TRUE(texture != nullptr);
-  auto pagTexture = ToPAG(texture->getBackendTexture());
+  auto device = Devices::MakeForTexture(secondary.texture);
+  ASSERT_TRUE(device != nullptr);
+  auto expected = device.get();
+  auto pagTexture = ToPAG(secondary.texture);
   auto image = pagx::PAGImage::MakeFromTexture(pagTexture, ImageOrigin::TopLeft);
   ASSERT_TRUE(image != nullptr);
+  device.reset();
+  auto revived = Devices::MakeForTexture(secondary.texture);
+  ASSERT_TRUE(revived != nullptr);
+  EXPECT_EQ(revived.get(), expected);
   auto target = pagx::PAGSurface::MakeFrom(pagTexture, ImageOrigin::TopLeft);
   ASSERT_TRUE(target != nullptr);
   EXPECT_TRUE(target->waitUntilCompleted());
@@ -399,48 +453,49 @@ void TransitionResource(ID3D12GraphicsCommandList* commandList, ID3D12Resource* 
 
 }  // namespace
 
+struct RegistryLookupTask {
+  const tgfx::BackendTexture* texture = nullptr;
+  std::shared_ptr<tgfx::Device>* result = nullptr;
+
+  void operator()() const {
+    *result = Devices::MakeForTexture(*texture);
+  }
+};
+
 /**
- * Covers concurrent resolution of the same native device: every worker must receive the canonical
- * registry entry instead of creating a second tgfx device for the same ID3D12Device.
+ * Covers concurrent first-time resolution of an unregistered native device: the registry must
+ * publish exactly one tgfx device even when every worker misses the cache.
  */
 PAG_TEST(D3D12Test, DeviceRegistryIsThreadSafe) {
-  auto texture = MakeRenderableTexture(8, 8);
-  ASSERT_TRUE(texture != nullptr);
-  auto backendTexture = texture->getBackendTexture();
-  auto expected = Devices::MakeDefault();
-  ASSERT_TRUE(expected != nullptr);
-
+  SecondaryDeviceTexture secondary = {};
+  if (!secondary.init(8, 8)) {
+    GTEST_SKIP() << "Failed to create a secondary D3D12 device.";
+  }
   constexpr int ThreadCount = 8;
-  std::vector<tgfx::Device*> results(ThreadCount, nullptr);
+  std::vector<std::shared_ptr<tgfx::Device>> results(ThreadCount);
   std::vector<std::thread> threads = {};
   for (int i = 0; i < ThreadCount; i++) {
-    threads.emplace_back([&backendTexture, &results, i]() {
-      auto device = Devices::MakeForTexture(backendTexture);
-      results[static_cast<size_t>(i)] = device.get();
-    });
+    RegistryLookupTask task = {&secondary.texture, &results[static_cast<size_t>(i)]};
+    threads.emplace_back(task);
   }
   for (auto& thread : threads) {
     thread.join();
   }
-  for (auto* result : results) {
-    EXPECT_EQ(result, expected.get());
+  auto canonical = results.front();
+  ASSERT_TRUE(canonical != nullptr);
+  for (const auto& result : results) {
+    EXPECT_EQ(result.get(), canonical.get());
   }
+  EXPECT_EQ(Devices::MakeForTexture(secondary.texture).get(), canonical.get());
+  EXPECT_NE(canonical.get(), Devices::MakeDefault().get());
 }
 
-/**
- * Covers the forAsyncThread surface path: the worker renders through the independently created
- * device context, and the caller observes the submitted frame after waitUntilCompleted().
- */
-PAG_TEST(D3D12Test, AsyncSurfaceRendersOnWorkerThread) {
-  const int size = 32;
-  auto texture = MakeRenderableTexture(size, size);
-  ASSERT_TRUE(texture != nullptr);
-  auto surface =
-      PAGSurface::MakeFrom(ToPAG(texture->getBackendTexture()), ImageOrigin::TopLeft, true);
-  ASSERT_TRUE(surface != nullptr);
+struct AsyncRenderTask {
+  std::shared_ptr<PAGSurface> surface = nullptr;
+  std::shared_ptr<bool> flushed = std::make_shared<bool>(false);
+  int size = 0;
 
-  bool flushed = false;
-  std::thread worker([&surface, &flushed, size]() {
+  void operator()() {
     auto composition = PAGComposition::Make(size, size);
     auto solid = PAGSolidLayer::Make(1000000, size, size, Red);
     composition->addLayer(solid);
@@ -448,10 +503,33 @@ PAG_TEST(D3D12Test, AsyncSurfaceRendersOnWorkerThread) {
     player->setSurface(surface);
     player->setComposition(composition);
     player->setMatrix(Matrix::I());
-    flushed = player->flush();
-  });
+    *flushed = player->flush();
+  }
+};
+
+/**
+ * Covers the forAsyncThread path on a non-default native device: D3D12 reuses the texture's
+ * registry device (there is no separate context), and the worker's frame is readable afterwards.
+ */
+PAG_TEST(D3D12Test, AsyncSurfaceRendersOnWorkerThread) {
+  const int size = 32;
+  SecondaryDeviceTexture secondary = {};
+  if (!secondary.init(size, size)) {
+    GTEST_SKIP() << "Failed to create a secondary D3D12 device.";
+  }
+  auto expected = Devices::MakeForTexture(secondary.texture);
+  ASSERT_TRUE(expected != nullptr);
+  auto surface = PAGSurface::MakeFrom(ToPAG(secondary.texture), ImageOrigin::TopLeft, true);
+  ASSERT_TRUE(surface != nullptr);
+  EXPECT_EQ(Devices::MakeForTexture(secondary.texture).get(), expected.get());
+  EXPECT_NE(expected.get(), Devices::MakeDefault().get());
+
+  AsyncRenderTask task = {};
+  task.surface = surface;
+  task.size = size;
+  std::thread worker(task);
   worker.join();
-  ASSERT_TRUE(flushed);
+  ASSERT_TRUE(*task.flushed);
   ASSERT_TRUE(surface->waitUntilCompleted());
 
   std::vector<uint8_t> pixels(size * size * 4);
