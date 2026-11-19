@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "pagx/PAGXNodeChannel.h"
+#include <climits>
 #include <cmath>
 #include <optional>
 #include <string_view>
@@ -1239,6 +1240,139 @@ std::vector<std::string> ListChannels(NodeType type) {
     names.emplace_back(field.channel);
   }
   return names;
+}
+
+// Parses a raw attribute string into the KeyValue alternative the channel expects, matching the
+// importer's per-type parsing exactly so an incremental edit yields the same value a full reparse
+// would. Returns false (leaving out unset) when the string is not a valid value for that type.
+static bool ParseChannelValue(ChannelValueType type, const std::string& raw, KeyValue* out) {
+  switch (type) {
+    case ChannelValueType::Float: {
+      const char* start = raw.c_str();
+      char* endPtr = nullptr;
+      float value = strtof(start, &endPtr);
+      // Strict like ParseTypedValue<float> in PAGXImporter.cpp: the whole string must be consumed
+      // and be finite, so an incremental edit never accepts input a full reparse would reject.
+      if (endPtr == start || *endPtr != '\0' || !std::isfinite(value)) {
+        return false;
+      }
+      *out = value;
+      return true;
+    }
+    case ChannelValueType::Int: {
+      const char* start = raw.c_str();
+      char* endPtr = nullptr;
+      long value = strtol(start, &endPtr, 10);
+      if (endPtr == start || *endPtr != '\0' || value < INT_MIN || value > INT_MAX) {
+        return false;
+      }
+      *out = static_cast<int>(value);
+      return true;
+    }
+    case ChannelValueType::Bool: {
+      if (raw == "true" || raw == "1") {
+        *out = true;
+        return true;
+      }
+      if (raw == "false" || raw == "0") {
+        *out = false;
+        return true;
+      }
+      return false;
+    }
+    case ChannelValueType::Color: {
+      bool valid = false;
+      Color color = ParseColor(raw, &valid);
+      if (!valid) {
+        return false;
+      }
+      *out = color;
+      return true;
+    }
+    case ChannelValueType::String:
+      // Strings and enums are carried verbatim; enum validity is checked by the accessor.
+      *out = raw;
+      return true;
+    case ChannelValueType::ImageRef:
+    case ChannelValueType::Matrix:
+    case ChannelValueType::PAGImage:
+    case ChannelValueType::Matrix3D:
+      // Not addressable through a raw attribute string: ImageRef/PAGImage need a resolved image
+      // handle and the matrix types need a full transform structure.
+      return false;
+  }
+  return false;
+}
+
+// The sibling percent channel for a dimension channel ("width" -> "percentWidth"); a "50%" value
+// routes through it so the write lands on the percent member. Returns null for a channel that has
+// no percent sibling.
+static const char* DimensionPercentChannel(const std::string& channel) {
+  if (channel == "width") {
+    return "percentWidth";
+  }
+  if (channel == "height") {
+    return "percentHeight";
+  }
+  return nullptr;
+}
+
+bool SetNodeChannelFromString(Node* node, const std::string& channel, const std::string& raw) {
+  if (node == nullptr) {
+    return false;
+  }
+  const auto* field = FindChannel(node->nodeType(), channel);
+  if (field == nullptr) {
+    LOGE("SetNodeChannelFromString: unhandled channel '%s' for node type %d.", channel.c_str(),
+         static_cast<int>(node->nodeType()));
+    return false;
+  }
+  // Only node types that pair width/height with a percent sibling (FIELD_DIMENSION) use the XML
+  // dimension syntax; a plain float channel that happens to be named "width" keeps float parsing.
+  const char* percentChannel = DimensionPercentChannel(channel);
+  const auto* percentField =
+      percentChannel != nullptr ? FindChannel(node->nodeType(), percentChannel) : nullptr;
+  KeyValue value = {};
+  if (percentField != nullptr) {
+    // Width/height accept the XML dimension syntax ("100" or "50%"). A percent value addresses
+    // the percent member, so route through the sibling percent channel; both dimension
+    // accessors clear their counterpart member, keeping the result identical to a full reparse
+    // (ReadDimension writes exactly one of the two members and NaNs the other).
+    float absolute = NAN;
+    float percent = NAN;
+    if (!ParseDimension(raw, &absolute, &percent)) {
+      LOGE("SetNodeChannelFromString: cannot parse dimension value '%s' for channel '%s'.",
+           raw.c_str(), channel.c_str());
+      return false;
+    }
+    if (!std::isnan(percent)) {
+      field = percentField;
+      value = percent;
+    } else {
+      value = absolute;
+    }
+  } else {
+    // The channel table does not record value types; KeyValue's alternative index equals
+    // ChannelValueType, so the current value tells which grammar the raw string must follow.
+    KeyValue current = {};
+    if (!field->access(node, &current, nullptr)) {
+      LOGE("SetNodeChannelFromString: failed to read channel '%s' for node type %d.",
+           channel.c_str(), static_cast<int>(node->nodeType()));
+      return false;
+    }
+    auto valueType = static_cast<ChannelValueType>(current.index());
+    if (!ParseChannelValue(valueType, raw, &value)) {
+      LOGE("SetNodeChannelFromString: cannot parse value '%s' for channel '%s' of type %d.",
+           raw.c_str(), channel.c_str(), static_cast<int>(valueType));
+      return false;
+    }
+  }
+  if (!field->access(node, nullptr, &value)) {
+    LOGE("SetNodeChannelFromString: failed to set channel '%s' for node type %d.", channel.c_str(),
+         static_cast<int>(node->nodeType()));
+    return false;
+  }
+  return true;
 }
 
 }  // namespace pagx

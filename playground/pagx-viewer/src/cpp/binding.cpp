@@ -57,10 +57,16 @@ EMSCRIPTEN_BINDINGS(PAGXPlayground) {
       .function("_durationMicros", optional_override([](pagx::PAGXView& self) -> double {
                   return static_cast<double>(self.durationMicros());
                 }))
+      .function("_hasTimeline", &pagx::PAGXView::hasTimeline)
       .function("_frameRate", &pagx::PAGXView::frameRate)
       .function("_setCurrentTimeMicros", optional_override([](pagx::PAGXView& self, double micros) {
                   self.setCurrentTimeMicros(static_cast<int64_t>(micros));
                 }))
       .function("_setLoop", &pagx::PAGXView::setLoop)
-      .function("_isLoop", &pagx::PAGXView::isLoop);
+      .function("_isLoop", &pagx::PAGXView::isLoop)
+      .function("_hitTest", &pagx::PAGXView::hitTest)
+      .function("_getNodeSourceMap", &pagx::PAGXView::getNodeSourceMap)
+      .function("_getNodeBounds", &pagx::PAGXView::getNodeBounds)
+      .function("_validatePAGX", &pagx::PAGXView::validatePAGX)
+      .function("_setNodeChannel", &pagx::PAGXView::setNodeChannel);
 }

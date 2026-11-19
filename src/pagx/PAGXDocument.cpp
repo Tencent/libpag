@@ -378,6 +378,7 @@ void PAGXDocument::adoptNodes(PAGXDocument& other) {
   renameCollidingIds(&other);
   nodes.reserve(nodes.size() + other.nodes.size());
   for (auto& node : other.nodes) {
+    node->index = static_cast<int>(nodes.size());
     nodeSet.insert(node.get());
     // Adopted content is part of this document after the transfer, so its ids join the id index
     // exactly like import-time registration: findNode(), data-bind "@id" targets, and deferred
@@ -473,6 +474,9 @@ void PAGXDocument::removeNodes(const std::unordered_set<Node*>& toRemove) {
     }
   }
   nodes.resize(writeIdx);
+  for (size_t i = 0; i < nodes.size(); i++) {
+    nodes[i]->index = static_cast<int>(i);
+  }
 }
 
 void PAGXDocument::setNodeId(Node* node, const std::string& id) {
@@ -1268,6 +1272,24 @@ const std::vector<const Layer*>& PAGXDocument::findLayersByImageFilePath(
 void detail::DocumentAccess::RegisterNode(PAGXDocument& document, Node* node,
                                           const std::string& id) {
   document.registerNode(node, id);
+}
+
+std::vector<NodeSourceEntry> PAGXDocument::getNodeSourceMap() const {
+  std::vector<NodeSourceEntry> result = {};
+  result.reserve(nodes.size());
+  for (const auto& node : nodes) {
+    if (isMountedComposition(node.get())) {
+      continue;
+    }
+    NodeSourceEntry entry = {};
+    entry.index = node->index;
+    entry.startLine = node->sourceLine;
+    entry.endLine = node->endLine;
+    entry.nodeType = node->nodeType();
+    entry.channels = ListChannels(node->nodeType());
+    result.push_back(std::move(entry));
+  }
+  return result;
 }
 
 }  // namespace pagx

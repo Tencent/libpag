@@ -22,9 +22,9 @@
 // The player interacts with the underlying wasm backend through a structural PlayerView /
 // PlayerModule contract declared inside this package (src/pagx-view-types.ts), so the bundle
 // carries no runtime or type reference to pagx-viewer at all - hosts inject the actual
-// implementation via the `moduleFactory` option. CodeMirror packages are bundled (declared as
-// regular dependencies in package.json) so the editor works without asking hosts to pin
-// matching CodeMirror versions.
+// implementation via the `moduleFactory` option. Monaco is loaded from CDN at runtime
+// (import type is erased by esbuild at build time, so rollup never bundles it); the npm
+// package provides TypeScript types only.
 
 import { nodeResolve } from '@rollup/plugin-node-resolve';
 import commonjs from '@rollup/plugin-commonjs';
