@@ -4155,6 +4155,43 @@ CLI_TEST(PAGXHtmlTest, AnimationRangeSelectorStartFansOutToGlyphs) {
 // the same polygon). The frame rebuilds `d` from the evaluated values instead of animating a
 // transform, and the bundle is sampled every few frames because CSS walks the two path() strings
 // point by point rather than rotating them.
+CLI_TEST(PAGXHtmlTest, AnimatedFontFamilyIsEscapedLikeTheStaticPath) {
+  // A font name may contain a quote, and an untrusted one may try to close the CSS string or the
+  // `<style>` raw-text element. The static path escapes both; the animated path used to splice the
+  // value in raw.
+  const char* xml = R"(<pagx width="320" height="200">
+    <Layer left="0" right="0" top="0" bottom="0">
+      <Text id="txt" text="AB" fontFamily="Arial" fontStyle="Bold" fontSize="64"
+            position="60,130"/>
+      <Fill color="#BE123C"/>
+    </Layer>
+    <Animations>
+      <Animation id="face" duration="60" frameRate="60" loop="once">
+        <Object target="txt">
+          <Channel name="fontFamily" type="string">
+            <Key time="0" value="Arial" interpolation="linear"/>
+            <Key time="60" value="O'Brien&lt;/style&gt;&lt;script&gt;"/>
+          </Channel>
+        </Object>
+      </Animation>
+    </Animations>
+  </pagx>)";
+
+  pagx::HTMLExportOptions options;
+  options.extractStyleSheet = false;
+  auto html = LoadXMLAndConvert(xml, options);
+  ASSERT_FALSE(html.empty());
+  // The quote is escaped, and the characters that could leave the CSS string or the style element
+  // are stripped rather than emitted.
+  EXPECT_NE(html.find("O\\'Brien"), std::string::npos) << html;
+  auto styleStart = html.find("<style>");
+  auto styleEnd = html.find("</style>", styleStart);
+  ASSERT_NE(styleStart, std::string::npos);
+  ASSERT_NE(styleEnd, std::string::npos);
+  auto styleBody = html.substr(styleStart, styleEnd - styleStart);
+  EXPECT_EQ(styleBody.find("<script>"), std::string::npos) << styleBody;
+}
+
 CLI_TEST(PAGXHtmlTest, UnreachableTailKeyDoesNotDriveTheSampling) {
   // A tail key far beyond the animation's duration is legal and only acts as an interpolation
   // target, but the roundness sampling used to walk from the first key to the last one: this

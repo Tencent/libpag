@@ -2829,7 +2829,9 @@ std::string EvaluateKeyframeCssDecls(const DomTargetBundle& bundle, const Bundle
   }
   if (animatedText != nullptr && chSet.fontFamilyCh != nullptr) {
     std::string family = EvalStringChannel(chSet.fontFamilyCh, t, animatedText->fontFamily);
-    AppendCssDecl(decls, "font-family", "'" + family + "'");
+    // Same escaping the static path uses: a font name may legitimately contain a quote, and an
+    // untrusted one must not be able to close the CSS string or the `<style>` raw-text element.
+    AppendCssDecl(decls, "font-family", "'" + EscapeCssFontFamily(family) + "'");
   }
   if (animatedText != nullptr && chSet.fontStyleCh != nullptr) {
     std::string style = EvalStringChannel(chSet.fontStyleCh, t, animatedText->fontStyle);
