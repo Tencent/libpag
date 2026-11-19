@@ -598,7 +598,7 @@ PAGX_TEST(PAGXRuntimeTest, MatrixInterpolationRespectsPivotFlag) {
 // `KeyframeInterpolationSpace::Reciprocal` and drives the channel in that space, which closes the
 // gap. Re-derive this constant (and turn the assertion into an equality against the CSS midpoint)
 // when that lands; until then it pins today's behaviour so a silent drift on either side shows up.
-static constexpr float kReciprocalKnownGapPx = 266.6667f;
+static constexpr float RECIPROCAL_KNOWN_GAP_PX = 266.6667f;
 
 /**
  * Test case: a `perspective` distance channel interpolates the distance itself in PAGX's Value space,
@@ -626,7 +626,7 @@ PAGX_TEST(PAGXRuntimeTest, PerspectiveChannelInterpolatesDistanceNotReciprocal) 
   // Both endpoints are pinned above, so this only fails when the Value-space result drifts: it
   // records the known gap between the two spaces rather than a correct value.
   const float gapPx = static_cast<float>(valueMidpoint) - cssMidpoint;
-  EXPECT_NEAR(gapPx, kReciprocalKnownGapPx, 0.5f)
+  EXPECT_NEAR(gapPx, RECIPROCAL_KNOWN_GAP_PX, 0.5f)
       << "Known gap between Value space and the CSS reciprocal space; re-derive "
          "kReciprocalKnownGapPx once the Reciprocal interpolation space lands";
 }

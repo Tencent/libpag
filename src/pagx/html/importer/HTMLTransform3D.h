@@ -140,10 +140,10 @@ HTMLElementAnchor ResolveElementAnchor(const std::string& originValue,
 /**
  * Parses a CSS `transform` value (a whitespace-separated function list) into a 4x4 pose, composed
  * in CSS order. `none` is a valid declaration of "no transform", so it resolves to the identity and
- * reports success; an absent value (empty string) is the only silent false. Emits a diagnostic and
- * returns false when a function is unknown, an argument is invalid, the perspective distance is not
- * positive, a `rotate3d` axis is degenerate, the result is not finite, or a 3D result is not
- * invertible (PAGX rejects such poses).
+ * reports success. Three failures return false with a diagnostic: an unknown function, an invalid
+ * argument (unit, arity, angle), or an unpresentable result (non-finite, or a 3D pose PAGX would
+ * reject because it is not invertible). The absent value (empty string) is the only silent false.
+ * A `perspective` distance may be zero — it clamps to 1px — and only a negative distance is invalid.
  */
 bool ParseCssTransformList(const std::string& value, HTMLValueParser& valueParser,
                            HTMLDiagnosticSink& diagnostics, Matrix3D* out,
