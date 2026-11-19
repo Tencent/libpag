@@ -5068,11 +5068,38 @@ std::string HTMLAnimationSession::emitKeyframesAndWeave(std::string& bodyHtml) {
             }
             nameIt = keyframesNameByTag.emplace(ruleKey, kfName).first;
           }
+          const std::string shorthand = BuildAnimationShorthand(anim, nameIt->second, ruleTiming,
+                                                                mount.offset, mount.scope != 0);
+          // `groupOpacity=false` means the runtime multiplies the alpha into every child, not into
+          // one group surface: two overlapping children at 0.5 composite to 0.75 that way and to
+          // 0.5 through a container opacity. The opacity half of the rule therefore targets the
+          // children, which is also what keeps it off the transform half.
+          // A rule that writes nothing but `opacity` is the alpha half; with an empty rest group it
+          // is the only thing the bundle drives.
+          const bool opacityOnlyRule =
+              ruleSet.propertyGroups == 1 ||
+              (ruleSet.alphaCh != nullptr && ruleSet.rotCh == nullptr &&
+               ruleSet.posXCh == nullptr && ruleSet.posYCh == nullptr &&
+               ruleSet.scaleXCh == nullptr && ruleSet.scaleYCh == nullptr &&
+               ruleSet.skewCh == nullptr && ruleSet.skewAxisCh == nullptr &&
+               ruleSet.matrixCh == nullptr && ruleSet.fillColorCh == nullptr &&
+               ruleSet.fillAlphaCh == nullptr && ruleSet.strokeColorCh == nullptr &&
+               ruleSet.strokeAlphaCh == nullptr && ruleSet.strokeWidthCh == nullptr &&
+               ruleSet.fontSizeCh == nullptr && ruleSet.letterSpacingCh == nullptr &&
+               !ruleSet.hasFilterAnim && !ruleSet.hasPolystarGeometry &&
+               ruleSet.geometryWidthCh == nullptr && ruleSet.geometryHeightCh == nullptr &&
+               ruleSet.visibleCh == nullptr && ruleSet.blendModeCh == nullptr);
+          const bool alphaOnChildren = opacityOnlyRule && bundle.primaryHost != nullptr &&
+                                       bundle.primaryHost->nodeType() == NodeType::Layer &&
+                                       !static_cast<const Layer*>(bundle.primaryHost)->groupOpacity;
+          if (alphaOnChildren) {
+            keyframesCss += "#" + element.id + " > * { animation: " + shorthand + "; }\n";
+            continue;
+          }
           if (edits.animDecls.find(element.id) == edits.animDecls.end()) {
             edits.idOrder.push_back(element.id);
           }
-          edits.animDecls[element.id].push_back(BuildAnimationShorthand(
-              anim, nameIt->second, ruleTiming, mount.offset, mount.scope != 0));
+          edits.animDecls[element.id].push_back(shorthand);
           edits.playStates[element.id].push_back(mount.playing);
           // Only an element whose own filter is animated gets the wrapper: the reference must leave
           // the animated declaration, and without an animated declaration the static filter already
