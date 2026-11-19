@@ -105,7 +105,7 @@
       <AdditionalLibraryDirectories>$(SolutionDir)..\out\release\win\x86</AdditionalLibraryDirectories>
       <AdditionalDependencies>libpag.lib;d3d12.lib;dxgi.lib;d3dcompiler.lib;dcomp.lib;d3d11.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
-    <PostBuildEvent>
+    <PostBuildEvent Condition="'$(PagBackend)'=='OpenGL'">
       <Command>xcopy /Y "$(SolutionDir)..\third_party\tgfx\vendor\angle\win\x86\*.*" "$(TargetDir)"</Command>
     </PostBuildEvent>
     <PreBuildEvent>
@@ -140,7 +140,7 @@ node .\build_pag -a x86 -DPAG_BUILD_SHARED=OFF $(PagBackendArguments)</Command>
     <ProjectReference>
       <UseLibraryDependencyInputs>true</UseLibraryDependencyInputs>
     </ProjectReference>
-    <PostBuildEvent>
+    <PostBuildEvent Condition="'$(PagBackend)'=='OpenGL'">
       <Command>xcopy /Y "$(SolutionDir)..\third_party\tgfx\vendor\angle\win\x86\*.*" "$(TargetDir)"</Command>
     </PostBuildEvent>
     <PreBuildEvent>
@@ -178,7 +178,7 @@ node .\build_pag -a x64 -DPAG_BUILD_SHARED=OFF $(PagBackendArguments)</Command>
     <ProjectReference>
       <UseLibraryDependencyInputs>true</UseLibraryDependencyInputs>
     </ProjectReference>
-    <PostBuildEvent>
+    <PostBuildEvent Condition="'$(PagBackend)'=='OpenGL'">
       <Command>xcopy /Y "$(SolutionDir)..\third_party\tgfx\vendor\angle\win\x64\*.*" "$(TargetDir)"</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
@@ -207,7 +207,7 @@ node .\build_pag -a x64 -DPAG_BUILD_SHARED=OFF $(PagBackendArguments)</Command>
     <ProjectReference>
       <UseLibraryDependencyInputs>true</UseLibraryDependencyInputs>
     </ProjectReference>
-    <PostBuildEvent>
+    <PostBuildEvent Condition="'$(PagBackend)'=='OpenGL'">
       <Command>xcopy /Y "$(SolutionDir)..\third_party\tgfx\vendor\angle\win\x64\*.*" "$(TargetDir)"</Command>
     </PostBuildEvent>
     <PreBuildEvent>
@@ -245,4 +245,8 @@ node .\build_pag -a x64 -DPAG_BUILD_SHARED=OFF $(PagBackendArguments)</Command>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
+  <Target Name="ValidatePagBackend" BeforeTargets="PrepareForBuild">
+    <Error Condition="'$(PagBackend)' != 'OpenGL' and '$(PagBackend)' != 'D3D12' and '$(PagBackend)' != 'D3D12WARP'"
+           Text="Unsupported PagBackend '$(PagBackend)'. Use OpenGL, D3D12 or D3D12WARP." />
+  </Target>
 </Project>
