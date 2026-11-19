@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: A filter chain whose residual stage (inner shadow) sits AFTER the animatable one (blur).
+     Target: BlurFilter  Channel: blurX, blurY  Type: float
+     Chain order must survive: the reference blurs first and then draws the inner shadow on the
+     blurred image. The wrapper-based split must keep that order too, and must not move the shadow
+     inward.
+     Ref: R17 -->
+<pagx width="320" height="200">
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F8FAFC"/>
+  </Layer>
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle position="160,100" size="140,100" roundness="12"/>
+    <Fill color="#1D4ED8"/>
+    <BlurFilter id="blur" blurX="0" blurY="0"/>
+    <InnerShadowFilter id="inner" offsetX="0" offsetY="6" blurX="8" blurY="8" color="#0F172A"/>
+  </Layer>
+  <Animations>
+    <Animation id="chain" duration="60" frameRate="60" loop="once">
+      <Object target="blur">
+        <Channel name="blurX" type="float">
+          <Key time="0" value="0" interpolation="linear"/>
+          <Key time="60" value="10"/>
+        </Channel>
+        <Channel name="blurY" type="float">
+          <Key time="0" value="0" interpolation="linear"/>
+          <Key time="60" value="10"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>

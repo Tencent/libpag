@@ -216,3 +216,12 @@ python3 tools/anim_coverage.py --check
   由 `composite/06_painter`、`composite/07_gradient` 里的 `radius`（来自 `RadialGradient`）顺带满足；`geometry/05`、
   `stroke/06` 这类两节点用例还会多出 4 个没人声明的配对，已登记在脚本的 `CROSS_NODE_PAIRS` 里。这些都是「声明过、
   名字对上了」级别的证据，不是 (节点, 通道) 级的精确绑定，把它们当成后者会高估这套论证的力量。
+
+## review/ · 结构性回归用例
+
+`review/` 目录存放代码评审提出的结构性问题用例，**暂不并入正式覆盖统计**，用于固定行为基线：
+
+| 用例 | 固定什么 |
+| --- | --- |
+| `01_filter_inner_then_blur` | 残差阶段（内阴影）在可动画阶段（模糊）**之前**时的链序 |
+| `02_filter_blur_then_inner` | 残影阶段在**之后**时的链序 |
