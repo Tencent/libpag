@@ -4986,8 +4986,17 @@ std::string HTMLAnimationSession::emitKeyframesAndWeave(std::string& bodyHtml) {
             std::string d = RebuildAnimatedPathSVGString(chSet.animatedMaskPath, chSet.maskPtX,
                                                          chSet.maskPtY, t);
             Frame relTime = (t >= windowStart) ? (t - windowStart) : 0;
-            stops += "  " + FormatPercent(relTime, timing.effectiveDuration) + " { d: path(\"" + d +
-                     "\"); }\n";
+            // The mask writes `d` directly instead of going through the CSS emitters, so it has to
+            // carry its own timing: a hold key on a mask point used to be sampled like any other and
+            // the vertex crept toward the next key instead of jumping at the key after the hold.
+            std::string timingDecl = {};
+            AppendStopTimingFunction(chSet, timing, t, timingDecl);
+            std::string body = "d: path(\"" + d + "\");";
+            if (!timingDecl.empty()) {
+              body += " " + timingDecl + ";";
+            }
+            stops +=
+                "  " + FormatPercent(relTime, timing.effectiveDuration) + " { " + body + " }\n";
           }
           std::string kfName = MakeSafeKeyframesName(idIt->second, animCounter++);
           keyframesCss += "@keyframes " + kfName + " {\n" + stops + "}\n";
