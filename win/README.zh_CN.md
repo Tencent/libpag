@@ -26,22 +26,23 @@ D3D12，使用硬件适配器（没有可用适配器时回退到 WARP）：
 
 ```powershell
 node build_pag pag -a x64 -i -DPAG_BUILD_SHARED=OFF -DPAG_USE_D3D12=ON -DPAG_USE_OPENGL=OFF
-node third_party/vendor_tools/ms-build -a x64 win/Win32Demo.sln /p:Configuration=Release /p:Platform=x64 /p:PreBuildEventUseInBuild=false
+node third_party/vendor_tools/ms-build -a x64 win/Win32Demo.sln /p:Configuration=Release /p:Platform=x64 /p:PagBackend=D3D12
 ```
 
 强制 D3D12 使用 WARP：
 
 ```powershell
 node build_pag pag -a x64 -i -DPAG_BUILD_SHARED=OFF -DPAG_USE_D3D12=ON -DPAG_D3D12_USE_WARP=ON -DPAG_USE_OPENGL=OFF
-node third_party/vendor_tools/ms-build -a x64 win/Win32Demo.sln /p:Configuration=Release /p:Platform=x64 /p:PreBuildEventUseInBuild=false
+node third_party/vendor_tools/ms-build -a x64 win/Win32Demo.sln /p:Configuration=Release /p:Platform=x64 /p:PagBackend=D3D12WARP
 ```
 
 示例工程在所有 x64 配置下都从 `out/release/win/x64` 读取 `libpag.lib`，因此切换后端前需要重新构建 libpag，并保证 CRT 和构建配置与示例一致。
 
 `ms-build` 命令说明：
 
-- D3D12 和 WARP 命令必须带 `PreBuildEventUseInBuild=false`：工程的预构建步骤会执行不带后端参数的
-  `build_pag`，把 D3D12 版 `libpag.lib` 覆盖成默认的 OpenGL 构建。OpenGL 命令与该默认构建一致，不需要该开关。
+- `PagBackend=D3D12` 或 `PagBackend=D3D12WARP` 会让工程的预构建步骤给 `build_pag` 传同样的后端参数，
+  默认值是 `OpenGL`。不加这个属性时，预构建会用默认的 OpenGL 构建覆盖 D3D12 版 `libpag.lib`。
+- 如果 libpag 已经自己构建过，或者不想执行预构建，可以改用 `/p:PreBuildEventUseInBuild=false`。
 - 工程固定使用 `v142` 工具集。如果只安装了 VS2022，需要在每条 `ms-build` 命令后追加
   `/p:PlatformToolset=v143`，否则构建会以 `MSB8020` 失败。
 

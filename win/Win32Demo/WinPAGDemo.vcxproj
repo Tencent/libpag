@@ -70,7 +70,11 @@
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
-  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Label="UserMacros">
+    <PagBackend Condition="'$(PagBackend)'==''">OpenGL</PagBackend>
+    <PagBackendArguments Condition="'$(PagBackend)'=='D3D12'">-DPAG_USE_D3D12=ON -DPAG_USE_OPENGL=OFF</PagBackendArguments>
+    <PagBackendArguments Condition="'$(PagBackend)'=='D3D12WARP'">-DPAG_USE_D3D12=ON -DPAG_D3D12_USE_WARP=ON -DPAG_USE_OPENGL=OFF</PagBackendArguments>
+  </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <LinkIncremental>true</LinkIncremental>
   </PropertyGroup>
@@ -109,7 +113,7 @@
 call npm install -g depsync --silent
 call depsync
 set CMAKE_MSVC_PATH=$(VCInstallDir)
-node .\build_pag -a x86 -DPAG_BUILD_SHARED=OFF</Command>
+node .\build_pag -a x86 -DPAG_BUILD_SHARED=OFF $(PagBackendArguments)</Command>
     </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -144,7 +148,7 @@ node .\build_pag -a x86 -DPAG_BUILD_SHARED=OFF</Command>
 call npm install -g depsync --silent
 call depsync
 set CMAKE_MSVC_PATH=$(VCInstallDir)
-node .\build_pag -a x86 -DPAG_BUILD_SHARED=OFF</Command>
+node .\build_pag -a x86 -DPAG_BUILD_SHARED=OFF $(PagBackendArguments)</Command>
     </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -169,7 +173,7 @@ node .\build_pag -a x86 -DPAG_BUILD_SHARED=OFF</Command>
 call npm install -g depsync --silent
 call depsync
 set CMAKE_MSVC_PATH=$(VCInstallDir)
-node .\build_pag -a x64 -DPAG_BUILD_SHARED=OFF</Command>
+node .\build_pag -a x64 -DPAG_BUILD_SHARED=OFF $(PagBackendArguments)</Command>
     </PreBuildEvent>
     <ProjectReference>
       <UseLibraryDependencyInputs>true</UseLibraryDependencyInputs>
@@ -211,7 +215,7 @@ node .\build_pag -a x64 -DPAG_BUILD_SHARED=OFF</Command>
 call npm install -g depsync --silent
 call depsync
 set CMAKE_MSVC_PATH=$(VCInstallDir)
-node .\build_pag -a x64 -DPAG_BUILD_SHARED=OFF</Command>
+node .\build_pag -a x64 -DPAG_BUILD_SHARED=OFF $(PagBackendArguments)</Command>
     </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>

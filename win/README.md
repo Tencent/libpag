@@ -28,14 +28,14 @@ D3D12 with hardware adapters (falls back to WARP when no adapter is available):
 
 ```powershell
 node build_pag pag -a x64 -i -DPAG_BUILD_SHARED=OFF -DPAG_USE_D3D12=ON -DPAG_USE_OPENGL=OFF
-node third_party/vendor_tools/ms-build -a x64 win/Win32Demo.sln /p:Configuration=Release /p:Platform=x64 /p:PreBuildEventUseInBuild=false
+node third_party/vendor_tools/ms-build -a x64 win/Win32Demo.sln /p:Configuration=Release /p:Platform=x64 /p:PagBackend=D3D12
 ```
 
 D3D12 forced onto WARP:
 
 ```powershell
 node build_pag pag -a x64 -i -DPAG_BUILD_SHARED=OFF -DPAG_USE_D3D12=ON -DPAG_D3D12_USE_WARP=ON -DPAG_USE_OPENGL=OFF
-node third_party/vendor_tools/ms-build -a x64 win/Win32Demo.sln /p:Configuration=Release /p:Platform=x64 /p:PreBuildEventUseInBuild=false
+node third_party/vendor_tools/ms-build -a x64 win/Win32Demo.sln /p:Configuration=Release /p:Platform=x64 /p:PagBackend=D3D12WARP
 ```
 
 The demo reads `libpag.lib` from `out/release/win/x64` for every x64 configuration, so rebuild
@@ -43,10 +43,11 @@ libpag before switching backends and keep the CRT/configuration consistent with 
 
 Notes on the `ms-build` commands:
 
-- `PreBuildEventUseInBuild=false` is required for the D3D12 and WARP commands: the project's
-  pre-build step runs `build_pag` without backend arguments, which would replace the D3D12
-  `libpag.lib` with a default OpenGL build. The OpenGL command already matches that default and
-  does not need the switch.
+- `PagBackend=D3D12` or `PagBackend=D3D12WARP` makes the project's pre-build step pass the same
+  backend flags to `build_pag`; the default is `OpenGL`. Without it the pre-build step would replace
+  a D3D12 `libpag.lib` with a default OpenGL build.
+- If you already built libpag yourself or do not want the pre-build step to run, pass
+  `/p:PreBuildEventUseInBuild=false` instead of `PagBackend`.
 - The project pins the `v142` toolset. If only VS2022 is installed, append
   `/p:PlatformToolset=v143` to every `ms-build` command, otherwise the build stops with `MSB8020`.
 
