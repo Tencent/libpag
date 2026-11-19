@@ -59,7 +59,11 @@ def remove(text, target, index):
 
 
 def run_eval(case_path, work_dir, samples, jobs):
-    """Copies the case into a private corpus, runs the eval and returns (ssimMin, ssimMean)."""
+    """Copies the case into a private corpus, runs the eval and returns ssimMean.
+
+    The report grades on the per-frame mean alone; `ssimMin` and the static-baseline columns were
+    removed, so this reads the one metric that still exists.
+    """
     corpus = os.path.join(work_dir, "corpus")
     out = os.path.join(work_dir, "out")
     os.makedirs(corpus, exist_ok=True)
@@ -76,9 +80,9 @@ def run_eval(case_path, work_dir, samples, jobs):
         raise SystemExit("eval produced no report: %s" % case_path)
     with open(report, newline="") as stream:
         rows = list(csv.DictReader(stream))
-    if not rows or not rows[0]["ssimMin"]:
+    if not rows or not rows[0].get("ssimMean"):
         raise SystemExit("no ssim in report: %s" % case_path)
-    return float(rows[0]["ssimMin"]), float(rows[0]["ssimMean"])
+    return float(rows[0]["ssimMean"])
 
 
 def main():
@@ -96,9 +100,9 @@ def main():
         raise SystemExit("no Channel elements: %s" % case_path)
 
     with tempfile.TemporaryDirectory() as tmp:
-        base_min, base_mean = run_eval(case_path, os.path.join(tmp, "base"), args.samples, args.jobs)
-        print("%s\n  baseline  min=%.4f  mean=%.4f  (threshold %.2f)\n" % (
-            os.path.basename(case_path), base_min, base_mean, args.threshold))
+        base_mean = run_eval(case_path, os.path.join(tmp, "base"), args.samples, args.jobs)
+        print("%s\n  baseline  mean=%.4f  (threshold %.2f)\n" % (
+            os.path.basename(case_path), base_mean, args.threshold))
 
         rows = []
         per_target = {}
@@ -109,15 +113,15 @@ def main():
             variant_path = os.path.join(tmp, "v", os.path.basename(case_path))
             os.makedirs(os.path.dirname(variant_path), exist_ok=True)
             open(variant_path, "w").write(variant)
-            value, mean = run_eval(variant_path, os.path.join(tmp, "v%d" % len(rows)), args.samples,
-                                   args.jobs)
-            rows.append((target, name, value, mean))
+            mean = run_eval(variant_path, os.path.join(tmp, "v%d" % len(rows)), args.samples,
+                            args.jobs)
+            rows.append((target, name, mean))
 
         rows.sort(key=lambda row: -row[2])
-        print("  drop channel            min     mean    verdict")
-        for target, name, value, mean in rows:
-            verdict = "CULPRIT" if value >= args.threshold else "no effect"
-            print("  %-20s %-14s %.4f  %.4f  %s" % (target, name, value, mean, verdict))
+        print("  drop channel            mean    verdict")
+        for target, name, mean in rows:
+            verdict = "CULPRIT" if mean >= args.threshold else "no effect"
+            print("  %-20s %-14s %.4f  %s" % (target, name, mean, verdict))
 
     return 0
 
