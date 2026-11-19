@@ -1499,7 +1499,12 @@ void HTMLWriter::writeTextModifier(HTMLBuilder& out, const std::vector<GeoInfo>&
         } else {
           fillRef = ColorToSVGHex(static_cast<const SolidColor*>(fill->color)->color);
         }
+        // `ColorToSVGHex` drops the colour's own alpha, so the product the runtime paints with has to
+        // be carried by `fill-opacity`; taking only `fill->alpha` made a `#FF000080` fill opaque.
         float fillAlpha = fill->alpha;
+        if (fill->color != nullptr && fill->color->nodeType() == NodeType::SolidColor) {
+          fillAlpha *= static_cast<const SolidColor*>(fill->color)->color.alpha;
+        }
 
         // Build shared font attributes.
         std::string fontFamily;
@@ -1632,15 +1637,21 @@ void HTMLWriter::writeTextModifier(HTMLBuilder& out, const std::vector<GeoInfo>&
           }
           if (stroke && stroke->color && stroke->color->nodeType() == NodeType::SolidColor) {
             auto sc = static_cast<const SolidColor*>(stroke->color);
+            // The span route mixes the modifier's stroke colour by the selector factor; this route
+            // only honoured the width, so a fully covered selector still drew the authored outline.
+            Color strokeColor = sc->color;
+            if (modifier->strokeColor.has_value() && absF > 0.0f) {
+              strokeColor = LerpColor(strokeColor, modifier->strokeColor.value(), absF);
+            }
             float strokeWidth = stroke->width;
             if (modifier->strokeWidth.has_value() && absF > 0.0f) {
               strokeWidth += (modifier->strokeWidth.value() - strokeWidth) * absF;
             }
             if (strokeWidth > 0) {
-              out.addAttr("stroke", ColorToSVGHex(sc->color));
+              out.addAttr("stroke", ColorToSVGHex(strokeColor));
               out.addAttr("stroke-width", CssFloatToString(strokeWidth));
-              if (sc->color.alpha * stroke->alpha < 1.0f) {
-                out.addAttr("stroke-opacity", CssFloatToString(sc->color.alpha * stroke->alpha));
+              if (strokeColor.alpha * stroke->alpha < 1.0f) {
+                out.addAttr("stroke-opacity", CssFloatToString(strokeColor.alpha * stroke->alpha));
               }
             }
           }
