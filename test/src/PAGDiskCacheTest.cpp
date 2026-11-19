@@ -516,7 +516,7 @@ PAG_TEST(PAGDiskCacheTest, PAGDecoderContextDestroyed) {
   ASSERT_TRUE(callerContext != nullptr);
   auto decoder = PAGDecoder::MakeFrom(pagFile, 30, 0.5f);
   ASSERT_TRUE(decoder != nullptr);
-  EXPECT_TRUE(decoder->sharedDevice != nullptr);
+  PAG_PRIVATE_ACCESS(EXPECT_TRUE(decoder->sharedDevice != nullptr);)
 
   // Destroy the caller's context; a correct decoder no longer depends on its lifetime.
   callerDevice->unlock();
@@ -528,7 +528,7 @@ PAG_TEST(PAGDiskCacheTest, PAGDecoderContextDestroyed) {
   std::thread reader(ReadFirstFrame, decoder.get(), &success);
   reader.join();
   EXPECT_TRUE(success);
-  EXPECT_TRUE(decoder->reader != nullptr);
+  PAG_PRIVATE_ACCESS(EXPECT_TRUE(decoder->reader != nullptr);)
 
   decoder = nullptr;
   pag::PAGDiskCache::RemoveAll();

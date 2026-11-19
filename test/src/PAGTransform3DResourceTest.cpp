@@ -30,14 +30,7 @@
 
 #ifdef TGFX_USE_OPENGL
 #include "tgfx/gpu/opengl/GLTypes.h"
-#ifdef PAG_USE_SWIFTSHADER
-#include <GLES3/gl3.h>
-#else
-#ifndef GL_SILENCE_DEPRECATION
-#define GL_SILENCE_DEPRECATION
-#endif
-#include <OpenGL/gl3.h>
-#endif
+#include "utils/GLHeaders.h"
 #endif
 
 namespace pag {

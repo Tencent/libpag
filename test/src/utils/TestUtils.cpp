@@ -22,19 +22,9 @@
 #include "rendering/utils/Directory.h"
 #include "tgfx/core/Buffer.h"
 #include "tgfx/core/Stream.h"
+#include "utils/GLHeaders.h"
 #include "utils/ProjectPath.h"
 #include "utils/TestDir.h"
-
-#ifdef TGFX_USE_OPENGL
-#if defined(PAG_USE_SWIFTSHADER) || defined(__EMSCRIPTEN__)
-#include <GLES3/gl3.h>
-#else
-#ifndef GL_SILENCE_DEPRECATION
-#define GL_SILENCE_DEPRECATION
-#endif
-#include <OpenGL/gl3.h>
-#endif
-#endif  // TGFX_USE_OPENGL
 
 namespace pag {
 using namespace tgfx;
