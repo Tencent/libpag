@@ -36,6 +36,9 @@
 #include "base/PAGXTestCommon.h"
 #include "pagx/HTMLImporter.h"
 #include "pagx/PAGXDocument.h"
+#include "pagx/html/importer/HTMLDiagnosticSink.h"
+#include "pagx/html/importer/HTMLTransform3D.h"
+#include "pagx/html/importer/HTMLValueParser.h"
 #include "pagx/nodes/Animation.h"
 #include "pagx/nodes/AnimationObject.h"
 #include "pagx/nodes/Channel.h"
@@ -2435,6 +2438,58 @@ PAGX_TEST(PAGXHTML3DRenderTest, Imported3DAnchorRendersLikeBakedMatrix3D) {
   ASSERT_FALSE(anchoredPixels.empty());
   ASSERT_EQ(anchoredPixels.size(), bakedPixels.size());
   EXPECT_EQ(CountDifferentPixels(anchoredPixels, bakedPixels), 0u);
+}
+
+/**
+ * Test case: a percentage / keyword `transform-origin` cannot resolve against an unknown reference
+ * box, but the shared size chain falls back to the layer's final size. Without that step the static
+ * and the animated pivot could disagree on the same element.
+ */
+PAG_TEST(PAGXHTML3DTest, LayerSizeRescuesAnUnresolvablePercentageOrigin) {
+  pagx::HTMLDiagnosticSink diagnostics(false);
+  float canvasWidth = 200.0f;
+  float canvasHeight = 120.0f;
+  pagx::HTMLValueParser parser(diagnostics, canvasWidth, canvasHeight);
+  const pagx::HTMLTransformReference unknown = {NAN, NAN};
+
+  const pagx::HTMLElementAnchor withoutLayer =
+      pagx::ResolveElementAnchor("50% 50%", unknown, nullptr, parser);
+  EXPECT_FALSE(withoutLayer.resolved)
+      << "no reference box and no layer: nothing to resolve against";
+  EXPECT_TRUE(withoutLayer.valid) << "the declaration itself is legal";
+
+  pagx::Layer layer = {};
+  layer.width = 100.0f;
+  layer.height = 60.0f;
+  const pagx::HTMLElementAnchor withLayer =
+      pagx::ResolveElementAnchor("50% 50%", unknown, &layer, parser);
+  ASSERT_TRUE(withLayer.resolved) << "the layer size is the last step of the fallback chain";
+  EXPECT_TRUE(NearlyEqual(withLayer.point.x, 50.0f, 0.001f));
+  EXPECT_TRUE(NearlyEqual(withLayer.point.y, 30.0f, 0.001f));
+}
+
+/**
+ * Test case: an `em` pivot is approximated as 16px, and that approximation is reported once. The
+ * cascade resolves the value provisionally before the layer exists, so it must not repeat the note.
+ */
+PAG_TEST(PAGXHTML3DTest, EmOriginWarnsOnce) {
+  auto doc = ParseHtml(R"HTML(
+    <html><body style="width:200px;height:120px">
+      <div id="box" style="position:absolute;left:0;top:0;width:60px;height:40px;
+           background-color:#000;transform:rotate(10deg);transform-origin:1em 0"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  int emWarnings = 0;
+  for (const auto& message : doc->errors) {
+    if (message.find("em/rem") != std::string::npos) {
+      emWarnings++;
+    }
+  }
+  EXPECT_EQ(emWarnings, 1) << "the provisional cascade pass must stay silent";
+  auto* box = FindLayerById(doc, "box");
+  ASSERT_NE(box, nullptr);
+  EXPECT_TRUE(NearlyEqual(box->anchor.x, 16.0f, 0.001f));
 }
 
 }  // namespace pag

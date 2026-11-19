@@ -780,14 +780,13 @@ void HTMLParserContext::attachParentCamera(HTMLBoxAttributes& box,
   // An element whose pose only exists in `@keyframes` never parsed a static origin, so its pivot depth
   // has to come from the resolved style through the same fallback chain the animated pivot uses;
   // reading `box.transform.originZ` would always give 0.
-  const HTMLElementAnchor animatedPivot =
-      ResolveElementAnchor(Trim(LookupProperty(style, "transform-origin")), reference, nullptr,
-                           silentParser);
+  const HTMLElementAnchor animatedPivot = ResolveElementAnchor(
+      Trim(LookupProperty(style, "transform-origin")), reference, nullptr, silentParser);
   const float pivotZ = box.transform.valid ? box.transform.originZ : animatedPivot.depth;
-  ApplyParentPerspective(box, inherited.parentCamera, inherited.parentBorderWidthPx,
-                         Animates3DTransform(_styleCascade->keyframes(), style, silentParser,
-                                             reference, pivotZ),
-                         element->name, *_diagnostics, _flowChildPerspectiveWarned);
+  ApplyParentPerspective(
+      box, inherited.parentCamera, inherited.parentBorderWidthPx,
+      Animates3DTransform(_styleCascade->keyframes(), style, silentParser, reference, pivotZ),
+      element->name, *_diagnostics, _flowChildPerspectiveWarned);
 }
 
 void HTMLParserContext::forwardParentCamera(const HTMLBoxAttributes& box,

@@ -98,6 +98,13 @@ class HTMLValueParser {
    * value yields one message instead of two.
    */
   float parseAbsoluteLengthPx(const std::string& valueRaw, bool warn = true);
+
+  /**
+   * Same as `parseAbsoluteLengthPx`, but the em/rem approximation note is suppressed as well. Used
+   * by the provisional `transform-origin` pass in the cascade: the layer resolves the same value once
+   * more with the final box size and reports the note there, so this pass must stay silent.
+   */
+  float parseQuietLengthPx(const std::string& valueRaw);
   float resolveLineHeightPx(const std::string& valueRaw, float fontSizePx);
 
   /** Parses box-shadow entries; non-zero spread is diagnosed and omitted by HTML import. */
@@ -154,6 +161,10 @@ class HTMLValueParser {
 
  private:
   std::vector<ShadowSpec> parseShadowList(const std::string& value, bool boxShadow);
+
+  // Set while `parseQuietLengthPx` runs: the em/rem approximation note is reported by the
+  // authoritative pass (the layer, which knows the final box), not by a provisional one.
+  bool _suppressEmNote = false;
 
   // Builds the tiled color stops of a `repeating-linear-gradient` in the gradient line's
   // normalised (0..1) space. One authored period is parsed into pixel positions along the line

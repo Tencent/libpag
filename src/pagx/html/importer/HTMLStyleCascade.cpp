@@ -839,8 +839,10 @@ void HTMLStyleCascade::parseBoxTransform(HTMLBoxAttributes& box, const PropertyM
   }
   const std::string originValue = Trim(LookupProperty(props, "transform-origin"));
   const HTMLTransformReference reference = {referenceWidthPx, referenceHeightPx};
+  // Provisional: the layer resolves the same value with the final box size and reports diagnostics
+  // there, so this pass must not repeat them (an em origin used to warn twice).
   const HTMLElementAnchor anchor =
-      ResolveElementAnchor(originValue, reference, nullptr, _valueParser);
+      ResolveElementAnchor(originValue, reference, nullptr, _valueParser, /*quiet=*/true);
   HTMLTransform parsed = {};
   parsed.valid = true;
   parsed.pose = pose;

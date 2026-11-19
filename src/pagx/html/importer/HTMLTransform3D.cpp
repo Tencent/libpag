@@ -196,8 +196,8 @@ OriginTokenAxis ApplyOriginFraction(float dimension, float fraction, float& out)
   return OriginTokenAxis::Resolved;
 }
 
-OriginTokenAxis ResolveOriginAxis(const std::string& token, float dimension, HTMLValueParser& valueParser,
-                             float& out) {
+OriginTokenAxis ResolveOriginAxis(const std::string& token, float dimension,
+                                  HTMLValueParser& valueParser, float& out, bool quiet) {
   if (token == "center") {
     return ApplyOriginFraction(dimension, 0.5f, out);
   }
@@ -219,7 +219,8 @@ OriginTokenAxis ResolveOriginAxis(const std::string& token, float dimension, HTM
   }
   // The caller reports the declaration itself as invalid, so the generic unit warning is suppressed
   // here: `10foo 20px` yields one diagnostic, not a unit warning plus a position warning.
-  out = valueParser.parseAbsoluteLengthPx(token, /*warn=*/false);
+  out = quiet ? valueParser.parseQuietLengthPx(token)
+              : valueParser.parseAbsoluteLengthPx(token, /*warn=*/false);
   return std::isfinite(out) ? OriginTokenAxis::Resolved : OriginTokenAxis::TokenInvalid;
 }
 
@@ -690,7 +691,7 @@ HTMLTransformOrigin InvalidOrigin(float width, float height) {
 }
 
 HTMLTransformOrigin ResolveTransformOrigin(const std::string& value, float width, float height,
-                                           HTMLValueParser& valueParser) {
+                                           HTMLValueParser& valueParser, bool quiet) {
   HTMLTransformOrigin origin = {};
   std::string text = ToLower(Trim(value));
   if (text.empty()) {
@@ -754,14 +755,15 @@ HTMLTransformOrigin ResolveTransformOrigin(const std::string& value, float width
   // Every component is validated before any size-dependent early return: an unknown box only decides
   // whether the value can be expressed in pixels, never whether the declaration is legal. Returning
   // early on the axes used to skip the depth and silently drop a legal `30px` third value.
-  const OriginTokenAxis axisX = ResolveOriginAxis(tokenX, width, valueParser, x);
-  const OriginTokenAxis axisY = ResolveOriginAxis(tokenY, height, valueParser, y);
+  const OriginTokenAxis axisX = ResolveOriginAxis(tokenX, width, valueParser, x, quiet);
+  const OriginTokenAxis axisY = ResolveOriginAxis(tokenY, height, valueParser, y, quiet);
   if (axisX == OriginTokenAxis::TokenInvalid || axisY == OriginTokenAxis::TokenInvalid) {
     return InvalidOrigin(width, height);
   }
   if (tokens.size() == 3) {
     // The third value is a bare depth; a percentage has no basis there.
-    z = valueParser.parseAbsoluteLengthPx(tokens[2], /*warn=*/false);
+    z = quiet ? valueParser.parseQuietLengthPx(tokens[2])
+              : valueParser.parseAbsoluteLengthPx(tokens[2], /*warn=*/false);
     if (!std::isfinite(z)) {
       return InvalidOrigin(width, height);
     }
@@ -781,7 +783,7 @@ HTMLTransformOrigin ResolveTransformOrigin(const std::string& value, float width
 
 HTMLElementAnchor ResolveElementAnchor(const std::string& originValue,
                                        const HTMLTransformReference& reference, const Layer* layer,
-                                       HTMLValueParser& valueParser) {
+                                       HTMLValueParser& valueParser, bool quiet) {
   HTMLTransformReference size = reference;
   if (std::isnan(size.widthPx) && layer != nullptr) {
     size.widthPx = layer->width;
@@ -789,7 +791,8 @@ HTMLElementAnchor ResolveElementAnchor(const std::string& originValue,
   if (std::isnan(size.heightPx) && layer != nullptr) {
     size.heightPx = layer->height;
   }
-  const auto origin = ResolveTransformOrigin(originValue, size.widthPx, size.heightPx, valueParser);
+  const auto origin =
+      ResolveTransformOrigin(originValue, size.widthPx, size.heightPx, valueParser, quiet);
   HTMLElementAnchor anchor = {};
   anchor.point = origin.point;
   anchor.depth = origin.z;

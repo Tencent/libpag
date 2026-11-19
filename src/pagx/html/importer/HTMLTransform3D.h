@@ -101,7 +101,7 @@ bool SplitTransformFunctions(const std::string& value, std::vector<std::string>*
  * `width` / `height`, and the optional third value is the pivot depth in pixels.
  */
 HTMLTransformOrigin ResolveTransformOrigin(const std::string& value, float width, float height,
-                                           HTMLValueParser& valueParser);
+                                           HTMLValueParser& valueParser, bool quiet = false);
 
 /**
  * The pivot of one element's local transform: `transform-origin` in layer-local pixels plus its
@@ -135,7 +135,7 @@ struct HTMLElementAnchor {
  */
 HTMLElementAnchor ResolveElementAnchor(const std::string& originValue,
                                        const HTMLTransformReference& reference, const Layer* layer,
-                                       HTMLValueParser& valueParser);
+                                       HTMLValueParser& valueParser, bool quiet = false);
 
 /**
  * Parses a CSS `transform` value (a whitespace-separated function list) into a 4x4 pose, composed
