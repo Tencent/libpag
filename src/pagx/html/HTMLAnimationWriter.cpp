@@ -2037,7 +2037,8 @@ void EmitTransformCssAtFrame(const DomTargetBundle& bundle, const BundleChannelS
   // full transform, so an animated pose or position channel must not be stacked on top (the case
   // names it "matrix3dWins" - with the matrix's translation at 0 the layer sits at the origin, not
   // at its authored x/y).
-  if (hostLayer != nullptr && !hostLayer->matrix3D.isIdentity()) {
+  if (hostLayer != nullptr && !hostLayer->matrix3D.isIdentity() &&
+      chSet.layerMatrix3DCh == nullptr) {
     // The static exporter emits the matrix alone and matches the reference exactly, so no
     // `perspective()` function goes on top: the matrix already carries the projection it needs.
     auto anchored = ApplyAnchorToMatrix(hostLayer->matrix3D, hostLayer->anchor, hostLayer->anchorZ);
@@ -2071,10 +2072,30 @@ void EmitTransformCssAtFrame(const DomTargetBundle& bundle, const BundleChannelS
       append("perspective(" + CssFloatToString(persist) + "px)");
     }
     float z = EvalFloatChannel(chSet.layerZCh, t, hostLayer->z);
-    if (!FloatNearlyZero(hostLayer->x) || !FloatNearlyZero(hostLayer->y) || !FloatNearlyZero(z) ||
-        chSet.layerZCh != nullptr) {
-      append("translate3d(" + CssFloatToString(hostLayer->x) + "px, " +
-             CssFloatToString(hostLayer->y) + "px, " + CssFloatToString(z) + "px)");
+    // The in-plane position is a channel like any other: taking the authored x/y here dropped a
+    // slide the moment the same layer also rotated in 3D (x 0->100 with rotation.y 0->30 exported as
+    // `rotateY(...)` alone, so the layer never moved).
+    // A Layer binds its position as LayerX/LayerY, a Group as GroupPosX/GroupPosY: both feed the
+    // same translate slot.
+    const Channel* xCh = chSet.xCh != nullptr ? chSet.xCh : chSet.posXCh;
+    const Channel* yCh = chSet.yCh != nullptr ? chSet.yCh : chSet.posYCh;
+    // The animated tag drops `left`/`top` (the 3D list carries the translation), so the base has to
+    // come from the resolved position rather than the authored x/y attributes - a layer placed with
+    // `left`/`top` has x/y at 0 and would otherwise jump to the origin.
+    // Same source the static writer uses once a layer carries transform components: the resolved
+    // layout position, which is what `left`/`top` would have carried.
+    // `renderPosition()`/`layoutPosition()` read the live `x`/`y`, which the animation state has
+    // already overwritten with the value at the sampling frame; the authored `left`/`top` still hold
+    // the box's origin, so prefer them and fall back to the live position.
+    auto livePos = hostLayer->renderPosition();
+    float baseX = std::isnan(hostLayer->left) ? livePos.x : hostLayer->left;
+    float baseY = std::isnan(hostLayer->top) ? livePos.y : hostLayer->top;
+    float px = EvalFloatChannel(xCh, t, baseX);
+    float py = EvalFloatChannel(yCh, t, baseY);
+    if (!FloatNearlyZero(px) || !FloatNearlyZero(py) || !FloatNearlyZero(z) ||
+        chSet.layerZCh != nullptr || xCh != nullptr || yCh != nullptr) {
+      append("translate3d(" + CssFloatToString(px) + "px, " + CssFloatToString(py) + "px, " +
+             CssFloatToString(z) + "px)");
     }
     // The anchor conjugates the affine part only; spelling it out keeps the projection outside.
     float anchorX = EvalFloatChannel(chSet.anchorXCh, t, hostLayer->anchor.x);
