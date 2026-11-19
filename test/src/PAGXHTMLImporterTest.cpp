@@ -3106,6 +3106,8 @@ PAG_TEST(PAGXHTMLImporterTest, DisallowedLayoutPropertiesEmitWarnings) {
 }
 
 PAG_TEST(PAGXHTMLImporterTest, DisallowedVisualPropertiesEmitWarnings) {
+  // `perspective` is supported now, so it no longer warns; `outline` and the geometric clip-path
+  // forms still do.
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:50px;height:50px">
       <div style="outline:1px solid red;clip-path:margin-box;
@@ -3121,28 +3123,25 @@ PAG_TEST(PAGXHTMLImporterTest, DisallowedVisualPropertiesEmitWarnings) {
   }
   EXPECT_TRUE(outlineWarn);
   EXPECT_TRUE(clipWarn);
-  EXPECT_TRUE(perspectiveWarn);
+  EXPECT_FALSE(perspectiveWarn);
 }
 
-PAG_TEST(PAGXHTMLImporterTest, NonDefaultTransformOriginWarnsWithTransform) {
-  // `transform-origin` resolved as `<x>px <y>px` is honoured by applyBoxTransform — the
-  // pivot lands at the requested point and no warning is emitted, because the html-snapshot
-  // tool always serialises the origin to absolute pixels (Chromium does the same in
-  // `getComputedStyle`). Other forms (keywords other than `center`, percentages other than
-  // `50% 50%`) cannot be resolved without further state and still warn so authors of
-  // hand-written subset HTML notice the pivot is being approximated.
+PAG_TEST(PAGXHTMLImporterTest, NonDefaultTransformOriginBecomesAnchor) {
+  // `transform-origin` is resolved against the element box and written onto `Layer.anchor`, so the
+  // matrix keeps the raw CSS value and no warning is emitted, whatever form the origin used.
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:200px;height:60px">
-      <h1 style="transform:skewX(-5deg);transform-origin:left top;
+      <h1 style="transform:skewX(-5deg);transform-origin:20px 10px;
                  width:200px;height:60px">Hello</h1>
     </body></html>
   )HTML");
   ASSERT_NE(doc, nullptr);
-  bool originWarn = false;
-  for (const auto& msg : doc->errors) {
-    if (msg.find("transform-origin") != std::string::npos) originWarn = true;
-  }
-  EXPECT_TRUE(originWarn);
+  EXPECT_FALSE(HasDiagnosticContaining(doc, "transform-origin"));
+  auto* host = doc->layers.front()->children.front();
+  ASSERT_NE(host, nullptr);
+  EXPECT_FALSE(host->matrix.isIdentity());
+  EXPECT_FLOAT_EQ(host->anchor.x, 20.0f);
+  EXPECT_FLOAT_EQ(host->anchor.y, 10.0f);
 }
 
 PAG_TEST(PAGXHTMLImporterTest, DisallowedTextPropertiesEmitWarnings) {
@@ -5971,10 +5970,8 @@ PAG_TEST(PAGXHTMLImporterTest, RawGridTemplateWarns) {
   EXPECT_TRUE(gridWarn);
 }
 
-PAG_TEST(PAGXHTMLImporterTest, RawTransformWarns) {
-  // Compound transform chains aren't decomposed by the importer today; they fall through
-  // the subset transformer with a diagnostic. Single-function forms (skewX/rotate/scale/...)
-  // map onto the TextBox transform fields and are silent — see RawSingleTransformIsAccepted.
+PAG_TEST(PAGXHTMLImporterTest, RawCompoundTransformIsComposed) {
+  // A compound chain is composed in CSS order into a single pose, so it no longer warns or drops.
   pagx::HTMLImporter::Options opts;
   opts.autoNormalize = false;
   auto doc = pagx::HTMLImporter::ParseString(R"HTML(
@@ -5984,11 +5981,10 @@ PAG_TEST(PAGXHTMLImporterTest, RawTransformWarns) {
   )HTML",
                                              opts);
   ASSERT_NE(doc, nullptr);
-  bool warned = false;
-  for (const auto& msg : doc->errors) {
-    if (msg.find("transform") != std::string::npos) warned = true;
-  }
-  EXPECT_TRUE(warned);
+  EXPECT_FALSE(HasDiagnosticContaining(doc, "compound transforms are not supported"));
+  auto* div = doc->layers.front()->children.front();
+  ASSERT_NE(div, nullptr);
+  EXPECT_FALSE(div->matrix.isIdentity());
 }
 
 PAG_TEST(PAGXHTMLImporterTest, RawSingleTransformIsAccepted) {
@@ -8353,10 +8349,10 @@ PAG_TEST(PAGXHTMLImporterTest, AnimationReverseDirectionFlipsStepsJump) {
   EXPECT_NEAR(ch->keyframes.back().value, 0.0f, kEps);
 }
 
-PAG_TEST(PAGXHTMLImporterTest, AnimationRotateUsesStructuralPivotMatrixChannel) {
-  // Sampled pure rotations keep transform-origin structural. The matrix channel targets a pivot
-  // wrapper and contains zero-translation rotation matrices, so runtime decomposition cannot make
-  // the centre drift between keyframes.
+PAG_TEST(PAGXHTMLImporterTest, AnimationRotateKeepsPivotOnAnchor) {
+  // Sampled rotations keep the pivot on the animated layer: the keyframes carry zero-translation
+  // rotation matrices and the runtime applies `anchor` once per frame, so no wrapper pair is needed
+  // and the centre cannot drift between keyframes.
   pagx::HTMLImporter::Options opts;
   opts.autoNormalize = false;
   auto doc = pagx::HTMLImporter::ParseString(R"HTML(
@@ -8385,45 +8381,23 @@ PAG_TEST(PAGXHTMLImporterTest, AnimationRotateUsesStructuralPivotMatrixChannel) 
   auto* mCh = dynamic_cast<pagx::TypedChannel<pagx::Matrix>*>(FindChannel(anim, "matrix"));
   ASSERT_NE(mCh, nullptr);
   ASSERT_EQ(mCh->keyframes.size(), 5u);
-  pagx::AnimationObject* matrixObject = nullptr;
-  for (auto* candidate : anim->objects) {
-    if (candidate != nullptr && !candidate->channels.empty() &&
-        candidate->channels.front() == mCh) {
-      matrixObject = candidate;
-      break;
-    }
-  }
-  ASSERT_NE(matrixObject, nullptr);
-  pagx::Layer* pivotLayer = nullptr;
-  std::vector<pagx::Layer*> pendingLayers(doc->layers.begin(), doc->layers.end());
-  while (!pendingLayers.empty() && pivotLayer == nullptr) {
-    auto* candidate = pendingLayers.back();
-    pendingLayers.pop_back();
-    if (candidate->id == matrixObject->target) {
-      pivotLayer = candidate;
-      break;
-    }
-    pendingLayers.insert(pendingLayers.end(), candidate->children.begin(),
-                         candidate->children.end());
-  }
-  ASSERT_NE(pivotLayer, nullptr);
-  EXPECT_FLOAT_EQ(pivotLayer->left, 5.0f);
-  EXPECT_FLOAT_EQ(pivotLayer->top, 5.0f);
-  ASSERT_EQ(pivotLayer->children.size(), 1u);
-  auto* visualLayer = pivotLayer->children.front();
-  EXPECT_FLOAT_EQ(visualLayer->left, -5.0f);
-  EXPECT_FLOAT_EQ(visualLayer->top, -5.0f);
+
+  auto* layer = doc->layers.front()->children.front();
+  ASSERT_NE(layer, nullptr);
+  EXPECT_EQ(layer->id, "d");
+  EXPECT_FLOAT_EQ(layer->anchor.x, 5.0f);
+  EXPECT_FLOAT_EQ(layer->anchor.y, 5.0f);
+  EXPECT_TRUE(layer->children.empty()) << "the pivot no longer needs a wrapper pair";
+  auto* object = FindObjectByTarget(anim, layer->id);
+  ASSERT_NE(object, nullptr);
+  EXPECT_EQ(object->channels.front(), mCh);
   for (const auto& key : mCh->keyframes) {
     EXPECT_NEAR(key.value.tx, 0.0f, kEps);
     EXPECT_NEAR(key.value.ty, 0.0f, kEps);
   }
 }
 
-// A structural rotation pivot moves every visual attribute onto its innermost child. Filter and
-// clip-path animations must follow that move: leaving either one on the emptied outer layer would
-// render the static and animated effects on different coordinate spaces, and newly minted targets
-// could be detached from the visual subtree after optimization.
-PAG_TEST(PAGXHTMLImporterTest, AnimationRotateKeepsFilterAndClipOnVisualPivotChild) {
+PAG_TEST(PAGXHTMLImporterTest, AnimationRotateKeepsFilterAndClipOnTheElement) {
   pagx::HTMLImporter::Options opts;
   opts.autoNormalize = false;
   auto doc = pagx::HTMLImporter::ParseString(R"HTML(
@@ -8431,12 +8405,8 @@ PAG_TEST(PAGXHTMLImporterTest, AnimationRotateKeepsFilterAndClipOnVisualPivotChi
       @keyframes spinFx {
         0%   { transform: rotate(0deg);   filter: drop-shadow(0 0 0 #FF0000);
                clip-path: path("M 0 0 L 0 0 L 0 10 L 0 10 Z"); }
-        25%  { transform: rotate(90deg);  filter: drop-shadow(8px 0 0 #FF0000);
-               clip-path: path("M 0 0 L 2 0 L 2 10 L 0 10 Z"); }
         50%  { transform: rotate(180deg); filter: drop-shadow(16px 0 0 #FF0000);
                clip-path: path("M 0 0 L 5 0 L 5 10 L 0 10 Z"); }
-        75%  { transform: rotate(270deg); filter: drop-shadow(24px 0 0 #FF0000);
-               clip-path: path("M 0 0 L 8 0 L 8 10 L 0 10 Z"); }
         100% { transform: rotate(360deg); filter: drop-shadow(30px 0 0 #FF0000);
                clip-path: path("M 0 0 L 10 0 L 10 10 L 0 10 Z"); }
       }
@@ -8453,16 +8423,14 @@ PAG_TEST(PAGXHTMLImporterTest, AnimationRotateKeepsFilterAndClipOnVisualPivotChi
   ASSERT_EQ(doc->animations.size(), 1u);
   auto* anim = static_cast<pagx::Animation*>(doc->animations.front());
 
-  auto* outer = doc->layers.front()->children.front();
-  ASSERT_EQ(outer->children.size(), 1u);
-  auto* pivot = outer->children.front();
-  ASSERT_EQ(pivot->children.size(), 1u);
-  auto* visual = pivot->children.front();
-
-  EXPECT_TRUE(outer->filters.empty());
-  EXPECT_EQ(outer->mask, nullptr);
-  EXPECT_TRUE(pivot->filters.empty());
-  EXPECT_EQ(pivot->mask, nullptr);
+  // The element keeps its own pose, filters and mask: no pivot wrapper is inserted any more.
+  auto* visual = doc->layers.front()->children.front();
+  ASSERT_NE(visual, nullptr);
+  EXPECT_EQ(visual->id, "d");
+  auto* matrixChannel = FindChannel(anim, "matrix");
+  ASSERT_NE(matrixChannel, nullptr);
+  EXPECT_NE(FindObjectByTarget(anim, visual->id), nullptr)
+      << "the animated pose targets the element itself";
 
   pagx::DropShadowFilter* drop = nullptr;
   for (auto* filter : visual->filters) {
@@ -8512,16 +8480,19 @@ PAG_TEST(PAGXHTMLImporterTest, AnimationScaleProducesMatrixChannel) {
   EXPECT_EQ(FindChannel(anim, "x"), nullptr);
   EXPECT_EQ(FindChannel(anim, "y"), nullptr);
   ASSERT_EQ(mCh->keyframes.size(), 2u);
-  // 0% scale(1) about a (25, 25) pivot is the identity.
+  // The keyframes carry the raw CSS scale; the (25, 25) pivot lives on the layer as `anchor`.
   const auto& first = mCh->keyframes.front().value;
   EXPECT_FLOAT_EQ(first.a, 1.0f);
   EXPECT_FLOAT_EQ(first.d, 1.0f);
-  // 100% scale(2) about (25, 25): a == d == 2, tx == ty == -25 (T(c) * S(2) * T(-c)).
   const auto& last = mCh->keyframes.back().value;
   EXPECT_FLOAT_EQ(last.a, 2.0f);
   EXPECT_FLOAT_EQ(last.d, 2.0f);
-  EXPECT_FLOAT_EQ(last.tx, -25.0f);
-  EXPECT_FLOAT_EQ(last.ty, -25.0f);
+  EXPECT_FLOAT_EQ(last.tx, 0.0f);
+  EXPECT_FLOAT_EQ(last.ty, 0.0f);
+  auto* box = doc->layers.front()->children.front();
+  ASSERT_NE(box, nullptr);
+  EXPECT_FLOAT_EQ(box->anchor.x, 25.0f);
+  EXPECT_FLOAT_EQ(box->anchor.y, 25.0f);
 }
 
 PAG_TEST(PAGXHTMLImporterTest, AnimationMatrixWithScaleProducesMatrixChannel) {
@@ -8627,9 +8598,8 @@ PAG_TEST(PAGXHTMLImporterTest, InlineSvgRotateProducesScalarRotationChannel) {
   EXPECT_FLOAT_EQ(rotationGroup->position.y, 40.0f);
 }
 
-PAG_TEST(PAGXHTMLImporterTest, AnimationUnsupported3DTransformWarnsAndDrops) {
-  // 3D transforms (matrix3d / rotate3d / perspective) have no 2D affine representation, so they
-  // warn and drop, emitting no animation when no other channel survives.
+PAG_TEST(PAGXHTMLImporterTest, Animation3DRotationUsesMatrix3DChannel) {
+  // 3D keyframes are composed into a 4x4 pose and played through the `matrix3D` channel.
   pagx::HTMLImporter::Options opts;
   opts.autoNormalize = false;
   auto doc = pagx::HTMLImporter::ParseString(R"HTML(
@@ -8646,12 +8616,20 @@ PAG_TEST(PAGXHTMLImporterTest, AnimationUnsupported3DTransformWarnsAndDrops) {
   )HTML",
                                              opts);
   ASSERT_NE(doc, nullptr);
-  bool warned = false;
   for (const auto& msg : doc->errors) {
-    if (msg.find("subset:animation-unsupported-property") != std::string::npos) warned = true;
+    EXPECT_EQ(msg.find("subset:animation-unsupported-property"), std::string::npos)
+        << "Unexpected diagnostic: " << msg;
   }
-  EXPECT_TRUE(warned);
-  EXPECT_TRUE(doc->animations.empty());
+  ASSERT_EQ(doc->animations.size(), 1u);
+  auto* anim = static_cast<pagx::Animation*>(doc->animations.front());
+  EXPECT_EQ(FindChannel(anim, "matrix"), nullptr);
+  auto* channel = FindChannel(anim, "matrix3D");
+  ASSERT_NE(channel, nullptr);
+  ASSERT_EQ(channel->valueType(), pagx::ChannelValueType::Matrix3D);
+  auto* m3d = static_cast<pagx::TypedChannel<pagx::Matrix3D>*>(channel);
+  ASSERT_EQ(m3d->keyframes.size(), 2u);
+  EXPECT_FLOAT_EQ(m3d->keyframes.front().value.getRowColumn(0, 0), 1.0f);
+  EXPECT_FLOAT_EQ(m3d->keyframes.back().value.getRowColumn(0, 0), -1.0f);
 }
 
 PAG_TEST(PAGXHTMLImporterTest, AnimationUnknownKeyframesWarns) {
@@ -9093,7 +9071,7 @@ PAG_TEST(PAGXHTMLImporterTest, RawTransformMatrixNonNumericWarns) {
 PAG_TEST(PAGXHTMLImporterTest, RawTransformUnknownFunctionWarns) {
   auto doc = ParseRaw(R"HTML(
     <html><body style="width:50px;height:50px">
-      <div style="transform:perspective(100px);width:50px;height:50px"></div>
+      <div style="transform:foo(100px);width:50px;height:50px"></div>
     </body></html>
   )HTML");
   ASSERT_NE(doc, nullptr);
@@ -9127,15 +9105,19 @@ PAG_TEST(PAGXHTMLImporterTest, RawTransformOriginPxSetsResolvedPivot) {
   EXPECT_FALSE(HasDiagnosticContaining(doc, "transform-origin '0px 0px'"));
 }
 
-PAG_TEST(PAGXHTMLImporterTest, RawTransformOriginUnsupportedKeywordWarns) {
+PAG_TEST(PAGXHTMLImporterTest, RawTransformOriginKeywordResolvesAgainstBox) {
   auto doc = ParseRaw(R"HTML(
     <html><body style="width:50px;height:50px">
-      <div style="transform:rotate(45deg);transform-origin:left top;width:50px;height:50px"></div>
+      <div id="box" style="transform:rotate(45deg);transform-origin:right bottom;
+                           width:50px;height:50px"></div>
     </body></html>
   )HTML");
   ASSERT_NE(doc, nullptr);
-  EXPECT_TRUE(HasDiagnosticContaining(doc, "transform-origin"));
-  EXPECT_TRUE(HasDiagnosticContaining(doc, "not supported"));
+  EXPECT_FALSE(HasDiagnosticContaining(doc, "transform-origin"));
+  auto* div = doc->layers.front()->children.front();
+  ASSERT_NE(div, nullptr);
+  EXPECT_FLOAT_EQ(div->anchor.x, 50.0f);
+  EXPECT_FLOAT_EQ(div->anchor.y, 50.0f);
 }
 
 PAG_TEST(PAGXHTMLImporterTest, RawTransformOriginCenterIsSilent) {
@@ -9170,7 +9152,7 @@ PAG_TEST(PAGXHTMLImporterTest, RawTransformOnElementWithoutSizeWarnsForOrigin) {
     </body></html>
   )HTML");
   ASSERT_NE(doc, nullptr);
-  EXPECT_TRUE(HasDiagnosticContaining(doc, "without explicit width/height"));
+  EXPECT_TRUE(HasDiagnosticContaining(doc, "cannot be resolved against the box size"));
 }
 
 //==================================================================================================
@@ -9905,17 +9887,17 @@ PAG_TEST(PAGXHTMLSubsetTransformerTest, SupportedTransformIsKept) {
   EXPECT_TRUE(StyleContains(FirstBodyChild(root, "div"), "transform: rotate(45deg)"));
 }
 
-PAG_TEST(PAGXHTMLSubsetTransformerTest, UnsupportedTransformIsDropped) {
-  // Compound chains and `matrix(...)` would need 2x2 matrix decomposition the importer
-  // doesn't implement; they're dropped with a diagnostic rather than passed through and
-  // mis-applied later.
+PAG_TEST(PAGXHTMLSubsetTransformerTest, CompoundTransformIsForwarded) {
+  // The resolver composes the whole function list into one pose, so the subset transformer forwards
+  // compound chains instead of dropping them.
   std::shared_ptr<pagx::DOMNode> root;
   auto result = RunTransform(
       R"HTML(<html><body style="width:1px;height:1px">
                <div style="transform: rotate(45deg) translate(10px)"></div></body></html>)HTML",
       &root);
   ASSERT_TRUE(result.ok);
-  EXPECT_FALSE(StyleContains(FirstBodyChild(root, "div"), "transform"));
+  EXPECT_TRUE(StyleContains(FirstBodyChild(root, "div"), "transform"));
+  EXPECT_FALSE(HasDiagnostic(result, "subset:unsupported-property"));
 }
 
 PAG_TEST(PAGXHTMLSubsetTransformerTest, BackgroundClipTextIsKept) {
@@ -12617,7 +12599,7 @@ PAG_TEST(PAGXHTMLSubsetTransformerTest, TransformUnsupportedFunctionIsDropped) {
   std::shared_ptr<pagx::DOMNode> root;
   auto result = RunTransform(
       R"HTML(<html><body style="width:1px;height:1px">
-               <div style="transform: perspective(200px)"></div></body></html>)HTML",
+               <div style="transform: foo(200px)"></div></body></html>)HTML",
       &root);
   ASSERT_TRUE(result.ok);
   EXPECT_FALSE(StyleContains(FirstBodyChild(root, "div"), "transform"));
@@ -12739,8 +12721,9 @@ PAG_TEST(PAGXHTMLImporterTest, RawMatrix3DAffineSetsLayerMatrix) {
   EXPECT_FALSE(HasDiagnosticContaining(doc, "carries perspective"));
 }
 
-PAG_TEST(PAGXHTMLImporterTest, RawMatrix3DPerspectiveWarns) {
-  // A non-affine matrix3d (m44 != 1) keeps its affine subset but warns about the dropped depth.
+PAG_TEST(PAGXHTMLImporterTest, RawMatrix3DPerspectivePassesThrough) {
+  // A non-affine matrix3d (m44 != 1) keeps its projection row on `Layer.matrix3D` instead of being
+  // projected onto the 2D plane, so no depth is lost and nothing warns.
   auto doc = ParseRaw(R"HTML(
     <html><body style="width:200px;height:200px">
       <div style="width:50px;height:50px;
@@ -12748,7 +12731,11 @@ PAG_TEST(PAGXHTMLImporterTest, RawMatrix3DPerspectiveWarns) {
     </body></html>
   )HTML");
   ASSERT_NE(doc, nullptr);
-  EXPECT_TRUE(HasDiagnosticContaining(doc, "carries perspective"));
+  auto* div = doc->layers.front()->children.front();
+  ASSERT_NE(div, nullptr);
+  EXPECT_TRUE(div->matrix.isIdentity());
+  EXPECT_FLOAT_EQ(div->matrix3D.values[15], 2.0f);
+  EXPECT_FALSE(HasDiagnosticContaining(doc, "carries perspective"));
 }
 
 PAG_TEST(PAGXHTMLImporterTest, RawMatrix3DWrongArgCountWarns) {
@@ -12939,6 +12926,7 @@ PAG_TEST(PAGXHTMLImporterTest, RawDisallowedLayoutPropertiesWarn) {
 }
 
 PAG_TEST(PAGXHTMLImporterTest, RawDisallowedVisualPropertiesWarn) {
+  // `perspective` is supported now (it projects the children), so only `outline` still warns here.
   auto doc = ParseRaw(R"HTML(
     <html><body style="width:50px;height:50px">
       <div style="outline:1px solid red;perspective:100px;width:50px;height:50px"></div>
@@ -12946,7 +12934,7 @@ PAG_TEST(PAGXHTMLImporterTest, RawDisallowedVisualPropertiesWarn) {
   )HTML");
   ASSERT_NE(doc, nullptr);
   EXPECT_TRUE(HasDiagnosticContaining(doc, "outline not supported; ignored"));
-  EXPECT_TRUE(HasDiagnosticContaining(doc, "perspective not supported; ignored"));
+  EXPECT_FALSE(HasDiagnosticContaining(doc, "perspective not supported"));
 }
 
 PAG_TEST(PAGXHTMLImporterTest, RawDisallowedTextPropertiesWarn) {

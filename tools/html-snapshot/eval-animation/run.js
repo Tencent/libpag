@@ -197,6 +197,21 @@ function countAnimationsCaptured(stderrPath) {
   return m ? parseInt(m[1], 10) : 0;
 }
 
+// Perspective elements whose `perspective()` form the snapshot kept instead of rewriting it into a
+// camera wrapper (`depth-pivot`, `not-a-sized-div`, `keyframes-mixed`).
+function countCameraSkips(stderrPath) {
+  if (!fs.existsSync(stderrPath)) return 0;
+  const m = fs.readFileSync(stderrPath, 'utf8').match(/camera-skips: (\d+)/);
+  return m ? parseInt(m[1], 10) : 0;
+}
+
+// Per-reason breakdown of the skipped perspective rewrites, e.g. `depth-pivot:1`.
+function cameraSkipReasons(stderrPath) {
+  if (!fs.existsSync(stderrPath)) return '';
+  const m = fs.readFileSync(stderrPath, 'utf8').match(/camera-skips: \d+ \(([^)]*)\)/);
+  return m ? m[1].trim() : '';
+}
+
 function countAnimationWarnings(stderrPath) {
   if (!fs.existsSync(stderrPath)) return { animWarnings: 0, animDropped: 0 };
   const text = fs.readFileSync(stderrPath, 'utf8');
@@ -270,6 +285,8 @@ async function processCase(entry, outDir, opts) {
     animCaptured: 0,
     animWarnings: 0,
     animDropped: 0,
+    cameraSkips: 0,
+    camSkipReasons: '',
     width: 0,
     height: 0,
     // Per-frame sample times (seconds) + the global timeline length, so the HTML report can play
@@ -341,6 +358,8 @@ async function processCase(entry, outDir, opts) {
     }
   }
   row.animCaptured = countAnimationsCaptured(snapshotStderr);
+  row.cameraSkips = countCameraSkips(snapshotStderr);
+  row.camSkipReasons = cameraSkipReasons(snapshotStderr);
 
   // 3. import
   if (!opts.skipExisting || !fs.existsSync(subsetPagx)) {
@@ -425,7 +444,8 @@ async function processCase(entry, outDir, opts) {
 function writeCsv(rows, outPath) {
   const headers = [
     'name', 'frames', 'ssimMean', 'pixelDiffMean', 'motion',
-    'animCaptured', 'animWarnings', 'animDropped', 'width', 'height', 'error',
+    'animCaptured', 'animWarnings', 'animDropped', 'cameraSkips', 'camSkipReasons', 'width', 'height',
+    'error',
   ];
   const lines = [headers.join(',')];
   for (const r of rows) {
@@ -457,12 +477,13 @@ function summarize(rows) {
     pdMean: mean(ok.map((r) => r.pixelDiffMean)),
     animCaptured: ok.reduce((a, r) => a + (r.animCaptured || 0), 0),
     animDropped: ok.reduce((a, r) => a + (r.animDropped || 0), 0),
+    cameraSkips: ok.reduce((a, r) => a + (r.cameraSkips || 0), 0),
   };
 }
 
 function writeMarkdown(rows, outPath, label) {
   const s = summarize(rows);
-  const headers = ['name', 'frames', 'ssim', 'pixelDiff%', 'motion', 'animCap', 'animWarn', 'animDrop', 'error'];
+  const headers = ['name', 'frames', 'ssim', 'pixelDiff%', 'motion', 'animCap', 'animWarn', 'animDrop', 'camSkip', 'camSkipWhy', 'error'];
   const lines = [];
   lines.push(`# Animation eval report — ${label}`);
   lines.push('');
@@ -471,6 +492,7 @@ function writeMarkdown(rows, outPath, label) {
   lines.push(`- SSIM (per-frame mean) — all cases ${fmt(s.ssimMean)}, moving cases only ${fmt(s.ssimMovingMean)}`);
   lines.push(`- pixel diff (per-frame mean) — ${fmt(s.pdMean)}`);
   lines.push(`- animations captured: ${s.animCaptured} (dropped at import: ${s.animDropped})`);
+  lines.push(`- perspective elements that kept the function form: ${s.cameraSkips}`);
   lines.push('');
   lines.push('| ' + headers.join(' | ') + ' |');
   lines.push('| ' + headers.map(() => '---').join(' | ') + ' |');
@@ -484,6 +506,8 @@ function writeMarkdown(rows, outPath, label) {
       String(r.animCaptured),
       String(r.animWarnings),
       String(r.animDropped),
+      String(r.cameraSkips || 0),
+      r.camSkipReasons || '',
       r.error || '',
     ];
     lines.push('| ' + cells.join(' | ') + ' |');
@@ -568,7 +592,7 @@ function writeIndexHtml(rows, outDir, label) {
     frames <b>${r.frames}</b> &middot; pixel diff <b>${isFinite(r.pixelDiffMean) ? fmt(r.pixelDiffMean * 100, 2) + '%' : '-'}</b>
     &middot; motion <b>${fmt(r.motion, 3)}</b>
     &middot; animations captured <b>${r.animCaptured}</b>
-    <span class="muted">(import warnings ${r.animWarnings}, dropped ${r.animDropped})</span>
+    <span class="muted">(import warnings ${r.animWarnings}, dropped ${r.animDropped}${r.cameraSkips ? `, kept perspective() form ${r.cameraSkips}` : ''})</span>
     ${status}
   </p>
   ${body}
@@ -631,6 +655,7 @@ function writeIndexHtml(rows, outDir, label) {
     <li>SSIM (per-frame mean) — all <b>${fmt(s.ssimMean, 4)}</b>, moving cases only <b>${fmt(s.ssimMovingMean, 4)}</b></li>
     <li>pixel diff (per-frame mean) — <b>${isFinite(s.pdMean) ? fmt(s.pdMean * 100, 2) + '%' : '-'}</b></li>
     <li>animations captured — <b>${s.animCaptured}</b> (dropped at import: <b>${s.animDropped}</b>)</li>
+    <li>perspective elements that kept the function form — <b>${s.cameraSkips}</b></li>
   </ul>
 </div>
 <div class="toolbar">

@@ -22,6 +22,7 @@
 #include <string>
 #include <unordered_map>
 #include <utility>
+#include "pagx/html/importer/HTMLTransform3D.h"
 #include "pagx/nodes/Animation.h"
 
 namespace pagx {
@@ -42,7 +43,9 @@ struct CssKeyframesRule;
  * emits an `Animation` -> `AnimationObject` -> `Channel` -> `Keyframe` graph into
  * `PAGXDocument::animations`, restricted to the channels the runtime can play back
  * (`alpha` / `x` / `y` on the element's Layer for opacity and pure translation; the full affine
- * `matrix` channel for scale / rotate / skew transforms; and `color` on the Layer's solid Fill).
+ * `matrix` channel for scale / rotate / skew transforms; the `matrix3D` channel for poses with depth
+ * or perspective; and `color` on the Layer's solid Fill). None of the transform channels carries the
+ * pivot: `transform-origin` stays on the layer as `anchor`.
  *
  * The builder borrows the importer's diagnostic sink, value parser and id allocator; the document
  * handle and the `@keyframes` registry are bound after the document and cascade exist.
@@ -65,7 +68,9 @@ class HTMLAnimationBuilder {
    * reference it.
    */
   bool buildForElement(const std::unordered_map<std::string, std::string>& resolvedStyle,
-                       Layer* layer);
+                       Layer* layer, const HTMLTransformReference& reference,
+                       float parentPerspectivePx = 0.0f, float localPerspectiveOriginX = NAN,
+                       float localPerspectiveOriginY = NAN);
 
   /**
    * Builds and registers animations for a single inline-SVG shape (`<path>`, `<rect>`, …) that

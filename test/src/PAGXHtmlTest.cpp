@@ -41,6 +41,7 @@
 #include "pagx/nodes/SolidColor.h"
 #include "pagx/nodes/Text.h"
 #include "pagx/nodes/TextBox.h"
+#include "pagx/runtime/KeyframeEvaluatorImpl.h"
 #include "pagx/svg/SVGPathParser.h"
 #include "pagx/utils/Woff2FontGenerator.h"
 #include "tgfx/core/ImageCodec.h"
@@ -3268,6 +3269,41 @@ PAGX_TEST(PAGXHtmlWriterTest, Matrix3DToCSSKeepsSmallPerspectiveTerms) {
   ASSERT_EQ(parts.size(), 16u);
   EXPECT_FLOAT_EQ(std::strtof(parts[0].c_str(), nullptr), 1.0f);
   EXPECT_FLOAT_EQ(std::strtof(parts[11].c_str(), nullptr), -2.5e-05f);
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////////////
+// A `perspective` channel animates the camera distance. PAGX interpolates that distance linearly,
+// while CSS interpolates its reciprocal, so exporting the two endpoint keys alone matches at the
+// endpoints and diverges in between: a 1000 -> 200 channel reads 600 in PAGX at the midpoint but a
+// browser renders 333.3 there (measured ~0.82 SSIM on the mid frames of
+// `resources/pagx_to_html/animations/layer/12_perspective.pagx`).
+//
+// This pins both halves of the contract, so a change on either side (denser exported keys, a
+// reciprocal-distance channel, or a CSS-side conversion) shows up here first.
+/////////////////////////////////////////////////////////////////////////////////////////////////
+PAG_TEST(PAGXHtmlAnimationTest, AnimatedPerspectiveInterpolatesInDistanceNotReciprocal) {
+  const std::vector<pagx::Keyframe<float>> keys = {
+      {0, 1000.0f, pagx::KeyframeInterpolationType::Linear, {}, {}},
+      {60, 200.0f, pagx::KeyframeInterpolationType::Linear, {}, {}},
+  };
+
+  // Value space (the default, and the space every channel starts in): the distance itself is what
+  // interpolates, so the midpoint is the arithmetic mean.
+  const double valueMidpoint = pagx::EvaluateKeyframeSequence(keys, 30.0);
+  EXPECT_NEAR(valueMidpoint, 600.0, 0.01) << "Value space interpolates the distance linearly";
+
+  // What a browser renders for the same pair of `perspective` keyframes: the reciprocal of the
+  // distance is what interpolates, so the midpoint is the harmonic mean of the endpoints.
+  const float cssMidpoint = 1.0f / ((1.0f / 1000.0f + 1.0f / 200.0f) * 0.5f);
+  EXPECT_NEAR(cssMidpoint, 333.33f, 0.05f);
+
+  // `feature/mite085_perspective_interp` adds `KeyframeInterpolationSpace::Reciprocal` and makes an
+  // imported document drive `Layer::perspective` in that space, which lands the midpoint on
+  // `cssMidpoint` and closes this gap. Once it merges, extend this test with
+  //   EvaluateKeyframeSequence(keys, 30.0, KeyframeInterpolationSpace::Reciprocal) == cssMidpoint
+  // and keep the Value-space assertion above as the record of the previous default.
+  EXPECT_GT(std::fabs(static_cast<float>(valueMidpoint) - cssMidpoint), 200.0f)
+      << "Value space diverges from CSS in the mid frames; the Reciprocal space closes it";
 }
 
 }  // namespace pag

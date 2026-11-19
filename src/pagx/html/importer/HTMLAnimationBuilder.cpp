@@ -28,6 +28,7 @@
 #include "pagx/html/importer/HTMLDetail.h"
 #include "pagx/html/importer/HTMLDiagnosticSink.h"
 #include "pagx/html/importer/HTMLIdAllocator.h"
+#include "pagx/html/importer/HTMLTransform3D.h"
 #include "pagx/html/importer/HTMLValueParser.h"
 #include "pagx/nodes/Animation.h"
 #include "pagx/nodes/AnimationObject.h"
@@ -43,8 +44,10 @@
 #include "pagx/nodes/SolidColor.h"
 #include "pagx/runtime/KeyframeEvaluator.h"
 #include "pagx/runtime/KeyframeEvaluatorImpl.h"
+#include "pagx/runtime/Matrix3DDecompose.h"
 #include "pagx/svg/SVGPathParser.h"
 #include "pagx/svg/SVGTransformParser.h"
+#include "pagx/utils/LayerTransformUtils.h"
 
 namespace pagx {
 
@@ -403,166 +406,59 @@ constexpr float kPi = 3.14159265358979323846f;
 // validate matrix/scale arguments before they are folded into a transform matrix — without this
 // guard, `strtof`'s 0-on-failure behavior would silently produce degenerate matrices for malformed
 // transforms.
-bool ParseFiniteFloat(const std::string& token, float& outValue) {
-  std::string t = Trim(token);
-  const char* begin = t.c_str();
-  char* end = nullptr;
-  float v = std::strtof(begin, &end);
-  if (end == begin || !std::isfinite(v)) return false;
-  outValue = v;
+// Parses a CSS `transform` value into the 4x4 pose a keyframe carries. How that pose is routed
+// (x/y, 2D `matrix` or `matrix3D`) is decided by `PlacePose`, once the parent camera has been folded
+// in, so classification does not happen here as well. `transform-origin` is NOT folded in: the pivot
+// stays on the layer as `anchor`, so keyframes never carry a per-frame pivot translation that the
+// runtime would interpolate independently.
+bool ParseTransformPose(const std::string& value, HTMLValueParser& parser,
+                        HTMLDiagnosticSink& diagnostics, Matrix3D& outPose,
+                        const HTMLTransformReference& reference) {
+  outPose = {};
+  const std::string trimmed = Trim(value);
+  if (trimmed.empty() || ToLower(trimmed) == "none") {
+    return true;  // identity == translate(0, 0)
+  }
+  return ParseCssTransformList(trimmed, parser, diagnostics, &outPose, reference.widthPx,
+                               reference.heightPx);
+}
+
+// Resolves the pivot the animation keeps on the layer: the element's `transform-origin` in
+// layer-local pixels, including its optional depth. Returns false when the origin cannot be
+// resolved because the box has no absolute size, in which case the caller pivots at the top-left
+// and warns.
+bool ResolveAnchor(const std::unordered_map<std::string, std::string>& style, const Layer* layer,
+                   const HTMLTransformReference& reference, HTMLValueParser& parser, Point& point,
+                   float& depth) {
+  float width = reference.widthPx;
+  float height = reference.heightPx;
+  if (std::isnan(width)) width = parser.parseAbsoluteLengthPx(GetTrimmed(style, "width"));
+  if (std::isnan(height)) height = parser.parseAbsoluteLengthPx(GetTrimmed(style, "height"));
+  if (std::isnan(width) && layer != nullptr) width = layer->width;
+  if (std::isnan(height) && layer != nullptr) height = layer->height;
+  const auto origin =
+      ResolveTransformOrigin(GetTrimmed(style, "transform-origin"), width, height, parser);
+  if (!origin.resolved) {
+    return false;
+  }
+  point = origin.point;
+  depth = origin.z;
   return true;
 }
 
-// Parses a CSS `transform` value — a single function or a space-separated compound chain — into a
-// 2D affine `Matrix`. The chain is multiplied left-to-right (`A B C` -> A * B * C), matching CSS
-// application order. `pureTranslate` is set true only when every function in the chain is a
-// translation (`translate[X|Y]`, or a `matrix(...)` whose linear part is identity), letting the
-// caller route the animation through the cheaper layout-preserving `x`/`y` channels. Returns false
-// when the value contains a function outside the animatable 2D subset (matrix3d / rotate3d /
-// perspective / unparseable), so the caller drops the keyframe transform with a diagnostic.
-//
-// `transform-origin` is NOT folded in here — the matrix is the raw CSS value, mirroring
-// `HTMLTransform::matrix`; the caller pivots it via `T(cx,cy) * m * T(-cx,-cy)` exactly like
-// `HTMLLayerBuilder::applyBoxTransform` does for the static path.
-bool ParseTransformMatrix(const std::string& value, HTMLValueParser& parser, Matrix& outMatrix,
-                          bool& pureTranslate) {
-  outMatrix = Matrix::Identity();
-  pureTranslate = true;
-  std::string trimmed = Trim(value);
-  std::string lc = ToLower(trimmed);
-  if (trimmed.empty() || lc == "none") {
-    return true;  // identity == translate(0, 0)
+// Resolves the pivot the inline SVG resolver hands to the generated group. The shape's own box size
+// is unknown here, so only absolute px values resolve; the caller warns when an authored origin is
+// dropped.
+bool ResolveShapePivot(const std::unordered_map<std::string, std::string>& style,
+                       HTMLValueParser& parser, float& cx, float& cy) {
+  const auto origin =
+      ResolveTransformOrigin(GetTrimmed(style, "transform-origin"), NAN, NAN, parser);
+  if (!origin.resolved) {
+    return false;
   }
-  auto funcs = SplitTopLevelWhitespace(trimmed);
-  if (funcs.empty()) return false;
-  bool any = false;
-  for (const auto& fnCall : funcs) {
-    std::string fn;
-    std::string args;
-    if (!ParseCssFunctionCall(Trim(fnCall), fn, args)) return false;
-    auto parts = SplitTopLevelCommas(args);
-    Matrix m = Matrix::Identity();
-    bool isTranslate = false;
-    if (fn == "translate" && (parts.size() == 1 || parts.size() == 2)) {
-      float tx = parser.parseAbsoluteLengthPx(parts[0]);
-      if (std::isnan(tx)) return false;
-      float ty = 0.0f;
-      if (parts.size() == 2) {
-        ty = parser.parseAbsoluteLengthPx(parts[1]);
-        if (std::isnan(ty)) return false;
-      }
-      m = Matrix::Translate(tx, ty);
-      isTranslate = true;
-    } else if (fn == "translatex" && parts.size() == 1) {
-      float tx = parser.parseAbsoluteLengthPx(parts[0]);
-      if (std::isnan(tx)) return false;
-      m = Matrix::Translate(tx, 0.0f);
-      isTranslate = true;
-    } else if (fn == "translatey" && parts.size() == 1) {
-      float ty = parser.parseAbsoluteLengthPx(parts[0]);
-      if (std::isnan(ty)) return false;
-      m = Matrix::Translate(0.0f, ty);
-      isTranslate = true;
-    } else if (fn == "scale" && (parts.size() == 1 || parts.size() == 2)) {
-      float sx = 0.0f;
-      if (!ParseFiniteFloat(parts[0], sx)) return false;
-      float sy = sx;
-      if (parts.size() == 2 && !ParseFiniteFloat(parts[1], sy)) return false;
-      m = Matrix::Scale(sx, sy);
-    } else if (fn == "scalex" && parts.size() == 1) {
-      float sx = 0.0f;
-      if (!ParseFiniteFloat(parts[0], sx)) return false;
-      m = Matrix::Scale(sx, 1.0f);
-    } else if (fn == "scaley" && parts.size() == 1) {
-      float sy = 0.0f;
-      if (!ParseFiniteFloat(parts[0], sy)) return false;
-      m = Matrix::Scale(1.0f, sy);
-    } else if (fn == "rotate" && parts.size() == 1) {
-      m = Matrix::Rotate(ParseAngle(parts[0]));
-    } else if (fn == "skewx" && parts.size() == 1) {
-      // CSS skewX(α) == [1 0 tan(α) 1 0 0]; the x-shear lives in `c`.
-      m.c = std::tan(ParseAngle(parts[0]) * kPi / 180.0f);
-    } else if (fn == "skewy" && parts.size() == 1) {
-      // CSS skewY(α) == [1 tan(α) 0 1 0 0]; the y-shear lives in `b`.
-      m.b = std::tan(ParseAngle(parts[0]) * kPi / 180.0f);
-    } else if (fn == "skew" && (parts.size() == 1 || parts.size() == 2)) {
-      m.c = std::tan(ParseAngle(parts[0]) * kPi / 180.0f);
-      if (parts.size() == 2) {
-        m.b = std::tan(ParseAngle(parts[1]) * kPi / 180.0f);
-      }
-    } else if (fn == "matrix" && parts.size() == 6) {
-      float v[6];
-      for (int i = 0; i < 6; i++) {
-        if (!ParseFiniteFloat(parts[i], v[i])) return false;
-      }
-      m.a = v[0];
-      m.b = v[1];
-      m.c = v[2];
-      m.d = v[3];
-      m.tx = v[4];
-      m.ty = v[5];
-      isTranslate = (v[0] == 1.0f && v[1] == 0.0f && v[2] == 0.0f && v[3] == 1.0f);
-    } else {
-      return false;  // matrix3d / rotate3d / perspective / unknown -> drop
-    }
-    if (!isTranslate) pureTranslate = false;
-    outMatrix = outMatrix * m;
-    any = true;
-  }
-  return any;
-}
-
-// Resolves a single CSS `transform-origin` component (one axis) to absolute pixels. Handles px /
-// keyword (left/top = 0, right/bottom = dim, center = dim/2) / percentage forms. Returns NaN when
-// the dimension is unknown (so a percentage / keyword can't be resolved) or the token is unparsed.
-float ResolveOriginComponent(const std::string& token, float dim, HTMLValueParser& parser) {
-  std::string t = Trim(token);
-  std::string lc = ToLower(t);
-  if (lc == "center") return std::isnan(dim) ? NAN : dim * 0.5f;
-  if (lc == "left" || lc == "top") return 0.0f;
-  if (lc == "right" || lc == "bottom") return dim;
-  if (!t.empty() && t.back() == '%') {
-    char* end = nullptr;
-    float p = std::strtof(t.c_str(), &end);
-    if (end == t.c_str()) return NAN;
-    return std::isnan(dim) ? NAN : dim * p / 100.0f;
-  }
-  return parser.parseAbsoluteLengthPx(t);
-}
-
-// Resolves the transform-origin pivot (cx, cy) in the element's local box space, mirroring
-// `HTMLLayerBuilder::applyBoxTransform` so animated transforms pivot exactly like the static path.
-// Prefers an explicit `transform-origin`; falls back to the box centre from the resolved (or
-// layer-authored) width/height. Returns false when neither a usable origin nor box dimensions are
-// known, in which case the caller pivots at the top-left and warns.
-bool ResolvePivot(const std::unordered_map<std::string, std::string>& style, const Layer* layer,
-                  HTMLValueParser& parser, float& cx, float& cy) {
-  float w = parser.parseAbsoluteLengthPx(GetTrimmed(style, "width"));
-  float h = parser.parseAbsoluteLengthPx(GetTrimmed(style, "height"));
-  if (std::isnan(w) && layer != nullptr) w = layer->width;
-  if (std::isnan(h) && layer != nullptr) h = layer->height;
-
-  std::string origin = ToLower(GetTrimmed(style, "transform-origin"));
-  bool originIsCentre =
-      origin.empty() || origin == "center" || origin == "center center" || origin == "50% 50%";
-  if (!originIsCentre) {
-    auto tokens = SplitTopLevelWhitespace(origin);
-    if (tokens.size() == 2) {
-      float ox = ResolveOriginComponent(tokens[0], w, parser);
-      float oy = ResolveOriginComponent(tokens[1], h, parser);
-      if (!std::isnan(ox) && !std::isnan(oy)) {
-        cx = ox;
-        cy = oy;
-        return true;
-      }
-    }
-  }
-  if (!std::isnan(w) && !std::isnan(h)) {
-    cx = w * 0.5f;
-    cy = h * 0.5f;
-    return true;
-  }
-  return false;
+  cx = origin.point.x;
+  cy = origin.point.y;
+  return true;
 }
 
 // Ordering predicate for keyframe stops by ascending offset.
@@ -570,11 +466,9 @@ bool KeyframeStopLess(const CssKeyframeStop& a, const CssKeyframeStop& b) {
   return a.percent < b.percent;
 }
 
-// Converts sampled raw CSS matrices into an unwrapped scalar rotation track when every stop is a
-// unit rotation without translation. html-snapshot samples long turns into intermediate matrices,
-// so unwrapping adjacent atan2 angles preserves winding across the +/-180-degree boundary. The
-// resulting Group.rotation channel keeps transform-origin structural instead of baking it into a
-// matrix translation that can drift during runtime interpolation.
+// Inline SVG shapes keep the structural pivot: the resolver places the shape's group at the
+// rotation centre, so a sampled run of pure rotations becomes one scalar `rotation` channel whose
+// interpolation cannot move the centre. The Layer `anchor` path does not apply here.
 bool BuildPureRotationKeys(const std::vector<std::pair<Frame, Matrix>>& transformStops,
                            KeyframeInterpolationType interpolation,
                            std::vector<Keyframe<float>>* rotationKeys) {
@@ -605,6 +499,23 @@ bool BuildPureRotationKeys(const std::vector<std::pair<Frame, Matrix>>& transfor
     first = false;
   }
   *rotationKeys = std::move(result);
+  return true;
+}
+
+// SVG shapes stay on the 2D plane: a pose with depth or perspective has no faithful SVG shape
+// rendering here, so it is dropped the way the previous 2D-only parser dropped `matrix3d`.
+bool ParseFlatTransformMatrix(const std::string& value, HTMLValueParser& parser,
+                              HTMLDiagnosticSink& diagnostics, Matrix& outMatrix,
+                              bool& pureTranslate) {
+  Matrix3D pose = {};
+  // SVG shapes have no box reference for percentage / `calc()` lengths, so the empty reference
+  // keeps that path on plain px.
+  if (!ParseTransformPose(value, parser, diagnostics, pose, HTMLTransformReference{}) ||
+      !IsFlatTransform(pose)) {
+    return false;
+  }
+  pureTranslate = IsLinearIdentity(pose);
+  outMatrix = ToAffine2D(pose);
   return true;
 }
 
@@ -845,6 +756,8 @@ Layer* SplitForTransformAnimation(Layer* outer, PAGXDocument* document,
 
   inner->matrix = outer->matrix;
   inner->matrix3D = outer->matrix3D;
+  inner->anchor = outer->anchor;
+  inner->anchorZ = outer->anchorZ;
   inner->preserve3D = outer->preserve3D;
   inner->blendMode = outer->blendMode;
   inner->visible = outer->visible;
@@ -853,6 +766,8 @@ Layer* SplitForTransformAnimation(Layer* outer, PAGXDocument* document,
   inner->passThroughBackground = outer->passThroughBackground;
   outer->matrix = {};
   outer->matrix3D = {};
+  outer->anchor = {};
+  outer->anchorZ = 0.0f;
   outer->preserve3D = false;
   outer->blendMode = BlendMode::Normal;
   outer->antiAlias = true;
@@ -1151,7 +1066,9 @@ void HTMLAnimationBuilder::addAnimation(Animation* animation, Frame originalDela
 }
 
 bool HTMLAnimationBuilder::buildForElement(
-    const std::unordered_map<std::string, std::string>& resolvedStyle, Layer* layer) {
+    const std::unordered_map<std::string, std::string>& resolvedStyle, Layer* layer,
+    const HTMLTransformReference& reference, float parentPerspectivePx,
+    float localPerspectiveOriginX, float localPerspectiveOriginY) {
   if (_document == nullptr || layer == nullptr || _keyframes == nullptr) return false;
 
   // Gather the animation spec from the shorthand and/or longhands.
@@ -1249,22 +1166,16 @@ bool HTMLAnimationBuilder::buildForElement(
   std::vector<Keyframe<float>> xKeys;
   std::vector<Keyframe<float>> yKeys;
   std::vector<Keyframe<Matrix>> matrixKeys;
+  std::vector<Keyframe<Matrix3D>> matrix3DKeys;
   std::vector<Keyframe<Color>> colorKeys;
-  // A pure rotation can keep transform-origin structural: the animated Layer is placed at the
-  // pivot and its visual child is offset by the inverse pivot. Its matrix keys then contain only
-  // rotation (zero translation), avoiding the centre drift caused by independently interpolating
-  // the translation baked into T(pivot) * R * T(-pivot).
-  bool matrixUsesStructuralPivot = false;
-  float matrixPivotX = 0.0f;
-  float matrixPivotY = 0.0f;
   bool warnedTransform = false;
 
-  // Raw (un-pivoted) CSS transform matrix per keyframe, collected first so we can decide once
-  // whether the whole animation is a pure translation (cheap layout-preserving x/y channels) or a
-  // general affine (the `matrix` channel). `transformAllPureTranslate` stays true only while every
-  // keyframe's transform is a translation.
-  std::vector<std::pair<Frame, Matrix>> transformStops;
+  // Raw (un-pivoted) CSS pose per keyframe, collected first so we can decide once whether the whole
+  // animation is a pure translation (cheap, layout-preserving x/y channels), a flat affine (the 2D
+  // `matrix` channel) or a pose with depth / perspective (the `matrix3D` channel).
+  std::vector<std::pair<Frame, Matrix3D>> transformStops;
   bool transformAllPureTranslate = true;
+  bool transformAllFlat = true;
 
   // Per-keyframe `filter` decomposition. A glow / shadow authored as
   // `filter: drop-shadow(...)` (and `none` at rest) is lowered onto the runtime's
@@ -1331,11 +1242,24 @@ bool HTMLAnimationBuilder::buildForElement(
         v = std::max(0.0f, std::min(1.0f, v));
         alphaKeys.push_back({time, v, interp, {}, {}});
       } else if (prop == "transform") {
-        Matrix m = {};
-        bool pureTranslate = false;
-        if (ParseTransformMatrix(val, _valueParser, m, pureTranslate)) {
-          transformStops.push_back({time, m});
-          if (!pureTranslate) transformAllPureTranslate = false;
+        Matrix3D pose = {};
+        if (ParseTransformPose(val, _valueParser, _diagnostics, pose, reference)) {
+          // The parent camera is folded in after parsing, so a pose that parsed as flat can gain
+          // depth here; `PlacePose` re-classifies it, and an invalid pose only drops this stop.
+          const PosePlacement placement = PlacePose(
+              pose, parentPerspectivePx, localPerspectiveOriginX, localPerspectiveOriginY);
+          if (!placement.valid) {
+            if (!warnedTransform) {
+              _diagnostics.warn(
+                  "html: a @keyframes transform becomes non-invertible under the parent "
+                  "perspective; dropped [subset:animation-unsupported-property]");
+              warnedTransform = true;
+            }
+          } else {
+            transformStops.push_back({time, placement.pose});
+            if (!(placement.flat && placement.linearIsIdentity)) transformAllPureTranslate = false;
+            if (!placement.flat) transformAllFlat = false;
+          }
         } else if (!warnedTransform) {
           _diagnostics.warn("html: unsupported 'transform' value '" + Trim(val) +
                             "' in @keyframes; dropped [subset:animation-unsupported-property]");
@@ -1425,47 +1349,67 @@ bool HTMLAnimationBuilder::buildForElement(
 
   // Lower transform keyframes onto the runtime channel matching their CSS composition. A pure
   // translation uses x/y when there is no static transform; if a static transform exists, the
-  // animation replaces that transform property, so emit complete matrix samples instead of x/y
-  // channels that the matrix priority would suppress. Other affine transforms use a matrix channel.
+  // animation replaces that transform property, so emit complete samples instead of x/y channels
+  // that the matrix priority would suppress. Any other in-plane affine uses the `matrix` channel,
+  // and a pose with depth or perspective uses `matrix3D`.
+  //
+  // None of the three carries the pivot: `transform-origin` stays on the layer as `anchor`, so the
+  // runtime applies it once per frame, after the keyframes have been interpolated. Baking it in
+  // would make the interpolator treat the pivot translation as an independent value and drift.
   if (!transformStops.empty()) {
-    if (transformAllPureTranslate && layer->matrix.isIdentity()) {
-      for (const auto& ts : transformStops) {
-        xKeys.push_back({ts.first, ts.second.tx, interp, {}, {}});
-        yKeys.push_back({ts.first, ts.second.ty, interp, {}, {}});
+    const bool hasStaticPose = !layer->matrix.isIdentity() || !layer->matrix3D.isIdentity();
+    bool needsAnchor = false;
+    for (const auto& stop : transformStops) {
+      if (!IsLinearIdentity(stop.second)) {
+        needsAnchor = true;
+        break;
       }
-    } else if (transformAllPureTranslate) {
+    }
+    if (needsAnchor) {
+      Point anchor = {};
+      float anchorZ = 0.0f;
+      if (ResolveAnchor(resolvedStyle, layer, reference, _valueParser, anchor, anchorZ)) {
+        layer->anchor = anchor;
+        layer->anchorZ = anchorZ;
+      } else {
+        _diagnostics.warn(
+            "html: transform animation without resolvable transform-origin; pivoting at "
+            "top-left may differ from CSS [subset:animation-unsupported-property]");
+      }
+    }
+    // A static `matrix3D` outranks `matrix` in the runtime transform priority, so a flat keyframe
+    // route has to be lifted onto the matrix3D channel; otherwise the keyframes are written to a
+    // matrix the renderer never reads and the animation has no visible effect.
+    const bool staticPoseIs3D = !layer->matrix3D.isIdentity();
+    if (transformAllPureTranslate && !hasStaticPose) {
       for (const auto& ts : transformStops) {
-        matrixKeys.push_back({ts.first, ts.second, interp, {}, {}});
+        const Matrix affine = ToAffine2D(ts.second);
+        xKeys.push_back({ts.first, affine.tx, interp, {}, {}});
+        yKeys.push_back({ts.first, affine.ty, interp, {}, {}});
+      }
+    } else if (transformAllFlat && !staticPoseIs3D) {
+      for (const auto& ts : transformStops) {
+        matrixKeys.push_back({ts.first, ToAffine2D(ts.second), interp, {}, {}});
       }
     } else {
-      float cx = 0.0f;
-      float cy = 0.0f;
-      bool hasPivot = ResolvePivot(resolvedStyle, layer, _valueParser, cx, cy);
-      std::vector<Keyframe<float>> rotationProbe;
-      bool canKeepPivotStructural = hasPivot && layer->matrix3D.isIdentity() &&
-                                    BuildPureRotationKeys(transformStops, interp, &rotationProbe);
-      if (canKeepPivotStructural) {
-        matrixUsesStructuralPivot = true;
-        matrixPivotX = cx;
-        matrixPivotY = cy;
-        for (const auto& ts : transformStops) {
-          matrixKeys.push_back({ts.first, ts.second, interp, {}, {}});
-        }
-      } else {
-        if (!hasPivot) {
-          _diagnostics.warn(
-              "html: transform animation without resolvable transform-origin; pivoting at "
-              "top-left may differ from CSS [subset:animation-unsupported-property]");
-        }
-        Matrix toCenter = Matrix::Translate(cx, cy);
-        Matrix fromCenter = Matrix::Translate(-cx, -cy);
-        for (const auto& ts : transformStops) {
-          Matrix m = ts.second;
-          if (hasPivot) {
-            m = toCenter * m * fromCenter;
+      bool warnedSingularStop = false;
+      for (const auto& ts : transformStops) {
+        const Matrix3D pose = IsFlatTransform(ts.second)
+                                  ? LiftMatrixToMatrix3D(ToAffine2D(ts.second), 0.0f)
+                                  : ts.second;
+        // PAGX requires every `matrix3D` keyframe to be invertible, and a flat stop that is singular
+        // (e.g. `scale(0)`) becomes one as soon as it is lifted, so it is dropped instead of written
+        // as an invalid key that a re-import would reject.
+        if (!IsInvertibleMatrix3D(pose)) {
+          if (!warnedSingularStop) {
+            _diagnostics.warn(
+                "html: a @keyframes stop is not invertible once lifted to matrix3D; dropped "
+                "[subset:animation-unsupported-property]");
+            warnedSingularStop = true;
           }
-          matrixKeys.push_back({ts.first, m, interp, {}, {}});
+          continue;
         }
+        matrix3DKeys.push_back({ts.first, pose, interp, {}, {}});
       }
     }
   }
@@ -1475,6 +1419,7 @@ bool HTMLAnimationBuilder::buildForElement(
   ApplyBezierHandles(xKeys, interp, easing.x1, easing.y1, easing.x2, easing.y2);
   ApplyBezierHandles(yKeys, interp, easing.x1, easing.y1, easing.x2, easing.y2);
   ApplyBezierHandles(matrixKeys, interp, easing.x1, easing.y1, easing.x2, easing.y2);
+  ApplyBezierHandles(matrix3DKeys, interp, easing.x1, easing.y1, easing.x2, easing.y2);
   ApplyBezierHandles(colorKeys, interp, easing.x1, easing.y1, easing.x2, easing.y2);
 
   // CSS `steps()` / `step-start` / `step-end` are not a runtime interpolation type — they expand
@@ -1485,6 +1430,7 @@ bool HTMLAnimationBuilder::buildForElement(
     ExpandSteps(xKeys, easing.stepCount, easing.stepJump);
     ExpandSteps(yKeys, easing.stepCount, easing.stepJump);
     ExpandSteps(matrixKeys, easing.stepCount, easing.stepJump);
+    ExpandSteps(matrix3DKeys, easing.stepCount, easing.stepJump);
     ExpandSteps(colorKeys, easing.stepCount, easing.stepJump);
   }
 
@@ -1524,8 +1470,8 @@ bool HTMLAnimationBuilder::buildForElement(
   }
 
   if (alphaKeys.empty() && xKeys.empty() && yKeys.empty() && matrixKeys.empty() &&
-      colorKeys.empty() && !filterHasShadow && !filterHasBlur && !filterHasBrightness &&
-      !clipUsable) {
+      matrix3DKeys.empty() && colorKeys.empty() && !filterHasShadow && !filterHasBlur &&
+      !filterHasBrightness && !clipUsable) {
     return false;
   }
 
@@ -1546,13 +1492,26 @@ bool HTMLAnimationBuilder::buildForElement(
   float baselineAlpha = layer->alpha;
   float baselineXY = 0.0f;
   Matrix baselineMatrix = layer->matrix;
-  Matrix matrixChannelBaseline = baselineMatrix;
-  if (matrixUsesStructuralPivot) {
-    // HTMLLayerBuilder has already baked transform-origin into the static Layer matrix. Undo that
-    // bake because the pivot wrapper below supplies T(pivot) and T(-pivot) structurally.
-    Matrix toCenter = Matrix::Translate(matrixPivotX, matrixPivotY);
-    Matrix fromCenter = Matrix::Translate(-matrixPivotX, -matrixPivotY);
-    matrixChannelBaseline = fromCenter * baselineMatrix * toCenter;
+  // The static pose is already un-pivoted (the pivot lives in `anchor`), so the keyframe baseline
+  // is the composed local transform. The matrix3D channel carries the whole pose, so its baseline
+  // cannot be `layer->matrix3D` alone: a static 2D `matrix` (or components) would be read as the
+  // identity and the fill-mode holds would hide it before the animation starts and after it ends.
+  const Matrix matrixChannelBaseline = baselineMatrix;
+  Matrix3D matrix3DChannelBaseline = ComposeLayerTransform3DWithoutAnchor(layer);
+  if (!IsInvertibleMatrix3D(matrix3DChannelBaseline)) {
+    // A singular static pose (`scale(0)`) cannot travel on the `matrix3D` channel: PAGX rejects a
+    // non-invertible keyframe, and an all-zero matrix would come back as the identity on re-import.
+    // Collapsing the linear block to a tiny uniform scale keeps the element as invisible as
+    // `scale(0)` renders while staying valid; the translation column is preserved.
+    constexpr float collapsedScale = 1e-4f;
+    Matrix3D collapsed = {};
+    collapsed.setRowColumn(0, 0, collapsedScale);
+    collapsed.setRowColumn(1, 1, collapsedScale);
+    collapsed.setRowColumn(2, 2, collapsedScale);
+    for (int row = 0; row < 3; ++row) {
+      collapsed.setRowColumn(row, 3, matrix3DChannelBaseline.getRowColumn(row, 3));
+    }
+    matrix3DChannelBaseline = collapsed;
   }
   Color baselineColor = {};
   SolidColor* baselineSolid = nullptr;
@@ -1597,6 +1556,7 @@ bool HTMLAnimationBuilder::buildForElement(
   ApplyFillMode(xKeys, spec.fillMode, baselineXY, loopOnce, activeEnd);
   ApplyFillMode(yKeys, spec.fillMode, baselineXY, loopOnce, activeEnd);
   ApplyFillMode(matrixKeys, spec.fillMode, matrixChannelBaseline, loopOnce, activeEnd);
+  ApplyFillMode(matrix3DKeys, spec.fillMode, matrix3DChannelBaseline, loopOnce, activeEnd);
   ApplyFillMode(brightnessAlphaKeys, spec.fillMode, 1.0f, loopOnce, activeEnd);
   // Color channel fill-mode is conditional on having a target SolidColor; if the lookup failed
   // the channel is dropped below, so the fill-mode mutation would be wasted work and the
@@ -1649,29 +1609,9 @@ bool HTMLAnimationBuilder::buildForElement(
   // subtree.
   Layer* visualTarget = xyTarget != nullptr ? xyTarget : layer;
 
-  // Keep a pure rotation's pivot outside the animated matrix. The first split preserves the
-  // element's parent-facing layout slot; the second creates a visual child that carries every
-  // renderable attribute and descendant. Positioning the matrix target at +pivot and the visual
-  // child at -pivot produces T(pivot) * R * T(-pivot), while R itself has no translation for the
-  // runtime to interpolate independently. This prevents the visible orbit/jitter of pivot-baked
-  // matrices and applies uniformly to backgrounds, imported SVG, filters, masks and child layers.
+  // The pivot no longer needs structural wrappers: it lives in `anchor`, which the runtime applies
+  // once per frame after interpolation, so the matrix target is always the element layer itself.
   Layer* matrixTarget = layer;
-  if (!matrixKeys.empty() && matrixUsesStructuralPivot) {
-    auto* pivotTarget = SplitForTransformAnimation(layer, _document, _idAllocator);
-    visualTarget = SplitForTransformAnimation(pivotTarget, _document, _idAllocator);
-    // These wrappers are percentage-sized and excluded from flow. Use explicit positional
-    // constraints rather than x/y preferred positions: constraint layout intentionally ignores
-    // preferred positions for such children, which would leave both wrappers at the origin and
-    // make the visual orbit around the element's top-left.
-    pivotTarget->left = matrixPivotX;
-    pivotTarget->top = matrixPivotY;
-    pivotTarget->matrix = matrixChannelBaseline;
-    visualTarget->left = -matrixPivotX;
-    visualTarget->top = -matrixPivotY;
-    visualTarget->matrix = Matrix::Identity();
-    visualTarget->matrix3D = {};
-    matrixTarget = pivotTarget;
-  }
 
   // Keep brightness-as-opacity independent from the element's authored opacity and transform
   // channels by placing it on a dedicated visual wrapper. SplitForTransformAnimation already
@@ -1681,13 +1621,19 @@ bool HTMLAnimationBuilder::buildForElement(
   if (!brightnessAlphaKeys.empty()) {
     Matrix savedMatrix = visualTarget->matrix;
     Matrix3D savedMatrix3D = visualTarget->matrix3D;
+    Point savedAnchor = visualTarget->anchor;
+    float savedAnchorZ = visualTarget->anchorZ;
     bool savedPreserve3D = visualTarget->preserve3D;
     brightnessTarget = SplitForTransformAnimation(visualTarget, _document, _idAllocator);
     visualTarget->matrix = savedMatrix;
     visualTarget->matrix3D = savedMatrix3D;
+    visualTarget->anchor = savedAnchor;
+    visualTarget->anchorZ = savedAnchorZ;
     visualTarget->preserve3D = savedPreserve3D;
     brightnessTarget->matrix = Matrix::Identity();
     brightnessTarget->matrix3D = {};
+    brightnessTarget->anchor = {};
+    brightnessTarget->anchorZ = 0.0f;
     brightnessTarget->preserve3D = false;
     visualTarget = brightnessTarget;
   }
@@ -1725,15 +1671,27 @@ bool HTMLAnimationBuilder::buildForElement(
   }
 
   // Layer-targeted `matrix` channel for scale / rotate / skew (and any non-translation transform).
-  // General affine transforms target the original Layer with transform-origin baked into each
-  // matrix. Pure rotations target the structural pivot wrapper created above, whose keyframes have
-  // zero translation so interpolation cannot move the centre.
+  // The keyframes carry the un-pivoted pose; `transform-origin` stays on the layer as `anchor`, which
+  // the runtime applies once after interpolation. Baking it in would make the interpolator treat the
+  // pivot translation as an independent value and drift between keyframes.
   if (!matrixKeys.empty()) {
     auto* object = _document->makeNode<AnimationObject>();
     object->target = matrixTarget->id;
     auto* ch = _document->makeNode<TypedChannel<Matrix>>();
     ch->name = "matrix";
     ch->keyframes = std::move(matrixKeys);
+    object->channels.push_back(ch);
+    animation->objects.push_back(object);
+  }
+
+  // Layer-targeted `matrix3D` channel for poses with depth or perspective. Like the 2D channel it
+  // carries the un-pivoted pose; the pivot stays on the layer as `anchor`.
+  if (!matrix3DKeys.empty()) {
+    auto* object = _document->makeNode<AnimationObject>();
+    object->target = matrixTarget->id;
+    auto* ch = _document->makeNode<TypedChannel<Matrix3D>>();
+    ch->name = "matrix3D";
+    ch->keyframes = std::move(matrix3DKeys);
     object->channels.push_back(ch);
     animation->objects.push_back(object);
   }
@@ -2110,7 +2068,7 @@ bool HTMLAnimationBuilder::buildForInlineSvgShape(
         } else if (prop == "transform") {
           Matrix m = Matrix::Identity();
           bool pureTranslate = false;
-          if (ParseTransformMatrix(val, _valueParser, m, pureTranslate)) {
+          if (ParseFlatTransformMatrix(val, _valueParser, _diagnostics, m, pureTranslate)) {
             transformStops.push_back({time, m});
             if (!pureTranslate) transformAllPureTranslate = false;
           } else {
@@ -2174,7 +2132,7 @@ bool HTMLAnimationBuilder::buildForInlineSvgShape(
     } else if (!transformStops.empty()) {
       float cx = 0.0f;
       float cy = 0.0f;
-      bool hasPivot = ResolvePivot(style, nullptr, _valueParser, cx, cy);
+      bool hasPivot = ResolveShapePivot(style, _valueParser, cx, cy);
       if (!hasPivot && !GetTrimmed(style, "transform-origin").empty()) {
         _diagnostics.warn(
             "html: inline-svg transform animation has an unresolvable transform-origin; pivoting "
