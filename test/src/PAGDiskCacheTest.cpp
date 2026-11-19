@@ -686,6 +686,8 @@ PAG_PIXEL_TEST(PAGDiskCacheTest, PAGDecoder_StaticTimeRanges) {
 }
 #endif
 
+#ifdef PAG_TEST_ACCESS_PRIVATE
+
 PAG_TEST(PAGDiskCacheTest, FileCache) {
   ScopedDiskCacheDirectory cleanup;
   ASSERT_FALSE(cleanup.directory.empty());
@@ -705,6 +707,8 @@ PAG_TEST(PAGDiskCacheTest, FileCache) {
 /**
  * Tests for DiskIOWorker: serial execution order and waitAll behavior.
  */
+#endif  // PAG_TEST_ACCESS_PRIVATE
+
 PAG_TEST(PAGDiskCacheTest, DiskIOWorker) {
   auto worker = DiskIOWorker::GetInstance();
 
@@ -767,6 +771,8 @@ PAG_TEST(PAGDiskCacheTest, DiskIOWorker) {
  * exercises the destructor locking and the shared DiskCache paths under concurrent load, guarding
  * against regressions of #3684 without pinning down the exact race window.
  */
+#ifdef PAG_TEST_ACCESS_PRIVATE
+
 PAG_TEST(PAGDiskCacheTest, PAGDecoderTeardownRace) {
   ScopedDiskCacheDirectory cleanup;
   ASSERT_FALSE(cleanup.directory.empty());
@@ -822,6 +828,8 @@ PAG_TEST(PAGDiskCacheTest, PAGDecoderTeardownRace) {
  * graduated backoff as RenderCache, so a transient failure recovers quickly instead of freezing for
  * the full ceiling.
  */
+#endif  // PAG_TEST_ACCESS_PRIVATE
+
 #ifdef PAG_TEST_ACCESS_PRIVATE
 PAG_TEST(PAGDiskCacheTest, SequenceRetryDelayGraduatesAndCaps) {
   EXPECT_EQ(SequenceRetryDelay(0), SEQUENCE_RETRY_INITIAL_DELAY);

@@ -22,6 +22,8 @@
 #include "utils/ScopedDiskCacheDirectory.h"
 #include "utils/ScopedDiskIOWorkerBlock.h"
 
+#ifdef PAG_TEST_ACCESS_PRIVATE
+
 namespace pag {
 namespace {
 
@@ -453,3 +455,5 @@ PAG_TEST(PAGDiskCacheDirectoryTest, FixtureRestoresFileIDAndConfigurationState) 
 }
 
 }  // namespace pag
+
+#endif  // PAG_TEST_ACCESS_PRIVATE
