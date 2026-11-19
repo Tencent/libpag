@@ -2564,8 +2564,8 @@ void EmitFloodColorCssAtFrame(const BundleChannelSet& chSet, const std::string& 
   }
 }
 
-void EmitFilterCssAtFrame(const DomTargetBundle& bundle, const BundleChannelSet& chSet, Frame t,
-                          std::string& decls) {
+void EmitFilterCssAtFrame(const DomTargetBundle& bundle, const BundleChannelSet& chSet,
+                          const std::string& tagName, Frame t, std::string& decls) {
   if (!chSet.hasFilterAnim || bundle.primaryHost == nullptr ||
       bundle.primaryHost->nodeType() != NodeType::Layer) {
     return;
@@ -2607,6 +2607,13 @@ void EmitFilterCssAtFrame(const DomTargetBundle& bundle, const BundleChannelSet&
   // reference therefore rides on a wrapper div around this element instead (see
   // residualFilterWrappers and ApplyElementEdits), which keeps the authored chain order because the
   // wrapper's own filter runs on the already-filtered subtree.
+  if (!filterVal.empty() && !bundle.residualFilterId.empty() && tagName != "div") {
+    // Only an absolutely positioned div host can take the wrapper that carries the residual stage
+    // (see ApplyElementEdits). An SVG shape cannot, and silently dropping the stage there removed a
+    // filter the reference still draws, so it goes back inside the list: the interpolation degrades
+    // to steps for this host, which is better than losing the effect.
+    filterVal += " " + bundle.residualFilterId;
+  }
   if (!filterVal.empty()) {
     AppendCssDecl(decls, "filter", filterVal);
   }
@@ -2881,7 +2888,7 @@ std::string EvaluateKeyframeCssDecls(const DomTargetBundle& bundle, const Bundle
   }
   EmitPaintCssAtFrame(chSet, tagName, t, decls);
   EmitTextCssAtFrame(bundle, chSet, t, decls);
-  EmitFilterCssAtFrame(bundle, chSet, t, decls);
+  EmitFilterCssAtFrame(bundle, chSet, tagName, t, decls);
   EmitFloodColorCssAtFrame(chSet, tagName, t, decls);
   EmitGradientCssAtFrame(chSet, tagName, t, decls);
 
