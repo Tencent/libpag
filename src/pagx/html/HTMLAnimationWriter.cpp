@@ -2841,12 +2841,14 @@ std::string EvaluateKeyframeCssDecls(const DomTargetBundle& bundle, const Bundle
     AppendCssDecl(decls, "font-family", "'" + EscapeCssFontFamily(family) + "'");
   }
   if (animatedText != nullptr && chSet.fontStyleCh != nullptr) {
+    // Same mapping the static text path uses: a simplified bold/normal split dropped the weights it
+    // already handles (Light 300, Medium 500, SemiBold 600, Black 900) and flattened Oblique into
+    // italic, so an animated fontStyle disagreed with the same face rendered statically.
     std::string style = EvalStringChannel(chSet.fontStyleCh, t, animatedText->fontStyle);
-    bool bold = style.find("Bold") != std::string::npos;
-    bool italic =
-        style.find("Italic") != std::string::npos || style.find("Oblique") != std::string::npos;
-    AppendCssDecl(decls, "font-weight", bold ? "700" : "400");
-    AppendCssDecl(decls, "font-style", italic ? "italic" : "normal");
+    auto fontProps = ParseFontStyleToCSS(style);
+    AppendCssDecl(decls, "font-weight", fontProps.weightString());
+    AppendCssDecl(decls, "font-style",
+                  fontProps.italic ? "italic" : (fontProps.oblique ? "oblique" : "normal"));
   }
   if (wantsStepped && animatedText != nullptr && chSet.fauxBoldCh != nullptr) {
     auto* text = animatedText;
