@@ -106,9 +106,10 @@ void DiskCache::setDefaultCacheDir(const std::string& dir) {
     return;
   }
   std::lock_guard<std::mutex> autoLock(locker);
-  if (!customCacheDir.empty() || applyCacheDir(dir)) {
-    defaultCacheDir = dir;
-    hasDefaultCacheDir = true;
+  defaultCacheDir = dir;
+  hasDefaultCacheDir = true;
+  if (customCacheDir.empty()) {
+    applyCacheDir(dir);
   }
 }
 

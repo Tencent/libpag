@@ -78,6 +78,7 @@ static napi_value SetDefaultCacheDirInternal(napi_env env, napi_callback_info in
   std::string cacheDir;
   if (ReadCacheDirArgument(env, info, &cacheDir) && !cacheDir.empty()) {
     NativePlatform::SetDefaultCacheDir(cacheDir);
+    DiskCache::SetDefaultCacheDir(cacheDir);
   }
   return nullptr;
 }

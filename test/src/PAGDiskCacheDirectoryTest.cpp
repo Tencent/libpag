@@ -16,11 +16,11 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include <condition_variable>
 #include <fstream>
 #include "rendering/utils/Directory.h"
 #include "tgfx/core/DataView.h"
 #include "utils/ScopedDiskCacheDirectory.h"
+#include "utils/ScopedDiskIOWorkerBlock.h"
 
 namespace pag {
 namespace {
@@ -109,52 +109,6 @@ static void AppendConfigRecord(std::ofstream& stream, uint32_t id, uint32_t keyL
   stream.write(reinterpret_cast<const char*>(header), sizeof(header));
   stream.write(key.data(), static_cast<std::streamsize>(key.size()));
 }
-
-class DiskIOBarrier {
- public:
-  DiskIOBarrier() {
-    DiskIOWorker::GetInstance()->submit(std::bind(&DiskIOBarrier::block, this));
-    std::unique_lock<std::mutex> lock(locker);
-    condition.wait(lock, std::bind(&DiskIOBarrier::hasStarted, this));
-  }
-
-  ~DiskIOBarrier() {
-    release();
-  }
-
-  /**
-   * Releases the IO worker and waits for all queued operations to complete.
-   */
-  void release() {
-    {
-      std::lock_guard<std::mutex> lock(locker);
-      released = true;
-    }
-    condition.notify_all();
-    DiskIOWorker::GetInstance()->waitAll();
-  }
-
- private:
-  std::mutex locker;
-  std::condition_variable condition;
-  bool started = false;
-  bool released = false;
-
-  bool hasStarted() {
-    return started;
-  }
-
-  bool hasReleased() {
-    return released;
-  }
-
-  void block() {
-    std::unique_lock<std::mutex> lock(locker);
-    started = true;
-    condition.notify_all();
-    condition.wait(lock, std::bind(&DiskIOBarrier::hasReleased, this));
-  }
-};
 
 }  // namespace
 
@@ -373,7 +327,7 @@ PAG_TEST(PAGDiskCacheDirectoryTest, ClosingSequenceRejectsDirectorySwitch) {
   ASSERT_TRUE(sequence != nullptr);
   DiskIOWorker::GetInstance()->waitAll();
   auto next = Directory::JoinPath(cleanup.directory, "next");
-  DiskIOBarrier barrier;
+  ScopedDiskIOWorkerBlock barrier;
   PAGDiskCache::RemoveAll();
   sequence = nullptr;
   PAGDiskCache::SetCacheDir(next);
@@ -390,7 +344,7 @@ PAG_TEST(PAGDiskCacheDirectoryTest, SwitchFlushesPendingConfiguration) {
   auto first = cleanup.directory;
   auto second = Directory::JoinPath(first, "second");
   auto data = MakeCacheData();
-  DiskIOBarrier barrier;
+  ScopedDiskIOWorkerBlock barrier;
   ASSERT_TRUE(DiskCache::WriteFile("first", data));
   PAGDiskCache::SetCacheDir(second);
   EXPECT_GT(std::filesystem::file_size(Directory::JoinPath(first, "cache.cfg")), 0u);
@@ -407,7 +361,7 @@ PAG_TEST(PAGDiskCacheDirectoryTest, SwitchFlushesPendingConfiguration) {
 PAG_TEST(PAGDiskCacheDirectoryTest, EmptyConfigurationSupersedesPendingSave) {
   ScopedDiskCacheDirectory cleanup;
   ASSERT_FALSE(cleanup.directory.empty());
-  DiskIOBarrier barrier;
+  ScopedDiskIOWorkerBlock barrier;
   ASSERT_TRUE(DiskCache::WriteFile("pending", MakeCacheData()));
   auto path = CacheFilePath("pending");
   PAGDiskCache::RemoveAll();

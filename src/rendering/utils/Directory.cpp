@@ -32,19 +32,6 @@ static constexpr char PathSeparator = '\\';
 static constexpr char PathSeparator = '/';
 #endif
 
-std::string Directory::GetFileName(const std::string& filePath) {
-  auto fileName = filePath;
-  auto pos = fileName.find_last_of(PathSeparator);
-  if (pos != std::string::npos) {
-    fileName = fileName.substr(pos + 1);
-  }
-  pos = fileName.find_last_of('.');
-  if (pos != std::string::npos) {
-    fileName = fileName.substr(0, pos);
-  }
-  return fileName;
-}
-
 std::string Directory::GetParentDirectory(const std::string& filePath) {
   auto parentDirectory = filePath;
   auto pos = parentDirectory.find_last_of(PathSeparator);

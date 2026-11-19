@@ -19,7 +19,6 @@
 #include <algorithm>
 #include <atomic>
 #include <chrono>
-#include <condition_variable>
 #include <cstdlib>
 #include <cstring>
 #include <filesystem>
@@ -36,6 +35,7 @@
 #include "rendering/utils/Directory.h"
 #include "tgfx/core/Clock.h"
 #include "utils/ScopedDiskCacheDirectory.h"
+#include "utils/ScopedDiskIOWorkerBlock.h"
 #include "utils/TestUtils.h"
 
 #ifdef TGFX_USE_OPENGL
@@ -104,69 +104,6 @@ static void ClearDiskCacheAndWait() {
   PAGDiskCache::RemoveAll();
   worker->waitAll();
 }
-
-/**
- * Occupies the single DiskIOWorker thread with a blocking task, so that every task submitted
- * afterwards (e.g. the asynchronous close of a SequenceFile) stays queued until release() is
- * called. This makes close/reopen orderings reproducible instead of timing dependent. A case built
- * on it covers the "close has been queued but has not started yet" ordering only: the
- * "close is already running on the IO thread" ordering cannot be paused deterministically without
- * instrumenting the worker.
- */
-class ScopedDiskIOWorkerBlock {
- public:
-  ScopedDiskIOWorkerBlock() {
-    DiskIOWorker::GetInstance()->submit(std::bind(&ScopedDiskIOWorkerBlock::run, this));
-    std::unique_lock<std::mutex> lock(locker);
-    condition.wait(lock, [this] { return entered; });
-  }
-
-  ~ScopedDiskIOWorkerBlock() {
-    release();
-  }
-
-  ScopedDiskIOWorkerBlock(const ScopedDiskIOWorkerBlock&) = delete;
-  ScopedDiskIOWorkerBlock& operator=(const ScopedDiskIOWorkerBlock&) = delete;
-
-  void release() {
-    {
-      std::lock_guard<std::mutex> lock(locker);
-      released = true;
-    }
-    condition.notify_all();
-    DiskIOWorker::GetInstance()->waitAll();
-  }
-
- private:
-  void run() {
-    std::unique_lock<std::mutex> lock(locker);
-    entered = true;
-    condition.notify_all();
-    condition.wait(lock, [this] { return released; });
-  }
-
-  std::mutex locker = {};
-  std::condition_variable condition = {};
-  bool entered = false;
-  bool released = false;
-};
-
-class ScopedDiskCacheCleanup {
- public:
-  const size_t originalMaxDiskSize;
-
-  ScopedDiskCacheCleanup() : originalMaxDiskSize(PAGDiskCache::MaxDiskSize()) {
-  }
-
-  ScopedDiskCacheCleanup(const ScopedDiskCacheCleanup&) = delete;
-  ScopedDiskCacheCleanup& operator=(const ScopedDiskCacheCleanup&) = delete;
-
-  ~ScopedDiskCacheCleanup() {
-    DiskIOWorker::GetInstance()->waitAll();
-    PAGDiskCache::SetMaxDiskSize(originalMaxDiskSize);
-    ClearDiskCacheAndWait();
-  }
-};
 
 static void ResetDiskCacheFixture(const std::string& cacheDir, size_t maxDiskSize,
                                   const std::string& fixturePath = {}) {
@@ -393,8 +330,9 @@ PAG_PIXEL_TEST(PAGDiskCacheTest, SequenceFile) {
 PAG_TEST(PAGDiskCacheTest, ReopenWhileCloseTaskPending) {
   constexpr int Size = 16;
   constexpr int FrameCount = 8;
-  auto cacheDir = Platform::Current()->getCacheDir();
-  ScopedDiskCacheCleanup cleanup;
+  ScopedDiskCacheDirectory cleanup;
+  ASSERT_FALSE(cleanup.directory.empty());
+  auto cacheDir = cleanup.directory;
   ASSERT_NO_FATAL_FAILURE(ResetDiskCacheFixture(cacheDir, cleanup.originalMaxDiskSize));
   auto key = std::string("PAGDiskCacheTest/ReopenWhileCloseTaskPending");
   auto info = tgfx::ImageInfo::Make(Size, Size, tgfx::ColorType::RGBA_8888);
