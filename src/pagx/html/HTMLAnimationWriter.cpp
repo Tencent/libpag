@@ -3423,26 +3423,30 @@ std::string FormatCubicBezier(const CubicBezierCurve& curve) {
 // A falloff shape that is not a ramp/square is not a rational function of time, so its bend has to
 // come from the easing curve itself: fit all four bezier parameters to the piece instead of
 // sampling the frame. Returns false when no curve gets within `tolerance`.
+// Sample count for the generic-ease fit. Namespace scope rather than a local constant: the error
+// lambda below reads it, and MSVC refuses to read an uncaptured local even when it is constexpr
+// (C3493, which then cascades into "term does not evaluate to a function" at every call site).
+constexpr int kEaseFitSamples = 20;
+
 bool FitGenericEase(const BundleChannelSet& chSet, double t0, double t1, double f0, double f1,
                     double tolerance, CubicBezierCurve& out) {
-  constexpr int kSamples = 20;
-  double targets[kSamples + 1];
+  double targets[kEaseFitSamples + 1];
   double span = t1 - t0;
-  for (int i = 0; i <= kSamples; ++i) {
-    double u = static_cast<double>(i) / kSamples;
+  for (int i = 0; i <= kEaseFitSamples; ++i) {
+    double u = static_cast<double>(i) / kEaseFitSamples;
     double factor = RangeGlyphFactorAt(chSet, t0 + span * u);
     targets[i] = std::clamp((factor - f0) / (f1 - f0), 0.0, 1.0);
   }
   // A non-monotone piece cannot be an easing at all.
-  for (int i = 1; i <= kSamples; ++i) {
+  for (int i = 1; i <= kEaseFitSamples; ++i) {
     if (targets[i] + 1e-6 < targets[i - 1]) {
       return false;
     }
   }
   auto error = [&targets](const CubicBezierCurve& curve) {
     double worst = 0.0;
-    for (int i = 1; i < kSamples; ++i) {
-      double u = static_cast<double>(i) / kSamples;
+    for (int i = 1; i < kEaseFitSamples; ++i) {
+      double u = static_cast<double>(i) / kEaseFitSamples;
       worst = std::max(
           worst, std::abs(CubicBezierEase(curve.x1, curve.y1, curve.x2, curve.y2, u) - targets[i]));
     }
