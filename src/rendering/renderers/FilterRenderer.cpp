@@ -290,6 +290,12 @@ static int GetClipStartIndex(const std::vector<Effect*>& effects) {
   return -1;
 }
 
+static std::shared_ptr<tgfx::Image> GetFailedFilterFallback(std::shared_ptr<tgfx::Image> input,
+                                                            const FilterList* filterList) {
+  // A 3D layer cannot fall back to its untransformed content, so it is skipped instead.
+  return filterList->layer->transform3D == nullptr ? input : nullptr;
+}
+
 std::shared_ptr<tgfx::Image> FilterRenderer::ApplyFilters(
     std::shared_ptr<tgfx::Image> input, RenderCache* cache, const FilterList* filterList,
     const tgfx::Point& contentScale, tgfx::Rect contentBounds, tgfx::Rect clipBounds,
@@ -301,19 +307,20 @@ std::shared_ptr<tgfx::Image> FilterRenderer::ApplyFilters(
   output = ApplyEffects(output, cache, filterList, clipBounds, contentScale, clipStartIndex,
                         &filterBounds, &offset);
   if (!output) {
-    return input;
+    return GetFailedFilterFallback(input, filterList);
   }
   *outputOffset += offset;
 
-  output = Apply3DEffects(output, filterList, clipBounds, contentScale, &filterBounds, &offset);
+  output =
+      Apply3DEffects(output, cache, filterList, clipBounds, contentScale, &filterBounds, &offset);
   if (!output) {
-    return input;
+    return GetFailedFilterFallback(input, filterList);
   }
   *outputOffset += offset;
 
   output = ApplyMotionBlur(output, filterList, clipBounds, &filterBounds, &offset);
   if (!output) {
-    return input;
+    return GetFailedFilterFallback(input, filterList);
   }
   *outputOffset += offset;
   return output;

@@ -207,6 +207,28 @@ std::vector<TimeRange> LayerCache::getFilterStaticTimeRanges() {
   for (auto& effect : layer->effects) {
     effect->excludeVaryingRanges(&timeRanges);
   }
+  if (layer->transform3D != nullptr) {
+    // The camera of the composition is part of the input of a 3D layer, so its animation and its
+    // active range break the static time ranges of the layer.
+    for (auto camera : layer->containingComposition->layers) {
+      if (camera->type() != LayerType::Camera) {
+        continue;
+      }
+      camera->excludeVaryingRanges(&timeRanges);
+      SplitTimeRangesAt(&timeRanges, camera->startTime);
+      SplitTimeRangesAt(&timeRanges, camera->startTime + camera->duration);
+      auto parent = camera->parent;
+      while (parent != nullptr) {
+        if (parent->transform != nullptr) {
+          parent->transform->excludeVaryingRanges(&timeRanges);
+        }
+        if (parent->transform3D != nullptr) {
+          parent->transform3D->excludeVaryingRanges(&timeRanges);
+        }
+        parent = parent->parent;
+      }
+    }
+  }
   return OffsetTimeRanges(timeRanges, -layer->startTime);
 }
 }  // namespace pag

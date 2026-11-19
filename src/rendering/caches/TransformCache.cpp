@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TransformCache.h"
+#include "base/utils/TGFXCast.h"
 #include "rendering/renderers/TransformRenderer.h"
 
 namespace pag {
@@ -47,6 +48,11 @@ TransformCache::TransformCache(Layer* layer)
 Transform* TransformCache::createCache(Frame layerFrame) {
   auto transform = new Transform();
   if (layer->transform == nullptr) {
+    // A 3D layer carries its opacity in the 3D transform, so it has to be resolved here instead of
+    // in the 3D filter to keep the alpha of the layer content consistent.
+    if (layer->transform3D != nullptr) {
+      transform->alpha = ToAlpha(layer->transform3D->opacity->getValueAt(layerFrame));
+    }
     return transform;
   }
   RenderTransform(transform, layer->transform, layerFrame);
