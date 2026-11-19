@@ -202,6 +202,7 @@ class PAGComposition : public PAGLayer {
   void collectTextHolders(std::vector<std::shared_ptr<TextHolder>>& out) const;
 
   friend class PAGScene;
+  friend class VideoExporter;
 };
 
 }  // namespace pagx

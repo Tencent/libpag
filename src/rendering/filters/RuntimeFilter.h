@@ -37,6 +37,20 @@ struct FilterResources {
   std::shared_ptr<tgfx::Sampler> sampler = nullptr;
 
   virtual ~FilterResources() = default;
+
+  /** Returns the nominal bytes of temporary GPU resources held directly, excluding resources
+   * already accounted by the Context. */
+  virtual size_t memoryUsage() const {
+    return 0;
+  }
+
+  /** Releases idle temporary GPU resources at the end of a drawing frame. */
+  virtual void onFrameEnd() {
+  }
+
+  /** Releases temporary GPU resources used by a non-drawing query when the query ends. */
+  virtual void onQueryEnd() {
+  }
 };
 
 class RenderCache;

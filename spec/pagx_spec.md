@@ -18,7 +18,7 @@
 
 ### 1.2 File Structure
 
-PAGX is a plain XML file (`.pagx`) that can reference external resource files (images, videos, audio, fonts, etc.) or embed resources via data URIs. PAGX and binary PAG formats are bidirectionally convertible: convert to PAG for optimized loading performance during publishing; use PAGX format for reading and editing during development and review.
+PAGX is a plain XML file (`.pagx`) that can reference external resource files (images, videos, audio, fonts, etc.) or embed resources via data URIs. A document and its images can also be packaged as a ZIP archive (see 2.12). PAGX and binary PAG formats are bidirectionally convertible: convert to PAG for optimized loading performance during publishing; use PAGX format for reading and editing during development and review.
 
 ### 1.3 Document Organization
 
@@ -242,6 +242,33 @@ External resources are referenced via relative paths or data URIs, applicable to
 - **Relative paths**: Resolved relative to the directory containing the PAGX file; supports `../` to reference parent directories
 - **Data URIs**: Begin with `data:`, format is `data:<mediatype>;base64,<data>`; only base64 encoding is supported
 - Path separators must use `/` (forward slash); `\` (backslash) is not supported
+
+### 2.12 PAGX Archive
+
+A PAGX archive is a ZIP produced by `PAGXExporter::ToData()`. It packages one document together
+with the image payloads embedded in it. The XML inside is exactly what `PAGXExporter::ToXML()`
+returns, so an archive introduces no new document semantics.
+
+**Layout**:
+
+| Entry | Required | Description |
+|---|---|---|
+| `document.pagx` | yes | The root document, stored at the archive root |
+| `images/<name>.<ext>` | no | An image payload referenced from `document.pagx` |
+
+**Rules**:
+
+- `document.pagx` is the entry a reader opens; no other entry contains a document.
+- Every other entry lives under `images/`, and its path is exactly the value the document uses in
+  `source` or `image`, so a reader resolves it with the same relative-path rules as a directory.
+- Entry paths never contain an absolute path, a `..` segment or a backslash. Entry names are
+  compared case-insensitively, so an archive extracts correctly on case-insensitive filesystems.
+- The extension follows the sniffed payload format (`png`, `jpeg`, `webp`, `gif`, `avif`,
+  `heic`, `svg`); bytes whose format cannot be identified use `bin` rather than claiming a
+  format they are not.
+- An archive is not guaranteed to be self-contained: a local file path, a `hash:` reference or a
+  remote URL is kept verbatim in the XML. `PAGXExporter::ToData()` reports such references one by
+  one through `warnings`, while `errorMsg` only reports a failed export.
 
 ---
 
@@ -2457,6 +2484,8 @@ A keyframe holds a property value at a specific time, together with how it trans
 | `Bezier` | Cubic bezier easing using `bezierOut` and the next keyframe's `bezierIn` handles |
 | `Hold` | Holds value until the next keyframe, then jumps |
 
+**Perspective interpolation**: a `Layer`'s `perspective` reaches the renderer as the projection coefficient `-1/d`, so its keyframes interpolate that coefficient rather than the distance — a distance animating from 1000 to 200 passes through about 333 at the midpoint instead of 600. This is how a browser interpolates the `perspective()` transform function of a CSS keyframe animation, and it keeps the projection tightening at a constant rate. The easing applies to the coefficient, so `Linear`, `Bezier` and `Hold` keep their meaning. A distance of 0 means no projection, which is the coefficient 0, i.e. the infinite-distance end of that space, so it blends continuously with a finite distance: mixing 0 with 200 halfway yields 400 rather than snapping to a near camera. A negative distance is not a projection either: a keyframe holding one reads as no projection. This is a PAGX convention rather than an exact copy of the browser behavior — a browser drops the invalid declaration and falls back to the element's static distance, while PAGX does not read the static attribute here, so a Layer that also sets a static `perspective` still renders without projection while such a keyframe applies. Every other channel interpolates its values.
+
 **Key attributes**:
 
 | Attribute | Type | Default | Description |
@@ -3138,7 +3167,7 @@ The following lists all node channels that can be driven via `<Channel>` (animat
 | `rotation.x` / `rotation.y` / `rotation.z` | float | Rotation in degrees (`rotationX`/`rotationY`/`rotationZ`) |
 | `scale.x` / `scale.y` / `scale.z` | float | Scale (`scaleX`/`scaleY`/`scaleZ`) |
 | `skew.x` / `skew.y` | float | Skew angle in degrees (`skewX`/`skewY`) |
-| `perspective` | float | Perspective distance (`perspective`); 0 means none |
+| `perspective` | float | Perspective distance (`perspective`); 0 means none. Keyframes interpolate the projection coefficient `-1/d` instead of the distance, see §8.1.4 |
 | `anchor.x` / `anchor.y` | float | Local transform pivot in layer-local pixels, interpolated per component |
 | `anchor.z` | float | Pivot depth; needs a Z component, a purely 2D transform cancels it out |
 

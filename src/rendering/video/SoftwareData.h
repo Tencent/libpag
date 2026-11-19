@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <cstdint>
 #include <cstring>
 #include <vector>
 #include "tgfx/core/YUVData.h"

@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 120 120">
+  <g transform="translate(60 60)">
+    <rect x="-25" y="-25" width="50" height="50" rx="8" fill="#14b8a6" opacity="0">
+      <animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.1;0.9;1" dur="3s" repeatCount="indefinite"/>
+      <animateTransform attributeName="transform" type="rotate" from="-15" to="15" dur="3s" repeatCount="indefinite"/>
+      <animateTransform attributeName="transform" type="scale" values="0.8;1.1;1;0.8" keyTimes="0;0.3;0.7;1" dur="3s" additive="sum" repeatCount="indefinite"/>
+    </rect>
+  </g>
+</svg>

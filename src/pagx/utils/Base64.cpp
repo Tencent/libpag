@@ -23,7 +23,7 @@
 
 namespace pagx {
 
-std::shared_ptr<Data> Base64Decode(const std::string& encodedString) {
+std::shared_ptr<Data> Base64Decode(std::string_view encodedString) {
   static const std::array<unsigned char, 128> decodingTable = {
       64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64,
       64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 62,
@@ -86,34 +86,41 @@ std::shared_ptr<Data> Base64Decode(const std::string& encodedString) {
   return Data::MakeAdopt(output.release(), outputLength);
 }
 
-// Returns the offset of the base64 payload inside a `data:` URI, or std::string::npos when the
-// URI is not a base64-encoded one. The scheme is compared case-insensitively because RFC 3986
-// makes URI schemes case-insensitive, and a hand-authored `DATA:` reaches the same callers.
-static size_t Base64PayloadOffset(const std::string& dataURI) {
+bool IsDataUri(std::string_view uri) {
   static constexpr const char* DATA_SCHEME = "data:";
   static constexpr size_t DATA_SCHEME_LENGTH = 5;
-  if (dataURI.size() < DATA_SCHEME_LENGTH) {
-    return std::string::npos;
+  if (uri.size() < DATA_SCHEME_LENGTH) {
+    return false;
   }
   for (size_t i = 0; i < DATA_SCHEME_LENGTH; i++) {
-    if (std::tolower(static_cast<unsigned char>(dataURI[i])) != DATA_SCHEME[i]) {
-      return std::string::npos;
+    if (std::tolower(static_cast<unsigned char>(uri[i])) != DATA_SCHEME[i]) {
+      return false;
     }
   }
+  return true;
+}
+
+// Returns the offset of the base64 payload inside a `data:` URI, or std::string_view::npos when
+// the URI is not a base64-encoded one. The scheme is compared case-insensitively because RFC 3986
+// makes URI schemes case-insensitive, and a hand-authored `DATA:` reaches the same callers.
+static size_t Base64PayloadOffset(std::string_view dataURI) {
+  if (!IsDataUri(dataURI)) {
+    return std::string_view::npos;
+  }
   auto commaPos = dataURI.find(',');
-  if (commaPos == std::string::npos) {
-    return std::string::npos;
+  if (commaPos == std::string_view::npos) {
+    return std::string_view::npos;
   }
   auto base64Pos = dataURI.find(";base64");
-  if (base64Pos == std::string::npos || base64Pos > commaPos) {
-    return std::string::npos;
+  if (base64Pos == std::string_view::npos || base64Pos > commaPos) {
+    return std::string_view::npos;
   }
   return commaPos + 1;
 }
 
-std::shared_ptr<Data> DecodeBase64DataURI(const std::string& dataURI) {
+std::shared_ptr<Data> DecodeBase64DataURI(std::string_view dataURI) {
   auto payloadOffset = Base64PayloadOffset(dataURI);
-  if (payloadOffset == std::string::npos) {
+  if (payloadOffset == std::string_view::npos) {
     return nullptr;
   }
   return Base64Decode(dataURI.substr(payloadOffset));
@@ -126,7 +133,7 @@ std::shared_ptr<Data> DecodeBase64DataURIPrefix(const std::string& dataURI, size
     return nullptr;
   }
   auto payloadOffset = Base64PayloadOffset(dataURI);
-  if (payloadOffset == std::string::npos) {
+  if (payloadOffset == std::string_view::npos) {
     return nullptr;
   }
   auto payloadLength = dataURI.size() - payloadOffset;

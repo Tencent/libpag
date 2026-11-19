@@ -51,7 +51,7 @@
 namespace pagx {
 
 class Group;
-class HTMLZipWriter;
+class MemZipWriter;
 class HTMLWriterContext;
 class LinearGradient;
 class RadialGradient;
@@ -192,7 +192,7 @@ class HTMLWriterContext {
 
   // ToData sets this ZIP writer; ToHTML leaves it null and writes resources to
   // staticImgDir. HTML export currently supports no other resource writer.
-  HTMLZipWriter* zipWriter = nullptr;
+  MemZipWriter* zipWriter = nullptr;
 
   // ToData only: first resource write failure, if any. An archive is all-or-nothing
   // (design spec section 8), so any failed ZIP entry write fails the whole ToData call.
@@ -371,6 +371,10 @@ class HTMLWriter {
   void writeLayer(HTMLBuilder& out, const Layer* layer, float parentAlpha = 1.0f,
                   bool distributeAlpha = false, bool isFlexItem = false,
                   LayoutMode parentLayout = LayoutMode::None);
+
+  // Layers referenced through Layer::mask, collected once per document. Nested siblings of their
+  // owner are mask definitions too, so writeLayer consults this set as well.
+  std::unordered_set<const Layer*> maskReferenceLayers = {};
 
  private:
   friend struct ElementDispatchStateGuard;

@@ -157,9 +157,18 @@ void ApplyImageStorage(PAGXDocument* doc, const ImageStorageOptions& options,
       if (image->filePath.rfind("http://", 0) == 0 || image->filePath.rfind("https://", 0) == 0) {
         continue;
       }
-      std::string resolved = IsRelativeFilePath(image->filePath)
-                                 ? FindExistingSource(image->filePath, baseDir)
-                                 : image->filePath;
+      std::string resolved = {};
+      if (!documentDir.empty() && !options.baseDir.empty() && options.baseDir != documentDir) {
+        auto relative = AuthoredRelativeSource(image->filePath, documentDir, {});
+        if (!relative.empty()) {
+          resolved = (std::filesystem::path(baseDir) / relative).string();
+        }
+      }
+      if (resolved.empty()) {
+        resolved = IsRelativeFilePath(image->filePath)
+                       ? FindExistingSource(image->filePath, baseDir)
+                       : image->filePath;
+      }
       auto data = resolved.empty() ? nullptr : ReadFileToData(resolved);
       if (!data) {
         std::cerr << command << ": warning: cannot embed image, file not found: '"

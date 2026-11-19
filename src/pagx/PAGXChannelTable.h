@@ -20,7 +20,7 @@
 
 #include <cstdint>
 #include <vector>
-#include "pagx/nodes/Channel.h"
+#include "pagx/nodes/KeyValue.h"
 #include "pagx/nodes/Node.h"
 
 namespace pagx {

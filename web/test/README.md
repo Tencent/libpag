@@ -56,8 +56,9 @@ npm run autotest:webgl                   # 仅运行（复用 build-webgl）
 
 普通测试只读 `.cache/{backend}`，不自动刷新或合并期待值。只有基线与缓存 key 都存在且版本
 不同时才保留版本跳过语义；缺失版本或 MD5 是失败，不是接受变更。普通测试不生成 `_base` 图。
-缓存刷新要求干净工作区以及 `origin/main` 已包含本协议，同时验证 `third_party/tgfx` 为 main
-钉版的干净源码。不回退到待测分支；仅完整成功后整体替换缓存，并记录来源及文件摘要。
+缓存刷新会把本地改动（含未跟踪文件）自动 stash，切到 `origin/main` 构建并在结束后恢复现场；
+要求 `origin/main` 已包含本协议，同时验证 `third_party/tgfx` 为 main 钉版的干净源码。
+不回退到待测分支；仅完整成功后整体替换缓存，并记录来源及文件摘要。
 普通比较拒绝缺失 `provenance.json`、来源不可信或内容不一致的旧缓存，不自动补写来源。
 缓存源提交可不同于当前候选提交，但必须属于本地 `origin/main` 历史，且依赖、版本与该来源一致。
 接受仓库截图基线仍须用户执行 `/accept-baseline`。迁移期间未建立可信缓存前，不应将运行器
@@ -74,6 +75,8 @@ npm run autotest:webgl                   # 仅运行（复用 build-webgl）
 | `MultiThreadCase.cpp`、`PAGANRRegressionTest.cpp`、`PAGDiskCacheTest.cpp` | 依赖 pthreads（单线程构建）/ MEMFS 磁盘缓存语义 |
 | `AsyncDecodeTest.cpp` | 断言依赖原生 500ms 预取窗口驱动的序列/图片缓存计数；web 构建在 `RenderCache::prepareLayers` 中全时间线预取，计数与原生语义永久不一致 |
 | `PAGXCliTest.cpp` | CLI 源码不编入 web 测试 |
+| `PAGXVideoCliTest.cpp`、`PAGXVideoExporterTest.cpp`、`CliTestUtils.cpp` | 视频导出及进程测试为 native-only；共享 CLI 测试工具也不参与 web 构建 |
+| `CommandExport.cpp`、`VideoEncoder.cpp`、`VideoEncoderProcess_posix.cpp`、`VideoEncoderProcess_win.cpp`、`VideoFrameSource.cpp` | 依赖外部进程或 native-only `VideoExporter`，不编入 web 测试；`CommandRender.cpp` 保留静态渲染，帧序列路径在开关关闭时裁掉 |
 | `PAGXHTMLImporterTest.cpp` | 使用 `dynamic_cast`；tgfx 的 embind typeinfo 是 no-rtti 编译，无法开启 RTTI。由原生车道覆盖 |
 | `*.mm`（Metal/Cocoa） | 平台测试在 Emscripten 下永远无法编译 |
 

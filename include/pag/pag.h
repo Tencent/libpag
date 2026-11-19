@@ -37,6 +37,8 @@ class Device;
 namespace pag {
 class Composition;
 class Recorder;
+class FilterModifier;
+struct Transform3DContext;
 
 class RenderCache;
 
@@ -518,6 +520,8 @@ class PAG_API PAGLayer : public Content {
 
   friend class TrackMatteRenderer;
 
+  std::shared_ptr<Transform3DContext> createTransform3DContext() const;
+
   friend class FilterModifier;
 
   friend class RenderCache;
@@ -994,7 +998,8 @@ class PAG_API PAGComposition : public PAGLayer {
                          std::vector<std::shared_ptr<PAGLayer>>* result,
                          std::shared_ptr<PAGLayer> pagLayer);
   static void MeasureChildLayer(tgfx::Rect* bounds, PAGLayer* childLayer);
-  static void DrawChildLayer(Recorder* recorder, PAGLayer* childLayer);
+  static void DrawChildLayer(Recorder* recorder, PAGLayer* childLayer,
+                              std::shared_ptr<FilterModifier> filterModifier);
   static bool GetTrackMatteLayerAtPoint(PAGLayer* childLayer, float x, float y,
                                         std::vector<std::shared_ptr<PAGLayer>>* results);
   static bool GetChildLayerAtPoint(PAGLayer* childLayer, float x, float y,

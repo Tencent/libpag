@@ -36,6 +36,12 @@ const isRelease = process.env.BUILD_MODE === 'release';
 export default [
     {
         input: 'src/index.ts',
+        onwarn(warning, warn) {
+            if (warning.code === 'UNRESOLVED_IMPORT') {
+                throw new Error(warning.message);
+            }
+            warn(warning);
+        },
         output: {
             file: 'lib/pagx-player.esm.js',
             format: 'esm',

@@ -19,6 +19,7 @@
 #pragma once
 
 #include <list>
+#include <memory>
 #include <mutex>
 #include <unordered_map>
 #include "DiskIOWorker.h"
@@ -60,6 +61,15 @@ class DiskCache {
  private:
   static constexpr uint32_t InitialFileID = 1;
 
+  /**
+   * An entry of openedFiles. The handle is registered together with the SequenceFile and outlives
+   * it, so that a reopen of the same file can complete the pending close before reading the file.
+   */
+  struct OpenedFile {
+    std::weak_ptr<SequenceFile> sequenceFile = {};
+    std::shared_ptr<SequenceFileHandle> handle = nullptr;
+  };
+
   std::mutex locker = {};
   std::string customCacheDir;
   std::string defaultCacheDir;
@@ -72,7 +82,14 @@ class DiskCache {
   std::unordered_map<std::string, uint32_t> cachedFileIDs = {};
   std::unordered_map<uint32_t, std::shared_ptr<FileInfo>> cachedFileInfos = {};
   std::list<std::shared_ptr<FileInfo>> cachedFiles = {};
-  std::unordered_map<uint32_t, std::weak_ptr<SequenceFile>> openedFiles = {};
+  /**
+   * The files that must not be deleted nor evicted. An entry is added when a file is opened and is
+   * removed only by notifyFileClosed(), so an entry whose sequenceFile has already expired still
+   * keeps its file alive while the close is pending on the DiskIOWorker: removeAll() and
+   * checkDiskSpace() must treat such an entry as in use, and openSequence() closes the pending
+   * handle before reopening the same file.
+   */
+  std::unordered_map<uint32_t, OpenedFile> openedFiles = {};
 
   static DiskCache* GetInstance();
 
@@ -90,6 +107,8 @@ class DiskCache {
   std::shared_ptr<SequenceFile> openSequence(const std::string& key, const tgfx::ImageInfo& info,
                                              int frameCount, float frameRate,
                                              const std::vector<TimeRange>& staticTimeRanges);
+  void resolvePendingClose(const OpenedFile& openedFile);
+  void registerOpened(uint32_t fileID, const std::shared_ptr<SequenceFile>& sequenceFile);
   std::shared_ptr<tgfx::Data> readFile(const std::string& key);
   bool writeFile(const std::string& key, std::shared_ptr<tgfx::Data> data);
 
@@ -107,7 +126,7 @@ class DiskCache {
   static void RemoveCacheFile(const std::string& path, size_t fileSize);
   void removeClosedCacheFile(const std::string& path, size_t fileSize);
   void reconcileCacheFile(const std::string& path, size_t fileSize);
-  void notifyFileClosed(uint32_t fileID);
+  void notifyFileClosed(uint32_t fileID, const std::shared_ptr<SequenceFileHandle>& handle);
   void notifyFileSizeChanged(uint32_t fileID, size_t fileSize);
 
   /**
@@ -120,7 +139,8 @@ class DiskCache {
                               std::shared_ptr<tgfx::Buffer> data,
                               std::shared_ptr<ConfigSaveState> state, uint64_t currentVersion);
 
-  static void CloseFileTask(FILE* fileToClose, DiskCache* cache, uint32_t id);
+  static void CloseFileTask(std::shared_ptr<SequenceFileHandle> handle, DiskCache* cache,
+                            uint32_t id);
 
   std::shared_ptr<ConfigSaveState> configSaveState = nullptr;
 

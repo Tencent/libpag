@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx width="200" height="120">
+  <Layer id="badge" mask="@shape">
+    <Rectangle position="70,60" size="120,80"/>
+    <Fill color="#FF0000"/>
+  </Layer>
+  <Layer id="shape">
+    <Ellipse position="70,60" size="60,60"/>
+    <Fill color="#00FF00"/>
+  </Layer>
+</pagx>

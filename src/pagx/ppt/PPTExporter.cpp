@@ -867,7 +867,7 @@ void PPTWriter::writeLayer(XMLBuilder& out, const Layer* layer,
     // environment) we must still skip emitting the mask layer's own geometry — otherwise its fill
     // (e.g. a solid rounded rect) paints as an opaque patch over the masked content. The tgfx child
     // slot is still consumed above so later children stay aligned with the tgfx subtree.
-    if (child == layer->mask) {
+    if (child == layer->mask || _maskReferenceLayers.count(child) != 0) {
       continue;
     }
     writeLayer(out, child, childTgfx, layerMatrix, layerAlpha);
@@ -890,12 +890,18 @@ void PPTWriter::writeDocument(XMLBuilder& out) {
   // Composition is referenced multiple times.
   const auto* topChildren = buildResult.root ? &buildResult.root->children() : nullptr;
   size_t topIndex = 0;
+  CollectMaskReferenceLayers(*_doc, &_maskReferenceLayers);
   for (const auto* layer : _doc->layers) {
     std::shared_ptr<tgfx::Layer> tgfxLayer;
     if (topChildren && topIndex < topChildren->size()) {
       tgfxLayer = (*topChildren)[topIndex];
     }
     ++topIndex;
+    // A layer referenced as another layer's mask is a clip shape, not content. Importers keep it
+    // visible for downstream consumers, so the visibility check alone cannot skip it.
+    if (_maskReferenceLayers.count(layer) != 0) {
+      continue;
+    }
     writeLayer(out, layer, tgfxLayer);
   }
 }
@@ -988,7 +994,7 @@ std::vector<SlideBuild> BuildSlides(const std::vector<PAGXDocument*>& documents,
   slides.reserve(documents.size());
   int imageBase = 0;
   for (auto* doc : documents) {
-    if (doc == nullptr || doc->hasUnresolvedImports()) {
+    if (doc == nullptr) {
       return {};
     }
     auto errorCount = doc->errors.size();
@@ -998,7 +1004,8 @@ std::vector<SlideBuild> BuildSlides(const std::vector<PAGXDocument*>& documents,
     // applyLayout reports structural failures (for example, a cyclic external
     // composition) through the document's error list. Do not silently turn the
     // failed document into an empty slide while returning success for the deck.
-    if (!doc->isLayoutApplied() || doc->errors.size() != errorCount) {
+    if (!doc->isLayoutApplied() || doc->hasUnresolvedImports() ||
+        doc->errors.size() != errorCount) {
       return {};
     }
     SlideBuild slide;

@@ -16,7 +16,22 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#ifdef _WIN32
+#include <windows.h>
+#else
+#include <fcntl.h>
+#include <signal.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <unistd.h>
+#endif
+#include <algorithm>
+#include <cerrno>
+#include <cmath>
+#include <cstdint>
+#include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -25,6 +40,7 @@
 #include <unordered_set>
 #include <vector>
 #include "base/PAGTest.h"
+#include "cli/CliUtils.h"
 #include "cli/CommandBounds.h"
 #include "cli/CommandEmbed.h"
 #include "cli/CommandExport.h"
@@ -39,33 +55,22 @@
 #include "pagx/PAGXExporter.h"
 #include "pagx/PAGXImporter.h"
 #include "pagx/nodes/Font.h"
+#include "pagx/nodes/GlyphRun.h"
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/ImagePattern.h"
+#include "pagx/nodes/Text.h"
 #include "tgfx/core/Bitmap.h"
 #include "tgfx/core/ImageCodec.h"
 #include "tgfx/core/Pixmap.h"
 #include "utils/Baseline.h"
+#include "utils/CliTestUtils.h"
 #include "utils/PAGXTestUtils.h"
 #include "utils/ProjectPath.h"
 #include "utils/TestDir.h"
 
 namespace pag {
 using namespace tgfx;
-
-static std::string TempDir() {
-#ifdef GENERATE_BASELINE_IMAGES
-  auto dir = TestDir::GetRoot() + "/baseline-out/PAGXCliTest";
-#else
-  auto dir = TestDir::GetRoot() + "/out/PAGXCliTest";
-#endif
-  std::filesystem::create_directories(dir);
-  return dir;
-}
-
-static std::string TestResourcePath(const std::string& name) {
-  return ProjectPath::Absolute("resources/cli/" + name);
-}
 
 static std::string CopyToTemp(const std::string& resourceName, const std::string& tempName) {
   auto src = TestResourcePath(resourceName);
@@ -98,48 +103,23 @@ static bool CompareRenderedImage(const std::string& imagePath, const std::string
   return Baseline::Compare(pixmap, key);
 }
 
-static bool RenderAndCompare(std::vector<std::string> args, const std::string& key) {
+static Bitmap RenderCLI(std::vector<std::string> args) {
   std::vector<char*> argv = {};
   argv.reserve(args.size());
   for (auto& arg : args) {
     argv.push_back(arg.data());
   }
-  auto bitmap = pagx::cli::RenderToBitmap(static_cast<int>(argv.size()), argv.data());
+  return pagx::cli::RenderToBitmap(static_cast<int>(argv.size()), argv.data());
+}
+
+static bool RenderAndCompare(std::vector<std::string> args, const std::string& key) {
+  auto bitmap = RenderCLI(args);
   if (bitmap.isEmpty()) {
     return false;
   }
   Pixmap pixmap(bitmap);
   return Baseline::Compare(pixmap, key);
 }
-
-static std::string ReadFile(const std::string& path) {
-  std::ifstream in(path);
-  return {std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()};
-}
-
-// RAII helper that redirects an ostream (e.g. std::cout, std::cerr) into an internal
-// stringstream for the lifetime of the instance and restores the original buffer on
-// destruction. Use str() to read what was captured.
-class StreamCapture {
- public:
-  explicit StreamCapture(std::ostream& stream) : stream_(stream), oldBuf_(stream.rdbuf()) {
-    stream_.rdbuf(captured_.rdbuf());
-  }
-  ~StreamCapture() {
-    stream_.rdbuf(oldBuf_);
-  }
-  StreamCapture(const StreamCapture&) = delete;
-  StreamCapture& operator=(const StreamCapture&) = delete;
-
-  std::string str() const {
-    return captured_.str();
-  }
-
- private:
-  std::ostream& stream_;
-  std::streambuf* oldBuf_;
-  std::stringstream captured_;
-};
 
 static std::string ExportToSVG(const std::string& pagxResourceName, const std::string& svgTempName,
                                std::vector<std::string> extraExportArgs = {}) {
@@ -159,7 +139,7 @@ CLI_TEST(PAGXCliTest, Format_PreserveNewline) {
   auto outputPath = TempDir() + "/format_newline_out.pagx";
   auto ret = CallRun(pagx::cli::RunFormat, {"format", "-o", outputPath, inputPath});
   EXPECT_EQ(ret, 0);
-  auto output = ReadFile(outputPath);
+  auto output = ReadTextFile(outputPath);
   EXPECT_TRUE(output.find("&#10;") != std::string::npos);
   EXPECT_TRUE(output.find("Hello&#10;World") != std::string::npos);
 }
@@ -173,7 +153,7 @@ CLI_TEST(PAGXCliTest, Format_Indentation) {
   auto outputPath = TempDir() + "/messy_out.pagx";
   auto ret = CallRun(pagx::cli::RunFormat, {"format", "-o", outputPath, inputPath});
   EXPECT_EQ(ret, 0);
-  auto output = ReadFile(outputPath);
+  auto output = ReadTextFile(outputPath);
   EXPECT_TRUE(output.find("  <Layer") != std::string::npos);
   EXPECT_TRUE(output.find("    <Rectangle") != std::string::npos);
   EXPECT_TRUE(output.find("    <Fill") != std::string::npos);
@@ -184,7 +164,7 @@ CLI_TEST(PAGXCliTest, Format_AttributeReordering) {
   auto outputPath = TempDir() + "/attr_order_out.pagx";
   auto ret = CallRun(pagx::cli::RunFormat, {"format", "-o", outputPath, inputPath});
   EXPECT_EQ(ret, 0);
-  auto output = ReadFile(outputPath);
+  auto output = ReadTextFile(outputPath);
   auto namePos = output.find("name=");
   auto alphaPos = output.find("alpha=");
   ASSERT_NE(namePos, std::string::npos);
@@ -204,7 +184,7 @@ CLI_TEST(PAGXCliTest, Format_PreservesValues) {
   auto outputPath = TempDir() + "/preserve_out.pagx";
   auto ret = CallRun(pagx::cli::RunFormat, {"format", "-o", outputPath, inputPath});
   EXPECT_EQ(ret, 0);
-  auto output = ReadFile(outputPath);
+  auto output = ReadTextFile(outputPath);
   EXPECT_TRUE(output.find("visible=\"true\"") != std::string::npos);
   EXPECT_TRUE(output.find("alpha=\"1\"") != std::string::npos);
   EXPECT_TRUE(output.find("roundness=\"0\"") != std::string::npos);
@@ -216,7 +196,7 @@ CLI_TEST(PAGXCliTest, Format_CustomIndent) {
   auto ret =
       CallRun(pagx::cli::RunFormat, {"format", "--indent", "4", "-o", outputPath, inputPath});
   EXPECT_EQ(ret, 0);
-  auto output = ReadFile(outputPath);
+  auto output = ReadTextFile(outputPath);
   EXPECT_TRUE(output.find("    <Layer") != std::string::npos);
 }
 
@@ -225,7 +205,7 @@ CLI_TEST(PAGXCliTest, Format_DeepNesting) {
   auto outputPath = TempDir() + "/deep_out.pagx";
   auto ret = CallRun(pagx::cli::RunFormat, {"format", "-o", outputPath, inputPath});
   EXPECT_EQ(ret, 0);
-  auto output = ReadFile(outputPath);
+  auto output = ReadTextFile(outputPath);
   EXPECT_TRUE(output.find("        <Rectangle") != std::string::npos);
 }
 
@@ -234,7 +214,7 @@ CLI_TEST(PAGXCliTest, Format_ResourcesBlock) {
   auto outputPath = TempDir() + "/resources_out.pagx";
   auto ret = CallRun(pagx::cli::RunFormat, {"format", "-o", outputPath, inputPath});
   EXPECT_EQ(ret, 0);
-  auto output = ReadFile(outputPath);
+  auto output = ReadTextFile(outputPath);
   EXPECT_TRUE(output.find("  <Resources>") != std::string::npos);
   EXPECT_TRUE(output.find("    <PathData") != std::string::npos);
 }
@@ -243,7 +223,7 @@ CLI_TEST(PAGXCliTest, Format_InPlace) {
   auto inputPath = CopyToTemp("format_messy_indent.pagx", "format_inplace.pagx");
   auto ret = CallRun(pagx::cli::RunFormat, {"format", inputPath});
   EXPECT_EQ(ret, 0);
-  auto output = ReadFile(inputPath);
+  auto output = ReadTextFile(inputPath);
   EXPECT_TRUE(output.find("  <Layer") != std::string::npos);
   EXPECT_TRUE(output.find("    <Rectangle") != std::string::npos);
 }
@@ -254,7 +234,7 @@ CLI_TEST(PAGXCliTest, Format_IndentZero) {
   auto ret =
       CallRun(pagx::cli::RunFormat, {"format", "--indent", "0", "-o", outputPath, inputPath});
   EXPECT_EQ(ret, 0);
-  auto output = ReadFile(outputPath);
+  auto output = ReadTextFile(outputPath);
   EXPECT_TRUE(output.find("<Layer") != std::string::npos);
   EXPECT_TRUE(output.find("  <Layer") == std::string::npos);
 }
@@ -266,7 +246,7 @@ CLI_TEST(PAGXCliTest, Format_PreserveCommentsAndBlankLines) {
   auto outputPath = TempDir() + "/format_comments_out.pagx";
   auto ret = CallRun(pagx::cli::RunFormat, {"format", "-o", outputPath, inputPath});
   EXPECT_EQ(ret, 0);
-  auto output = ReadFile(outputPath);
+  auto output = ReadTextFile(outputPath);
   EXPECT_TRUE(output.find("<!-- Top-level comment describing the file -->") != std::string::npos);
   EXPECT_TRUE(output.find("<!-- Section A -->") != std::string::npos);
   EXPECT_TRUE(output.find("<!-- Section B -->") != std::string::npos);
@@ -413,16 +393,6 @@ CLI_TEST(PAGXCliTest, Render_BackdropStyles) {
   EXPECT_GT(glassBlue.alpha, 0.99f);
 }
 
-static tgfx::Bitmap RenderAnimatedTimelinesAt(const std::string& timeSeconds) {
-  auto inputPath = TestResourcePath("render_animated_timelines.pagx");
-  std::vector<std::string> args = {"render", "--time", timeSeconds, inputPath};
-  std::vector<char*> argv = {};
-  for (auto& arg : args) {
-    argv.push_back(arg.data());
-  }
-  return pagx::cli::RenderToBitmap(static_cast<int>(argv.size()), argv.data());
-}
-
 // --time must drive both the top-level animations and the timelines mounted on Composition slots,
 // honoring each slot's evaluationOffset and playing state.
 CLI_TEST(PAGXCliTest, Render_TimeDrivesCompositionTimelines) {
@@ -447,6 +417,77 @@ CLI_TEST(PAGXCliTest, Render_TimeDrivesCompositionTimelines) {
   EXPECT_LT(switched.getColor(150, 50).green, 0.1f);
   EXPECT_GT(switched.getColor(250, 50).green, 0.9f);
   EXPECT_LT(switched.getColor(250, 50).red, 0.1f);
+}
+
+static void ExpectSamePixels(const tgfx::Bitmap& expected, const tgfx::Bitmap& actual) {
+  ASSERT_FALSE(expected.isEmpty());
+  ASSERT_FALSE(actual.isEmpty());
+  ASSERT_EQ(actual.width(), expected.width());
+  ASSERT_EQ(actual.height(), expected.height());
+  tgfx::Pixmap expectedPixels(expected);
+  tgfx::Pixmap actualPixels(actual);
+  auto packedRowBytes = static_cast<size_t>(expected.width()) * 4;
+  ASSERT_GE(expectedPixels.rowBytes(), packedRowBytes);
+  ASSERT_GE(actualPixels.rowBytes(), packedRowBytes);
+  auto* expectedData = static_cast<const uint8_t*>(expectedPixels.pixels());
+  auto* actualData = static_cast<const uint8_t*>(actualPixels.pixels());
+  for (int row = 0; row < expected.height(); ++row) {
+    EXPECT_EQ(std::memcmp(actualData + static_cast<size_t>(row) * actualPixels.rowBytes(),
+                          expectedData + static_cast<size_t>(row) * expectedPixels.rowBytes(),
+                          packedRowBytes),
+              0)
+        << "row " << row;
+  }
+}
+
+CLI_TEST(PAGXCliTest, Render_FrameSequenceMatchesSingleFrameTimes) {
+  auto inputPath = TestResourcePath("render_animated_timelines.pagx");
+  auto framesDir = TempDir() + "/animated_frame_sequence";
+  std::filesystem::remove_all(framesDir);
+  auto ret =
+      CallRun(pagx::cli::RunRender, {"render", "--frames-dir", framesDir, "--fps", "20",
+                                     "--duration", "0.35", "--background", "#FFFFFF", inputPath});
+  ASSERT_EQ(ret, 0);
+
+  const char* timeSeconds[] = {"0", "0.05", "0.1", "0.15", "0.2", "0.25", "0.3"};
+  for (int frame = 0; frame < 7; ++frame) {
+    char fileName[32] = {};
+    std::snprintf(fileName, sizeof(fileName), "f_%06d.png", frame);
+    auto codec = tgfx::ImageCodec::MakeFrom(framesDir + "/" + fileName);
+    ASSERT_NE(codec, nullptr) << "frame " << frame;
+    tgfx::Bitmap actual(codec->width(), codec->height(), false, false);
+    ASSERT_FALSE(actual.isEmpty());
+    {
+      tgfx::Pixmap actualPixels(actual);
+      ASSERT_TRUE(codec->readPixels(actualPixels.info(), actualPixels.writablePixels()));
+    }
+    auto expected = RenderAnimatedTimelinesAt(timeSeconds[frame], true);
+    ExpectSamePixels(expected, actual);
+  }
+}
+
+CLI_TEST(PAGXCliTest, Render_FrameSequenceRejectsNonEmptyDirectory) {
+  auto inputPath = TestResourcePath("render_animated_timelines.pagx");
+  auto framesDir = TempDir() + "/nonempty_frame_sequence";
+  std::filesystem::remove_all(framesDir);
+  std::filesystem::create_directories(framesDir);
+  auto staleFile = framesDir + "/stale.png";
+  {
+    std::ofstream out(staleFile);
+    out << "keep";
+  }
+  std::string errors;
+  int ret = 0;
+  {
+    StreamCapture capturedErr(std::cerr);
+    ret = CallRun(pagx::cli::RunRender,
+                  {"render", "--frames-dir", framesDir, "--fps", "20", inputPath});
+    errors = capturedErr.str();
+  }
+  EXPECT_NE(ret, 0);
+  EXPECT_NE(errors.find("must be empty"), std::string::npos);
+  EXPECT_EQ(ReadTextFile(staleFile), "keep");
+  EXPECT_FALSE(std::filesystem::is_empty(framesDir));
 }
 
 CLI_PIXEL_TEST(PAGXCliTest, Render_WebpFormat) {
@@ -491,8 +532,15 @@ CLI_PIXEL_TEST(PAGXCliTest, Render_Text) {
 
 CLI_TEST(PAGXCliTest, Render_MissingFile) {
   auto outputPath = TempDir() + "/RenderMissingFile.png";
-  auto ret = CallRun(pagx::cli::RunRender, {"render", "-o", outputPath, "nonexistent.pagx"});
+  std::string errors;
+  int ret = 0;
+  {
+    StreamCapture capturedErr(std::cerr);
+    ret = CallRun(pagx::cli::RunRender, {"render", "-o", outputPath, "nonexistent.pagx"});
+    errors = capturedErr.str();
+  }
   EXPECT_NE(ret, 0);
+  EXPECT_NE(errors.find("pagx render: error: failed to load"), std::string::npos);
 }
 
 CLI_TEST(PAGXCliTest, Render_DefaultOutput) {
@@ -507,8 +555,42 @@ CLI_TEST(PAGXCliTest, Render_DefaultOutput) {
 CLI_TEST(PAGXCliTest, Render_InvalidScale) {
   auto inputPath = TestResourcePath("render_basic.pagx");
   auto outputPath = TempDir() + "/RenderInvalidScale.png";
-  auto ret = CallRun(pagx::cli::RunRender, {"render", "-o", outputPath, "--scale", "0", inputPath});
+  std::string errors;
+  int ret = 0;
+  {
+    StreamCapture capturedErr(std::cerr);
+    ret = CallRun(pagx::cli::RunRender, {"render", "-o", outputPath, "--scale", "0", inputPath});
+    errors = capturedErr.str();
+  }
   EXPECT_NE(ret, 0);
+  EXPECT_NE(errors.find("pagx render: error: invalid scale"), std::string::npos);
+}
+
+CLI_TEST(PAGXCliTest, Render_FontAndSequenceErrorsUseTheErrorPrefix) {
+  auto inputPath = TestResourcePath("render_basic.pagx");
+  std::string errors;
+  int ret = 0;
+  {
+    StreamCapture capturedErr(std::cerr);
+    ret = CallRun(pagx::cli::RunRender,
+                  {"render", "--font", TempDir() + "/missing-font.ttf", inputPath});
+    errors = capturedErr.str();
+  }
+  EXPECT_NE(ret, 0);
+  EXPECT_NE(errors.find("pagx render: error: failed to load font"), std::string::npos);
+
+  auto framesPath = TempDir() + "/render-sequence-not-a-directory";
+  {
+    std::ofstream out(framesPath);
+    out << "file";
+  }
+  {
+    StreamCapture capturedErr(std::cerr);
+    ret = CallRun(pagx::cli::RunRender, {"render", "--frames-dir", framesPath, inputPath});
+    errors = capturedErr.str();
+  }
+  EXPECT_NE(ret, 0);
+  EXPECT_NE(errors.find("pagx render: error: failed to create directory"), std::string::npos);
 }
 
 CLI_TEST(PAGXCliTest, Render_InvalidCrop) {
@@ -1350,7 +1432,7 @@ CLI_TEST(PAGXCliTest, Export_PagxToSvg_Basic) {
       CallRun(pagx::cli::RunExport, {"export", "--input", inputPath, "--output", outputPath});
   EXPECT_EQ(ret, 0);
   EXPECT_TRUE(std::filesystem::exists(outputPath));
-  auto output = ReadFile(outputPath);
+  auto output = ReadTextFile(outputPath);
   EXPECT_NE(output.find("<svg"), std::string::npos);
   EXPECT_NE(output.find("</svg>"), std::string::npos);
   EXPECT_NE(output.find("xmlns=\"http://www.w3.org/2000/svg\""), std::string::npos);
@@ -1362,7 +1444,7 @@ CLI_TEST(PAGXCliTest, Export_PagxToSvg_Gradient) {
   auto ret =
       CallRun(pagx::cli::RunExport, {"export", "--input", inputPath, "--output", outputPath});
   EXPECT_EQ(ret, 0);
-  auto output = ReadFile(outputPath);
+  auto output = ReadTextFile(outputPath);
   EXPECT_TRUE(output.find("<svg") != std::string::npos);
 }
 
@@ -1372,7 +1454,7 @@ CLI_TEST(PAGXCliTest, Export_PagxToSvg_CustomIndent) {
   auto ret = CallRun(pagx::cli::RunExport,
                      {"export", "--svg-indent", "4", "--input", inputPath, "--output", outputPath});
   EXPECT_EQ(ret, 0);
-  auto output = ReadFile(outputPath);
+  auto output = ReadTextFile(outputPath);
   EXPECT_TRUE(output.find("    <") != std::string::npos);
 }
 
@@ -1382,7 +1464,7 @@ CLI_TEST(PAGXCliTest, Export_PagxToSvg_NoXmlDeclaration) {
   auto ret = CallRun(pagx::cli::RunExport, {"export", "--svg-no-xml-declaration", "--input",
                                             inputPath, "--output", outputPath});
   EXPECT_EQ(ret, 0);
-  auto output = ReadFile(outputPath);
+  auto output = ReadTextFile(outputPath);
   EXPECT_TRUE(output.find("<?xml") == std::string::npos);
   EXPECT_EQ(output.find("<svg"), 0u);
 }
@@ -1393,7 +1475,7 @@ CLI_TEST(PAGXCliTest, Export_PagxToSvg_ForceFormat) {
   auto ret = CallRun(pagx::cli::RunExport,
                      {"export", "--format", "svg", "--input", inputPath, "--output", outputPath});
   EXPECT_EQ(ret, 0);
-  auto output = ReadFile(outputPath);
+  auto output = ReadTextFile(outputPath);
   EXPECT_NE(output.find("<svg"), std::string::npos);
 }
 
@@ -1441,7 +1523,7 @@ CLI_TEST(PAGXCliTest, Export_PagxToSvg_Text) {
   auto ret =
       CallRun(pagx::cli::RunExport, {"export", "--input", inputPath, "--output", outputPath});
   EXPECT_EQ(ret, 0);
-  auto output = ReadFile(outputPath);
+  auto output = ReadTextFile(outputPath);
   EXPECT_NE(output.find("<svg"), std::string::npos);
 }
 
@@ -1451,7 +1533,7 @@ CLI_TEST(PAGXCliTest, Export_PagxToSvg_Scale) {
   auto ret =
       CallRun(pagx::cli::RunExport, {"export", "--input", inputPath, "--output", outputPath});
   EXPECT_EQ(ret, 0);
-  auto output = ReadFile(outputPath);
+  auto output = ReadTextFile(outputPath);
   EXPECT_NE(output.find("<svg"), std::string::npos);
 }
 
@@ -1461,7 +1543,7 @@ CLI_TEST(PAGXCliTest, Export_PagxToSvg_ValidateSimple) {
   auto ret =
       CallRun(pagx::cli::RunExport, {"export", "--input", inputPath, "--output", outputPath});
   EXPECT_EQ(ret, 0);
-  auto output = ReadFile(outputPath);
+  auto output = ReadTextFile(outputPath);
   EXPECT_NE(output.find("<svg"), std::string::npos);
   EXPECT_NE(output.find("</svg>"), std::string::npos);
 }
@@ -1476,7 +1558,7 @@ CLI_TEST(PAGXCliTest, Import_SvgToPagx_Basic) {
   auto ret = CallRun(pagx::cli::RunImport, {"import", "--input", svgPath, "--output", outputPath});
   EXPECT_EQ(ret, 0);
   EXPECT_TRUE(std::filesystem::exists(outputPath));
-  auto output = ReadFile(outputPath);
+  auto output = ReadTextFile(outputPath);
   EXPECT_NE(output.find("<pagx"), std::string::npos);
   EXPECT_NE(output.find("</pagx>"), std::string::npos);
 }
@@ -1486,7 +1568,7 @@ CLI_TEST(PAGXCliTest, Import_SvgToPagx_Gradient) {
   auto outputPath = TempDir() + "/ImportSVG_Gradient.pagx";
   auto ret = CallRun(pagx::cli::RunImport, {"import", "--input", svgPath, "--output", outputPath});
   EXPECT_EQ(ret, 0);
-  auto output = ReadFile(outputPath);
+  auto output = ReadTextFile(outputPath);
   EXPECT_NE(output.find("<pagx"), std::string::npos);
 }
 
@@ -1495,7 +1577,7 @@ CLI_TEST(PAGXCliTest, Import_SvgToPagx_Text) {
   auto outputPath = TempDir() + "/ImportSVG_Text.pagx";
   auto ret = CallRun(pagx::cli::RunImport, {"import", "--input", svgPath, "--output", outputPath});
   EXPECT_EQ(ret, 0);
-  auto output = ReadFile(outputPath);
+  auto output = ReadTextFile(outputPath);
   EXPECT_NE(output.find("<pagx"), std::string::npos);
 }
 
@@ -1511,7 +1593,7 @@ CLI_TEST(PAGXCliTest, Import_SvgToPagx_Scale) {
   auto outputPath = TempDir() + "/ImportSVG_Scale.pagx";
   auto ret = CallRun(pagx::cli::RunImport, {"import", "--input", svgPath, "--output", outputPath});
   EXPECT_EQ(ret, 0);
-  auto output = ReadFile(outputPath);
+  auto output = ReadTextFile(outputPath);
   EXPECT_NE(output.find("<pagx"), std::string::npos);
 }
 
@@ -1521,7 +1603,7 @@ CLI_TEST(PAGXCliTest, Import_ForceFormat) {
   auto ret = CallRun(pagx::cli::RunImport,
                      {"import", "--format", "svg", "--input", svgPath, "--output", outputPath});
   EXPECT_EQ(ret, 0);
-  auto output = ReadFile(outputPath);
+  auto output = ReadTextFile(outputPath);
   EXPECT_NE(output.find("<pagx"), std::string::npos);
 }
 
@@ -1585,7 +1667,7 @@ CLI_TEST(PAGXCliTest, Import_SvgOptions) {
                      {"import", "--svg-no-expand-use", "--svg-flatten-transforms",
                       "--svg-preserve-unknown", "--input", svgPath, "--output", outputPath});
   EXPECT_EQ(ret, 0);
-  auto output = ReadFile(outputPath);
+  auto output = ReadTextFile(outputPath);
   EXPECT_NE(output.find("<pagx"), std::string::npos);
 }
 
@@ -1948,7 +2030,7 @@ CLI_TEST(PAGXCliTest, Export_PagxToPptx_MultipleInputs) {
                                             "--output", outputPath});
   EXPECT_EQ(ret, 0);
   ASSERT_TRUE(std::filesystem::exists(outputPath));
-  auto bytes = ReadFile(outputPath);
+  auto bytes = ReadTextFile(outputPath);
   EXPECT_NE(bytes.find("ppt/slides/slide1.xml"), std::string::npos);
   EXPECT_NE(bytes.find("ppt/slides/slide2.xml"), std::string::npos);
   EXPECT_EQ(bytes.find("ppt/slides/slide3.xml"), std::string::npos);
@@ -1965,7 +2047,7 @@ CLI_TEST(PAGXCliTest, Export_PagxToPptx_ThreeInputsDefaultOutput) {
   EXPECT_EQ(ret, 0);
   auto defaultOutput = TempDir() + "/ExportPPTXThree.pptx";
   ASSERT_TRUE(std::filesystem::exists(defaultOutput));
-  auto bytes = ReadFile(defaultOutput);
+  auto bytes = ReadTextFile(defaultOutput);
   EXPECT_NE(bytes.find("ppt/slides/slide3.xml"), std::string::npos);
   EXPECT_EQ(bytes.find("ppt/slides/slide4.xml"), std::string::npos);
 }
@@ -1978,7 +2060,7 @@ CLI_TEST(PAGXCliTest, Export_PagxToPptx_SingleInputOneSlide) {
   auto ret =
       CallRun(pagx::cli::RunExport, {"export", "--input", inputPath, "--output", outputPath});
   EXPECT_EQ(ret, 0);
-  auto bytes = ReadFile(outputPath);
+  auto bytes = ReadTextFile(outputPath);
   EXPECT_NE(bytes.find("ppt/slides/slide1.xml"), std::string::npos);
   EXPECT_EQ(bytes.find("ppt/slides/slide2.xml"), std::string::npos);
 }
@@ -2004,7 +2086,7 @@ CLI_TEST(PAGXCliTest, Export_PagxToPptx_IgnoreGlyphRuns) {
   ret = CallRun(pagx::cli::RunExport,
                 {"export", "--input", inputPath, "--output", textToPathOnlyPath, "--text-to-path"});
   EXPECT_EQ(ret, 0);
-  EXPECT_EQ(ReadFile(pathsPath), ReadFile(textToPathOnlyPath));
+  EXPECT_EQ(ReadTextFile(pathsPath), ReadTextFile(textToPathOnlyPath));
 }
 
 // If one of several inputs fails to load, the whole export aborts with an error
@@ -2025,7 +2107,7 @@ CLI_TEST(PAGXCliTest, Export_NoConvertTextToPath) {
   auto ret =
       CallRun(pagx::cli::RunExport, {"export", "--input", inputPath, "--output", outputPath});
   EXPECT_EQ(ret, 0);
-  auto output = ReadFile(outputPath);
+  auto output = ReadTextFile(outputPath);
   EXPECT_NE(output.find("<svg"), std::string::npos);
 }
 
@@ -3502,9 +3584,270 @@ CLI_TEST(PAGXCliTest, UnresolvedImport_ExportRejects) {
   EXPECT_NE(ret, 0);
 }
 
+CLI_TEST(PAGXCliTest, LazyInlineSvg_LayoutRenderBoundsAndExport) {
+  auto inputPath = TempDir() + "/lazy_inline_svg.pagx";
+  {
+    std::ofstream file(inputPath);
+    file << R"(<pagx version="1.0" width="40" height="40">
+  <Layer id="host" width="40" height="40">
+    <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40">
+      <rect x="0" y="0" width="20" height="20" fill="#FF0000"/>
+    </svg>
+  </Layer>
+</pagx>)";
+  }
+  auto doc = pagx::PAGXImporter::FromFile(inputPath);
+  ASSERT_NE(doc, nullptr);
+  EXPECT_TRUE(doc->hasUnresolvedImports());
+  {
+    StreamCapture output(std::cout);
+    EXPECT_EQ(CallRun(pagx::cli::RunLayout, {"layout", inputPath}), 0);
+    EXPECT_EQ(CallRun(pagx::cli::RunBounds, {"bounds", inputPath}), 0);
+  }
+  auto pngPath = TempDir() + "/lazy_inline_svg.png";
+  EXPECT_EQ(CallRun(pagx::cli::RunRender, {"render", inputPath, "-o", pngPath}), 0);
+  EXPECT_TRUE(std::filesystem::exists(pngPath));
+  auto svgPath = TempDir() + "/lazy_inline_svg.svg";
+  EXPECT_EQ(CallRun(pagx::cli::RunExport, {"export", "--input", inputPath, "--output", svgPath}),
+            0);
+  EXPECT_FALSE(ReadTextFile(svgPath).empty());
+  auto htmlPath = TempDir() + "/lazy_inline_svg.html";
+  EXPECT_EQ(CallRun(pagx::cli::RunExport, {"export", "--input", inputPath, "--output", htmlPath}),
+            0);
+  EXPECT_FALSE(ReadTextFile(htmlPath).empty());
+  auto embedPath = TempDir() + "/lazy_inline_svg_embedded.pagx";
+  EXPECT_EQ(CallRun(pagx::cli::RunEmbed, {"embed", inputPath, "--skip-fonts", "-o", embedPath}), 0);
+  EXPECT_EQ(ReadTextFile(embedPath).find("<svg"), std::string::npos);
+  auto embedded = pagx::PAGXImporter::FromFile(embedPath);
+  ASSERT_NE(embedded, nullptr);
+  EXPECT_FALSE(embedded->hasUnresolvedImports());
+}
+
+CLI_TEST(PAGXCliTest, Import_ExtensionlessSourceUsesContentFormat) {
+  auto inputPath = TempDir() + "/extensionless_svg_source";
+  {
+    std::ofstream file(inputPath, std::ios::binary);
+    file << "<!-- <html> -->\r\n<svg\r\n xmlns=\"http://www.w3.org/2000/svg\" "
+            "width=\"20\" height=\"20\"><rect width=\"20\" height=\"20\" "
+            "fill=\"#00FF00\"/></svg>";
+  }
+  auto outputPath = TempDir() + "/extensionless_svg_imported.pagx";
+  EXPECT_EQ(CallRun(pagx::cli::RunImport, {"import", "--input", inputPath, "--output", outputPath}),
+            0);
+  EXPECT_NE(ReadTextFile(outputPath).find("#00FF00"), std::string::npos);
+  auto doc = pagx::PAGXImporter::FromFile(outputPath);
+  ASSERT_NE(doc, nullptr);
+  EXPECT_FALSE(doc->hasUnresolvedImports());
+}
+
+CLI_TEST(PAGXCliTest, Embed_InlineTextAndImageAreFlattenedAndPersisted) {
+  CopyResourceToTemp("resources/apitest/image_as_mask.png", "inline_embed_image.png");
+  auto inputPath = TempDir() + "/inline_embed_resources.pagx";
+  {
+    std::ofstream file(inputPath);
+    file << R"(<pagx width="100" height="100">
+  <Layer width="100" height="100">
+    <svg xmlns="http://www.w3.org/2000/svg" width="100" height="100">
+      <image href="inline_embed_image.png" x="0" y="0" width="20" height="20"/>
+      <text x="0" y="50" font-size="24" fill="#000000">Embed</text>
+    </svg>
+  </Layer>
+</pagx>)";
+  }
+  auto outputPath = TempDir() + "/inline_embed_resources_out.pagx";
+  auto fontPath = ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf");
+  EXPECT_EQ(
+      CallRun(pagx::cli::RunEmbed, {"embed", inputPath, "--fallback", fontPath, "-o", outputPath}),
+      0);
+  auto output = ReadTextFile(outputPath);
+  EXPECT_EQ(output.find("<svg"), std::string::npos);
+  EXPECT_EQ(output.find("inline_embed_image.png"), std::string::npos);
+  auto doc = pagx::PAGXImporter::FromFile(outputPath);
+  ASSERT_NE(doc, nullptr);
+  EXPECT_FALSE(doc->hasUnresolvedImports());
+  bool hasText = false;
+  bool hasImage = false;
+  for (const auto& node : doc->nodes) {
+    if (node->nodeType() == pagx::NodeType::Text) {
+      auto* text = static_cast<pagx::Text*>(node.get());
+      hasText = true;
+      EXPECT_FALSE(text->glyphRuns.empty());
+      for (auto* run : text->glyphRuns) {
+        EXPECT_TRUE(doc->ownsNode(run));
+        EXPECT_TRUE(doc->ownsNode(run->font));
+      }
+    } else if (node->nodeType() == pagx::NodeType::Image) {
+      auto* image = static_cast<pagx::Image*>(node.get());
+      hasImage = true;
+      EXPECT_TRUE(image->filePath.empty());
+      EXPECT_NE(image->data, nullptr);
+    }
+  }
+  EXPECT_TRUE(hasText);
+  EXPECT_TRUE(hasImage);
+}
+
+CLI_TEST(PAGXCliTest, Resolve_ExplicitImportOverridesInlineSvg) {
+  auto inputPath = TempDir() + "/explicit_import_inline.pagx";
+  auto svgPath = TempDir() + "/explicit_import.svg";
+  {
+    std::ofstream file(svgPath);
+    file << R"(<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20">
+  <rect width="20" height="20" fill="#00FF00"/>
+</svg>)";
+  }
+  {
+    std::ofstream file(inputPath);
+    file << R"(<pagx version="1.0" width="20" height="20">
+  <Layer id="host" width="20" height="20" import="explicit_import.svg">
+    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20">
+      <rect width="20" height="20" fill="#FF0000"/>
+    </svg>
+  </Layer>
+</pagx>)";
+  }
+  auto document = pagx::PAGXImporter::FromFile(inputPath);
+  ASSERT_NE(document, nullptr);
+  document->applyLayout();
+  auto* host = document->findNode<pagx::Layer>("host");
+  ASSERT_NE(host, nullptr);
+  EXPECT_EQ(host->composition, nullptr);
+  EXPECT_EQ(host->externalDoc, nullptr);
+  EXPECT_TRUE(document->hasUnresolvedImports());
+  auto outputPath = TempDir() + "/explicit_import_flattened.pagx";
+  EXPECT_EQ(CallRun(pagx::cli::RunResolve, {"resolve", inputPath, "-o", outputPath}), 0);
+  auto output = ReadTextFile(outputPath);
+  EXPECT_NE(output.find("#00FF00"), std::string::npos);
+  EXPECT_EQ(output.find("#FF0000"), std::string::npos);
+  auto flattened = pagx::PAGXImporter::FromFile(outputPath);
+  ASSERT_NE(flattened, nullptr);
+  EXPECT_FALSE(flattened->hasUnresolvedImports());
+}
+
+CLI_TEST(PAGXCliTest, Resolve_InlineImageEmbedHonorsBaseDirectory) {
+  auto imageBaseDir = TempDir() + "/inline_image_source";
+  std::filesystem::create_directories(imageBaseDir);
+  auto imagePath = imageBaseDir + "/override_inline_image.png";
+  std::filesystem::copy_file(ProjectPath::Absolute("resources/apitest/image_as_mask.png"),
+                             imagePath, std::filesystem::copy_options::overwrite_existing);
+  auto inputPath = TempDir() + "/inline_image_base.pagx";
+  {
+    std::ofstream file(inputPath);
+    file << R"(<pagx width="20" height="20">
+  <Layer width="20" height="20">
+    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20">
+      <image href="override_inline_image.png" width="20" height="20"/>
+    </svg>
+  </Layer>
+</pagx>)";
+  }
+  auto outputPath = TempDir() + "/inline_image_base_out.pagx";
+  EXPECT_EQ(CallRun(pagx::cli::RunResolve, {"resolve", inputPath, "--images", "embed",
+                                            "--image-base-dir", imageBaseDir, "-o", outputPath}),
+            0);
+  auto doc = pagx::PAGXImporter::FromFile(outputPath);
+  ASSERT_NE(doc, nullptr);
+  bool embedded = false;
+  for (const auto& node : doc->nodes) {
+    if (node->nodeType() == pagx::NodeType::Image) {
+      auto* image = static_cast<pagx::Image*>(node.get());
+      EXPECT_TRUE(image->filePath.empty());
+      EXPECT_NE(image->data, nullptr);
+      embedded = image->data != nullptr;
+    }
+  }
+  EXPECT_TRUE(embedded);
+}
+
 //==============================================================================
 // Verify screenshot output
 //==============================================================================
+
+CLI_TEST(PAGXCliTest, LazyInlineResourcesUseTheSameDirectoryAsResolve) {
+  auto directory = TempDir() + "/lazy_relative_resources";
+  std::filesystem::create_directories(directory + "/assets");
+  std::filesystem::copy_file(ProjectPath::Absolute("resources/apitest/image_as_mask.png"),
+                             directory + "/assets/image.png",
+                             std::filesystem::copy_options::overwrite_existing);
+  auto inputPath = directory + "/input.pagx";
+  {
+    std::ofstream file(inputPath);
+    file << R"(<pagx width="40" height="40">
+  <Layer width="40" height="40">
+    <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40">
+      <image href="assets/image.png" width="40" height="40"/>
+    </svg>
+  </Layer>
+</pagx>)";
+  }
+  auto doc = pagx::PAGXImporter::FromFile(inputPath);
+  ASSERT_NE(doc, nullptr);
+  ASSERT_EQ(doc->layers.size(), 1u);
+  EXPECT_EQ(doc->layers[0]->externalDoc, nullptr);
+  doc->applyLayout();
+  auto mounted = doc->layers[0]->externalDoc;
+  ASSERT_NE(mounted, nullptr);
+  EXPECT_EQ(mounted->getExternalImagePaths(),
+            std::vector<std::string>({directory + "/assets/image.png"}));
+  auto xml = pagx::PAGXExporter::ToXML(*doc);
+  EXPECT_NE(xml.find("href=\"assets/image.png\""), std::string::npos);
+  auto direct = RenderCLI({"render", inputPath});
+  ASSERT_FALSE(direct.isEmpty());
+  auto outputPath = TempDir() + "/lazy_relative_flattened.pagx";
+  ASSERT_EQ(
+      CallRun(pagx::cli::RunResolve, {"resolve", inputPath, "--images", "embed", "-o", outputPath}),
+      0);
+  auto resolved = RenderCLI({"render", outputPath});
+  ASSERT_FALSE(resolved.isEmpty());
+  ASSERT_EQ(direct.width(), resolved.width());
+  ASSERT_EQ(direct.height(), resolved.height());
+  float alpha = 0;
+  for (int y = 0; y < direct.height(); y++) {
+    for (int x = 0; x < direct.width(); x++) {
+      auto expected = direct.getColor(x, y);
+      auto actual = resolved.getColor(x, y);
+      EXPECT_FLOAT_EQ(actual.red, expected.red);
+      EXPECT_FLOAT_EQ(actual.green, expected.green);
+      EXPECT_FLOAT_EQ(actual.blue, expected.blue);
+      EXPECT_FLOAT_EQ(actual.alpha, expected.alpha);
+      alpha += expected.alpha;
+    }
+  }
+  EXPECT_GT(alpha, 0);
+}
+
+CLI_TEST(PAGXCliTest, FileSubDocumentInlineResourcesKeepTheirOwnDirectory) {
+  auto directory = TempDir() + "/nested_relative_resources";
+  std::filesystem::create_directories(directory + "/child/assets");
+  auto inputPath = directory + "/input.pagx";
+  {
+    std::ofstream file(inputPath);
+    file << "<pagx width=\"40\" height=\"40\"><Layer composition=\"child/scene.pagx\"/></pagx>";
+  }
+  auto doc = pagx::PAGXImporter::FromFile(inputPath);
+  ASSERT_NE(doc, nullptr);
+  std::string childXML = R"(<pagx width="40" height="40">
+  <Layer width="40" height="40">
+    <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40">
+      <image href="assets/image.png" width="40" height="40"/>
+    </svg>
+  </Layer>
+</pagx>)";
+  EXPECT_TRUE(doc->loadFileData("child/scene.pagx",
+                                pagx::Data::MakeWithCopy(childXML.data(), childXML.size())));
+  ASSERT_EQ(doc->layers.size(), 1u);
+  auto child = doc->layers[0]->externalDoc;
+  ASSERT_NE(child, nullptr);
+  EXPECT_EQ(child->getExternalImagePaths(),
+            std::vector<std::string>({directory + "/child/assets/image.png"}));
+  auto* native = doc->makeNode<pagx::Image>();
+  native->filePath = "/absolute/image.png";
+  auto* uri = child->makeNode<pagx::Image>();
+  uri->filePath = "data:image/png;base64,AA==";
+  doc->applyLayout();
+  EXPECT_EQ(native->filePath, "/absolute/image.png");
+  EXPECT_EQ(uri->filePath, "data:image/png;base64,AA==");
+}
 
 CLI_TEST(PAGXCliTest, Verify_WritesScreenshot) {
   auto inputPath = TestResourcePath("import_node_none.pagx");
@@ -3723,7 +4066,7 @@ CLI_TEST(PAGXCliTest, Embed_SkipImages_FontsOnly) {
 CLI_TEST(PAGXCliTest, Embed_BothSkipFlags_ExitsWithError) {
   auto tempPagx = CopyToTemp("embed_sample.pagx", "embed_sample.pagx");
   auto tempPng = CopyResourceToTemp("resources/apitest/image_as_mask.png", "image_as_mask.png");
-  auto contentBefore = ReadFile(tempPagx);
+  auto contentBefore = ReadTextFile(tempPagx);
   std::streambuf* oldCerr = std::cerr.rdbuf();
   std::ostringstream capturedErr;
   std::cerr.rdbuf(capturedErr.rdbuf());
@@ -3732,7 +4075,7 @@ CLI_TEST(PAGXCliTest, Embed_BothSkipFlags_ExitsWithError) {
   EXPECT_EQ(ret, 1);
   EXPECT_NE(capturedErr.str().find("pagx embed: --skip-fonts and --skip-images cannot both be set"),
             std::string::npos);
-  auto contentAfter = ReadFile(tempPagx);
+  auto contentAfter = ReadTextFile(tempPagx);
   EXPECT_EQ(contentBefore, contentAfter);
 }
 
@@ -3797,7 +4140,7 @@ CLI_TEST(PAGXCliTest, Embed_FontFileImport_RoundTrips) {
 
 CLI_TEST(PAGXCliTest, Embed_MissingFontFile_FailsLoud) {
   auto tempPagx = CopyToTemp("embed_font_file.pagx", "embed_font_file.pagx");
-  auto content = ReadFile(tempPagx);
+  auto content = ReadTextFile(tempPagx);
   auto pos = content.find("NotoSansSC-Regular.otf");
   ASSERT_NE(pos, std::string::npos);
   content.replace(pos, std::strlen("NotoSansSC-Regular.otf"), "nonexistent_font.otf");
@@ -3848,12 +4191,12 @@ CLI_TEST(PAGXCliTest, Embed_AlreadyEmbeddedImage_IsNoOp) {
   EXPECT_EQ(ret1, 0);
   auto ret2 = CallRun(pagx::cli::RunEmbed, {"embed", out1, "-o", out2});
   EXPECT_EQ(ret2, 0);
-  EXPECT_EQ(ReadFile(out1), ReadFile(out2));
+  EXPECT_EQ(ReadTextFile(out1), ReadTextFile(out2));
 }
 
 CLI_TEST(PAGXCliTest, Embed_MissingImage_FailsLoud) {
   auto tempPagx = CopyToTemp("embed_sample.pagx", "embed_missing.pagx");
-  auto content = ReadFile(tempPagx);
+  auto content = ReadTextFile(tempPagx);
   auto pos = content.find("image_as_mask.png");
   ASSERT_NE(pos, std::string::npos);
   content.replace(pos, strlen("image_as_mask.png"), "missing.png");

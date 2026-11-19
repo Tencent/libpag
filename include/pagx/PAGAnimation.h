@@ -161,6 +161,7 @@ class PAGAnimation : public PAGTimeline {
   friend class PAGScene;
   friend class PAGComposition;
   friend class PAGStateMachine;
+  friend class VideoExporter;
 };
 
 }  // namespace pagx

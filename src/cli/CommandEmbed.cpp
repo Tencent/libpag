@@ -21,6 +21,7 @@
 #include <string>
 #include <vector>
 #include "cli/CliUtils.h"
+#include "cli/CommandResolve.h"
 #include "pagx/FontConfig.h"
 #include "pagx/PAGXExporter.h"
 #include "pagx/nodes/Font.h"
@@ -41,7 +42,7 @@ static void PrintEmbedUsage() {
   std::cout
       << "Usage: pagx embed [options] input.pagx\n"
       << "\n"
-      << "Embed font glyphs and images into a PAGX file for self-contained output.\n"
+      << "Flatten imports, then embed font glyphs and images into the PAGX file.\n"
       << "\n"
       << "Options:\n"
       << "  -o, --output <path>              Output file path (default: overwrite input)\n"
@@ -108,8 +109,13 @@ int RunEmbed(int argc, char* argv[]) {
   if (document == nullptr) {
     return 1;
   }
-  if (document->hasUnresolvedImports()) {
-    std::cerr << "pagx embed: error: unresolved import directive, run 'pagx resolve' first\n";
+  ImportFormatOptions formatOptions = {};
+  auto stats = ResolveDocument(document.get(), GetDirectory(options.inputFile), formatOptions);
+  if (stats.errorCount != 0) {
+    std::cerr << "pagx embed: failed to resolve " << stats.errorCount << " import directive(s)\n";
+    return 1;
+  }
+  if (!PrepareDocumentForRendering(document.get(), nullptr, "pagx embed")) {
     return 1;
   }
 
