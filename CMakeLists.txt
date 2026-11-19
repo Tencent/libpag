@@ -476,7 +476,8 @@ if (PAG_USE_QT)
     list(APPEND PAG_FILES ${PLATFORM_FILES})
     list(APPEND PAG_DEFINES GL_SILENCE_DEPRECATION)
     if (MACOS)
-        file(GLOB CGL_PLATFORM_FILES src/platform/mac/private/HardwareDecoder.mm)
+        file(GLOB CGL_PLATFORM_FILES src/platform/mac/private/HardwareDecoder.mm
+                src/platform/cocoa/private/HardwareDecodeContext.mm)
         list(APPEND PAG_FILES ${CGL_PLATFORM_FILES})
     endif ()
 elseif (PAG_USE_SWIFTSHADER)
@@ -1238,7 +1239,10 @@ if (PAG_BUILD_TESTS)
     file(GLOB_RECURSE SRC_FILES test/src/*.*)
     list(FILTER SRC_FILES EXCLUDE REGEX "/MetalTestSupport\\.(cpp|h)$")
     if (NOT APPLE OR NOT USE_NATIVE_PLATFORM)
-        list(FILTER SRC_FILES EXCLUDE REGEX "PAG(Metal(Surface|Texture|Atlas)|CocoaSurface(Header)?)Test\\.mm$")
+        # VTDecodeContextPoolTest links the VideoToolbox decode-context pool, which only the native
+        # Apple platforms compile; the swiftshader/non-native builds omit src/platform/cocoa.
+        list(FILTER SRC_FILES EXCLUDE REGEX
+                "PAG(Metal(Surface|Texture|Atlas)|CocoaSurface(Header)?)Test\\.mm$|VTDecodeContextPoolTest\\.cpp$")
     else ()
         set_source_files_properties(test/src/PAGCocoaSurfaceTest.mm test/src/PAGCocoaSurfaceHeaderTest.mm
                 PROPERTIES COMPILE_OPTIONS "-fobjc-arc")
