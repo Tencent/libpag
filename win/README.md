@@ -37,6 +37,27 @@ node build_pag pag -a x64 -i -DPAG_BUILD_SHARED=OFF -DPAG_USE_D3D12=ON -DPAG_D3D
 The demo reads `libpag.lib` from `out/release/win/x64` for every x64 configuration, so rebuild
 libpag before switching backends and keep the CRT/configuration consistent with the demo.
 
+The project pins the `v142` toolset. If only VS2022 is installed, append
+`/p:PlatformToolset=v143` to the `ms-build` command, otherwise the build stops with `MSB8020`. The
+project's `PreBuildEvent` runs `build_pag` without backend arguments, so when you built libpag
+yourself for D3D12 or WARP, also pass `/p:PreBuildEventUseInBuild=false`; otherwise the D3D12
+`libpag.lib` is replaced by a default OpenGL build.
+
+## Run
+
+The build writes `win\x64\Release\WinPAGDemo.exe`. The demo resolves its assets relative to the
+working directory, so start it from `win\Win32Demo` (the same directory the Visual Studio debugger
+uses):
+
+```powershell
+cd win\Win32Demo
+..\x64\Release\WinPAGDemo.exe
+```
+
+The demo loads `../../assets/test2.pag` and the fallback fonts under `../../resources/font`. When
+launched from a terminal, libpag log lines are printed to stdout, including the backend line on the
+first rendered frame.
+
 ## Runtime
 
 `PAGEngineImpl::InitOnscreenRender()` creates a `GPUDrawable` from the window handle. In a D3D12

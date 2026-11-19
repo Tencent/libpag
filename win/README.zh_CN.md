@@ -35,6 +35,24 @@ node build_pag pag -a x64 -i -DPAG_BUILD_SHARED=OFF -DPAG_USE_D3D12=ON -DPAG_D3D
 
 示例工程在所有 x64 配置下都从 `out/release/win/x64` 读取 `libpag.lib`，因此切换后端前需要重新构建 libpag，并保证 CRT 和构建配置与示例一致。
 
+工程固定使用 `v142` 工具集。如果只安装了 VS2022，需要在 `ms-build` 命令后追加
+`/p:PlatformToolset=v143`，否则构建会以 `MSB8020` 失败。工程的 `PreBuildEvent` 会执行不带后端参数的
+`build_pag`，因此如果 libpag 是你自己按 D3D12 或 WARP 构建的，还要传 `/p:PreBuildEventUseInBuild=false`，
+否则 D3D12 版本 `libpag.lib` 会被默认的 OpenGL 构建覆盖。
+
+## 运行
+
+构建产物是 `win\x64\Release\WinPAGDemo.exe`。示例按工作目录解析资源，因此要在 `win\Win32Demo`
+目录下启动（Visual Studio 调试器默认也使用该目录）：
+
+```powershell
+cd win\Win32Demo
+..\x64\Release\WinPAGDemo.exe
+```
+
+示例加载 `../../assets/test2.pag` 和 `../../resources/font` 下的兜底字体。从终端启动时，libpag 的日志会输出到
+stdout，首帧渲染时会打印当前生效的后端。
+
 ## 运行时
 
 `PAGEngineImpl::InitOnscreenRender()` 使用窗口句柄创建 `GPUDrawable`。在 D3D12 构建下，libpag 会为每个 drawable 输出一次 `GPUDrawable: the window surface uses the D3D12 backend.`，因此可以在控制台或调试器输出中确认当前生效的后端。窗口缩放和最小化恢复使用 D3D12 交换链的客户区尺寸。
