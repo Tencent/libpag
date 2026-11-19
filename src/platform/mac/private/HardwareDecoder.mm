@@ -49,6 +49,10 @@ HardwareDecoder::HardwareDecoder(const VideoFormat& format)
 
 HardwareDecoder::~HardwareDecoder() {
   if (session) {
+    // Non-blocking: asks VideoToolbox to emit any delayed frame but may return before it does, so
+    // teardown never stalls the way a wait-for-frames barrier would. A still-pending context is
+    // handed to the graveyard below instead of waited on.
+    VTDecompressionSessionFinishDelayedFrames(session);
     VTDecompressionSessionInvalidate(session);
     CFRelease(session);
     session = nullptr;
@@ -60,6 +64,9 @@ HardwareDecoder::~HardwareDecoder() {
   }
 
   cleanResources();
+  // Resolved contexts are deleted; a context still pending (a bounded late callback not yet landed)
+  // moves to the graveyard so the callback has a live object to write into.
+  contextPool.drain();
 }
 
 void HardwareDecoder::cleanResources() {
@@ -86,14 +93,6 @@ void HardwareDecoder::cleanResources() {
   pendingFrames.clear();
   outputFrameCaches.clear();
   inputEndOfStream = false;
-}
-
-void DidDecompress(void*, void* sourceFrameRefCon, OSStatus status, VTDecodeInfoFlags,
-                   CVImageBufferRef pixelBuffer, CMTime, CMTime) {
-  if (status == noErr && pixelBuffer) {
-    CVPixelBufferRef* outputPixelBuffer = static_cast<CVPixelBufferRef*>(sourceFrameRefCon);
-    *outputPixelBuffer = CVPixelBufferRetain(pixelBuffer);
-  }
 }
 
 bool HardwareDecoder::initVideoToolBox(const std::vector<std::shared_ptr<tgfx::Data>>& headers,
@@ -139,10 +138,17 @@ bool HardwareDecoder::initVideoToolBox(const std::vector<std::shared_ptr<tgfx::D
 
 bool HardwareDecoder::resetVideoToolBox() {
   if (session) {
+    // Non-blocking emit of any delayed frame, then tear down; a still-pending context is handed to
+    // the graveyard by drain() rather than waited on here.
+    VTDecompressionSessionFinishDelayedFrames(session);
     VTDecompressionSessionInvalidate(session);
     CFRelease(session);
     session = nullptr;
   }
+
+  // Resolved contexts of the old session are deleted; a context still pending moves to the
+  // graveyard so a bounded late callback can still land safely.
+  contextPool.drain();
 
   // create decompression session
   CFDictionaryRef inAttrs = NULL;
@@ -271,9 +277,17 @@ pag::DecodingResult HardwareDecoder::onDecodeFrame() {
   if (sampleBuffer) {
     OSStatus status = 0;
     VTDecodeInfoFlags infoFlags = 0;
+    auto* context = contextPool.create();
 
-    status =
-        VTDecompressionSessionDecodeFrame(session, sampleBuffer, 0, &outputPixelBuffer, &infoFlags);
+    status = VTDecompressionSessionDecodeFrame(session, sampleBuffer, 0, context, &infoFlags);
+
+    outputPixelBuffer = context->takeBuffer();
+    if (status != noErr) {
+      // VideoToolbox will not call back for a rejected frame, so the context needs no callback to
+      // become resolved and is reclaimed below instead of lingering in the graveyard.
+      context->abandon();
+    }
+    contextPool.reclaimResolved();
 
     if (status != noErr && !outputPixelBuffer) {
       LOGE("HardwareDecoder:Decode failed status = %d", (int)status);
