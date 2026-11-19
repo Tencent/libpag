@@ -6,6 +6,8 @@ Windows 示例工程链接的是静态库 `libpag.lib`，因此 GPU 后端由 li
 
 ## 构建
 
+下面的命令都要在仓库根目录执行，`build_pag` 和 `ms-build` 的路径是相对仓库根目录的。
+
 首次使用需安装依赖同步工具并拉取预编译依赖：
 
 ```powershell

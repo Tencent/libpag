@@ -7,6 +7,9 @@ built, not by the demo project. Build libpag for the backend you want, then buil
 
 ## Build
 
+Run every command below from the repository root; the `build_pag` and `ms-build` paths are
+relative to it.
+
 Install the dependency sync tool once and fetch the prebuilt dependencies:
 
 ```powershell
