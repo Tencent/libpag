@@ -39,6 +39,7 @@ class DataBindRuntime;
 class DataContext;
 class Node;
 class TextHolder;
+class VideoExporterImpl;
 struct RuntimeBinding;
 
 /**
@@ -216,7 +217,7 @@ class PAGComposition : public PAGLayer {
   void collectTextHolders(std::vector<std::shared_ptr<TextHolder>>& out) const;
 
   friend class PAGScene;
-  friend class VideoExporter;
+  friend class VideoExporterImpl;
 };
 
 }  // namespace pagx

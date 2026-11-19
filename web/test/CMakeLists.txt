@@ -10,6 +10,7 @@ if (NOT CMAKE_BUILD_TYPE)
 endif ()
 
 option(PAG_USE_WEBGPU "Build the test binary against the WebGPU backend" OFF)
+option(PAG_TEST_ASYNCIFY "Use Asyncify in the WebGPU test binary" ON)
 option(PAG_UPDATE_BASELINE "Record MD5s into the local cache instead of comparing" OFF)
 option(PAG_SKIP_GENERATE_BASELINE_IMAGES "Do not regenerate _base.webp reference images" OFF)
 set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
@@ -38,6 +39,11 @@ set(PAG_USE_PNG_ENCODE ON)
 set(PAG_USE_JPEG_DECODE ON)
 set(PAG_USE_WEBP_ENCODE ON)
 set(PAG_USE_JPEG_ENCODE ON)
+# The async video export lane drives the native-only exporter from the wasm test binary, so keep it
+# in the pag library even though the web platform drops it by default. This is a cache option rather
+# than a plain set() so that an explicit -DPAG_BUILD_WEB_VIDEO_EXPORT_TESTS=OFF is rejected by the
+# root project instead of being silently overridden here.
+option(PAG_BUILD_WEB_VIDEO_EXPORT_TESTS "Keep VideoExporter in the wasm test build" ON)
 
 # Include vendor.cmake before add_subdirectory so that vendor variables (VENDOR_TOOLS_DIR,
 # PLATFORM, ARCH, etc.) are set in this scope. The include_guard(GLOBAL) in vendor.cmake
@@ -167,7 +173,11 @@ set(PAG_TEST_MODE "compare")
 if (PAG_UPDATE_BASELINE)
     set(PAG_TEST_MODE "update")
 endif ()
-set(BUILD_INFO "{\"protocol\":1,\"backend\":\"${PAG_BACKEND_NAME}\",\"mode\":\"${PAG_TEST_MODE}\",\"buildId\":\"${PAG_TEST_BUILD_ID}\",\"sourceRevision\":\"${SOURCE_REVISION}\",\"tgfxRevision\":\"${TGFX_REVISION}\",\"configuration\":\"${CMAKE_BUILD_TYPE}\"}")
+set(PAG_TEST_ASYNCIFY_JSON "false")
+if (PAG_USE_WEBGPU AND PAG_TEST_ASYNCIFY)
+    set(PAG_TEST_ASYNCIFY_JSON "true")
+endif ()
+set(BUILD_INFO "{\"protocol\":1,\"backend\":\"${PAG_BACKEND_NAME}\",\"mode\":\"${PAG_TEST_MODE}\",\"buildId\":\"${PAG_TEST_BUILD_ID}\",\"sourceRevision\":\"${SOURCE_REVISION}\",\"tgfxRevision\":\"${TGFX_REVISION}\",\"asyncify\":${PAG_TEST_ASYNCIFY_JSON},\"configuration\":\"${CMAKE_BUILD_TYPE}\"}")
 file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/build-info.json "${BUILD_INFO}\n")
 file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/tgfx-binding-path.txt "${TGFX_DIR}/web/lib/tgfx.esm.js\n")
 file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/WebTestBuildInfo.h
@@ -206,27 +216,23 @@ target_compile_options(pag-test PRIVATE
         -DEMSCRIPTEN_HAS_UNBOUND_TYPE_NAMES=0
 )
 
-# Asyncify enables synchronous C++ code to await JS Promises. Required for the WebGPU backend
-# where buffer mapping is fully asynchronous: without it, the synchronous readPixels() used by
-# Baseline::Compare busy-waits forever. Only enabled for WebGPU; enabling it on WebGL causes
-# function signature mismatch crashes in indirect calls.
+# Asyncify enables synchronous C++ code to await JS Promises. The full baseline suite requires it
+# on WebGPU. The targeted async video-export driver also supports a non-Asyncify build, where JS
+# yields to the event loop between short C++ polling calls instead of suspending a C++ stack.
 if (PAG_USE_WEBGPU)
-    # ASYNCIFY_REMOVE excludes the shader compilation libraries (tint and friends) from
-    # instrumentation. These are pure CPU computation and never participate in async
-    # operations; instrumenting them corrupts their execution state.
-    set(ASYNCIFY_LINK_OPTIONS
-            -sASYNCIFY=1
-            -sASYNCIFY_STACK_SIZE=262144
-            "-sASYNCIFY_REMOVE=['shaderc*','glslang*','spv::*','spvtools*','tint::*','Glslang*','TShader*','Compile*ToSpv*','SpvCompilat*']"
-    )
+    if (PAG_TEST_ASYNCIFY)
+        # ASYNCIFY_REMOVE excludes pure CPU shader libraries from Asyncify instrumentation.
+        set(ASYNCIFY_LINK_OPTIONS
+                -sASYNCIFY=1
+                -sASYNCIFY_STACK_SIZE=262144
+                "-sASYNCIFY_REMOVE=['shaderc*','glslang*','spv::*','spvtools*','tint::*','Glslang*','TShader*','Compile*ToSpv*','SpvCompilat*']"
+        )
+        target_compile_definitions(pag-test PRIVATE PAG_USE_ASYNCIFY)
+        target_compile_definitions(tgfx PUBLIC TGFX_USE_ASYNCIFY)
+    endif ()
     # The WebTestRunner GL-context guard branches on the backend macro, which the root project
     # only defines for the pag library target, not for the test sources.
     target_compile_definitions(pag-test PRIVATE TGFX_USE_WEBGPU)
-    target_compile_definitions(pag-test PRIVATE PAG_USE_ASYNCIFY)
-    # Mirror tgfx's own web test lane: WebGPUBuffer's synchronous map (EM_ASYNC_JS) is only
-    # compiled with TGFX_USE_ASYNCIFY. Without it requestMapAsync() takes the callback path,
-    # never suspends the stack, and Surface::readPixels() always fails on WebGPU.
-    target_compile_definitions(tgfx PUBLIC TGFX_USE_ASYNCIFY)
     set(WEB_GRAPHICS_LINK_OPTIONS -sUSE_WEBGPU=1)
     # HEAPU8 mirrors the main web build (root CMakeLists.txt): tgfx's web image paths
     # (WebImageBuffer/NativeCodec/ReadPixelsFromCanvasImage) read Module.HEAPU8 directly.
