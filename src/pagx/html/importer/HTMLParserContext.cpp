@@ -50,7 +50,7 @@ namespace {
 // themselves, so this can never classify a transform differently from the layer it describes.
 bool Animates3DTransform(const std::unordered_map<std::string, html::CssKeyframesRule>& rules,
                          const HTMLStyleCascade::PropertyMap& style, HTMLValueParser& valueParser,
-                         const HTMLTransformReference& reference, float pivotZ) {
+                         const HTMLTransformReference& reference) {
   std::vector<std::string> names = {};
   for (const char* property : {"animation-name", "animation"}) {
     const std::string value = LookupProperty(style, property);
@@ -67,7 +67,6 @@ bool Animates3DTransform(const std::unordered_map<std::string, html::CssKeyframe
       }
     }
   }
-  bool animatesTransform = false;
   // Unbound local sink: parsing only answers a yes / no question here, so a stop that fails to parse
   // means "cannot decide" instead of adding a diagnostic the conversion never produced.
   HTMLDiagnosticSink silentDiagnostics(false);
@@ -81,7 +80,6 @@ bool Animates3DTransform(const std::unordered_map<std::string, html::CssKeyframe
         if (ToLower(declaration.first) != "transform") {
           continue;
         }
-        animatesTransform = true;
         Matrix3D pose = {};
         if (ParseCssTransformList(declaration.second, valueParser, silentDiagnostics, &pose,
                                   reference.widthPx, reference.heightPx) &&
@@ -91,9 +89,7 @@ bool Animates3DTransform(const std::unordered_map<std::string, html::CssKeyframe
       }
     }
   }
-  // A pivot in front of the layer plane leaves it even for a flat pose, exactly as `PlacePose` does
-  // for the keyframe it converts.
-  return animatesTransform && std::fabs(pivotZ) > 0.0f;
+  return false;
 }
 
 // Folds a CSS `perspective` declared on the parent into `box`: stores the camera distance and
@@ -787,20 +783,18 @@ void HTMLParserContext::attachParentCamera(HTMLBoxAttributes& box,
     return;
   }
   // A flow / flex child is placed by layout, so it has no offset to subtract and cannot be wrapped.
-  // Report it once per document rather than folding the projection into the wrong point.
+  // Report it once per document rather than folding the projection into the wrong point. Only a pose
+  // that actually leaves the z = 0 plane is projected: `anchorZ` cancels in `T(a) * L * T(-a)` for a
+  // flat `L`, and the projection is the identity on that plane, so a non-zero pivot depth alone must
+  // not count as affected.
   HTMLDiagnosticSink silentDiagnostics(false);
   HTMLValueParser silentParser(silentDiagnostics, _canvasWidth, _canvasHeight);
   const auto& style = _styleCascade->getResolvedStyle(element);
   const HTMLTransformReference reference = _styleCascade->getTransformReferenceSize(element);
-  const HTMLElementAnchor animatedPivot = ResolveElementAnchor(
-      Trim(LookupProperty(style, "transform-origin")), reference, nullptr, silentParser);
-  const float pivotZ = box.transform.valid ? box.transform.originZ : animatedPivot.depth;
   const bool animatesTransform =
-      Animates3DTransform(_styleCascade->keyframes(), style, silentParser, reference, pivotZ);
+      Animates3DTransform(_styleCascade->keyframes(), style, silentParser, reference);
   const bool cameraAffectsPose =
-      (box.transform.valid &&
-       (!IsFlatTransform(box.transform.pose) || std::fabs(box.transform.originZ) > 0.0f)) ||
-      animatesTransform;
+      (box.transform.valid && !IsFlatTransform(box.transform.pose)) || animatesTransform;
   if (!cameraAffectsPose) {
     return;
   }

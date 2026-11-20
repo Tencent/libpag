@@ -172,11 +172,10 @@ bool ParseCssTransformList(const std::string& value, HTMLValueParser& valueParse
  *  - `pose`    — the pushed pose itself. It never carries the pivot: `anchor` is applied by the
  *                runtime after interpolation.
  *
- * The camera is folded in only when it can change the result. A pose that stays on the z = 0 plane
- * is untouched by the projection as long as its pivot depth `anchorZ` is zero too — the projection
- * only divides by `1 - z / distance`, and z is zero across that whole plane. Skipping the fold keeps
- * such a pose on the legal flat path instead of turning it (e.g. `scale(0)`) into a non-invertible
- * 3D pose.
+ * The camera is carried by a wrapper layer and never folded into the pose, so the projection only
+ * matters when the pose itself leaves the z = 0 plane: on that plane it divides by a z that is zero
+ * everywhere. A pivot depth `anchorZ` does not change that — `T(a) * L * T(-a)` maps the plane onto
+ * itself for a flat `L` — so a non-zero depth alone must not count as affected.
  */
 struct PosePlacement {
   bool valid = false;

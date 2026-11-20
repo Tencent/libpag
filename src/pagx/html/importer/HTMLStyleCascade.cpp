@@ -845,7 +845,6 @@ void HTMLStyleCascade::parseBoxTransform(HTMLBoxAttributes& box, const PropertyM
   HTMLTransform parsed = {};
   parsed.valid = true;
   parsed.pose = pose;
-  parsed.originZ = anchor.depth;
   parsed.originValue = originValue;
   parsed.reference = reference;
   // A percentage / keyword origin only resolves against a laid-out box, which does not exist yet: the

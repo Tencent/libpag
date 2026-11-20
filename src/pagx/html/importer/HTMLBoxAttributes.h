@@ -155,9 +155,6 @@ struct HTMLInheritedStyle {
 struct HTMLTransform {
   bool valid = false;
   Matrix3D pose = {};
-  // Pivot depth resolved against the reference size. Read by `attachParentCamera`'s "does the parent
-  // camera affect this pose" test, which runs before the layer (and thus the final pivot) exists.
-  float originZ = 0.0f;
   // Authored `transform-origin` plus the box size the cascade resolved it against. Kept unresolved so
   // the layer builder can finish the shared fallback chain once the final layer size is known.
   std::string originValue = {};

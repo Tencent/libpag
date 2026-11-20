@@ -789,6 +789,48 @@ PAG_TEST(PAGXHTML3DTest, PlainFlowChildUnderPerspectiveDoesNotWarn) {
 }
 
 /**
+ * Test case: a pivot depth alone does not take a pose off the z = 0 plane — `T(a) * L * T(-a)` maps
+ * that plane onto itself for a flat `L`, and the projection divides by a z that is zero there. A 2D
+ * animation with a 3D `transform-origin` therefore must not report a dropped projection, while a
+ * static `rotateY` on the same pivot still does.
+ */
+PAG_TEST(PAGXHTML3DTest, PivotDepthAloneDoesNotLeaveTheLayerPlane) {
+  auto animated = ParseHtml(R"HTML(
+    <html><head><style>
+      @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(40deg); } }
+    </style></head>
+    <body style="width:300px;height:120px">
+      <div style="position:absolute;left:10px;top:10px;width:200px;height:100px;display:flex;
+           perspective:600px">
+        <div style="width:100px;height:60px;background-color:#38BDF8;
+             transform-origin:50% 50% 30px;animation:spin 1s linear infinite"></div>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(animated, nullptr);
+  EXPECT_FALSE(HasDiagnosticContaining(animated, "vanishing point"))
+      << "a flat animation stays on the z = 0 plane whatever the pivot depth";
+
+  auto state = ParseHtml(R"HTML(
+    <html><body style="width:300px;height:120px">
+      <div style="position:absolute;left:10px;top:10px;width:200px;height:100px;display:flex;
+           perspective:600px">
+        <div style="width:100px;height:60px;background-color:#38BDF8;
+             transform-origin:50% 50% 30px;transform:rotateY(40deg)"></div>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(state, nullptr);
+  int warnings = 0;
+  for (const auto& message : state->errors) {
+    if (message.find("vanishing point") != std::string::npos) {
+      warnings++;
+    }
+  }
+  EXPECT_EQ(warnings, 1) << "a static 3D pose under a flow parent still reports the dropped camera";
+}
+
+/**
  * Test case: a flow / flex child has no resolved offset from the parent's box, so the parent camera
  * cannot be projected around the exact vanishing point. That has to be reported once per document
  * instead of silently shifting the centre of every such child.
