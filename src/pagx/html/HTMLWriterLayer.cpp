@@ -1430,7 +1430,7 @@ void HTMLWriter::renderTextBoxWithSpans(HTMLBuilder& out, const TextBox* tb) {
       }
       out.openTag("span");
       {
-        auto animId = _ctx->claimAnimatedDomId({span.fill, span.text});
+        auto animId = _ctx->claimAnimatedDomId({span.fill, span.stroke, span.text});
         if (!animId.empty()) {
           out.addAttr("id", animId);
         }
@@ -1580,7 +1580,7 @@ void HTMLWriter::renderTextBoxAsRichText(HTMLBuilder& out, const TextBox* tb,
     }
     out.openTag("span");
     {
-      auto animId = _ctx->claimAnimatedDomId({span.fill, span.text});
+      auto animId = _ctx->claimAnimatedDomId({span.fill, span.stroke, span.text});
       if (!animId.empty()) {
         out.addAttr("id", animId);
       }

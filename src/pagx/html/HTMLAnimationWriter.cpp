@@ -75,6 +75,11 @@ namespace {
 using pag::FloatNearlyZero;
 using pag::RadiansToDegrees;
 
+// Name of the registered custom property that carries a span's animated text stroke width. One name
+// serves the whole document: custom properties are per element, so spans that share a keyframes rule
+// still animate their own copy. Chromium does not interpolate `-webkit-text-stroke-width` itself.
+constexpr const char* kTextStrokeWidthVar = "--pagx-text-stroke-width";
+
 // tgfx fakes italic by shearing the chosen face with Matrix::postSkew(ITALIC_SKEW = -0.2, 0) about
 // the baseline, so the CSS equivalent is a skew of atan(0.2) pivoting on that same baseline.
 float FauxItalicSkewDegrees() {
@@ -667,11 +672,39 @@ size_t FindEnclosingSvgStart(const std::string& html, size_t pos) {
   return std::string::npos;
 }
 
+// Rewrites the width of a span's text stroke declarations so they read the animated variable, keeping
+// the authored width as its fallback. The width cannot ride on the `-webkit-text-stroke` shorthand's
+// own animation: Chromium treats `-webkit-text-stroke-width` as non-interpolable and steps it at the
+// midpoint. A separate longhand declaration would not work either — the style extractor hoists
+// declarations into class rules by value, and a class carrying the shorthand (which resets the width)
+// would win over the longhand. Every declaration is bound because a span can carry both the real
+// Stroke and the faux-bold emulation, and each writes the same property.
+bool BindTextStrokeWidthVars(std::string& style) {
+  static const std::string strokeProp = "-webkit-text-stroke:";
+  bool bound = false;
+  size_t pos = style.find(strokeProp);
+  while (pos != std::string::npos) {
+    size_t widthStart = pos + strokeProp.size();
+    size_t widthEnd = style.find(' ', widthStart);
+    if (widthEnd == std::string::npos) {
+      return bound;
+    }
+    std::string fallback = style.substr(widthStart, widthEnd - widthStart);
+    style.replace(widthStart, widthEnd - widthStart,
+                  std::string("var(") + kTextStrokeWidthVar + ", " + fallback + ")");
+    bound = true;
+    size_t colorEnd = style.find(';', widthEnd);
+    pos = style.find(strokeProp, colorEnd == std::string::npos ? style.size() : colorEnd);
+  }
+  return bound;
+}
+
 // Builds the opening tag text with the animation declarations added to its style attribute. A tag
 // without a style attribute gets one after its last attribute. `tagStr` is the opening tag without
 // its closing '>', so the new attribute goes at the end, or before the '/' of a self-closing tag.
 std::string BuildWovenTag(const std::string& tagStr, const std::string& animDecl,
-                          bool needsZeroTransformOrigin) {
+                          bool needsZeroTransformOrigin, bool consumesTextStrokeWidthVar,
+                          bool fauxBoldStrokeWidth) {
   std::string woven = tagStr;
   size_t stylePos = woven.find(" style=\"");
   if (stylePos != std::string::npos) {
@@ -684,6 +717,20 @@ std::string BuildWovenTag(const std::string& tagStr, const std::string& animDecl
           styleVal += ';';
         }
         styleVal += "transform-origin:0 0";
+      }
+      if (consumesTextStrokeWidthVar) {
+        bool bound = BindTextStrokeWidthVars(styleVal);
+        // A faux-bold-only span has nothing to bind: the emulation exists only while the animation
+        // says the text is bold, so the document never wrote a text stroke for it. The properties the
+        // rule animates are declared here instead; the width starts at zero and is invisible until
+        // the rule raises it.
+        if (!bound && fauxBoldStrokeWidth) {
+          if (!styleVal.empty() && styleVal.back() != ';') {
+            styleVal += ';';
+          }
+          styleVal += "-webkit-text-stroke-color:currentColor;";
+          styleVal += std::string("-webkit-text-stroke-width:var(") + kTextStrokeWidthVar + ")";
+        }
       }
       if (!styleVal.empty() && styleVal.back() != ';') {
         styleVal += ';';
@@ -2369,10 +2416,13 @@ bool HasSolidPaint(const ColorSource* source) {
   return source != nullptr && source->nodeType() == NodeType::SolidColor;
 }
 
+bool IsSvgShapeTag(const std::string& tagName) {
+  return tagName == "path" || tagName == "rect" || tagName == "ellipse" || tagName == "use";
+}
+
 void EmitPaintCssAtFrame(const BundleChannelSet& chSet, const std::string& tagName, Frame t,
                          std::string& decls) {
-  bool isSvgShape =
-      (tagName == "path" || tagName == "rect" || tagName == "ellipse" || tagName == "use");
+  bool isSvgShape = IsSvgShapeTag(tagName);
   // PAGX paints with the color's own alpha multiplied by the painter alpha. A keyframe stop
   // replaces the element's static paint, so each stop re-emits that product, taking the static
   // value for whichever factor is not animated. The product is folded into the paint color rather
@@ -2423,7 +2473,11 @@ void EmitPaintCssAtFrame(const BundleChannelSet& chSet, const std::string& tagNa
   }
   if (chSet.strokeWidthCh != nullptr) {
     float sw = EvalFloatChannel(chSet.strokeWidthCh, t, 1.0f);
-    AppendCssDecl(decls, isSvgShape ? "stroke-width" : "-webkit-text-stroke-width",
+    // Chromium does not interpolate `-webkit-text-stroke-width`: a stop holding it steps between
+    // values at the animation midpoint, so a span stroke popped instead of growing. The width is
+    // animated through a registered custom property instead (see kTextStrokeWidthVar), which the
+    // element's static `-webkit-text-stroke-width` consumes.
+    AppendCssDecl(decls, isSvgShape ? "stroke-width" : kTextStrokeWidthVar,
                   CssFloatToString(sw) + "px");
   }
   if (chSet.miterLimitCh != nullptr) {
@@ -2913,7 +2967,9 @@ std::string EvaluateKeyframeCssDecls(const DomTargetBundle& bundle, const Bundle
                      ? EvalFloatChannel(chSet.fontSizeCh, t, text->renderFontSize())
                      : text->renderFontSize();
     float width = bold ? FauxBoldStrokeWidth(size) : 0.0f;
-    AppendCssDecl(decls, "-webkit-text-stroke-width", CssFloatToString(width) + "px");
+    // The emulated width rides the same registered variable as a real Stroke's width: both paint the
+    // one CSS property, so the rule that comes later has to stay the winner.
+    AppendCssDecl(decls, kTextStrokeWidthVar, CssFloatToString(width) + "px");
     AppendCssDecl(decls, "-webkit-text-stroke-color", "currentColor");
   }
   if (!wantsRest) {
@@ -5182,6 +5238,18 @@ std::string HTMLAnimationSession::emitKeyframesAndWeave(std::string& bodyHtml) {
           }
           edits.animDecls[element.id].push_back(shorthand);
           edits.playStates[element.id].push_back(mount.playing);
+          if (!IsSvgShapeTag(element.tagName)) {
+            unsigned drivers = 0;
+            if (chSet.strokeWidthCh != nullptr) {
+              drivers |= ElementEdits::RealStrokeWidth;
+            }
+            if (chSet.fauxBoldCh != nullptr) {
+              drivers |= ElementEdits::FauxBoldWidth;
+            }
+            if (drivers != 0) {
+              edits.textStrokeWidthVars[element.id] |= drivers;
+            }
+          }
           // Only an element whose own filter is animated gets the wrapper: the reference must leave
           // the animated declaration, and without an animated declaration the static filter already
           // holds the full chain (wrapping then would blend twice).
@@ -5208,6 +5276,11 @@ std::string HTMLAnimationSession::emitKeyframesAndWeave(std::string& bodyHtml) {
 
   ApplyElementEdits(bodyHtml, tagIndex.rangeById, edits);
 
+  if (!edits.textStrokeWidthVars.empty()) {
+    keyframesCss = std::string("@property ") + kTextStrokeWidthVar +
+                   " {\n  syntax: '<length>';\n  inherits: false;\n  initial-value: 0px;\n}\n" +
+                   keyframesCss;
+  }
   return keyframesCss;
 }
 
@@ -5358,9 +5431,13 @@ void HTMLAnimationSession::ApplyElementEdits(
     bool liftsSvgClip = liftIt != edits.liftsSvgClip.end() && liftIt->second;
     size_t tagStart = rangeIt->second.first;
     size_t tagEnd = rangeIt->second.second;
+    auto strokeVarIt = edits.textStrokeWidthVars.find(elementId);
+    unsigned strokeDrivers =
+        strokeVarIt != edits.textStrokeWidthVars.end() ? strokeVarIt->second : 0u;
     textEdits.push_back(
         {tagStart, tagEnd,
-         BuildWovenTag(bodyHtml.substr(tagStart, tagEnd - tagStart), combined, needsZeroOrigin)});
+         BuildWovenTag(bodyHtml.substr(tagStart, tagEnd - tagStart), combined, needsZeroOrigin,
+                       strokeDrivers != 0, (strokeDrivers & ElementEdits::FauxBoldWidth) != 0)});
     // The SVG viewport is sized for the static paint, so a shape whose animation widens its painted
     // extent would be clipped; lift the clipping on the hosting <svg> while keeping its viewport.
     if (liftsSvgClip) {

@@ -85,6 +85,15 @@ class HTMLAnimationSession {
     std::unordered_map<std::string, bool> needsZeroOrigin = {};
     std::unordered_map<std::string, bool> liftsSvgClip = {};
     std::unordered_map<std::string, std::vector<bool>> playStates = {};
+    // Elements whose text stroke width is animated, and which of the two semantics drives it: a real
+    // Stroke, or the faux-bold emulation that strokes the glyph with the current colour. Their
+    // `-webkit-text-stroke-width` has to read the registered custom property the keyframes animate,
+    // because Chromium does not interpolate the width itself.
+    enum TextStrokeWidthDriver : unsigned {
+      RealStrokeWidth = 1,
+      FauxBoldWidth = 2,
+    };
+    std::unordered_map<std::string, unsigned> textStrokeWidthVars = {};
     // Elements whose animated `filter` would otherwise carry a residual SVG reference (a blend, an
     // inner shadow). Value is the ready-made `url(#id)` reference that goes on the wrapper. Chromium
     // treats a filter list containing a `url()` as non-interpolable and steps the whole list, so the
