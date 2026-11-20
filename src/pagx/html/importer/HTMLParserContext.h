@@ -318,9 +318,16 @@ class HTMLParserContext {
   // lets the projection be centred on `perspective-origin` instead of the layer origin.
   // Camera to wrap onto a child's layer, keyed by that child node: converting a child recurses, so a
   // single slot would be overwritten by the grandchild before the child is attached.
-  std::unordered_map<const DOMNode*, HTMLParentCamera> _pendingChildCamera = {};
+  struct PendingCamera {
+    HTMLParentCamera camera = {};
+    // Size of the box that declared the camera; the wrapper keeps it as its layout reference.
+    float referenceWidthPx = NAN;
+    float referenceHeightPx = NAN;
+  };
+  std::unordered_map<const DOMNode*, PendingCamera> _pendingChildCamera = {};
 
-  Layer* wrapInCameraLayer(Layer* child, const HTMLParentCamera& camera);
+  Layer* wrapInCameraLayer(Layer* child, const HTMLParentCamera& camera, float referenceWidthPx,
+                           float referenceHeightPx);
 
   // Recorded during `assignElementId` and processed after the whole tree is built (so background
   // fills used by `color` channels already exist).

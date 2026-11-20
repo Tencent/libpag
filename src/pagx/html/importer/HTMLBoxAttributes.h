@@ -77,6 +77,11 @@ struct HTMLInheritedStyle {
   // direct children only. The origin is the parent's `perspective-origin` in the parent's local
   // coordinates; the child subtracts its own offset to express it locally.
   HTMLParentCamera parentCamera = {};
+  // The declaring box's content size. The camera wrapper stands in for that box in the layer tree, so
+  // it has to keep the same size or percentage / centre constraints of its children resolve against
+  // a zero-sized reference.
+  float parentWidthPx = NAN;
+  float parentHeightPx = NAN;
   std::string color = {};
   std::string fontFamily = {};
   std::string fontSize = {};
