@@ -1708,11 +1708,12 @@ PAG_TEST(PAGXHTML3DTest, ScaleZeroPopInUnderPerspectiveKeepsItsStart) {
 }
 
 /**
- * Test case: a singular static pose (`scale(0)`) under a 3D keyframe track. The fill-mode holds
- * cannot carry an all-zero `matrix3D` (PAGX rejects non-invertible keyframes and a re-import would
- * read the identity), so they collapse to a tiny invertible scale instead of breaking the file.
+ * Test case: a singular static pose (`scale(0)`) under a 3D keyframe track. PAGX persists
+ * `matrix3D` keyframes only when they are invertible, so the fill-mode holds have no form that can
+ * carry the authored pose: they hold the identity and the substitution is reported once instead of
+ * faking a tiny scale the author never wrote.
  */
-PAG_TEST(PAGXHTML3DTest, SingularStaticPoseKeepsTheFillHoldsInvertible) {
+PAG_TEST(PAGXHTML3DTest, SingularStaticPoseFallsBackToIdentityInFillHolds) {
   auto doc = ParseHtml(R"HTML(
     <html><head><style>
       @keyframes k { 0% { transform: rotateY(0deg); } 100% { transform: rotateY(60deg); } }
@@ -1732,9 +1733,17 @@ PAG_TEST(PAGXHTML3DTest, SingularStaticPoseKeepsTheFillHoldsInvertible) {
   for (const auto& key : channel->keyframes) {
     EXPECT_TRUE(pagx::IsInvertibleMatrix3D(key.value)) << "time " << key.time;
   }
-  // `scale(0)` renders nothing; the holds keep that by collapsing the linear block.
-  EXPECT_LT(std::fabs(channel->keyframes.front().value.getRowColumn(0, 0)), 1e-3f);
-  EXPECT_GT(std::fabs(channel->keyframes.front().value.getRowColumn(0, 0)), 1e-6f);
+  EXPECT_TRUE(channel->keyframes.front().value.isIdentity())
+      << "the leading hold cannot carry scale(0)";
+  EXPECT_TRUE(channel->keyframes.back().value.isIdentity())
+      << "the trailing hold cannot carry scale(0)";
+  int warnings = 0;
+  for (const auto& message : doc->errors) {
+    if (message.find("animation-fill-mode") != std::string::npos) {
+      warnings++;
+    }
+  }
+  EXPECT_EQ(warnings, 1) << "the identity fallback must be reported exactly once";
 }
 
 /**

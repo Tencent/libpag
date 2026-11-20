@@ -433,22 +433,6 @@ bool ResolveShapePivot(const std::unordered_map<std::string, std::string>& style
   return true;
 }
 
-// A singular pose (`scale(0)`) cannot travel on the `matrix3D` channel: PAGX rejects a
-// non-invertible keyframe, and an all-zero matrix would come back as the identity on re-import.
-// Collapsing the linear block to a tiny uniform scale keeps the element as invisible as `scale(0)`
-// renders while staying valid; the translation column is preserved.
-Matrix3D CollapseSingularPose(const Matrix3D& pose) {
-  static constexpr float COLLAPSED_SCALE = 1e-4f;
-  Matrix3D collapsed = {};
-  collapsed.setRowColumn(0, 0, COLLAPSED_SCALE);
-  collapsed.setRowColumn(1, 1, COLLAPSED_SCALE);
-  collapsed.setRowColumn(2, 2, COLLAPSED_SCALE);
-  for (int row = 0; row < 3; ++row) {
-    collapsed.setRowColumn(row, 3, pose.getRowColumn(row, 3));
-  }
-  return collapsed;
-}
-
 // Ordering predicate for keyframe stops by ascending offset.
 bool KeyframeStopLess(const CssKeyframeStop& a, const CssKeyframeStop& b) {
   return a.percent < b.percent;
@@ -612,12 +596,32 @@ void ExpandSteps(std::vector<Keyframe<T>>& keys, int n, ResolvedEasing::Jump jum
 // the 100% terminal stop (e.g. only 0% or 0%+50%): everything past the last authored keyframe
 // would be clamped to the baseline instead of holding the last value across the rest of the
 // active duration.
+// How `animation-fill-mode` maps onto one keyframe track: which side of the active window keeps the
+// baseline, and whether a hold is written at all. The last flag matters to callers that have to
+// supply a representable baseline value: with no hold, the value is never used.
+struct FillModeRange {
+  bool fillBackwards = false;
+  bool fillForwards = false;
+  bool writesBaseline = false;
+};
+
+FillModeRange ResolveFillModeRange(const std::string& fillMode, Frame firstKeyTime,
+                                   bool loopOnce) {
+  FillModeRange range = {};
+  range.fillBackwards = (fillMode == "backwards" || fillMode == "both");
+  range.fillForwards = (fillMode == "forwards" || fillMode == "both");
+  range.writesBaseline = (firstKeyTime > ZeroFrame && !range.fillBackwards) ||
+                         (loopOnce && !range.fillForwards);
+  return range;
+}
+
 template <typename T>
 void ApplyFillMode(std::vector<Keyframe<T>>& keys, const std::string& fillMode, const T& baseline,
                    bool loopOnce, Frame activeEnd) {
   if (keys.empty()) return;
-  bool fillBackwards = (fillMode == "backwards" || fillMode == "both");
-  bool fillForwards = (fillMode == "forwards" || fillMode == "both");
+  const FillModeRange range = ResolveFillModeRange(fillMode, keys.front().time, loopOnce);
+  bool fillBackwards = range.fillBackwards;
+  bool fillForwards = range.fillForwards;
   // Pre-active baseline. CSS `none` and `forwards` both display the baseline before the animation
   // starts; `backwards` and `both` extrapolate the first keyframe value backwards instead. Skipped
   // when the first keyframe already lives at frame 0 (no gap to fill).
@@ -1517,12 +1521,6 @@ bool HTMLAnimationBuilder::buildForElement(
   // identity and the fill-mode holds would hide it before the animation starts and after it ends.
   const Matrix matrixChannelBaseline = baselineMatrix;
   Matrix3D matrix3DChannelBaseline = ComposeLayerTransform3DWithoutAnchor(layer);
-  if (!IsInvertibleMatrix3D(matrix3DChannelBaseline)) {
-    // Fill-mode can only restore a representable pose. The static pose here is singular (`scale(0)`),
-    // which PAGX cannot persist, so the hold keeps the element as invisible as the authored pose
-    // would, at the cost of being an approximation rather than the exact value.
-    matrix3DChannelBaseline = CollapseSingularPose(matrix3DChannelBaseline);
-  }
   Color baselineColor = {};
   SolidColor* baselineSolid = nullptr;
   if (!colorKeys.empty()) {
@@ -1555,6 +1553,18 @@ bool HTMLAnimationBuilder::buildForElement(
     loopMode = LoopMode::Loop;
   }
   bool loopOnce = (loopMode == LoopMode::Once);
+
+  if (!matrix3DKeys.empty() && !IsInvertibleMatrix3D(matrix3DChannelBaseline) &&
+      ResolveFillModeRange(spec.fillMode, matrix3DKeys.front().time, loopOnce).writesBaseline) {
+    // PAGX persists `matrix3D` keyframes only when they are invertible, so a singular static pose
+    // such as `scale(0)` has no form the hold can carry. Keep the authored pose untouched on the
+    // layer and hold the identity instead, which is a visible deviation from CSS: say so rather
+    // than fabricating a scale the author never wrote.
+    _diagnostics.warn(
+        "html: the static transform has no invertible pose, so animation-fill-mode cannot hold it; "
+        "the hold uses the identity [subset:animation-unsupported-property]");
+    matrix3DChannelBaseline = {};
+  }
 
   // Inject baseline hold keyframes per CSS `animation-fill-mode`. ApplyFillMode operates
   // independently on each channel and is a no-op for channels with no keyframes. The active end
