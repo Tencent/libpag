@@ -4039,10 +4039,11 @@ CLI_TEST(PAGXHtmlTest, AnimationTextModifierStrokeNeedsTheTextStroke) {
   ASSERT_FALSE(html.empty());
   auto tag = FindTagContaining(html, "id=\"strokeMod_g0\"");
   ASSERT_FALSE(tag.empty()) << html;
-  // The colour is the text's own painter at the start of the ramp; the width starts from the
-  // painter's 2px and mixes towards the modifier's 1.5px by the glyph factor (0.25 for the first
-  // glyph), which is 1.875px, then reaches 3px at the end.
-  EXPECT_NE(tag.find("stroke=\"#1E1B4B\""), std::string::npos) << tag;
+  // Both the colour and the width mix towards the modifier by the glyph factor (0.25 for the first
+  // glyph): #1E1B4B towards the modifier's stroke colour is #1A315C, and the 2px painter becomes
+  // 1.875px, then reaches 3px at the end. The SVG route used to keep the painter's colour, which
+  // made a fully covered selector draw the authored outline instead of the modifier's.
+  EXPECT_NE(tag.find("stroke=\"#1A315C\""), std::string::npos) << tag;
   auto first = KeyframeStopOf(html, "id=\"strokeMod_g0\"", "0%");
   ASSERT_FALSE(first.empty()) << html;
   EXPECT_NE(first.find("stroke-width: 1.875px"), std::string::npos) << first;
