@@ -510,11 +510,11 @@ animation uses the cheaper `x` / `y` channels (which stack on top of the layout-
 A flat pose routes the whole affine through one `matrix` channel, and a pose with depth or
 perspective through one `matrix3D` channel. Rejection and regularization happen at different stages
 and must not be conflated: a stop whose pose cannot be placed is rejected while it is parsed (that
-stop is dropped), whereas a flat stop the placement already accepted — `scale(0)` is the canonical
-case — is regularized by the router, which collapses it to a 1e-4 uniform scale so its time and
-translation survive and a pop-in keeps its start. That collapse is an approximation of an
-unrepresentable keyframe, not an equivalent encoding: `matrix3D` keyframes themselves must stay
-invertible, exactly like a static 3D pose. Neither channel carries the pivot:
+stop is dropped), and a flat stop the placement already accepted — `scale(0)` is the canonical case —
+becomes singular when it is lifted onto `matrix3D`, which PAGX cannot persist because every
+`matrix3D` keyframe must be invertible. Such a stop is dropped and reported
+(`subset:animation-unsupported-property`) rather than replaced by a substitute pose: a fabricated
+tiny scale would not be the value the author wrote. Neither channel carries the pivot:
 `transform-origin` stays on the animated layer as `anchor` / `anchorZ`, which the runtime applies
 once after interpolation, so the pivot cannot drift between keyframes. Layout-affecting properties
 (`width`, `height`, `margin`, `padding`, `gap`, `flex`, …) are never animatable (see §4.4) and are

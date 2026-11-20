@@ -1061,14 +1061,13 @@ void HTMLAnimationBuilder::addAnimation(Animation* animation, Frame originalDela
 // `matrix3D`. A static `matrix3D` outranks `matrix` in the runtime priority, so a flat keyframe route
 // has to be lifted in that case or the renderer never reads it. None of the channels carries the
 // pivot: `transform-origin` stays on the layer as `anchor`.
-void RouteTransformStops(const std::vector<std::pair<Frame, Matrix3D>>& stops,
-                         bool allPureTranslate, bool allFlat, const Layer& layer,
-                         KeyframeInterpolationType interp, std::vector<Keyframe<float>>* xKeys,
-                         std::vector<Keyframe<float>>* yKeys,
-                         std::vector<Keyframe<Matrix>>* matrixKeys,
-                         std::vector<Keyframe<Matrix3D>>* matrix3DKeys) {
+int RouteTransformStops(const std::vector<std::pair<Frame, Matrix3D>>& stops, bool allPureTranslate,
+                        bool allFlat, const Layer& layer, KeyframeInterpolationType interp,
+                        std::vector<Keyframe<float>>* xKeys, std::vector<Keyframe<float>>* yKeys,
+                        std::vector<Keyframe<Matrix>>* matrixKeys,
+                        std::vector<Keyframe<Matrix3D>>* matrix3DKeys) {
   if (stops.empty()) {
-    return;
+    return 0;
   }
   const bool hasStaticPose = !layer.matrix.isIdentity() || !layer.matrix3D.isIdentity();
   const bool staticPoseIs3D = !layer.matrix3D.isIdentity();
@@ -1078,29 +1077,33 @@ void RouteTransformStops(const std::vector<std::pair<Frame, Matrix3D>>& stops,
       xKeys->push_back({stop.first, affine.tx, interp, {}, {}});
       yKeys->push_back({stop.first, affine.ty, interp, {}, {}});
     }
-    return;
+    return 0;
   }
   if (allFlat && !staticPoseIs3D) {
     for (const auto& stop : stops) {
       matrixKeys->push_back({stop.first, ToAffine2D(stop.second), interp, {}, {}});
     }
-    return;
+    return 0;
   }
+  int dropped = 0;
   for (const auto& stop : stops) {
-    Matrix3D pose = IsFlatTransform(stop.second)
-                        ? LiftMatrixToMatrix3D(ToAffine2D(stop.second), 0.0f)
-                        : stop.second;
+    const Matrix3D pose = IsFlatTransform(stop.second)
+                              ? LiftMatrixToMatrix3D(ToAffine2D(stop.second), 0.0f)
+                              : stop.second;
     // PAGX requires every `matrix3D` keyframe to be invertible, and a flat stop that is singular
-    // (e.g. `scale(0)`) becomes one as soon as it is lifted. Collapsing it instead of dropping it
-    // keeps the stop on the timeline, so a pop-in start does not disappear.
+    // (e.g. `scale(0)`) becomes one as soon as it is lifted. Such a pose cannot be persisted: a
+    // substituted 1e-4 scale would not be what the author wrote, so the stop is dropped and counted
+    // instead of being faked into shape.
     if (!IsInvertibleMatrix3D(pose)) {
-      pose = CollapseSingularPose(pose);
+      dropped++;
+      continue;
     }
     // A single track may mix projected and unprojected stops: the projection only divides w by
     // `1 - z / d`, so it is the identity on the z = 0 plane and a flat stop renders the same either
     // way. The endpoints stay exact and the runtime interpolates between them.
     matrix3DKeys->push_back({stop.first, pose, interp, {}, {}});
   }
+  return dropped;
 }
 
 bool HTMLAnimationBuilder::buildForElement(
@@ -1419,8 +1422,16 @@ bool HTMLAnimationBuilder::buildForElement(
           "differ from CSS [subset:animation-unsupported-property]");
     }
   }
-  RouteTransformStops(transformStops, transformAllPureTranslate, transformAllFlat, *layer, interp,
-                      &xKeys, &yKeys, &matrixKeys, &matrix3DKeys);
+  const int droppedStops =
+      RouteTransformStops(transformStops, transformAllPureTranslate, transformAllFlat, *layer,
+                          interp, &xKeys, &yKeys, &matrixKeys, &matrix3DKeys);
+  if (droppedStops > 0) {
+    // The author's pose cannot be persisted (PAGX requires invertible `matrix3D` keyframes). Say so
+    // instead of substituting an approximation that would look like the authored value.
+    _diagnostics.warn("html: " + std::to_string(droppedStops) +
+                      " transform keyframe(s) have no invertible pose and cannot be represented; "
+                      "dropped [subset:animation-unsupported-property]");
+  }
 
   // Apply bezier handles between consecutive keyframes for each channel.
   ApplyBezierHandles(alphaKeys, interp, easing.x1, easing.y1, easing.x2, easing.y2);
@@ -1507,6 +1518,9 @@ bool HTMLAnimationBuilder::buildForElement(
   const Matrix matrixChannelBaseline = baselineMatrix;
   Matrix3D matrix3DChannelBaseline = ComposeLayerTransform3DWithoutAnchor(layer);
   if (!IsInvertibleMatrix3D(matrix3DChannelBaseline)) {
+    // Fill-mode can only restore a representable pose. The static pose here is singular (`scale(0)`),
+    // which PAGX cannot persist, so the hold keeps the element as invisible as the authored pose
+    // would, at the cost of being an approximation rather than the exact value.
     matrix3DChannelBaseline = CollapseSingularPose(matrix3DChannelBaseline);
   }
   Color baselineColor = {};

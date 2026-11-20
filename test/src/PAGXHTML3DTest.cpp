@@ -1596,7 +1596,12 @@ PAG_TEST(PAGXHTML3DTest, BodyPerspectiveReachesItsChildren) {
  * the stop collapses to a tiny uniform scale: the element stays invisible at the pop-in instead of
  * losing that stop (which would start the animation at the rotated pose).
  */
-PAG_TEST(PAGXHTML3DTest, SingularFlatStopKeepsThePopInOnMatrix3D) {
+/**
+ * Test case: a singular flat stop (`scale(0)`) on a track whose other stop is 3D cannot be persisted,
+ * because PAGX requires every `matrix3D` keyframe to be invertible. The importer drops that stop and
+ * says so instead of substituting a fake pose; the remaining stop keeps its own (unprojected) values.
+ */
+PAG_TEST(PAGXHTML3DTest, SingularFlatStopIsDroppedAndReported) {
   auto doc = ParseHtml(R"HTML(
     <html><head><style>
       @keyframes k { 0% { transform: scale(0); } 100% { transform: rotateY(45deg); } }
@@ -1609,24 +1614,24 @@ PAG_TEST(PAGXHTML3DTest, SingularFlatStopKeepsThePopInOnMatrix3D) {
     </body></html>
   )HTML");
   ASSERT_NE(doc, nullptr);
-  EXPECT_FALSE(HasDiagnosticContaining(doc, "not invertible"));
+  EXPECT_TRUE(HasDiagnosticContaining(doc, "cannot be represented"))
+      << "an unrepresentable stop has to be reported, not approximated";
   auto* animation = FirstAnimation(doc);
   ASSERT_NE(animation, nullptr);
   auto* channel = FindMatrix3DChannel(animation);
   ASSERT_NE(channel, nullptr);
-  ASSERT_EQ(channel->keyframes.size(), 2u) << "the scale(0) start must not be dropped";
-  for (const auto& key : channel->keyframes) {
-    EXPECT_TRUE(pagx::IsInvertibleMatrix3D(key.value)) << "time " << key.time;
+  // The singular 0% stop is gone; what remains is the representable 100% stop plus the closing hold.
+  ASSERT_EQ(channel->keyframes.size(), 2u) << "only representable stops survive";
+  bool sawAuthoredRotation = false;
+  for (const auto& frame : channel->keyframes) {
+    EXPECT_TRUE(pagx::IsInvertibleMatrix3D(frame.value));
+    EXPECT_TRUE(NearlyEqual(frame.value.getRowColumn(3, 0), 0.0f, 1e-6f));
+    if (NearlyEqual(std::fabs(frame.value.getRowColumn(0, 0)), 0.707106f, 0.01f)) {
+      sawAuthoredRotation = true;
+    }
   }
-  // `scale(0)` renders nothing; the collapsed linear block keeps that while staying invertible.
-  EXPECT_LT(std::fabs(channel->keyframes.front().value.getRowColumn(0, 0)), 1e-3f);
-  EXPECT_GT(std::fabs(channel->keyframes.front().value.getRowColumn(0, 0)), 1e-6f);
-  // The camera is not part of the track any more: it lives on the wrapper, so every stop stays a pure
-  // pose and the projection is applied once, after interpolation.
-  for (const auto& key : channel->keyframes) {
-    EXPECT_TRUE(NearlyEqual(key.value.getRowColumn(3, 0), 0.0f, 1e-6f)) << "time " << key.time;
-    EXPECT_TRUE(NearlyEqual(key.value.getRowColumn(3, 2), 0.0f, 1e-6f)) << "time " << key.time;
-  }
+  EXPECT_TRUE(sawAuthoredRotation)
+      << "the surviving stop is the authored rotateY(45deg), not a substituted scale";
   auto* card = FindLayerById(doc, "card");
   ASSERT_NE(card, nullptr);
   ASSERT_NE(CameraWrapperOf(doc, card), nullptr) << "the camera must survive on a wrapper";
