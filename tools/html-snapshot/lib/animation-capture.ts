@@ -418,8 +418,10 @@ export function pagxExtractTranslate(
 // friendly compound-string branch only reaches here from the WAAPI / transition
 // path; there we still fold a non-identity linear part into a `matrix(...)` via
 // a temporary element so scale / rotate authored directly in keyframes is kept
-// too, and fall back to translate-only extraction when the value cannot be
-// resolved to a matrix (e.g. a 3D transform).
+// too. When the chain cannot be resolved (no temporary element, or no used box
+// to resolve its percentages against) the result is null: folding it to
+// `translate()` would only drop the depth / linear terms the probe was there to
+// recover, so the caller drops the channel rather than playing a wrong pose.
 // Projects a `matrix3d` onto its 2D affine components when it is really flat
 // (no depth translation, no Z linear terms, no projection row); returns null for
 // a pose that genuinely uses the third dimension.
@@ -483,18 +485,35 @@ export function pagxExtractTransform(
   if (!/\b(scale|rotate|skew|matrix|translatez|translate3d|perspective)/.test(s)) {
     return pagxExtractTranslate(transformStr, box);
   }
+  // The probe has to carry the element's used box before its matrix is read: a percentage length
+  // resolves against the probe's own box, so an unsized probe resolves `translateX(-50%)` to 0 and
+  // the X offset is gone before the matrix exists (handing the box to the recursive call afterwards
+  // cannot recover it). A box that is absent or not a finite number leaves the chain unresolvable;
+  // guessing a size would silently author a different pose, and folding the chain to `translate()`
+  // would drop the depth / linear terms this branch exists to recover, so the stop is reported
+  // unresolved instead.
+  const widthPx = box && isFinite(box.width) ? box.width : null;
+  const heightPx = box && isFinite(box.height) ? box.height : null;
+  if (widthPx == null || heightPx == null) return null;
   try {
     const probe = document.createElement('div');
+    // Author box rules (`div { padding }`, `* { box-sizing: border-box }`, `min-width`, …) would
+    // move the box a percentage resolves against, so every property is reset to its initial value
+    // before the probe's own size is pinned.
+    probe.style.all = 'initial';
+    probe.style.display = 'block';
     probe.style.position = 'absolute';
+    probe.style.width = widthPx + 'px';
+    probe.style.height = heightPx + 'px';
     probe.style.transform = transformStr;
     (document.body || document.documentElement).appendChild(probe);
     const resolved = getComputedStyle(probe).transform;
     probe.remove();
     if (resolved && resolved !== 'none') return pagxExtractTransform(resolved, box);
   } catch (_) {
-    /* fall through to translate-only */
+    /* reported as unresolved below */
   }
-  return pagxExtractTranslate(transformStr, box);
+  return null;
 }
 
 // Resolve any tracked transform value the sampler / emitter produces
