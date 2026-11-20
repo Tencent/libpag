@@ -359,7 +359,7 @@ struct HostQueue {
       if (FAILED(fence->SetEventOnCompletion(fenceValue, event))) {
         return false;
       }
-      if (WaitForSingleObject(event, 10000) != WAIT_OBJECT_0) {
+      if (WaitForSingleObject(event, 30000) != WAIT_OBJECT_0) {
         return false;
       }
     }

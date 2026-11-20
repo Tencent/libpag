@@ -269,10 +269,6 @@ echo By default the script stashes local changes and checks out origin/main, the
 echo original branch and stash. Run one backend at a time; test\out and version.json are shared.
 exit /b 0
 
-:usage_error
-echo Usage: update_baseline.bat [USE_OPENGL^|USE_OPENGL_SWIFTSHADER^|USE_D3D12^|USE_D3D12_WARP^|USE_VULKAN] [--skip-images] [--no-checkout] [--no-fetch]
-exit /b 1
-
 :Fail
 echo Error: %~1 1>&2
 set "STATUS=1"
