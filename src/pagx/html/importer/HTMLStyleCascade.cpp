@@ -811,12 +811,12 @@ void HTMLStyleCascade::parseBoxTransform(HTMLBoxAttributes& box, const PropertyM
       box.camera.localOrigin.x = resolved.point.x;
       box.camera.localOrigin.y = resolved.point.y;
     } else {
-      // The default vanishing point is the box centre, which needs an absolute box size. Leaving the
-      // value unknown makes the projection step fall back to the layer origin, so report it once
-      // here instead of silently moving every child's perspective centre.
+      // The default vanishing point is the box centre, which needs an absolute box size. Without it
+      // the projection cannot be placed, and the camera is dropped for this box's children instead
+      // of being projected about a guessed point; say so where the declaration is resolved.
       _diagnostics.warn("html: perspective-origin '" + origin + "' on <" + elementName +
-                        "> has no absolute box size; the vanishing point falls back to the layer "
-                        "origin instead of the box centre");
+                        "> has no absolute box size; the vanishing point cannot be resolved, so "
+                        "this perspective is not applied to the children");
     }
   }
 

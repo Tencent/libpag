@@ -863,10 +863,10 @@ PAG_TEST(PAGXHTML3DTest, FlowChildrenUnderPerspectiveWarnOnce) {
 
 /**
  * Test case: a `perspective` element whose own box has no px size (percentage / auto) cannot resolve
- * the default `perspective-origin` (the box centre). That has to be reported once per declaring
- * element instead of silently projecting about the layer origin.
+ * the default `perspective-origin` (the box centre). The projection cannot be placed, so it is
+ * dropped for the children and the diagnostic has to say that instead of promising a fallback.
  */
-PAG_TEST(PAGXHTML3DTest, UnknownCameraBoxSizeWarnsAboutTheVanishingPoint) {
+PAG_TEST(PAGXHTML3DTest, UnknownCameraBoxSizeDropsTheProjectionWithADiagnostic) {
   auto doc = ParseHtml(R"HTML(
     <html><body style="width:200px;height:160px">
       <div style="position:absolute;left:0;top:0;width:100%;height:100%;perspective:600px">
@@ -878,12 +878,60 @@ PAG_TEST(PAGXHTML3DTest, UnknownCameraBoxSizeWarnsAboutTheVanishingPoint) {
   ASSERT_NE(doc, nullptr);
   EXPECT_TRUE(HasDiagnosticContaining(doc, "vanishing point"));
   EXPECT_TRUE(HasDiagnosticContaining(doc, "perspective-origin"));
-  // The documented fallback is the layer origin, i.e. the plain projection: no centre conjugation.
+  EXPECT_TRUE(HasDiagnosticContaining(doc, "not applied"));
+  EXPECT_FALSE(HasDiagnosticContaining(doc, "falls back"))
+      << "the drop must be reported, not a fallback that never happens";
+  // No vanishing point means no camera: the pose stays unprojected.
   auto* card = FindLayerById(doc, "card");
   ASSERT_NE(card, nullptr);
   EXPECT_FALSE(HasProjectionRow(card))
       << "an unknown vanishing point is neither applied nor folded";
   EXPECT_TRUE(NearlyEqual(card->matrix3D.getRowColumn(0, 0), 0.866025f, 0.001f));
+}
+
+/**
+ * Test case: a `preserve-3d` layer placed by flex has no pose of its own, but in CSS the parent
+ * camera still reaches the 3D poses below it. The wrapper cannot be inserted there, so the whole
+ * subtree loses the projection and that has to be reported once per document.
+ */
+PAG_TEST(PAGXHTML3DTest, Preserve3DFlowLayerReportsTheLostParentCamera) {
+  auto doc = ParseHtml(R"HTML(
+    <html><body style="width:300px;height:150px">
+      <div style="position:absolute;left:10px;top:10px;width:200px;height:100px;
+           perspective:600px">
+        <div style="display:flex;width:200px;height:100px;transform-style:preserve-3d">
+          <div id="g" style="width:100px;height:60px;background-color:#38BDF8;
+               transform:rotateY(40deg)"></div>
+        </div>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  int warnings = 0;
+  for (const auto& message : doc->errors) {
+    if (message.find("preserve-3d layer") != std::string::npos) {
+      warnings++;
+    }
+  }
+  EXPECT_EQ(warnings, 1) << "the lost camera is reported once per document";
+  auto* g = FindLayerById(doc, "g");
+  ASSERT_NE(g, nullptr);
+  EXPECT_FALSE(HasProjectionRow(g)) << "the camera is dropped, not folded into the pose";
+  EXPECT_TRUE(NearlyEqual(g->matrix3D.getRowColumn(0, 0), 0.766044f, 0.001f));
+
+  // The same structure with only flat poses below the preserve-3d layer keeps the camera irrelevant.
+  auto flat = ParseHtml(R"HTML(
+    <html><body style="width:300px;height:150px">
+      <div style="position:absolute;left:10px;top:10px;width:200px;height:100px;
+           perspective:600px">
+        <div style="display:flex;width:200px;height:100px;transform-style:preserve-3d">
+          <div style="width:100px;height:60px;background-color:#38BDF8;transform:rotate(20deg)"></div>
+        </div>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(flat, nullptr);
+  EXPECT_FALSE(HasDiagnosticContaining(flat, "preserve-3d layer"));
 }
 
 /**

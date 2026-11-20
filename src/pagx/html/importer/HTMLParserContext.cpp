@@ -92,6 +92,46 @@ bool Animates3DTransform(const std::unordered_map<std::string, html::CssKeyframe
   return false;
 }
 
+bool SubtreePosesOffThePlane(const std::shared_ptr<DOMNode>& parent, HTMLStyleCascade* cascade,
+                             HTMLValueParser& valueParser, HTMLDiagnosticSink& diagnostics,
+                             int depth) {
+  if (parent == nullptr || depth >= MAX_HTML_RECURSION_DEPTH) {
+    return false;
+  }
+  for (auto child = parent->getFirstChild(); child; child = child->getNextSibling()) {
+    if (child->type != DOMNodeType::Element) {
+      continue;
+    }
+    const auto& style = cascade->getResolvedStyle(child);
+    const HTMLTransformReference reference = cascade->getTransformReferenceSize(child);
+    const std::string transform = Trim(LookupProperty(style, "transform"));
+    if (!transform.empty()) {
+      Matrix3D pose = {};
+      if (ParseCssTransformList(transform, valueParser, diagnostics, &pose, reference.widthPx,
+                                reference.heightPx) &&
+          !IsFlatTransform(pose)) {
+        return true;
+      }
+    }
+    if (Animates3DTransform(cascade->keyframes(), style, valueParser, reference)) {
+      return true;
+    }
+    if (SubtreePosesOffThePlane(child, cascade, valueParser, diagnostics, depth + 1)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+// True when any descendant of `element` poses off the z = 0 plane, statically or through a keyframe
+// track. A `preserve-3d` layer forwards its parent's camera to those poses in CSS, so a camera that
+// cannot be wrapped there is lost for the whole subtree, not only for this element.
+bool SubtreePosesOffThePlane(const std::shared_ptr<DOMNode>& element, HTMLStyleCascade* cascade,
+                             HTMLValueParser& valueParser) {
+  HTMLDiagnosticSink silentDiagnostics(false);
+  return SubtreePosesOffThePlane(element, cascade, valueParser, silentDiagnostics, 0);
+}
+
 // Folds a CSS `perspective` declared on the parent into `box`: stores the camera distance and
 // re-expresses the parent's `perspective-origin` in this element's local coordinates. Only an
 // absolutely positioned child knows its offset from the parent's box; a flow / flex child is placed
@@ -766,7 +806,13 @@ void HTMLParserContext::attachParentCamera(HTMLBoxAttributes& box,
                                            const std::shared_ptr<DOMNode>& element,
                                            const HTMLInheritedStyle& inherited) {
   const HTMLParentCamera& camera = inherited.parentCamera;
+  if (!camera.Has()) {
+    return;
+  }
   if (!camera.HasOrigin()) {
+    // The wrapper is placed at the parent's vanishing point, so a camera whose `perspective-origin`
+    // never resolved cannot be wrapped and its projection is dropped. The cascade reports that
+    // unresolvable origin; guessing one here would move the projection of the whole subtree.
     return;
   }
   // The camera is carried by a wrapper layer, never folded into a pose: PAGX composes a layer's
@@ -793,16 +839,29 @@ void HTMLParserContext::attachParentCamera(HTMLBoxAttributes& box,
   const HTMLTransformReference reference = _styleCascade->getTransformReferenceSize(element);
   const bool animatesTransform =
       Animates3DTransform(_styleCascade->keyframes(), style, silentParser, reference);
-  const bool cameraAffectsPose =
+  const bool ownPoseOn3D =
       (box.transform.valid && !IsFlatTransform(box.transform.pose)) || animatesTransform;
-  if (!cameraAffectsPose) {
+  // A `preserve-3d` layer with no pose of its own still forwards the parent camera to the 3D poses
+  // below it in CSS. The wrapper cannot be inserted here, so that camera is lost for the whole
+  // subtree and the child check alone would stay silent about it.
+  const bool subtreeOn3D =
+      !ownPoseOn3D && box.preserve3D &&
+      SubtreePosesOffThePlane(element, _styleCascade.get(), silentParser);
+  if (!ownPoseOn3D && !subtreeOn3D) {
     return;
   }
-  _diagnostics->warn(
-      "html: perspective on the parent of <" + element->name +
-      "> cannot be projected onto this child: it has no resolved offset (flow / flex "
-      "placement, or positioned by right / bottom), so its vanishing point is the "
-      "parent origin");
+  if (subtreeOn3D) {
+    _diagnostics->warn(
+        "html: perspective on the parent of <" + element->name +
+        "> cannot be projected through this preserve-3d layer: it has no resolved offset (flow / "
+        "flex placement), so 3D poses in its subtree are not projected by the parent camera");
+  } else {
+    _diagnostics->warn(
+        "html: perspective on the parent of <" + element->name +
+        "> cannot be projected onto this child: it has no resolved offset (flow / flex "
+        "placement, or positioned by right / bottom), so its vanishing point is the "
+        "parent origin");
+  }
   _flowChildPerspectiveWarned = true;
 }
 

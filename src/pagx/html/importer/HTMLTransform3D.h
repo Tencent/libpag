@@ -43,11 +43,11 @@ struct HTMLTransformReference {
 
 /**
  * A CSS `perspective` camera: the distance to the viewer plus its `perspective-origin` vanishing point,
- * expressed in the coordinates of the layer the projection is folded into.
+ * expressed in the coordinates of the wrapper layer that carries the projection.
  *
  * Two frames exist and must not be merged: the inherited bag carries the camera in the *parent's*
  * coordinates (the child has not been placed yet), while the box carries the same camera re-expressed
- * in the element's own local coordinates. `ApplyParentPerspective` performs that one subtraction.
+ * in the element's own local coordinates. `wrapInCameraLayer` performs that one subtraction.
  */
 struct HTMLParentCamera {
   // Distance from the viewing plane in px; <= 0 means "no camera".
@@ -61,8 +61,8 @@ struct HTMLParentCamera {
     return distancePx > 0.0f && std::isfinite(distancePx);
   }
 
-  // True when that projection also knows its vanishing point; without one it conjugates about the
-  // layer origin.
+  // True when that projection also knows its vanishing point; a camera without one cannot be placed
+  // at the parent's `perspective-origin`, so the call sites drop it instead of guessing a point.
   bool HasOrigin() const {
     return Has() && std::isfinite(localOrigin.x) && std::isfinite(localOrigin.y);
   }
@@ -150,15 +150,7 @@ bool ParseCssTransformList(const std::string& value, HTMLValueParser& valueParse
                            float referenceWidthPx = NAN, float referenceHeightPx = NAN);
 
 /**
- * Returns `P * pose` for a CSS `perspective` declared on the pose's parent. The projection is pushed
- * into the child pose because PAGX keeps it on the layer that owns the pose; `Layer.perspective`
- * cannot be used for that, as it would only project the declaring layer itself. Two callers need it:
- * `PlacePose` folds the camera into a child pose, and `HTMLLayerBuilder::applyBareParentCamera`
- * materialises it on a `preserve-3d` layer that has no pose of its own.
- */
-
-/**
- * Where a pose goes once its parent camera has been folded in. Both the static box path and the
+ * Where a pose goes once the parent camera is resolved. Both the static box path and the
  * animation keyframe path ask this question, and answering it in two places is how they drifted
  * apart, so the classification lives here:
  *

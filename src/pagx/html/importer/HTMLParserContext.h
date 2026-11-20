@@ -308,7 +308,7 @@ class HTMLParserContext {
   std::unique_ptr<HTMLAnimationBuilder> _animationBuilder = nullptr;
 
   // A `perspective` parent whose child is placed by layout cannot be projected exactly; the first
-  // such child reports it, the rest stay quiet (see ApplyParentPerspective).
+  // such child reports it, the rest stay quiet (see attachParentCamera).
   bool _flowChildPerspectiveWarned = false;
 
   // Elements carrying an `animation` declaration, paired with their finalised outer Layer.
