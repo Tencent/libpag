@@ -19,6 +19,7 @@
 #pragma once
 
 #include <initializer_list>
+#include <map>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -375,7 +376,12 @@ class HTMLWriterContext {
     // Luminance) cannot be expressed as a clip polygon, so such a mask is emitted as an inline SVG
     // <mask> whose geometry is animated by CSS inside the mask.
     std::unordered_set<const Path*> maskPaths = {};
-    std::unordered_map<const Path*, std::string> maskPathIds = {};
+    // Mask path node -> how many tags it has already rendered into. A mask source mounted several
+    // times renders once per instance, and each copy needs its own DOM id so its keyframes can be
+    // scoped to that instance.
+    std::unordered_map<const Path*, size_t> maskPathUseCount = {};
+    // (mask path, scope) -> the DOM id of the copy rendered in that scope.
+    std::map<std::pair<const Path*, size_t>, std::string> maskPathIds = {};
     // Masked layers that own at least one animated mask path. The static writer routes such a layer
     // to the inline <mask> and asks this set instead of re-walking the mask subtree, so the mask
     // traversal lives in one place (the animation index) rather than once per consumer.

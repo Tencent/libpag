@@ -4942,6 +4942,10 @@ void HTMLAnimationSession::ResolveAnimationTargets(
             _restoredNodeIds.emplace_back(hostLayer, hostLayer->id);
             hostLayer->id = _ctx.nextId("animM");
           }
+          // The host is registered like any animated node, so each render of it claims a distinct
+          // DOM id. A Composition mounted several times renders the same host layer several times,
+          // and each instance needs its own tag for its own keyframes.
+          _ctx.animation.elementIds.emplace(hostLayer, hostLayer->id);
           // Coverage masks keep their paint, so they are emitted as an inline <mask> whose
           // geometry is animated instead of being reduced to a clip polygon.
           _ctx.animation.maskPaths.insert(pathNode);
@@ -5131,8 +5135,14 @@ std::string HTMLAnimationSession::emitKeyframesAndWeave(std::string& bodyHtml) {
       }
 
       if (chSet.animatedMaskPath != nullptr) {
-        auto idIt = _ctx.animation.maskPathIds.find(chSet.animatedMaskPath);
-        if (idIt != _ctx.animation.maskPathIds.end()) {
+        // The mask copy rendered in this mount's scope: a Composition mounted several times writes
+        // one inline <mask> per instance, each with its own path id and its own timeline.
+        auto idIt = _ctx.animation.maskPathIds.find({chSet.animatedMaskPath, mount.scope});
+        // A paused mount never advances, so its mask stays at the authored geometry the def already
+        // carries. Emitting the keyframes with `animation-play-state: paused` would look the same in
+        // a browser but not under a capture that drives every animation's currentTime, which is how
+        // the reference is sampled; leaving the mask static matches both.
+        if (idIt != _ctx.animation.maskPathIds.end() && mount.playing) {
           // The mask is an inline SVG subtree, so its geometry animates on its own: emit `d` stops
           // for the mask path and let the masked element keep its static style. A coverage mask
           // must never be rewritten as a clip polygon, which would drop its paint.
@@ -5174,6 +5184,11 @@ std::string HTMLAnimationSession::emitKeyframesAndWeave(std::string& bodyHtml) {
               "#" + idIt->second + " { animation: " +
               BuildAnimationShorthand(anim, kfName, timing, mount.offset, mount.scope != 0) +
               "; }\n";
+          continue;
+        }
+        if (idIt != _ctx.animation.maskPathIds.end()) {
+          // A mask bundle must not fall through to the generic emitters: they would turn the mask
+          // geometry into a `clip-path` on the host element.
           continue;
         }
       }

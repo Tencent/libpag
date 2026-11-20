@@ -822,10 +822,14 @@ void HTMLWriter::writeMaskElements(HTMLBuilder& out, const std::vector<Element*>
       if (!d.empty()) {
         out.openTag("path");
         if (_ctx->animation.maskPaths.count(p) > 0) {
-          // Animated mask geometry needs a target for its CSS keyframes.
-          std::string pathId = !p->id.empty() ? p->id : _ctx->nextId("maskPath");
+          // Animated mask geometry needs a target for its CSS keyframes. One mask source can render
+          // once per Composition mount, and every copy needs its own id: a repeated id would make
+          // all instances share the first copy's keyframes and timing.
+          std::string base = !p->id.empty() ? p->id : _ctx->nextId("maskPath");
+          size_t use = _ctx->animation.maskPathUseCount[p]++;
+          std::string pathId = use == 0 ? base : base + "__" + std::to_string(use);
           out.addAttr("id", pathId);
-          _ctx->animation.maskPathIds[p] = pathId;
+          _ctx->animation.maskPathIds[{p, _ctx->animation.scope}] = pathId;
         }
         if (!tr.empty()) {
           out.addAttr("transform", tr);
