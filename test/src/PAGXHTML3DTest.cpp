@@ -2083,13 +2083,13 @@ PAG_TEST(PAGXHTML3DTest, MultiValueOriginPutsEachKeywordOnItsOwnAxis) {
 }
 
 /**
- * Test case: a `transform-origin` token that does not parse (`10foo`, a percentage depth, four
- * components) drops the whole declaration, exactly like a bad keyword pair: Chromium falls back to
- * the initial `50% 50%` (the box centre) instead of pivoting at the top-left corner. The value is
+ * Test case: a `transform-origin` token that does not parse (`10foo`, `nan%`, a percentage depth,
+ * four components) drops the whole declaration, exactly like a bad keyword pair: Chromium falls back
+ * to the initial `50% 50%` (the box centre) instead of pivoting at the top-left corner. The value is
  * reported once — the per-token unit warning is suppressed so the position diagnostic stands alone.
  */
 PAG_TEST(PAGXHTML3DTest, UnparsableOriginTokenFallsBackToTheBoxCentre) {
-  const char* values[] = {"10foo 20px", "10px 20px 30%", "10px 20px 30px 40px"};
+  const char* values[] = {"10foo 20px", "nan% 20px", "10px 20px 30%", "10px 20px 30px 40px"};
   for (const char* value : values) {
     std::string html = R"HTML(
       <html><body style="width:200px;height:200px">
