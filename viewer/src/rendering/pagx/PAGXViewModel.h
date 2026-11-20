@@ -248,6 +248,14 @@ class PAGXViewModel : public ContentViewModel {
  private:
   void clearContent();
   void clearDocumentXml();
+  // Installs a freshly built document and scene, replacing whatever was loaded before. Callers must
+  // hold renderMutex, which is what makes the new objects visible to the render thread safely.
+  void installDocument(const std::shared_ptr<pagx::PAGXDocument>& document,
+                       const std::shared_ptr<pagx::PAGScene>& newScene);
+  // Emits the content-level change signals shared by loadFile and applyXmlChanges.
+  void notifyDocumentReplaced();
+  // Drops the editor text and the file path of a load that could not produce a document.
+  void failLoad();
   Q_SLOT void appendEditorChunk();
   Q_SLOT void onEditorContentsChange();
   void rebuildEditorGeometry();

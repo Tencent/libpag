@@ -83,7 +83,7 @@ void PAGXView::onSizeChangedDelayHandled() {
 }
 
 void PAGXView::flush() const {
-  if (viewModel->hasContent() && viewModel->isPlaying()) {
+  if (viewModel->hasContent() && viewModel->isPlaying() && isRenderActive()) {
     viewModel->markNeedsRender();
     triggerFlush();
   }

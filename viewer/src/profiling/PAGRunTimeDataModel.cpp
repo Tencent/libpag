@@ -151,13 +151,13 @@ void PAGRunTimeDataModel::setPAGXDocument(std::shared_ptr<pagx::PAGXDocument> pa
       if (totalFrame < 1) {
         totalFrame = 1;
       }
+      frameModeEnabled = true;
     } else {
-      // A StateMachine-first document has no single duration/frameRate to derive a frame count
-      // from; fall back to a single frame so frame mode does not run with a stale/invalid value,
-      // matching PAGXViewModel::updateAnimationState()'s no-animation fallback.
+      // A StateMachine-first document has no time base: PAGXRenderer reports no frame for it, so
+      // frame mode must stay off instead of showing a frame axis with a single frame.
       totalFrame = 1;
+      frameModeEnabled = false;
     }
-    frameModeEnabled = true;
   } else {
     totalFrame = pagxDocument ? 1 : 0;
     frameModeEnabled = false;

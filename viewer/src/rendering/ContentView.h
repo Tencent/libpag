@@ -71,6 +71,14 @@ class ContentView : public QQuickItem {
   bool takeSizeChanged();
   GPUDrawable* getDrawable() const;
 
+  /// True while the renderer expects further frames. Views that re-flush once per vsync consult it
+  /// so an idle renderer, such as a PAGX state machine waiting for an input, stops the loop instead
+  /// of re-rendering identical pixels at the refresh rate.
+  bool isRenderActive() const;
+
+  /// Records whether the renderer expects another frame. Called from the render thread.
+  void setRenderActive(bool active);
+
   friend class RenderThread;
 
  protected:
@@ -86,7 +94,8 @@ class ContentView : public QQuickItem {
   /// newly loaded content. While such a resize is settling, every geometry change refreshes the
   /// drawable surface size on the next flush instead of waiting for the resize debounce, so the
   /// first frame is rendered at the new size rather than stretching the previous texture. The mode
-  /// ends once the geometry stays unchanged for the debounce interval.
+  /// ends a fixed interval after it starts, independently of later geometry changes, so a window
+  /// drag that begins right after a file is opened is still debounced normally.
   void beginContentResize();
 
   // Called at the end of sizeChangedDelayHandle(). Subclasses may override to perform
@@ -97,10 +106,16 @@ class ContentView : public QQuickItem {
   std::shared_ptr<GPUDrawable> drawable = nullptr;
   std::unique_ptr<RenderThread> renderThread = nullptr;
   std::unique_ptr<QTimer> resizeTimer = nullptr;
+  // Owns the lifetime of the content resize mode; never restarted by geometry changes, unlike
+  // resizeTimer which exists only to debounce them.
+  std::unique_ptr<QTimer> contentResizeTimer = nullptr;
   std::atomic_bool sizeChanged = false;
+  // Written by the render thread at the end of every flush, read by the view on the GUI thread.
+  std::atomic_bool renderActive = true;
   bool contentResizing = false;
 
  private:
+  void endContentResize();
   QRectF textureRect(QSGTexture* texture) const;
 };
 

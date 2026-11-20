@@ -43,10 +43,13 @@ class PAGXRenderer : public IContentRenderer {
   // playback-finished notification for non-looping ones; timelines without a time base are handed
   // over to advanceTimeline(). reseat is true on the flush that first observes a paused→playing
   // transition or a content reload (generation bump), which re-arms the animation (seek to the
-  // shown progress or rewind a finished one, then play).
-  void advancePlayback(PAGXViewModel::RenderState& state, bool reseat);
+  // shown progress or rewind a finished one, then play). Returns true while the view should keep
+  // requesting frames.
+  bool advancePlayback(PAGXViewModel::RenderState& state, bool reseat);
 
-  void advanceTimeline(PAGXViewModel::RenderState& state);
+  // Advances a timeline without a time base (a state machine) and returns true if anything in the
+  // scene changed, i.e. whether rendering another frame is worth it.
+  bool advanceTimeline(PAGXViewModel::RenderState& state);
 
   // Handles the paused timeline: on a play-state transition or content reload it reports the
   // timeline's actual position so the UI catches up; in steady state it seeks to the requested

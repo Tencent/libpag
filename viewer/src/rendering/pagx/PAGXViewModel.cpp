@@ -161,14 +161,14 @@ int PAGXViewModel::getHeight() const {
 }
 
 bool PAGXViewModel::hasAnimation() const {
-  if (defaultAnimation != nullptr) {
-    return totalFrames > 1;
-  }
-  return defaultTimeline != nullptr;
+  // A state machine plays continuously although it exposes no time base, while an animation only
+  // counts as animated when it actually spans time.
+  return isSeekable() || (defaultTimeline != nullptr &&
+                          defaultTimeline->type() == pagx::TimelineType::StateMachine);
 }
 
 bool PAGXViewModel::isSeekable() const {
-  return defaultAnimation != nullptr && defaultAnimation->duration() > 0;
+  return defaultAnimation != nullptr && defaultAnimation->playbackPeriod() > 0;
 }
 
 bool PAGXViewModel::isPlaying() const {
@@ -452,15 +452,13 @@ bool PAGXViewModel::loadFile(const QString& filePath) {
   }
   auto byteData = pag::ByteData::FromPath(strPath);
   if (byteData == nullptr) {
-    clearDocumentXml();
-    Q_EMIT filePathChanged("");
+    failLoad();
     return false;
   }
 
   auto document = pagx::PAGXImporter::FromXML(byteData->data(), byteData->length());
   if (document == nullptr) {
-    clearDocumentXml();
-    Q_EMIT filePathChanged("");
+    failLoad();
     return false;
   }
   ResolveResourcePaths(document.get(), strPath);
@@ -476,8 +474,7 @@ bool PAGXViewModel::loadFile(const QString& filePath) {
       // null timeline this stops playback, zeroes the frame counters, and bumps the generation.
       updateAnimationState();
     }
-    clearDocumentXml();
-    Q_EMIT filePathChanged("");
+    failLoad();
     Q_EMIT pagxDocumentChanged(nullptr);
     emitContentStateReset();
     return false;
@@ -488,28 +485,13 @@ bool PAGXViewModel::loadFile(const QString& filePath) {
 
   {
     std::lock_guard<std::mutex> lock(renderMutex);
-    clearContent();
     currentFilePath = strPath;
-    pagxDocument = document;
-    scene = newScene;
-    resolveDefaultTimeline(document);
-    pagxWidth = static_cast<int>(document->width);
-    pagxHeight = static_cast<int>(document->height);
-    updateAnimationState();
-    needsRender = true;
+    installDocument(document, newScene);
   }
   Q_EMIT filePathChanged(QString::fromLocal8Bit(strPath.data()));
-  Q_EMIT widthChanged(pagxWidth);
-  Q_EMIT heightChanged(pagxHeight);
-  emitContentStateReset();
-  Q_EMIT preferredSizeChanged();
+  notifyDocumentReplaced();
   Q_EMIT editableTextLayerCountChanged(0);
   Q_EMIT editableImageLayerCountChanged(0);
-  Q_EMIT contentSizeChanged();
-
-  // pagxDocumentChanged is connected with Qt::QueuedConnection, so tree building
-  // happens asynchronously and won't block the render.
-  Q_EMIT pagxDocumentChanged(pagxDocument);
 
   // Save XML content for deferred update. The actual documentXmlText assignment happens in
   // onRenderCompleted() after the first render finishes, avoiding races between editor updates
@@ -567,6 +549,36 @@ void PAGXViewModel::clearContent() {
   defaultTimeline = nullptr;
   defaultAnimation = nullptr;
   defaultLoopMode = pagx::LoopMode::Once;
+}
+
+void PAGXViewModel::installDocument(const std::shared_ptr<pagx::PAGXDocument>& document,
+                                    const std::shared_ptr<pagx::PAGScene>& newScene) {
+  clearContent();
+  pagxDocument = document;
+  scene = newScene;
+  resolveDefaultTimeline(document);
+  pagxWidth = static_cast<int>(document->width);
+  pagxHeight = static_cast<int>(document->height);
+  updateAnimationState();
+  needsRender = true;
+}
+
+void PAGXViewModel::notifyDocumentReplaced() {
+  Q_EMIT widthChanged(pagxWidth);
+  Q_EMIT heightChanged(pagxHeight);
+  emitContentStateReset();
+  // The size change must reach the view before the flush request so the window is fitted to the new
+  // preferred size before the first frame of the new content is rendered. pagxDocumentChanged is
+  // connected with Qt::QueuedConnection, so tree building happens asynchronously and never blocks
+  // the render.
+  Q_EMIT preferredSizeChanged();
+  Q_EMIT contentSizeChanged();
+  Q_EMIT pagxDocumentChanged(pagxDocument);
+}
+
+void PAGXViewModel::failLoad() {
+  clearDocumentXml();
+  Q_EMIT filePathChanged("");
 }
 
 void PAGXViewModel::resolveDefaultTimeline(const std::shared_ptr<pagx::PAGXDocument>& document) {
@@ -648,24 +660,11 @@ QString PAGXViewModel::applyXmlChanges(const QString& newXml) {
 
   {
     std::lock_guard<std::mutex> lock(renderMutex);
-    pagxDocument = document;
-    pagxWidth = static_cast<int>(document->width);
-    pagxHeight = static_cast<int>(document->height);
-    scene = newScene;
-    resolveDefaultTimeline(document);
-    updateAnimationState();
-    needsRender = true;
+    installDocument(document, newScene);
   }
 
-  Q_EMIT widthChanged(pagxWidth);
-  Q_EMIT heightChanged(pagxHeight);
-  emitContentStateReset();
-  Q_EMIT contentSizeChanged();
-  // Match loadFile: a changed document size must drive the window geometry adjustment that
-  // PAGXView performs on preferredSizeChanged, otherwise Apply that resizes the document leaves
-  // the window sized to the old preferred size.
-  Q_EMIT preferredSizeChanged();
-  Q_EMIT pagxDocumentChanged(pagxDocument);
+  notifyDocumentReplaced();
+  // loadFile relies on resetView() for this; Apply keeps the current view transform.
   Q_EMIT requestFlush();
 
   // A successful Apply establishes a new discard baseline: clear the editor document's undo

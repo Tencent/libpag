@@ -27,11 +27,8 @@ PAGRenderer::PAGRenderer(PAGViewModel* viewModel) : viewModel(viewModel) {
 void PAGRenderer::setDrawable(GPUDrawable* drawable) {
   this->drawable = drawable;
   if (drawable != nullptr) {
-    auto width = static_cast<double>(drawable->width());
-    auto height = static_cast<double>(drawable->height());
-    viewModel->adjustForSurfaceResize(width, height, width, height,
-                                      static_cast<double>(viewModel->getWidth()),
-                                      static_cast<double>(viewModel->getHeight()));
+    viewModel->setSurfaceSize(
+        QSizeF(static_cast<double>(drawable->width()), static_cast<double>(drawable->height())));
   }
 }
 
@@ -51,6 +48,7 @@ void PAGRenderer::updateSize() {
   auto newWidth = static_cast<double>(drawable->width());
   auto newHeight = static_cast<double>(drawable->height());
   if (oldWidth != newWidth || oldHeight != newHeight) {
+    viewModel->setSurfaceSize(QSizeF(newWidth, newHeight));
     viewModel->adjustForSurfaceResize(oldWidth, oldHeight, newWidth, newHeight,
                                       static_cast<double>(viewModel->getWidth()),
                                       static_cast<double>(viewModel->getHeight()));
@@ -62,13 +60,12 @@ void PAGRenderer::applyDisplayTransform() {
       viewModel->getWidth() <= 0 || viewModel->getHeight() <= 0) {
     return;
   }
-  auto surfaceWidth = static_cast<float>(drawable->width());
-  auto surfaceHeight = static_cast<float>(drawable->height());
-  auto contentWidth = static_cast<float>(viewModel->getWidth());
-  auto contentHeight = static_cast<float>(viewModel->getHeight());
-  auto contentScale = std::min(surfaceWidth / contentWidth, surfaceHeight / contentHeight);
-  auto contentOffsetX = (surfaceWidth - contentWidth * contentScale) * 0.5f;
-  auto contentOffsetY = (surfaceHeight - contentHeight * contentScale) * 0.5f;
+  auto fit = ComputeContentFit(
+      static_cast<double>(viewModel->getWidth()), static_cast<double>(viewModel->getHeight()),
+      static_cast<double>(drawable->width()), static_cast<double>(drawable->height()));
+  auto contentScale = static_cast<float>(fit.scale);
+  auto contentOffsetX = static_cast<float>(fit.offsetX);
+  auto contentOffsetY = static_cast<float>(fit.offsetY);
   auto transform = viewModel->getViewTransform();
   auto zoomScale = static_cast<float>(transform.zoomScale);
   auto matrix = Matrix::MakeAll(contentScale * zoomScale, 0.0f,

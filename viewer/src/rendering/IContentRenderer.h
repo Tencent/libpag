@@ -38,6 +38,10 @@ class IContentRenderer {
     int64_t currentFrame = -1;
     // True if rendering actually occurred; false if the frame was skipped.
     bool rendered = false;
+    // True if the renderer expects the next frame to change the output. Views that re-flush on
+    // every vsync use it to stop the loop once the content is idle (for example a PAGX state
+    // machine waiting for an input).
+    bool wantsMoreFrames = true;
   };
 
   virtual ~IContentRenderer() = default;

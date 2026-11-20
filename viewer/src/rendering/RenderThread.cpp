@@ -43,6 +43,7 @@ void RenderThread::flush() {
   if (!metrics.rendered) {
     return;
   }
+  view->setRenderActive(metrics.wantsMoreFrames);
   Q_EMIT rendered();
   Q_EMIT renderMetricsReady(metrics.renderTime, metrics.presentTime, metrics.imageDecodeTime,
                             metrics.currentFrame);

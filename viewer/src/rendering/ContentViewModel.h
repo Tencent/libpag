@@ -28,6 +28,25 @@
 namespace pag {
 
 /**
+ * Centered fit of a content rectangle inside a surface: the uniform scale applied to the content and
+ * the top-left offset of the scaled content inside the surface.
+ */
+struct ContentFit {
+  double scale = 1.0;
+  double offsetX = 0.0;
+  double offsetY = 0.0;
+};
+
+/**
+ * Computes the centered fit of contentWidth x contentHeight into surfaceWidth x surfaceHeight.
+ * Every renderer and every gesture inverse-mapping must share this mapping: if they disagree, zoom
+ * anchors and pan distances silently drift apart. Returns a scale of 1 and zero offsets when either
+ * size is not positive.
+ */
+ContentFit ComputeContentFit(double contentWidth, double contentHeight, double surfaceWidth,
+                             double surfaceHeight);
+
+/**
  * Abstract ViewModel base class for content views. Holds all playback and file state, exposing
  * it to QML via Q_PROPERTY bindings. Subclasses implement format-specific logic.
  */
@@ -44,9 +63,9 @@ class ContentViewModel : public QObject {
   Q_PROPERTY(int width READ getWidth NOTIFY widthChanged)
   Q_PROPERTY(int height READ getHeight NOTIFY heightChanged)
   Q_PROPERTY(bool hasAnimation READ hasAnimation NOTIFY hasAnimationChanged)
-  /// True when the content has a time base that supports progress and frame seeking. PAG files
-  /// always do; PAGX files only when their default timeline is an animation. Content driven by a
-  /// PAGX state machine plays continuously but exposes no progress, duration or frames.
+  /// True when the content has a time base that supports progress and frame seeking. PAG files do
+  /// once a file is loaded; PAGX files only when their default timeline is an animation. Content
+  /// driven by a PAGX state machine plays continuously but exposes no progress, duration or frames.
   Q_PROPERTY(bool isSeekable READ isSeekable NOTIFY isSeekableChanged)
   Q_PROPERTY(bool isPlaying READ isPlaying WRITE setIsPlaying NOTIFY isPlayingChanged)
   Q_PROPERTY(double progress READ getProgress WRITE setProgress NOTIFY progressChanged)
@@ -119,8 +138,13 @@ class ContentViewModel : public QObject {
   /// Resets the view transform to the default (no zoom, no pan).
   void resetView();
 
-  /// Records the transform's render surface size and adjusts the pan offset to preserve the content
-  /// point at the viewport center while keeping user zoom. All parameters are in pixels.
+  /// Records the size of the render surface the transform is applied to. Called whenever the
+  /// drawable surface is created or resized; a non-positive size clears the record.
+  void setSurfaceSize(const QSizeF& size);
+
+  /// Adjusts the pan offset to preserve the content point at the viewport center while keeping the
+  /// user zoom. Only the pan math lives here; the new surface size must be recorded separately with
+  /// setSurfaceSize(). All parameters are in pixels.
   void adjustForSurfaceResize(double oldSurfaceWidth, double oldSurfaceHeight,
                               double newSurfaceWidth, double newSurfaceHeight, double contentWidth,
                               double contentHeight);

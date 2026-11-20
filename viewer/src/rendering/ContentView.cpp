@@ -25,15 +25,23 @@
 
 namespace pag {
 
+// Delay applied to window resizes before the drawable surface is reallocated.
+static constexpr int ResizeDebounceMs = 400;
+
 ContentView::ContentView(QQuickItem* parent) : QQuickItem(parent) {
   setFlag(ItemHasContents, true);
   resizeTimer = std::make_unique<QTimer>();
   connect(resizeTimer.get(), &QTimer::timeout, this, &ContentView::sizeChangedDelayHandle);
+  contentResizeTimer = std::make_unique<QTimer>();
+  contentResizeTimer->setSingleShot(true);
+  contentResizeTimer->setInterval(ResizeDebounceMs);
+  connect(contentResizeTimer.get(), &QTimer::timeout, this, &ContentView::endContentResize);
   connect(this, &QQuickItem::windowChanged, this, &ContentView::onWindowChanged);
 }
 
 ContentView::~ContentView() {
   resizeTimer->stop();
+  contentResizeTimer->stop();
   releaseDrawable();
 }
 
@@ -87,7 +95,6 @@ void ContentView::resetView() {
 
 void ContentView::sizeChangedDelayHandle() {
   resizeTimer->stop();
-  contentResizing = false;
   if (sizeChanged) {
     return;
   }
@@ -99,11 +106,17 @@ void ContentView::sizeChangedDelayHandle() {
 }
 
 void ContentView::beginContentResize() {
-  // The timer doubles as the end marker of the content resize: it fires once the geometry stopped
-  // changing, and also covers the case where the item already had the preferred size and no
-  // geometry change follows, so the mode can never outlive the fitting of the new content.
-  resizeTimer->start(400);
+  // A dedicated single-shot timer ends the mode. Reusing resizeTimer would let every geometry
+  // change restart it, so a window drag started within the debounce interval of a content-driven
+  // resize would keep the mode alive for the whole drag and turn the debounced surface reallocation
+  // into a per-frame one. It also covers the case where the item already had the preferred size and
+  // no geometry change follows.
   contentResizing = true;
+  contentResizeTimer->start();
+}
+
+void ContentView::endContentResize() {
+  contentResizing = false;
 }
 
 void ContentView::geometryChange(const QRectF& newGeometry, const QRectF& oldGeometry) {
@@ -118,7 +131,7 @@ void ContentView::geometryChange(const QRectF& newGeometry, const QRectF& oldGeo
     sizeChanged = true;
     triggerFlush();
   }
-  resizeTimer->start(400);
+  resizeTimer->start(ResizeDebounceMs);
 }
 
 RenderThread* ContentView::getRenderThread() const {
@@ -127,6 +140,14 @@ RenderThread* ContentView::getRenderThread() const {
 
 bool ContentView::takeSizeChanged() {
   return sizeChanged.exchange(false);
+}
+
+bool ContentView::isRenderActive() const {
+  return renderActive;
+}
+
+void ContentView::setRenderActive(bool active) {
+  renderActive = active;
 }
 
 GPUDrawable* ContentView::getDrawable() const {
