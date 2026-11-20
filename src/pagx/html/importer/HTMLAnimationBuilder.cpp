@@ -405,17 +405,19 @@ constexpr float kPi = 3.14159265358979323846f;
 // (x/y, 2D `matrix` or `matrix3D`) is decided by `PlacePose`, once the parent camera has been folded
 // in, so classification does not happen here as well. `transform-origin` is NOT folded in: the pivot
 // stays on the layer as `anchor`, so keyframes never carry a per-frame pivot translation that the
-// runtime would interpolate independently.
+// runtime would interpolate independently. `zeroScale` is the caller's policy for a zero `scale`
+// factor, which is why the keyframe loop decides it after the whole track is classified.
 bool ParseTransformPose(const std::string& value, HTMLValueParser& parser,
                         HTMLDiagnosticSink& diagnostics, Matrix3D& outPose,
-                        const HTMLTransformReference& reference) {
+                        const HTMLTransformReference& reference,
+                        ZeroScale zeroScale = ZeroScale::Keep, bool* clampedZeroScale = nullptr) {
   outPose = {};
   const std::string trimmed = Trim(value);
   if (trimmed.empty()) {
     return true;  // identity == translate(0, 0)
   }
   return ParseCssTransformList(trimmed, parser, diagnostics, &outPose, reference.widthPx,
-                               reference.heightPx);
+                               reference.heightPx, zeroScale, clampedZeroScale);
 }
 
 // Resolves the pivot the inline SVG resolver hands to the generated group. The shape's own box size
@@ -1222,6 +1224,14 @@ bool HTMLAnimationBuilder::buildForElement(
   std::vector<std::pair<Frame, Matrix3D>> transformStops;
   bool transformAllPureTranslate = true;
   bool transformAllFlat = true;
+  // Stops whose zero `scale` factor was clamped to `SINGULAR_SCALE_CLAMP`, with the authored value
+  // they came from, so a track that turns out to stay on the z = 0 plane can be restored to the
+  // authored zero (see the classification below).
+  struct ClampedTransformStop {
+    size_t index = 0;
+    std::string value = {};
+  };
+  std::vector<ClampedTransformStop> clampedStops;
 
   // Per-keyframe `filter` decomposition. A glow / shadow authored as
   // `filter: drop-shadow(...)` (and `none` at rest) is lowered onto the runtime's
@@ -1296,7 +1306,9 @@ bool HTMLAnimationBuilder::buildForElement(
         alphaKeys.push_back({time, v, interp, {}, {}});
       } else if (prop == "transform") {
         Matrix3D pose = {};
-        if (ParseTransformPose(val, _valueParser, _diagnostics, pose, reference)) {
+        bool clampedZeroScale = false;
+        if (ParseTransformPose(val, _valueParser, _diagnostics, pose, reference,
+                               ZeroScale::ClampToEpsilon, &clampedZeroScale)) {
           // The parent camera is folded in after parsing, so a pose that parsed as flat can gain
           // depth here; `PlacePose` re-classifies it, and an invalid pose only drops this stop. A
           // pose that stays flat keeps itself instead, so `scale(0)` survives as a pop-in start.
@@ -1310,6 +1322,9 @@ bool HTMLAnimationBuilder::buildForElement(
             }
           } else {
             transformStops.push_back({time, placement.pose});
+            if (clampedZeroScale) {
+              clampedStops.push_back({transformStops.size() - 1, val});
+            }
             if (!(placement.flat && placement.linearIsIdentity)) transformAllPureTranslate = false;
             if (!placement.flat) transformAllFlat = false;
           }
@@ -1396,6 +1411,22 @@ bool HTMLAnimationBuilder::buildForElement(
       } else {
         _diagnostics.warn("html: animated property '" + prop +
                           "' is not supported; dropped [subset:animation-unsupported-property]");
+      }
+    }
+  }
+
+  // A track that never leaves the z = 0 plane rides the 2D `matrix` channel, which accepts a
+  // singular pose, so CSS's `scale(0)` there has to stay exactly zero. The stops were parsed with
+  // the zero-scale clamp only because a sibling stop might have made the track 3D; now that the
+  // classification is known, the clamped stops are re-parsed without it. They are valid
+  // declarations (the clamp only runs on a parsed `scale`), so the re-parse cannot add a
+  // diagnostic.
+  if (transformAllFlat && !clampedStops.empty()) {
+    HTMLDiagnosticSink silentDiagnostics(false);
+    for (const auto& clampedStop : clampedStops) {
+      Matrix3D pose = {};
+      if (ParseTransformPose(clampedStop.value, _valueParser, silentDiagnostics, pose, reference)) {
+        transformStops[clampedStop.index].second = pose;
       }
     }
   }
@@ -1559,15 +1590,28 @@ bool HTMLAnimationBuilder::buildForElement(
   if (!matrix3DKeys.empty() && !IsInvertibleMatrix3D(matrix3DChannelBaseline) &&
       ResolveFillModeRange(spec.fillMode, matrix3DKeys.front().time, loopOnce).writesBaseline) {
     // PAGX persists `matrix3D` keyframes only when they are invertible, so a singular static pose
-    // such as `scale(0)` has no form the hold can carry. Keep the authored pose untouched on the
-    // layer and hold the identity instead, which is a deliberate, review-accepted deviation from
-    // CSS: outside the active window the element shows at full size while CSS keeps it invisible.
-    // Do not "fix" it by fabricating a scale the author never wrote, and do not widen the hold to
-    // the authored pose — neither can be persisted; the diagnostic is what makes it visible.
-    _diagnostics.warn(
-        "html: the static transform has no invertible pose, so animation-fill-mode cannot hold it; "
-        "the hold uses the identity [subset:animation-unsupported-property]");
-    matrix3DChannelBaseline = {};
+    // cannot be held verbatim. Re-parse the authored static transform with the same zero-scale clamp
+    // the keyframe stops use: `scale(0)` becomes `SINGULAR_SCALE_CLAMP`, so the hold keeps the
+    // element sub-pixel (which is what CSS shows) instead of showing it at full size. The element's
+    // own static `matrix` is untouched — only the hold frame differs. A singular pose that came from
+    // a `matrix` / `matrix3d` factor has no direction to recover, so that case keeps the identity
+    // fallback and reports it.
+    Matrix3D clampedBaseline = {};
+    bool clampedZeroScale = false;
+    HTMLDiagnosticSink silentDiagnostics(false);
+    const std::string staticTransform = GetTrimmed(resolvedStyle, "transform");
+    if (ParseCssTransformList(staticTransform, _valueParser, silentDiagnostics, &clampedBaseline,
+                              reference.widthPx, reference.heightPx, ZeroScale::ClampToEpsilon,
+                              &clampedZeroScale) &&
+        clampedZeroScale && IsInvertibleMatrix3D(clampedBaseline)) {
+      matrix3DChannelBaseline = clampedBaseline;
+    } else {
+      _diagnostics.warn(
+          "html: the static transform has no invertible pose, so animation-fill-mode cannot hold "
+          "it; "
+          "the hold uses the identity [subset:animation-unsupported-property]");
+      matrix3DChannelBaseline = {};
+    }
   }
 
   // Inject baseline hold keyframes per CSS `animation-fill-mode`. ApplyFillMode operates

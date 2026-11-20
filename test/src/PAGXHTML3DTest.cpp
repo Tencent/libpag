@@ -1807,15 +1807,11 @@ PAG_TEST(PAGXHTML3DTest, BodyPerspectiveReachesItsChildren) {
 /**
  * Test case: a singular flat stop (`scale(0)`) under a perspective parent, on a track whose other
  * stop is 3D so the whole track rides the `matrix3D` channel. PAGX rejects a non-invertible key, so
- * the stop collapses to a tiny uniform scale: the element stays invisible at the pop-in instead of
- * losing that stop (which would start the animation at the rotated pose).
+ * the zero factor is clamped to `SINGULAR_SCALE_CLAMP` before the list multiplies: the stop survives
+ * as a sub-pixel pose instead of being dropped (dropping it would start the animation at the
+ * rotated pose).
  */
-/**
- * Test case: a singular flat stop (`scale(0)`) on a track whose other stop is 3D cannot be persisted,
- * because PAGX requires every `matrix3D` keyframe to be invertible. The importer drops that stop and
- * says so instead of substituting a fake pose; the remaining stop keeps its own (unprojected) values.
- */
-PAG_TEST(PAGXHTML3DTest, SingularFlatStopIsDroppedAndReported) {
+PAG_TEST(PAGXHTML3DTest, SingularFlatStopKeepsItsSubPixelScaleOnA3DTrack) {
   auto doc = ParseHtml(R"HTML(
     <html><head><style>
       @keyframes k { 0% { transform: scale(0); } 100% { transform: rotateY(45deg); } }
@@ -1828,14 +1824,23 @@ PAG_TEST(PAGXHTML3DTest, SingularFlatStopIsDroppedAndReported) {
     </body></html>
   )HTML");
   ASSERT_NE(doc, nullptr);
-  EXPECT_TRUE(HasDiagnosticContaining(doc, "cannot be represented"))
-      << "an unrepresentable stop has to be reported, not approximated";
+  EXPECT_FALSE(HasDiagnosticContaining(doc, "cannot be represented"))
+      << "a clamped stop is representable, so nothing has to be dropped";
   auto* animation = FirstAnimation(doc);
   ASSERT_NE(animation, nullptr);
   auto* channel = FindMatrix3DChannel(animation);
   ASSERT_NE(channel, nullptr);
-  // The singular 0% stop is gone; what remains is the representable 100% stop plus the closing hold.
-  ASSERT_EQ(channel->keyframes.size(), 2u) << "only representable stops survive";
+  ASSERT_GE(channel->keyframes.size(), 2u);
+  EXPECT_EQ(channel->keyframes.front().time, 0);
+  const auto& start = channel->keyframes.front().value;
+  ASSERT_TRUE(pagx::IsInvertibleMatrix3D(start))
+      << "the 0% stop must survive, so the pop-in starts from nothing visible";
+  pagx::DecomposedMatrix3D decomposed = {};
+  ASSERT_TRUE(pagx::DecomposeMatrix3D(start, &decomposed));
+  // `scale(0)` only zeroes the two in-plane factors; the z factor stays 1, which is what keeps the
+  // lifted pose invertible.
+  EXPECT_NEAR(decomposed.scale[0], 1e-3, 1e-6) << "the clamp is sub-pixel, not the authored zero";
+  EXPECT_NEAR(decomposed.scale[1], 1e-3, 1e-6);
   bool sawAuthoredRotation = false;
   for (const auto& frame : channel->keyframes) {
     EXPECT_TRUE(pagx::IsInvertibleMatrix3D(frame.value));
@@ -1845,10 +1850,189 @@ PAG_TEST(PAGXHTML3DTest, SingularFlatStopIsDroppedAndReported) {
     }
   }
   EXPECT_TRUE(sawAuthoredRotation)
-      << "the surviving stop is the authored rotateY(45deg), not a substituted scale";
+      << "the surviving tail stop is the authored rotateY(45deg), not a substituted scale";
   auto* card = FindLayerById(doc, "card");
   ASSERT_NE(card, nullptr);
   ASSERT_NE(CameraWrapperOf(doc, card), nullptr) << "the camera must survive on a wrapper";
+}
+
+/**
+ * Test case: `rotateY(-90deg) scale(0)` is rank-deficient, and applying the zero factor first
+ * collapses the rotation away with it. Clamping the factor before the multiply keeps the direction,
+ * so the stop is representable and the animation still starts at -90 degrees (30 degrees per frame
+ * of error would be visible immediately).
+ */
+PAG_TEST(PAGXHTML3DTest, SingularRotatedZeroScaleStopKeepsItsDirection) {
+  auto doc = ParseHtml(R"HTML(
+    <html><head><style>
+      @keyframes flip {
+        0%   { transform: rotateY(-90deg) scale(0); }
+        100% { transform: rotateY(90deg) scale(1); }
+      }
+    </style></head>
+    <body style="width:200px;height:120px">
+      <div style="position:absolute;left:0;top:0;width:200px;height:120px;perspective:600px">
+        <div id="card" style="position:absolute;left:20px;top:20px;width:80px;height:60px;
+             background-color:#38BDF8;animation:flip 1s linear infinite"></div>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* animation = FirstAnimation(doc);
+  ASSERT_NE(animation, nullptr);
+  auto* channel = FindMatrix3DChannel(animation);
+  ASSERT_NE(channel, nullptr);
+  ASSERT_GE(channel->keyframes.size(), 2u);
+  const auto& start = channel->keyframes.front().value;
+  ASSERT_TRUE(pagx::IsInvertibleMatrix3D(start)) << "epsilon * R(-90) must be invertible";
+  // `scale(0)` zeroes the two in-plane factors only, so `R(-90) * S(epsilon, epsilon, 1)` keeps the
+  // rotation in the untouched z column and its sign shows up in row 2.
+  EXPECT_TRUE(NearlyEqual(start.getRowColumn(0, 2), -1.0f, 1e-5f))
+      << "the -90 degree direction must survive the clamp";
+  EXPECT_TRUE(NearlyEqual(start.getRowColumn(2, 0), 1e-3f, 1e-6f))
+      << "the in-plane column stays sub-pixel";
+  pagx::DecomposedMatrix3D decomposed = {};
+  ASSERT_TRUE(pagx::DecomposeMatrix3D(start, &decomposed));
+  EXPECT_NEAR(decomposed.scale[0], 1e-3, 1e-6);
+  EXPECT_NEAR(decomposed.scale[1], 1e-3, 1e-6);
+  // A quaternion and its negation are the same rotation, so the components are compared by
+  // magnitude.
+  EXPECT_NEAR(std::fabs(decomposed.rotation.y), 0.7071068, 1e-3);
+  EXPECT_NEAR(std::fabs(decomposed.rotation.w), 0.7071068, 1e-3);
+}
+
+/**
+ * Test case: the clamp must not borrow a rotation the author never wrote. `rotateY(0deg) scale(0)`
+ * starts at zero degrees, so the clamped start pose is `epsilon * I` (a sub-pixel unrotated box),
+ * not the 60 degrees of the tail stop.
+ */
+PAG_TEST(PAGXHTML3DTest, SingularZeroScaleAtZeroDegreesStaysUnrotated) {
+  auto doc = ParseHtml(R"HTML(
+    <html><head><style>
+      @keyframes grow {
+        0%   { transform: rotateY(0deg) scale(0); }
+        100% { transform: rotateY(60deg) scale(1); }
+      }
+    </style></head>
+    <body style="width:200px;height:120px">
+      <div style="position:absolute;left:0;top:0;width:200px;height:120px;perspective:600px">
+        <div id="card" style="position:absolute;left:20px;top:20px;width:80px;height:60px;
+             background-color:#38BDF8;animation:grow 1s linear infinite"></div>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* animation = FirstAnimation(doc);
+  ASSERT_NE(animation, nullptr);
+  auto* channel = FindMatrix3DChannel(animation);
+  ASSERT_NE(channel, nullptr);
+  ASSERT_GE(channel->keyframes.size(), 2u);
+  pagx::DecomposedMatrix3D decomposed = {};
+  ASSERT_TRUE(pagx::DecomposeMatrix3D(channel->keyframes.front().value, &decomposed));
+  EXPECT_NEAR(decomposed.scale[0], 1e-3, 1e-6);
+  EXPECT_NEAR(decomposed.scale[1], 1e-3, 1e-6);
+  EXPECT_NEAR(std::fabs(decomposed.rotation.y), 0.0, 1e-6)
+      << "the start keeps its own zero degrees";
+  EXPECT_NEAR(std::fabs(decomposed.rotation.w), 1.0, 1e-6);
+}
+
+/**
+ * Test case: the clamp is a keyframe-only policy. A static `transform: scale(0)` keeps the authored
+ * zero: the 2D `matrix` channel can carry a singular pose, so the element stays exactly invisible
+ * and nothing is reported.
+ */
+PAG_TEST(PAGXHTML3DTest, StaticZeroScaleStaysExactlyZero) {
+  auto doc = ParseHtml(R"HTML(
+    <html><body style="width:200px;height:120px">
+      <div id="card" style="position:absolute;left:20px;top:20px;width:80px;height:60px;
+           background-color:#38BDF8;transform:scale(0)"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* card = FindLayerById(doc, "card");
+  ASSERT_NE(card, nullptr);
+  EXPECT_TRUE(card->matrix3D.isIdentity()) << "a flat pose must not become 3D";
+  EXPECT_TRUE(NearlyEqual(card->matrix.a, 0.0f, 1e-6f));
+  EXPECT_TRUE(NearlyEqual(card->matrix.b, 0.0f, 1e-6f));
+  EXPECT_TRUE(NearlyEqual(card->matrix.c, 0.0f, 1e-6f));
+  EXPECT_TRUE(NearlyEqual(card->matrix.d, 0.0f, 1e-6f));
+  EXPECT_TRUE(doc->errors.empty()) << "a legal static pose reports nothing";
+}
+
+/**
+ * Test case: a singular pose that came from `matrix` / `matrix3d` carries no direction to recover,
+ * so the zero-scale clamp cannot apply: the stop is still dropped and reported instead of being
+ * approximated into something the author never wrote. This is the boundary between the two cases.
+ */
+PAG_TEST(PAGXHTML3DTest, MatrixSourceSingularStopIsStillDropped) {
+  auto doc = ParseHtml(R"HTML(
+    <html><head><style>
+      @keyframes k {
+        0%   { transform: matrix3d(0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,1); }
+        100% { transform: rotateY(45deg); }
+      }
+    </style></head>
+    <body style="width:200px;height:120px">
+      <div style="position:absolute;left:0;top:0;width:200px;height:120px;perspective:600px">
+        <div id="card" style="position:absolute;left:20px;top:20px;width:80px;height:60px;
+             background-color:#38BDF8;animation:k 1s linear infinite"></div>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  EXPECT_TRUE(HasDiagnosticContaining(doc, "not invertible"))
+      << "a matrix-form singular pose has to be reported, never clamped";
+  auto* animation = FirstAnimation(doc);
+  ASSERT_NE(animation, nullptr);
+  auto* channel = FindMatrix3DChannel(animation);
+  ASSERT_NE(channel, nullptr);
+  bool sawAuthoredRotation = false;
+  for (const auto& frame : channel->keyframes) {
+    EXPECT_TRUE(pagx::IsInvertibleMatrix3D(frame.value));
+    EXPECT_FALSE(std::fabs(frame.value.getRowColumn(0, 0)) < 0.01f &&
+                 std::fabs(frame.value.getRowColumn(0, 2)) < 0.01f)
+        << "no substitute for the dropped matrix stop";
+    if (NearlyEqual(std::fabs(frame.value.getRowColumn(0, 0)), 0.707106f, 0.01f)) {
+      sawAuthoredRotation = true;
+    }
+  }
+  EXPECT_TRUE(sawAuthoredRotation) << "the authored rotateY(45deg) stop survives";
+}
+
+/**
+ * Test case: the same `matrix(0,0,0,0,0,0)` form on a 3D track is flat, so it survives parsing and
+ * is dropped later, when the flat stop is lifted onto the `matrix3D` channel. That drop is reported
+ * by the routing step ("cannot be represented"), not by the parser.
+ */
+PAG_TEST(PAGXHTML3DTest, FlatMatrixSourceSingularStopIsDroppedByRouting) {
+  auto doc = ParseHtml(R"HTML(
+    <html><head><style>
+      @keyframes k {
+        0%   { transform: matrix(0,0,0,0,0,0); }
+        100% { transform: rotateY(45deg); }
+      }
+    </style></head>
+    <body style="width:200px;height:120px">
+      <div style="position:absolute;left:0;top:0;width:200px;height:120px;perspective:600px">
+        <div id="card" style="position:absolute;left:20px;top:20px;width:80px;height:60px;
+             background-color:#38BDF8;animation:k 1s linear infinite"></div>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  EXPECT_TRUE(HasDiagnosticContaining(doc, "cannot be represented"));
+  auto* animation = FirstAnimation(doc);
+  ASSERT_NE(animation, nullptr);
+  auto* channel = FindMatrix3DChannel(animation);
+  ASSERT_NE(channel, nullptr);
+  bool sawAuthoredRotation = false;
+  for (const auto& frame : channel->keyframes) {
+    EXPECT_TRUE(pagx::IsInvertibleMatrix3D(frame.value));
+    if (NearlyEqual(std::fabs(frame.value.getRowColumn(0, 0)), 0.707106f, 0.01f)) {
+      sawAuthoredRotation = true;
+    }
+  }
+  EXPECT_TRUE(sawAuthoredRotation) << "the authored rotateY(45deg) stop survives";
 }
 
 /**
@@ -1881,11 +2065,12 @@ PAG_TEST(PAGXHTML3DTest, ScaleZeroPopInUnderPerspectiveKeepsItsStart) {
 
 /**
  * Test case: a singular static pose (`scale(0)`) under a 3D keyframe track. PAGX persists
- * `matrix3D` keyframes only when they are invertible, so the fill-mode holds have no form that can
- * carry the authored pose: they hold the identity and the substitution is reported once instead of
- * faking a tiny scale the author never wrote.
+ * `matrix3D` keyframes only when they are invertible, so the fill-mode holds carry the clamped pose
+ * instead of the authored zero: outside the active window the element stays sub-pixel, which is what
+ * CSS shows, rather than snapping back to full size the way an identity hold would. The element's
+ * own static `matrix` keeps the authored zero — only the hold frames are clamped.
  */
-PAG_TEST(PAGXHTML3DTest, SingularStaticPoseFallsBackToIdentityInFillHolds) {
+PAG_TEST(PAGXHTML3DTest, SingularStaticPoseHoldsStaySubPixel) {
   auto doc = ParseHtml(R"HTML(
     <html><head><style>
       @keyframes k { 0% { transform: rotateY(0deg); } 100% { transform: rotateY(60deg); } }
@@ -1905,17 +2090,25 @@ PAG_TEST(PAGXHTML3DTest, SingularStaticPoseFallsBackToIdentityInFillHolds) {
   for (const auto& key : channel->keyframes) {
     EXPECT_TRUE(pagx::IsInvertibleMatrix3D(key.value)) << "time " << key.time;
   }
-  EXPECT_TRUE(channel->keyframes.front().value.isIdentity())
-      << "the leading hold cannot carry scale(0)";
-  EXPECT_TRUE(channel->keyframes.back().value.isIdentity())
-      << "the trailing hold cannot carry scale(0)";
+  for (const auto& hold : {channel->keyframes.front(), channel->keyframes.back()}) {
+    EXPECT_FALSE(hold.value.isIdentity()) << "an identity hold would show the card at full size";
+    pagx::DecomposedMatrix3D decomposed = {};
+    ASSERT_TRUE(pagx::DecomposeMatrix3D(hold.value, &decomposed));
+    EXPECT_NEAR(decomposed.scale[0], 1e-3, 1e-6);
+    EXPECT_NEAR(decomposed.scale[1], 1e-3, 1e-6);
+  }
   int warnings = 0;
   for (const auto& message : doc->errors) {
     if (message.find("animation-fill-mode") != std::string::npos) {
       warnings++;
     }
   }
-  EXPECT_EQ(warnings, 1) << "the identity fallback must be reported exactly once";
+  EXPECT_EQ(warnings, 0) << "a clamped hold is faithful, so nothing has to be reported";
+  auto* card = FindLayerById(doc, "card");
+  ASSERT_NE(card, nullptr);
+  EXPECT_TRUE(NearlyEqual(card->matrix.a, 0.0f, 1e-6f))
+      << "the element's own static matrix keeps the authored zero";
+  EXPECT_TRUE(NearlyEqual(card->matrix.d, 0.0f, 1e-6f));
 }
 
 /**

@@ -36,6 +36,24 @@ namespace {
 
 constexpr float POSE_EPSILON = 1e-6f;
 
+// Substitute for a zero scale factor when a caller asks for a pose it can persist (see `ZeroScale`).
+// A zero factor is rank-deficient, so composing it — in CSS order — collapses the whole list:
+// `rotateY(-90deg) scale(0)` becomes the zero matrix and the rotation is gone. Replacing the factor
+// *before* the multiply keeps the direction (`epsilon * R(-90deg)`), which is what makes the pose
+// invertible and therefore representable as a `matrix3D` keyframe.
+//
+// 1e-3 is picked from the rendering budget: on a 60px box the clamped edge is 60 * 1e-3 = 0.06px,
+// i.e. 0.0036 square px, which no viewer can see. Float32 rotation / scale decomposition stays well
+// conditioned down to about 1e-5, so 1e-3 is still far outside that noise band and there is no
+// reason to go smaller — a smaller factor buys nothing visually and only moves closer to the range
+// where the decomposition itself becomes unreliable.
+constexpr float SINGULAR_SCALE_CLAMP = 1e-3f;
+
+// Zero carries no direction, so the substitute is the positive epsilon.
+float ClampSingularScale(float value) {
+  return value == 0.0f ? SINGULAR_SCALE_CLAMP : value;
+}
+
 bool NearlyZero(float value) {
   return std::fabs(value) <= POSE_EPSILON;
 }
@@ -258,6 +276,10 @@ struct TransformArgs {
   // Percentage lengths resolve against the element box: width for X, height for Y.
   float referenceWidthPx = NAN;
   float referenceHeightPx = NAN;
+  // How the `scale` family treats a zero factor; set by `ParseCssTransformList` and reported back
+  // through `clampedZeroScale`.
+  ZeroScale zeroScale = ZeroScale::Keep;
+  bool* clampedZeroScale = nullptr;
 
   // The Z axis has no percentage basis, so a percentage there is reported as unsupported.
   bool LengthAt(size_t index, float& value, TransformAxis axis) const {
@@ -406,6 +428,14 @@ bool ParseScale(const TransformCall& call) {
     if (!call.args.NumberAt(0, only)) {
       call.diagnostics.warn(arityMessage);
       return false;
+    }
+  }
+  if (call.args.zeroScale == ZeroScale::ClampToEpsilon && (x == 0.0f || y == 0.0f || z == 0.0f)) {
+    x = ClampSingularScale(x);
+    y = ClampSingularScale(y);
+    z = ClampSingularScale(z);
+    if (call.args.clampedZeroScale != nullptr) {
+      *call.args.clampedZeroScale = true;
     }
   }
   *call.out = MakeScale(x, y, z);
@@ -599,7 +629,7 @@ TransformFamilyHandler FindTransformHandler(const std::string& name) {
 // Parses one `fn(args)` token. Returns false after emitting a diagnostic.
 bool ParseFunction(const std::string& token, HTMLValueParser& valueParser,
                    HTMLDiagnosticSink& diagnostics, Matrix3D* out, float referenceWidthPx,
-                   float referenceHeightPx) {
+                   float referenceHeightPx, ZeroScale zeroScale, bool* clampedZeroScale) {
   std::string name;
   std::string args;
   if (!ParseCssFunctionCall(token, name, args)) {
@@ -616,7 +646,8 @@ bool ParseFunction(const std::string& token, HTMLValueParser& valueParser,
   // exactly the token the author wrote.
   const std::string label = Trim(token.substr(0, token.find('(')));
   const auto parts = SplitTopLevelCommas(args);
-  const TransformArgs transformArgs = {parts, valueParser, referenceWidthPx, referenceHeightPx};
+  const TransformArgs transformArgs = {
+      parts, valueParser, referenceWidthPx, referenceHeightPx, zeroScale, clampedZeroScale};
   const TransformCall call = {token, name, label, transformArgs, diagnostics, out};
   return handler(call);
 }
@@ -803,7 +834,7 @@ HTMLElementAnchor ResolveElementAnchor(const std::string& originValue,
 
 bool ParseCssTransformList(const std::string& value, HTMLValueParser& valueParser,
                            HTMLDiagnosticSink& diagnostics, Matrix3D* out, float referenceWidthPx,
-                           float referenceHeightPx) {
+                           float referenceHeightPx, ZeroScale zeroScale, bool* clampedZeroScale) {
   if (out == nullptr) {
     return false;
   }
@@ -826,8 +857,8 @@ bool ParseCssTransformList(const std::string& value, HTMLValueParser& valueParse
   Matrix3D pose = {};
   for (const auto& token : tokens) {
     Matrix3D step = {};
-    if (!ParseFunction(token, valueParser, diagnostics, &step, referenceWidthPx,
-                       referenceHeightPx)) {
+    if (!ParseFunction(token, valueParser, diagnostics, &step, referenceWidthPx, referenceHeightPx,
+                       zeroScale, clampedZeroScale)) {
       return false;
     }
     pose = Multiply(pose, step);
@@ -837,7 +868,10 @@ bool ParseCssTransformList(const std::string& value, HTMLValueParser& valueParse
     return false;
   }
   // PAGX requires a 3D pose to be invertible; a singular flat pose stays legal because a 2D
-  // matrix has no such constraint (a zero scale is a valid, if empty, 2D transform).
+  // matrix has no such constraint (a zero scale is a valid, if empty, 2D transform). With
+  // `ClampToEpsilon` a `scale` factor can no longer be the singular one — the clamp runs before the
+  // multiply — so what fails here is a singular pose from a `matrix` / `matrix3d` factor, which
+  // carries no direction to recover.
   if (!IsFlatTransform(pose) && !IsInvertibleMatrix3D(pose)) {
     diagnostics.warn("html: transform '" + trimmed + "' is not invertible; ignored");
     return false;

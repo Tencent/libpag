@@ -138,16 +138,39 @@ HTMLElementAnchor ResolveElementAnchor(const std::string& originValue,
                                        HTMLValueParser& valueParser, bool quiet = false);
 
 /**
+ * How a transform list treats a zero scale factor (`scale(0)`, `scaleX(0)`, `scale3d(0, 1, 1)`).
+ *
+ *  - `Keep` is the CSS-exact result: the factor makes the composed matrix rank-deficient. Static
+ *    poses and purely 2D keyframe tracks use it — the 2D `matrix` channel can carry a singular pose,
+ *    so "invisible" stays exactly invisible.
+ *  - `ClampToEpsilon` substitutes `SINGULAR_SCALE_CLAMP` for the zero factor *before* the functions
+ *    multiply, which only matters when the same list also rotates: `rotateY(-90deg) scale(0)`
+ *    collapses to the zero matrix under `Keep`, losing the -90 degrees and leaving nothing a
+ *    `matrix3D` pose could carry, while `epsilon * R(-90deg)` keeps the direction and stays
+ *    invertible. Used for keyframe tracks whose poses reach the `matrix3D` channel.
+ */
+enum class ZeroScale {
+  Keep,
+  ClampToEpsilon,
+};
+
+/**
  * Parses a CSS `transform` value (a whitespace-separated function list) into a 4x4 pose, composed
  * in CSS order. `none` is a valid declaration of "no transform", so it resolves to the identity and
  * reports success. Three failures return false with a diagnostic: an unknown function, an invalid
  * argument (unit, arity, angle), or an unpresentable result (non-finite, or a 3D pose PAGX would
  * reject because it is not invertible). The absent value (empty string) is the only silent false.
  * A `perspective` distance may be zero — it clamps to 1px — and only a negative distance is invalid.
+ *
+ * `zeroScale` only reaches the `scale` family; a `matrix` / `matrix3d` factor is never clamped
+ * because it carries no direction to preserve, so a singular one still fails here. `clampedZeroScale`,
+ * when non-null, reports whether the clamp actually replaced a factor, which lets a caller keep a
+ * track that never leaves the z = 0 plane at its authored zero.
  */
 bool ParseCssTransformList(const std::string& value, HTMLValueParser& valueParser,
                            HTMLDiagnosticSink& diagnostics, Matrix3D* out,
-                           float referenceWidthPx = NAN, float referenceHeightPx = NAN);
+                           float referenceWidthPx = NAN, float referenceHeightPx = NAN,
+                           ZeroScale zeroScale = ZeroScale::Keep, bool* clampedZeroScale = nullptr);
 
 /**
  * Where a pose goes once the parent camera is resolved. Both the static box path and the

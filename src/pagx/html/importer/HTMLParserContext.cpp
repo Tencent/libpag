@@ -82,7 +82,8 @@ bool Animates3DTransform(const std::unordered_map<std::string, html::CssKeyframe
         }
         Matrix3D pose = {};
         if (ParseCssTransformList(declaration.second, valueParser, silentDiagnostics, &pose,
-                                  reference.widthPx, reference.heightPx) &&
+                                  reference.widthPx, reference.heightPx,
+                                  ZeroScale::ClampToEpsilon) &&
             !IsFlatTransform(pose)) {
           return true;
         }
