@@ -1560,8 +1560,10 @@ bool HTMLAnimationBuilder::buildForElement(
       ResolveFillModeRange(spec.fillMode, matrix3DKeys.front().time, loopOnce).writesBaseline) {
     // PAGX persists `matrix3D` keyframes only when they are invertible, so a singular static pose
     // such as `scale(0)` has no form the hold can carry. Keep the authored pose untouched on the
-    // layer and hold the identity instead, which is a visible deviation from CSS: say so rather
-    // than fabricating a scale the author never wrote.
+    // layer and hold the identity instead, which is a deliberate, review-accepted deviation from
+    // CSS: outside the active window the element shows at full size while CSS keeps it invisible.
+    // Do not "fix" it by fabricating a scale the author never wrote, and do not widen the hold to
+    // the authored pose — neither can be persisted; the diagnostic is what makes it visible.
     _diagnostics.warn(
         "html: the static transform has no invertible pose, so animation-fill-mode cannot hold it; "
         "the hold uses the identity [subset:animation-unsupported-property]");
