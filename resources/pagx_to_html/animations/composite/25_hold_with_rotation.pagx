@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: Hold translation and linear rotation share one transform property; rotation must not inherit translation's hold.
+     Target: Composite  Channel: x,rotation.z  Type: float
+     Ref: R12 -->
+<pagx width="320" height="240">
+  <Layer width="320" height="240"><Rectangle position="160,120" size="320,240"/><Fill color="#F8FAFC"/></Layer>
+  <Layer x="50" y="70" width="240" height="150">
+    <Layer id="holdBox" width="80" height="40"><Rectangle position="40,20" size="80,40"/><Fill color="#BE123C"/></Layer>
+  </Layer>
+  <Animations><Animation id="holdAndSpin" duration="60" frameRate="60" loop="once"><Object target="holdBox">
+    <Channel name="x" type="float"><Key time="0" value="0" interpolation="hold"/><Key time="60" value="100"/></Channel>
+    <Channel name="rotation.z" type="float"><Key time="0" value="0" interpolation="linear"/><Key time="60" value="60"/></Channel>
+  </Object></Animation></Animations>
+</pagx>

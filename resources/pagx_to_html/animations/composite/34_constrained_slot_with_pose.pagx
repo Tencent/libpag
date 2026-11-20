@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: A constrained layer's layout origin remains outside its animated local translation and rotation.
+     Target: Composite  Channel: x,rotation.z  Type: float
+     Ref: R10,R39 -->
+<pagx width="320" height="240">
+  <Layer width="320" height="240"><Rectangle position="160,120" size="320,240"/><Fill color="#F8FAFC"/></Layer>
+  <Layer id="constrainedPose" left="70" top="80" width="80" height="50">
+    <Rectangle position="40,25" size="80,50"/><Fill color="#1D4ED8"/>
+  </Layer>
+  <Animations><Animation id="constrainedMove" duration="60" frameRate="60" loop="once"><Object target="constrainedPose">
+    <Channel name="x" type="float"><Key time="0" value="0" interpolation="linear"/><Key time="60" value="80"/></Channel>
+    <Channel name="rotation.z" type="float"><Key time="0" value="0" interpolation="linear"/><Key time="60" value="45"/></Channel>
+  </Object></Animation></Animations>
+</pagx>

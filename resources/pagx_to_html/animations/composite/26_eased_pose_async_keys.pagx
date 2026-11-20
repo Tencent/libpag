@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: A linear axis adds a key inside another axis's Bezier segment; the active curve continues beyond that unrelated key.
+     Target: Composite  Channel: x,y  Type: float
+     Ref: R13 -->
+<pagx width="380" height="240">
+  <Layer width="380" height="240"><Rectangle position="190,120" size="380,240"/><Fill color="#F8FAFC"/></Layer>
+  <Layer x="30" y="50" width="330" height="160">
+    <Layer id="asyncBox" width="50" height="40"><Rectangle position="25,20" size="50,40"/><Fill color="#1D4ED8"/></Layer>
+  </Layer>
+  <Animations><Animation id="asyncPose" duration="60" frameRate="60" loop="once"><Object target="asyncBox">
+    <Channel name="x" type="float"><Key time="0" value="0" interpolation="bezier" bezierOut="0.42,0"/><Key time="60" value="250" bezierIn="0.58,1"/></Channel>
+    <Channel name="y" type="float"><Key time="0" value="0" interpolation="linear"/><Key time="10" value="10" interpolation="linear"/><Key time="60" value="60"/></Channel>
+  </Object></Animation></Animations>
+</pagx>

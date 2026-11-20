@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: A static filter forces offscreen compositing while a groupOpacity=false Layer fades; paint alpha must respect that boundary.
+     Target: Composite  Channel: alpha  Type: float
+     Ref: R16 -->
+<pagx width="320" height="220">
+  <Layer width="320" height="220"><Rectangle position="160,110" size="320,220"/><Fill color="#F8FAFC"/></Layer>
+  <Layer id="filteredFade" width="320" height="220" groupOpacity="false">
+    <Rectangle position="130,110" size="120,120"/><Fill color="#BE123C"/>
+    <Rectangle position="180,110" size="120,120"/><Fill color="#1D4ED8"/>
+    <BlurFilter blurX="8" blurY="8"/>
+  </Layer>
+  <Animations><Animation id="filteredAlpha" duration="60" frameRate="60" loop="once"><Object target="filteredFade">
+    <Channel name="alpha" type="float"><Key time="0" value="1" interpolation="linear"/><Key time="60" value="0.45"/></Channel>
+  </Object></Animation></Animations>
+</pagx>

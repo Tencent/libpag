@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: TextBox element spans and accumulated rich-text spans both animate their real Stroke without an unrelated Fill or Text channel.
+     Target: Composite  Channel: width  Type: float
+     Ref: R24 -->
+<pagx width="380" height="240">
+  <Layer width="380" height="240"><Rectangle position="190,120" size="380,240"/><Fill color="#F8FAFC"/></Layer>
+  <Layer width="380" height="240">
+    <TextBox position="25,30" width="330" height="75" textAlign="start" paragraphAlign="near" lineHeight="40">
+      <Text text="OWN STROKE" fontFamily="Arial" fontStyle="Regular" fontSize="30"/>
+      <Fill color="#1D4ED8"/><Stroke id="boxOwnOutline" color="#BE123C" width="2"/>
+    </TextBox>
+  </Layer>
+  <Layer width="380" height="240">
+    <Group>
+      <Text text="RICH " fontFamily="Arial" fontStyle="Regular" fontSize="28"/>
+      <Fill color="#1D4ED8"/><Stroke id="richOutlineA" color="#BE123C" width="2"/>
+    </Group>
+    <Group>
+      <Text text="SPANS" fontFamily="Arial" fontStyle="Regular" fontSize="28"/>
+      <Fill color="#0F766E"/><Stroke id="richOutlineB" color="#7C3AED" width="2"/>
+    </Group>
+    <TextBox position="25,140" width="330" height="70" textAlign="center" paragraphAlign="middle"/>
+  </Layer>
+  <Animations><Animation id="boxStrokeWidths" duration="60" frameRate="60" loop="once">
+    <Object target="boxOwnOutline"><Channel name="width" type="float"><Key time="0" value="2" interpolation="linear"/><Key time="60" value="8"/></Channel></Object>
+    <Object target="richOutlineA"><Channel name="width" type="float"><Key time="0" value="2" interpolation="linear"/><Key time="60" value="8"/></Channel></Object>
+    <Object target="richOutlineB"><Channel name="width" type="float"><Key time="0" value="2" interpolation="linear"/><Key time="60" value="8"/></Channel></Object>
+  </Animation></Animations>
+</pagx>

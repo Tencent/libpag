@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: A flex item rotates in 3D while its local x/y stay zero; its parent layout slot is applied exactly once.
+     Target: Composite  Channel: rotation.y  Type: float
+     Ref: R43 -->
+<pagx width="320" height="200">
+  <Layer width="320" height="200"><Rectangle position="160,100" size="320,200"/><Fill color="#F8FAFC"/></Layer>
+  <Layer x="40" y="60" width="240" height="100" layout="horizontal">
+    <Layer width="80" height="80"><Rectangle position="40,40" size="80,80"/><Fill color="#0F766E"/></Layer>
+    <Layer id="flexRotatingBox" width="80" height="80"><Rectangle position="40,40" size="80,80"/><Fill color="#BE123C"/></Layer>
+  </Layer>
+  <Animations><Animation id="flex3dPose" duration="60" frameRate="60" loop="once"><Object target="flexRotatingBox">
+    <Channel name="rotation.y" type="float"><Key time="0" value="0" interpolation="linear"/><Key time="60" value="50"/></Channel>
+  </Object></Animation></Animations>
+</pagx>

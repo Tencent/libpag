@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: Separate timelines with different durations write translation and rotation to one local pose.
+     Target: Composite  Channel: x,rotation.z  Type: float
+     Ref: R11 -->
+<pagx width="360" height="240">
+  <Resources><Composition id="poseCard" width="260" height="160">
+    <Layer id="poseBox" width="60" height="40"><Rectangle position="30,20" size="60,40"/><Fill color="#BE123C"/></Layer>
+    <Animations>
+      <Animation id="poseSlide" duration="60" frameRate="60" loop="once"><Object target="poseBox">
+        <Channel name="x" type="float"><Key time="0" value="0" interpolation="linear"/><Key time="60" value="150"/></Channel>
+      </Object></Animation>
+      <Animation id="poseSpin" duration="120" frameRate="60" loop="once"><Object target="poseBox">
+        <Channel name="rotation.z" type="float"><Key time="0" value="0" interpolation="linear"/><Key time="120" value="60"/></Channel>
+      </Object></Animation>
+    </Animations>
+  </Composition></Resources>
+  <Layer width="360" height="240"><Rectangle position="180,120" size="360,240"/><Fill color="#F8FAFC"/></Layer>
+  <Layer x="40" y="60" width="260" height="160" composition="@poseCard"><Timelines>
+    <Animation ref="@poseSlide" playing="true"/><Animation ref="@poseSpin" playing="true"/>
+  </Timelines></Layer>
+</pagx>

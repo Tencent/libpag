@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: Interleaved duration-60/duration-120/duration-60 mounts write the same component; the last authored writer must stay last.
+     Target: Composite  Channel: x  Type: float
+     Ref: R44 -->
+<pagx width="460" height="200">
+  <Resources><Composition id="orderCard" width="400" height="100">
+    <Layer id="orderBox" width="40" height="40"><Rectangle position="20,20" size="40,40"/><Fill color="#BE123C"/></Layer>
+    <Animations>
+      <Animation id="orderA" duration="60" frameRate="60" loop="once"><Object target="orderBox"><Channel name="x" type="float"><Key time="0" value="0" interpolation="linear"/><Key time="60" value="100"/></Channel></Object></Animation>
+      <Animation id="orderB" duration="120" frameRate="60" loop="once"><Object target="orderBox"><Channel name="x" type="float"><Key time="0" value="0" interpolation="linear"/><Key time="120" value="200"/></Channel></Object></Animation>
+      <Animation id="orderC" duration="60" frameRate="60" loop="once"><Object target="orderBox"><Channel name="x" type="float"><Key time="0" value="0" interpolation="linear"/><Key time="60" value="300"/></Channel></Object></Animation>
+    </Animations>
+  </Composition></Resources>
+  <Layer width="460" height="200"><Rectangle position="230,100" size="460,200"/><Fill color="#F8FAFC"/></Layer>
+  <Layer x="30" y="70" width="400" height="100" composition="@orderCard"><Timelines>
+    <Animation ref="@orderA" playing="true"/><Animation ref="@orderB" playing="true"/><Animation ref="@orderC" playing="true"/>
+  </Timelines></Layer>
+</pagx>
