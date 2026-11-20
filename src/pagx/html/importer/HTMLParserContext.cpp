@@ -190,6 +190,30 @@ size_t StripBackdropBlurUnderFade(Layer* layer, const std::unordered_set<std::st
   return removed;
 }
 
+// One parent-facing layout anchor and the delta that re-expresses it in a translated container.
+struct AnchorTranslation {
+  float* anchor;
+  float delta;
+};
+
+// Re-expresses every parent-facing anchor of `child` in the coordinate space of a container that
+// replaced the box the child was authored against. Layout reads the anchors the same way in both
+// boxes, so the child keeps its authored rect when the near edges (measured from the start edge)
+// move by `-offset`, the far edges (measured from the end edge) move by `+offset`, and the centre
+// offsets move with the near edges. Percent sizes and the container's reference extent are
+// untouched, so the resolved width / height stay the same. A NaN anchor stays NaN: a constraint the
+// author never wrote must not gain a value from this translation.
+void TranslateParentAnchors(Layer* child, const Point& offset) {
+  const AnchorTranslation translations[] = {
+      {&child->left, -offset.x}, {&child->centerX, -offset.x}, {&child->right, offset.x},
+      {&child->top, -offset.y},  {&child->centerY, -offset.y}, {&child->bottom, offset.y}};
+  for (const auto& translation : translations) {
+    if (std::isfinite(*translation.anchor)) {
+      *translation.anchor += translation.delta;
+    }
+  }
+}
+
 }  // namespace
 
 //==================================================================================================
@@ -697,9 +721,9 @@ void HTMLParserContext::assignElementId(Layer* layer, const std::shared_ptr<DOMN
   }
 }
 
-// Places `child` inside a zero-size layer that carries the parent camera at the parent's
-// `perspective-origin`. The child keeps its own (un-projected) pose; only its offset changes, so the
-// composition stays `T(origin) * P * T(-origin) * T(child) * pose`, i.e. CSS's order.
+// Places `child` inside a layer that carries the parent camera at the parent's `perspective-origin`.
+// The child keeps its own (un-projected) pose; only its layout anchors change, so the composition
+// stays `T(origin) * P * T(-origin) * T(child) * pose`, i.e. CSS's order.
 Layer* HTMLParserContext::wrapInCameraLayer(Layer* child, const HTMLParentCamera& camera,
                                             float referenceWidthPx, float referenceHeightPx) {
   if (child == nullptr || !camera.HasOrigin()) {
@@ -718,12 +742,7 @@ Layer* HTMLParserContext::wrapInCameraLayer(Layer* child, const HTMLParentCamera
   wrapper->perspective = camera.distancePx;
   // Without a 3D context the runtime flattens the child before projecting, which drops the camera.
   wrapper->preserve3D = true;
-  if (std::isfinite(child->left)) {
-    child->left -= camera.localOrigin.x;
-  }
-  if (std::isfinite(child->top)) {
-    child->top -= camera.localOrigin.y;
-  }
+  TranslateParentAnchors(child, camera.localOrigin);
   wrapper->children.push_back(child);
   return wrapper;
 }

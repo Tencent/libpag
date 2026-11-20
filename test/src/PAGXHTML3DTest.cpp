@@ -1081,6 +1081,89 @@ PAG_TEST(PAGXHTML3DTest, MaterializedCameraConjugatesPerspectiveOrigin) {
 }
 
 /**
+ * Test case: moving the child into the camera wrapper must not change its parent-facing layout.
+ * The wrapper sits at `perspective-origin` (100, 50 here), so the child is re-expressed in a
+ * container translated by `-origin`: the near edges move by `-origin`, the far edges by `+origin`.
+ * A child pinned to all four edges (`inset: 0`) used to keep `right` / `bottom` at 0 while only
+ * `left` / `top` moved, which stretched the 200x100 span to 300x150.
+ */
+PAG_TEST(PAGXHTML3DTest, CameraWrapperKeepsTwoEdgeConstraintsEquivalent) {
+  auto doc = ParseHtml(R"HTML(
+    <html><body style="width:200px;height:100px">
+      <div style="position:absolute;left:0;top:0;width:200px;height:100px;perspective:600px">
+        <div id="fill" style="position:absolute;left:0;right:0;top:0;bottom:0;
+             background-color:#38BDF8"></div>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* fill = FindLayerById(doc, "fill");
+  ASSERT_NE(fill, nullptr);
+  auto* wrapper = CameraWrapperOf(doc, fill);
+  ASSERT_NE(wrapper, nullptr);
+  EXPECT_TRUE(NearlyEqual(wrapper->left, 100.0f, 1e-4f));
+  EXPECT_TRUE(NearlyEqual(wrapper->top, 50.0f, 1e-4f));
+  EXPECT_TRUE(NearlyEqual(wrapper->width, 200.0f, 1e-4f));
+  EXPECT_TRUE(NearlyEqual(wrapper->height, 100.0f, 1e-4f));
+  EXPECT_TRUE(NearlyEqual(fill->left, -100.0f, 1e-4f));
+  EXPECT_TRUE(NearlyEqual(fill->right, 100.0f, 1e-4f));
+  EXPECT_TRUE(NearlyEqual(fill->top, -50.0f, 1e-4f));
+  EXPECT_TRUE(NearlyEqual(fill->bottom, 50.0f, 1e-4f));
+  EXPECT_TRUE(std::isnan(fill->centerX)) << "a translation must not invent a centre constraint";
+  EXPECT_TRUE(std::isnan(fill->centerY));
+
+  doc->applyLayout();
+  EXPECT_FLOAT_EQ(fill->layoutWidth, 200.0f)
+      << "the two-edge span must keep the parent's width, not grow to 300px";
+  EXPECT_FLOAT_EQ(fill->layoutHeight, 100.0f)
+      << "the two-edge span must keep the parent's height, not grow to 150px";
+  // Wrapper space -> parent space: the pinned rect still covers the parent box exactly.
+  EXPECT_TRUE(NearlyEqual(wrapper->renderPosition().x + fill->renderPosition().x, 0.0f, 1e-4f));
+  EXPECT_TRUE(NearlyEqual(wrapper->renderPosition().y + fill->renderPosition().y, 0.0f, 1e-4f));
+}
+
+/**
+ * Test case: a centre-anchored child is translated with the wrapper too. The
+ * `data-pagx-intrinsic-width="center"` line is the import path that expresses a horizontal anchor
+ * as `centerX`; it used to keep `centerX = 0` while the wrapper moved to the origin, which drifted
+ * the line by `origin.x` (half the parent box). `centerY` has no producer in this importer, so it
+ * must stay NaN instead of gaining a default from the translation.
+ */
+PAG_TEST(PAGXHTML3DTest, CameraWrapperKeepsCenterConstraintEquivalent) {
+  auto doc = ParseHtml(R"HTML(
+    <html><body style="width:200px;height:100px">
+      <div style="position:absolute;left:0;top:0;width:200px;height:100px;perspective:600px">
+        <span id="line" data-pagx-intrinsic-width="center"
+              style="position:absolute;left:60px;top:20px;width:80px;height:20px;font-size:13px;
+                     line-height:20px;text-align:center;white-space:nowrap">Center</span>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* line = FindLayerById(doc, "line");
+  ASSERT_NE(line, nullptr);
+  auto* wrapper = CameraWrapperOf(doc, line);
+  ASSERT_NE(wrapper, nullptr);
+  EXPECT_TRUE(NearlyEqual(wrapper->left, 100.0f, 1e-4f));
+  EXPECT_TRUE(NearlyEqual(wrapper->top, 50.0f, 1e-4f));
+  EXPECT_TRUE(NearlyEqual(line->centerX, -100.0f, 1e-4f))
+      << "the centre offset must move with the wrapper origin";
+  EXPECT_TRUE(std::isnan(line->centerY)) << "a centre anchor the author never wrote stays absent";
+  EXPECT_TRUE(std::isnan(line->left)) << "the marker's cleared edge anchors stay absent";
+  EXPECT_TRUE(std::isnan(line->right));
+  EXPECT_TRUE(std::isnan(line->bottom));
+  EXPECT_TRUE(NearlyEqual(line->top, -30.0f, 1e-4f));
+
+  doc->applyLayout();
+  const auto bounds = line->layoutBounds();
+  const float centerX = wrapper->renderPosition().x + bounds.x + bounds.width * 0.5f;
+  // Text shaping is sub-pixel, so the line box may shift a fraction of a pixel while staying
+  // centred in the parent box.
+  EXPECT_TRUE(NearlyEqual(centerX, 100.0f, 0.5f))
+      << "the centred line must stay on the parent's centre, not drift by the origin";
+}
+
+/**
  * Test case: without `transform-style: preserve-3d` the intermediate layer flattens its subtree, so
  * the parent camera stops there. That is the documented CSS behaviour of a plain 2D layer and must
  * not become a three-level camera push.
