@@ -177,7 +177,7 @@
 | `filter: blur(X) drop-shadow(X Y [B] [C])`（不支持 spread 或 `inset`） | `<BlurFilter>` / `<DropShadowFilter>` 链；静态颜色调整使用 `<ColorMatrixFilter>` |
 | `backdrop-filter: blur(X)` | `<BackgroundBlurStyle>` |
 | `transform: <fn-list>` | 按 CSS 顺序合成为一个 4x4 姿态。所有函数都支持：`translate[X\|Y\|Z\|3d]`、`scale[X\|Y\|Z\|3d]`、`rotate[X\|Y\|Z\|3d]`、`skewX`/`skewY`/`skew`、`matrix`、`matrix3d`、`perspective`。函数之间不需要分隔（`rotate(45deg)scale(2)` 合法），长度参数可以是 `px`、相对元素盒的百分比（X 取宽度、Y 取高度）。`calc()` 暂不支持：它需要 CSS 量纲校验，而快照链路给的是已计算值。角度参数接受 `deg` / `grad` / `rad` / `turn`（大小写不敏感）；无单位角度只有 `0` 合法，其它单位会让整条声明失效。仍停留在 z = 0 平面的姿态写入 `Layer.matrix`；带深度或透视的姿态写入 `Layer.matrix3D`（3D 姿态必须可逆）。`transform-style: preserve-3d` 映射到 `Layer.preserve3D` |
-| `perspective` / `perspective-origin` | 声明元素作为相机作用于**直接子级**：距离必须是非负长度；小于 1px 在渲染时按 1px 处理，只有 `none` 表示无相机；`perspective-origin`（默认盒中心）会被共轭进每个子层姿态，因为 PAGX 没有 origin 参数。详见 §13.7 |
+| `perspective` / `perspective-origin` | 声明元素作为相机作用于**直接子级**：距离必须是非负长度；小于 1px 在渲染时按 1px 处理，只有 `none` 表示无相机；相机由一层 wrapper 承载并摆在 `perspective-origin` 处，投影中心因此与 CSS 一致。无法包装的子元素（flow / flex 布局，或用 `right` / `bottom` 定位）不做投影，并提示一次。详见 §13.7 |
 | `transform-origin` | 按元素盒子解析（`px`、`%`、`left`/`center`/`right`/`top`/`bottom`，以及可选的 px 深度），写入 `Layer.anchor` / `anchorZ`，姿态本身不带支点。只有无法解析的原点（百分比 / 关键字但盒子没有绝对尺寸）才告警并退回左上角支点 |
 | Layer 上的 `overflow: hidden` | `Layer.clipToBounds = true` |
 | Layer 上的 `overflow: <x> <y>`（两值简写） | 任一轴不是 `visible`（`hidden` / `clip` / `scroll` / `auto` / `overlay`）时 `Layer.clipToBounds = true`，与 CSS「任一轴非 `visible` 即成为裁剪容器」的规则一致；`visible visible` 则不裁剪。`scroll` / `auto` / `overlay` 另外告警，因为 PAGX 无法表达它们隐含的滚动能力 |
@@ -470,7 +470,16 @@ CSS 圆角头像的常见写法是用 `border-radius` + `overflow: hidden` 的�
 拒绝与丢弃发生在不同阶段，不能混为一谈：无法放置的停靠点在解析阶段就被拒绝（该帧被丢弃）；
 而放置阶段已经接受的平面帧一旦抬到 `matrix3D` 上变成奇异矩阵（典型是 `scale(0)`），PAGX 无法持久化
 ——每个 `matrix3D` 关键帧都必须可逆。这类停靠点会被丢弃并报告（`subset:animation-unsupported-property`），
-而不是替换成一个伪造的姿态：1e-4 之类的极小缩放并不是作者写的值。两条通道都不携带支点：
+而不是替换成一个伪造的姿态：1e-4 之类的极小缩放并不是作者写的值。
+
+有两类 CSS 行为是刻意不复现的，在不改动 PAGX 关键帧格式的前提下也无法复现：
+
+* CSS 插值的是**每个函数的参数**，而 PAGX 插值的是分解后的关键帧矩阵（位移、旋转、缩放、斜切）。
+  即使首尾一致，重复相同函数列表的轨道在中间帧仍可能不同——`translateX(100px)` → `rotate(90deg)`
+  与相反顺序可以产生**完全相同的端点矩阵、却不同的中点**，而矩阵无法反推出作者想表达的是哪条路径。
+  只有端点是可保证的。
+* 作者写的 `perspective()` 与带深度的支点组合时无法复现：CSS 的 `transform-origin` 共轭整条函数列表，
+  而 PAGX 只通过 `anchor` 共轭仿射部分。导入器会报告这一点，并保留它能表达的形态。两条通道都不携带支点：
 `transform-origin` 以 `anchor` / `anchorZ` 的形式留在被动画的图层上，由运行时在插值之后统一施加一次，
 因此支点不会在关键帧之间漂移。影响布局的属性（`width`、`height`、`margin`、`padding`、`gap`、
 `flex` …）永远不可动画（见 §4.4），被丢弃并告警（`subset:animation-unsupported-property`）。
@@ -623,8 +632,10 @@ PAGX 把投影留在 `anchor` 之外（`M = P · T(anchor) · L · T(-anchor)`�
   分量；此时改写被跳过（`eval-animation` 记为 `camera-skips: depth-pivot`），元素保留函数写法：
   姿态里仍然带着投影，但 PAGX 按 `P · T(a) · L · T(-a)` 合成、CSS 按 `T(a) · P · L · T(-a)`，
   两者相差这个次序项（`d = 600px`、支点深度 30px 时约百分之几）。跳过改写绝不能把投影本身丢掉。
-* `perspective` 父级的 flow / flex 子元素在导入期没有已解析的偏移，相机按父级坐标系投影；
-  会有一条诊断提示。
+* `perspective` 父级的 flow / flex 子元素在导入期没有已解析的偏移，因此无法包装、**不做投影**，
+  并提示一次。把相机折进它的姿态会以父级原点作为消失点，那是另一种投影，而不是对作者写法的近似。
+* 作者写的 `perspective()` 同时带深度支点时，导入期会报告：投影中心无法复现（见 §13.2 的插值限制），
+  姿态保留 PAGX 能承载的表达式。
 * `perspective-origin` 无法相对声明盒解析（没有绝对尺寸）时告警一次，并退化为图层原点而非盒中心。
 * inline-SVG 形状的动画不带父级相机。这不是信息丢失：形状的位姿被限制在 z = 0 平面上
   （3D 形状位姿会被告警拒绝），而平面位姿投影后仍是自身（`w = 1`），把相机折进去不会改变任何像素。

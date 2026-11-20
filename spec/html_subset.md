@@ -190,7 +190,7 @@ also a no-op (the offsets are ignored alongside the dropped position).
 | `filter: blur(X) drop-shadow(X Y [B] [C])` (no spread or `inset`) | chain of `<BlurFilter>` / `<DropShadowFilter>`; static colour adjustments use `<ColorMatrixFilter>` |
 | `backdrop-filter: blur(X)` | `<BackgroundBlurStyle>` |
 | `transform: <fn-list>` | composed in CSS order into a 4x4 pose. Every function is supported: `translate[X\|Y\|Z\|3d]`, `scale[X\|Y\|Z\|3d]`, `rotate[X\|Y\|Z\|3d]`, `skewX`/`skewY`/`skew`, `matrix`, `matrix3d`, `perspective`. Functions need no separator (`rotate(45deg)scale(2)` is legal), and a length argument may be `px`, or a percentage of the element box (width on X, height on Y). `calc()` is not supported: it needs CSS type checking, and the snapshot path already hands over computed values. Angle arguments accept `deg` / `grad` / `rad` / `turn` case insensitively; a unitless angle is only valid as `0`, and any other unit invalidates the declaration. A pose that stays on the z = 0 plane is written onto `Layer.matrix`; a pose with depth or perspective onto `Layer.matrix3D` (3D poses must be invertible). `transform-style: preserve-3d` maps onto `Layer.preserve3D` |
-| `perspective` / `perspective-origin` | the declaring element acts as a camera for its **direct children**: the distance must be a non-negative length; values below 1px are clamped to 1px for rendering, and only `none` disables the camera; `perspective-origin` (the box centre by default) is conjugated into each child pose, since PAGX has no origin parameter. See §13.7 |
+| `perspective` / `perspective-origin` | the declaring element acts as a camera for its **direct children**: the distance must be a non-negative length; values below 1px are clamped to 1px for rendering, and only `none` disables the camera; the camera is carried by a wrapper layer placed at `perspective-origin`, so the projection centre follows CSS. A child that cannot be wrapped (flow / flex placement, or positioned by `right` / `bottom`) is left unprojected and reported once. See §13.7 |
 | `transform-origin` | resolved against the element box (`px`, `%`, `left`/`center`/`right`/`top`/`bottom`, plus the optional px depth) and written onto `Layer.anchor` / `anchorZ`; the pose itself stays un-pivoted. Only an unresolvable origin (a percentage / keyword with no absolute box size) warns and falls back to the top-left pivot |
 | `overflow: hidden` on a Layer | `Layer.clipToBounds = true` |
 | `overflow: <x> <y>` (two-value shorthand) on a Layer | `Layer.clipToBounds = true` when either axis is not `visible` (`hidden` / `clip` / `scroll` / `auto` / `overlay`), matching CSS's rule that a non-`visible` axis makes the box a clipping container; `visible visible` leaves the box unclipped. `scroll` / `auto` / `overlay` additionally warn, since PAGX cannot model the scroll affordance they imply |
@@ -514,7 +514,20 @@ stop is dropped), and a flat stop the placement already accepted — `scale(0)` 
 becomes singular when it is lifted onto `matrix3D`, which PAGX cannot persist because every
 `matrix3D` keyframe must be invertible. Such a stop is dropped and reported
 (`subset:animation-unsupported-property`) rather than replaced by a substitute pose: a fabricated
-tiny scale would not be the value the author wrote. Neither channel carries the pivot:
+tiny scale would not be the value the author wrote.
+
+Two CSS behaviours are deliberately not reproduced, and cannot be without changing the PAGX
+keyframe format:
+
+* `transform` is interpolated **per function parameter** in CSS, while PAGX interpolates the
+  decomposed keyframe matrix (translation, rotation, scale, skew). A track whose stops repeat the
+  same function list can therefore differ between keyframes even though both endpoints match — two
+  different authored paths (`translateX(100px)` then `rotate(90deg)` versus the reverse order) can
+  produce identical endpoint matrices and different midpoints, and a matrix cannot recover which
+  path was meant. Only the endpoints are guaranteed.
+* An authored `perspective()` combined with a pivot that has depth cannot be reproduced: CSS
+  conjugates `transform-origin` across the whole function list, while PAGX conjugates only the
+  affine part through `anchor`. The importer reports it and keeps the pose it can express. Neither channel carries the pivot:
 `transform-origin` stays on the animated layer as `anchor` / `anchorZ`, which the runtime applies
 once after interpolation, so the pivot cannot drift between keyframes. Layout-affecting properties
 (`width`, `height`, `margin`, `padding`, `gap`, `flex`, …) are never animatable (see §4.4) and are
@@ -697,8 +710,13 @@ Limits of that rewrite, in order of how often they are hit:
   the projection, but PAGX composes `P · T(a) · L · T(-a)` where CSS composes `T(a) · P · L · T(-a)`,
   so the projected size differs by that ordering term (a few percent at `d = 600px` with a 30px
   pivot depth). Skipping the rewrite must never drop the projection itself.
-* A flow / flex child of a `perspective` parent has no resolved offset at import time, so the
-  camera is projected about the parent's coordinate system as-is; one diagnostic reports it.
+* A flow / flex child of a `perspective` parent has no resolved offset at import time, so it cannot
+  be wrapped and is left **unprojected**; one diagnostic reports it. Folding the camera into its
+  pose instead would project about the parent origin, i.e. move the vanishing point, which is a
+  different projection rather than an approximation of the authored one.
+* An authored `perspective()` whose element also declares a pivot with depth is reported at import:
+  the projection centre cannot be reproduced (see the interpolation limits in §13.2), and the pose
+  keeps the expression PAGX can hold.
 * A `perspective-origin` that cannot be resolved against the declaring box (no absolute size)
   warns once and falls back to the layer origin instead of the box centre.
 * An inline-SVG shape animation ignores the parent camera. That is not a loss: shape transforms are

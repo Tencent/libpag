@@ -856,6 +856,16 @@ void HTMLStyleCascade::parseBoxTransform(HTMLBoxAttributes& box, const PropertyM
     _diagnostics.warn("html: transform-origin '" + originValue + "' on <" + elementName +
                       "> is not a valid CSS position; using the default 50% 50%");
   }
+  // CSS conjugates `transform-origin` across the whole function list, so an authored `perspective()`
+  // is conjugated with it; PAGX can only conjugate the affine part through `anchor`. The projection
+  // centre therefore moves by `originZ` and cannot be reproduced — say so instead of approximating.
+  if (std::fabs(anchor.depth) > 0.0f &&
+      ToLower(transform).find("perspective(") != std::string::npos) {
+    _diagnostics.warn("html: transform '" + transform + "' on <" + elementName +
+                      "> combines an authored perspective() with a 3D transform-origin; the "
+                      "projection centre cannot be reproduced because PAGX conjugates only the "
+                      "affine part of the pivot");
+  }
   box.transform = parsed;
 }
 
