@@ -336,13 +336,17 @@ struct SegmentEasing {
 template <typename T>
 void CollectKeyframeTimesAndEasing(const std::vector<Keyframe<T>>& keys, std::set<Frame>& timesOut,
                                    std::unordered_map<Frame, SegmentEasing>& easingOut,
-                                   std::set<Frame>& mixedOut) {
+                                   std::set<Frame>& mixedOut, std::set<Frame>& holdPinOut,
+                                   std::unordered_map<Frame, std::set<Frame>>& holdEndsByStart) {
   for (size_t i = 0; i < keys.size(); ++i) {
     const auto& k = keys[i];
     timesOut.insert(k.time);
     if (i + 1 < keys.size()) {
       SegmentEasing seg = {};
       seg.type = k.interpolation;
+      if (seg.type == KeyframeInterpolationType::Hold) {
+        holdEndsByStart[k.time].insert(keys[i + 1].time);
+      }
       if (seg.type == KeyframeInterpolationType::Bezier) {
         const auto& nextK = keys[i + 1];
         Point outPt = k.bezierOut;
@@ -368,17 +372,32 @@ void CollectKeyframeTimesAndEasing(const std::vector<Keyframe<T>>& keys, std::se
       if (it == easingOut.end()) {
         easingOut[k.time] = seg;
       } else {
+        bool hasEasing = it->second.type != KeyframeInterpolationType::None &&
+                         seg.type != KeyframeInterpolationType::None;
         bool curveConflict = it->second != seg &&
                              it->second.type != KeyframeInterpolationType::Hold &&
-                             seg.type != KeyframeInterpolationType::Hold &&
-                             it->second.type != KeyframeInterpolationType::None &&
-                             seg.type != KeyframeInterpolationType::None;
+                             seg.type != KeyframeInterpolationType::Hold && hasEasing;
         if (curveConflict) {
-          // Two channels disagree on this segment. A hold key is not a conflict: it needs
-          // `steps(1, end)`, which the fallback sampling cannot reproduce.
+          // Two channels disagree on this segment.
           mixedOut.insert(k.time);
         }
-        if (it->second.type == KeyframeInterpolationType::Linear) {
+        // A hold beside an interpolating channel cannot stay a step: one stop's timing function
+        // covers every property in the rule, so `steps(1, end)` would freeze the other channel.
+        // Record the conflict so the emitter can pin the held value with an extra stop instead.
+        bool holdVsOther = hasEasing && (it->second.type == KeyframeInterpolationType::Hold) !=
+                                            (seg.type == KeyframeInterpolationType::Hold);
+        auto holdEnds = holdEndsByStart.find(k.time);
+        bool pinable = holdEnds != holdEndsByStart.end();
+        if (holdVsOther && pinable) {
+          for (Frame end : holdEnds->second) {
+            if (end - 1 > k.time) {
+              holdPinOut.insert(end - 1);
+            }
+          }
+          if (seg.type != KeyframeInterpolationType::Hold) {
+            easingOut[k.time] = seg;
+          }
+        } else if (it->second.type == KeyframeInterpolationType::Linear) {
           // Keep the non-linear curve as the representative of the stop.
           easingOut[k.time] = seg;
         }
@@ -389,42 +408,43 @@ void CollectKeyframeTimesAndEasing(const std::vector<Keyframe<T>>& keys, std::se
 
 void ExtractChannelTimesAndEasing(const Channel* ch, std::set<Frame>& timesOut,
                                   std::unordered_map<Frame, SegmentEasing>& easingOut,
-                                  std::set<Frame>& mixedOut) {
+                                  std::set<Frame>& mixedOut, std::set<Frame>& holdPinOut,
+                                  std::unordered_map<Frame, std::set<Frame>>& holdEndsByStart) {
   if (ch == nullptr) {
     return;
   }
   switch (ch->valueType()) {
     case ChannelValueType::Float:
       CollectKeyframeTimesAndEasing(static_cast<const TypedChannel<float>*>(ch)->keyframes,
-                                    timesOut, easingOut, mixedOut);
+                                    timesOut, easingOut, mixedOut, holdPinOut, holdEndsByStart);
       break;
     case ChannelValueType::Color:
       CollectKeyframeTimesAndEasing(static_cast<const TypedChannel<Color>*>(ch)->keyframes,
-                                    timesOut, easingOut, mixedOut);
+                                    timesOut, easingOut, mixedOut, holdPinOut, holdEndsByStart);
       break;
     case ChannelValueType::Matrix:
       CollectKeyframeTimesAndEasing(static_cast<const TypedChannel<Matrix>*>(ch)->keyframes,
-                                    timesOut, easingOut, mixedOut);
+                                    timesOut, easingOut, mixedOut, holdPinOut, holdEndsByStart);
       break;
     case ChannelValueType::Bool:
       CollectKeyframeTimesAndEasing(static_cast<const TypedChannel<bool>*>(ch)->keyframes, timesOut,
-                                    easingOut, mixedOut);
+                                    easingOut, mixedOut, holdPinOut, holdEndsByStart);
       break;
     case ChannelValueType::Int:
       CollectKeyframeTimesAndEasing(static_cast<const TypedChannel<int>*>(ch)->keyframes, timesOut,
-                                    easingOut, mixedOut);
+                                    easingOut, mixedOut, holdPinOut, holdEndsByStart);
       break;
     case ChannelValueType::String:
       CollectKeyframeTimesAndEasing(static_cast<const TypedChannel<std::string>*>(ch)->keyframes,
-                                    timesOut, easingOut, mixedOut);
+                                    timesOut, easingOut, mixedOut, holdPinOut, holdEndsByStart);
       break;
     case ChannelValueType::ImageRef:
       CollectKeyframeTimesAndEasing(static_cast<const TypedChannel<ImageRef>*>(ch)->keyframes,
-                                    timesOut, easingOut, mixedOut);
+                                    timesOut, easingOut, mixedOut, holdPinOut, holdEndsByStart);
       break;
     case ChannelValueType::Matrix3D:
       CollectKeyframeTimesAndEasing(static_cast<const TypedChannel<Matrix3D>*>(ch)->keyframes,
-                                    timesOut, easingOut, mixedOut);
+                                    timesOut, easingOut, mixedOut, holdPinOut, holdEndsByStart);
       break;
     case ChannelValueType::PAGImage:
       // An image reference has no CSS animation channel.
@@ -1319,6 +1339,16 @@ struct BundleChannelSet {
   // be split into linear sub-stops, because one stop's easing drives every property in the rule.
   std::set<Frame> mixedEasingTimes = {};
   std::set<Frame> holdEnds = {};
+  // Start time -> end times of the hold segments in this bundle. A hold ends at its own next key,
+  // which is not necessarily the next stop of the rule: another channel may have keys in between.
+  std::unordered_map<Frame, std::set<Frame>> holdEndsByStart = {};
+  // Frames that need an extra stop because a hold shares its rule with an interpolating channel.
+  // Such a hold cannot use `steps(1, end)`: one stop's timing function covers every property in the
+  // rule, so a held translation would freeze a rotating one (composite/25). Pinning the held value
+  // one frame before its end confines the jump to that frame and leaves the other channel's curve.
+  // The merged set feeds the single-rule path, the transform one the split paths.
+  std::set<Frame> holdPinTimes = {};
+  std::set<Frame> transformGroupHoldPinTimes = {};
   // Which property groups this rule drives, as a bit mask: 1 = opacity/visibility, 2 = everything
   // else (transform, paint, geometry...). A rule normally drives both; when the two groups want
   // different timing functions the bundle is emitted as two rules with disjoint properties.
@@ -1845,11 +1875,14 @@ BundleChannelSet CollectBundleChannels(
       // An unbound channel has no CSS property to drive, so its keys must not split the bound
       // channels' keyframes or override their easing.
       if (BindChannelToBundleSet(objTarget, ch, solidToPainter, result)) {
+        // Throwaway sinks for the extractions that do not feed a pinned hold.
+        std::set<Frame> unusedPins = {};
+        std::unordered_map<Frame, std::set<Frame>> unusedHoldEnds = {};
         if (bundle.composedGlyph) {
           std::set<Frame> times;
           std::unordered_map<Frame, SegmentEasing> easings;
           std::set<Frame> mixed;
-          ExtractChannelTimesAndEasing(ch, times, easings, mixed);
+          ExtractChannelTimesAndEasing(ch, times, easings, mixed, unusedPins, unusedHoldEnds);
           for (auto time = times.begin(); time != times.end(); ++time) {
             auto next = std::next(time);
             auto easing = easings.find(*time);
@@ -1868,12 +1901,14 @@ BundleChannelSet CollectBundleChannels(
           std::set<Frame> countTimes = {};
           std::unordered_map<Frame, SegmentEasing> ignoredEasings = {};
           std::set<Frame> ignoredMixed = {};
-          ExtractChannelTimesAndEasing(ch, countTimes, ignoredEasings, ignoredMixed);
+          ExtractChannelTimesAndEasing(ch, countTimes, ignoredEasings, ignoredMixed, unusedPins,
+                                       unusedHoldEnds);
           result.keyTimes.insert(countTimes.begin(), countTimes.end());
           continue;
         }
         ExtractChannelTimesAndEasing(ch, result.keyTimes, result.stopEasings,
-                                     result.mixedEasingTimes);
+                                     result.mixedEasingTimes, result.holdPinTimes,
+                                     result.holdEndsByStart);
         // Opacity and visibility are their own property group: they can ride their own animation
         // without colliding with the transform/paint group.
         bool stepped =
@@ -1881,12 +1916,15 @@ BundleChannelSet CollectBundleChannels(
         bool opacityGroup = !stepped && role == TargetChannelRole::Opacity;
         if (stepped) {
           ExtractChannelTimesAndEasing(ch, result.steppedGroupTimes, result.steppedGroupEasings,
-                                       result.steppedGroupMixed);
+                                       result.steppedGroupMixed, unusedPins,
+                                       result.holdEndsByStart);
         } else {
           ExtractChannelTimesAndEasing(
               ch, opacityGroup ? result.opacityGroupTimes : result.transformGroupTimes,
               opacityGroup ? result.opacityGroupEasings : result.transformGroupEasings,
-              opacityGroup ? result.opacityGroupMixed : result.transformGroupMixed);
+              opacityGroup ? result.opacityGroupMixed : result.transformGroupMixed,
+              opacityGroup ? unusedPins : result.transformGroupHoldPinTimes,
+              result.holdEndsByStart);
         }
       }
     }
@@ -4294,6 +4332,13 @@ std::string EmitBundleKeyframeStops(const DomTargetBundle& bundle, const BundleC
       stopTimes.insert(t);
     }
   }
+  // A hold that shares its rule with an interpolating channel is pinned at its last held frame, so
+  // the rule can keep the other channel's curve and the jump happens inside the final frame.
+  for (Frame pin : chSet.holdPinTimes) {
+    if (pin > windowStart && pin <= windowEnd) {
+      stopTimes.insert(pin);
+    }
+  }
   stopTimes.insert(windowStart);
   stopTimes.insert(windowEnd);
   if (!chSet.mixedEasingTimes.empty() && windowEnd > windowStart) {
@@ -5099,6 +5144,11 @@ std::string HTMLAnimationSession::emitKeyframesAndWeave(std::string& bodyHtml) {
               stopTimes.insert(t);
             }
           }
+          for (Frame pin : chSet.holdPinTimes) {
+            if (pin > windowStart && pin <= windowEnd) {
+              stopTimes.insert(pin);
+            }
+          }
           stopTimes.insert(windowStart);
           stopTimes.insert(windowEnd);
           std::string stops = {};
@@ -5164,6 +5214,7 @@ std::string HTMLAnimationSession::emitKeyframesAndWeave(std::string& bodyHtml) {
           // hold key sat next to a linear channel - a sliding box simply stopped moving.
           BundleChannelSet restAfterStepped = chSet;
           restAfterStepped.propertyGroups = 2;
+          restAfterStepped.holdPinTimes = chSet.transformGroupHoldPinTimes;
           if (!chSet.transformGroupTimes.empty()) {
             restAfterStepped.keyTimes = chSet.transformGroupTimes;
             restAfterStepped.stopEasings = chSet.transformGroupEasings;
@@ -5177,12 +5228,14 @@ std::string HTMLAnimationSession::emitKeyframesAndWeave(std::string& bodyHtml) {
           opacitySet.keyTimes = chSet.opacityGroupTimes;
           opacitySet.stopEasings = chSet.opacityGroupEasings;
           opacitySet.mixedEasingTimes = chSet.opacityGroupMixed;
+          opacitySet.holdPinTimes = {};
           addRule(opacitySet);
           BundleChannelSet restSet = chSet;
           restSet.propertyGroups = 2;
           restSet.keyTimes = chSet.transformGroupTimes;
           restSet.stopEasings = chSet.transformGroupEasings;
           restSet.mixedEasingTimes = chSet.transformGroupMixed;
+          restSet.holdPinTimes = chSet.transformGroupHoldPinTimes;
           addRule(restSet);
         } else {
           // Opacity agrees with the rest on the curve, so it stays in the same rule.
@@ -5191,6 +5244,7 @@ std::string HTMLAnimationSession::emitKeyframesAndWeave(std::string& bodyHtml) {
           restSet.keyTimes = chSet.transformGroupTimes;
           restSet.stopEasings = chSet.transformGroupEasings;
           restSet.mixedEasingTimes = chSet.transformGroupMixed;
+          restSet.holdPinTimes = chSet.transformGroupHoldPinTimes;
           for (Frame frame : chSet.opacityGroupTimes) {
             restSet.keyTimes.insert(frame);
           }
