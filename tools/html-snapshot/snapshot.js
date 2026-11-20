@@ -35,6 +35,7 @@ require('./ensure-built').ensureBuilt();
 
 const { parseArgs } = require('./dist/lib/cli');
 const { LOG_PREFIX } = require('./dist/lib/common');
+const { PAGX_CAMERA_SKIP_BLOCK_LEVEL_REASONS } = require('./dist/lib/browser-snapshot');
 const { launchBrowser, formatLaunchHint } = require('./dist/lib/browser-engine');
 const { runSnapshot } = require('./dist/lib/snapshot-runner');
 
@@ -103,11 +104,10 @@ async function main() {
     // block kept its own projection, which is *why* some elements fell back). Only the element
     // entries are affected elements, so the reported total excludes the block-level reasons while
     // the detail breakdown still lists them.
-    const CAMERA_SKIP_BLOCK_LEVEL_REASONS = new Set(['keyframes-mixed']);
     const cameraSkips = result.cameraSkips || {};
     const skipReasons = Object.keys(cameraSkips);
     const skipTotal = skipReasons
-      .filter((reason) => !CAMERA_SKIP_BLOCK_LEVEL_REASONS.has(reason))
+      .filter((reason) => !PAGX_CAMERA_SKIP_BLOCK_LEVEL_REASONS.has(reason))
       .reduce((sum, reason) => sum + cameraSkips[reason], 0);
     if (skipReasons.length > 0) {
       const detail = Object.entries(cameraSkips)

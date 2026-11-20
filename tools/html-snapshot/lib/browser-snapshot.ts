@@ -2112,6 +2112,14 @@ function recordCameraSkip(reason) {
   skips[reason] = (skips[reason] || 0) + 1;
 }
 
+// Reasons `rewritePerspectiveKeyframes` records once per `@keyframes` block, not once per element.
+// The skip registry mixes both units, so the eval report keeps these out of the affected-element
+// total and lists them only in the detail breakdown; every key recorded per element stays counted.
+const PAGX_CAMERA_SKIP_BLOCK_LEVEL_REASONS = new Set([
+  'keyframes-mixed',
+  'keyframes-not-separable',
+]);
+
 function pagxCameraSkips() {
   return cameraRegistry('__pagxCameraSkips');
 }
@@ -6962,6 +6970,7 @@ export {
   staticCameraFor,
   withPerspectiveCamera,
   recordCameraSkip,
+  PAGX_CAMERA_SKIP_BLOCK_LEVEL_REASONS,
   pagxCameraSkips,
   transformOriginDepth,
   perspectiveOriginXY,

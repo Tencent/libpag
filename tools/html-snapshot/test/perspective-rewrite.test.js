@@ -10,6 +10,7 @@ const {
   insideAncestorCamera,
   recordCameraSkip,
   pagxCameraSkips,
+  PAGX_CAMERA_SKIP_BLOCK_LEVEL_REASONS,
   staticCameraFor,
   withPerspectiveCamera,
   restoreProjectedTransform,
@@ -301,6 +302,17 @@ describe('camera skip accounting', () => {
 
   test('reports an empty map before anything was skipped', () => {
     expect(pagxCameraSkips()).toEqual({});
+  });
+
+  test('block-level keyframe reasons stay out of the affected-element total', () => {
+    // Every reason `rewritePerspectiveKeyframes` records belongs to one `@keyframes` block, so it is
+    // listed in the detail breakdown but never added to the "affected elements" total. Any new
+    // block-level reason missing from this set silently inflates that total.
+    expect(PAGX_CAMERA_SKIP_BLOCK_LEVEL_REASONS.has('keyframes-mixed')).toBe(true);
+    expect(PAGX_CAMERA_SKIP_BLOCK_LEVEL_REASONS.has('keyframes-not-separable')).toBe(true);
+    // Element-level reasons, including the ancestor guard, are counted as affected elements.
+    expect(PAGX_CAMERA_SKIP_BLOCK_LEVEL_REASONS.has('element-keyframes-mixed')).toBe(false);
+    expect(PAGX_CAMERA_SKIP_BLOCK_LEVEL_REASONS.has('ancestor-camera')).toBe(false);
   });
 });
 
