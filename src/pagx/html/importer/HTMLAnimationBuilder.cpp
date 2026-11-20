@@ -725,13 +725,17 @@ SolidColor* FindSolidFillInElements(const std::vector<Element*>& elements, int e
 // `outer` keeps the parent-facing slot (width/height/percent/positional-constraints/flex,
 // `includeInLayout`) and the existing `id` used by alpha targets and external references.
 // All other state — internal layout (layout/gap/padding/alignment/arrangement),
-// transform / visibility / compositing (matrix/matrix3D/anchor/anchorZ/preserve3D/blendMode/
-// visible/antiAlias/groupOpacity/passThroughBackground), content/styles/filters/children/
-// composition, clip/mask state — is moved to `inner`. `anchor` / `anchorZ` travel with the pose
-// and `preserve3D`: the pivot is expressed in the coordinate space the `matrix3D` opens, so
-// splitting it off would apply it in the wrong space (or twice). After the split,
-// `outer.children` contains `inner` only. `alpha` stays on `outer` because the alpha channel
-// still targets the original id.
+// transform / visibility / compositing (matrix/matrix3D/anchor/anchorZ/blendMode/visible/
+// antiAlias/groupOpacity/passThroughBackground), content/styles/filters/children/composition,
+// clip/mask state — is moved to `inner`. `anchor` / `anchorZ` travel with the pose: the pivot is
+// expressed in the coordinate space the `matrix3D` opens, so splitting it off would apply it in the
+// wrong space (or twice). `preserve3D` is deliberately left on BOTH layers: it carries no camera of
+// its own, it only stops this layer's children from being flattened into its plane. The camera that
+// projects the subtree lives on a wrapper above `outer`, so clearing the flag on either surface cuts
+// the 3D space between that camera and the poses below (a `translateZ(50px)` grandchild under
+// `perspective: 100px` then stops scaling), while keeping it on both cannot duplicate the
+// projection. After the split, `outer.children` contains `inner` only. `alpha` stays on `outer`
+// because the alpha channel still targets the original id.
 Layer* SplitForTransformAnimation(Layer* outer, PAGXDocument* document,
                                   HTMLIdAllocator& idAllocator) {
   auto* inner = document->makeNode<Layer>();
@@ -762,7 +766,6 @@ Layer* SplitForTransformAnimation(Layer* outer, PAGXDocument* document,
   outer->matrix3D = {};
   outer->anchor = {};
   outer->anchorZ = 0.0f;
-  outer->preserve3D = false;
   outer->blendMode = BlendMode::Normal;
   outer->antiAlias = true;
   outer->groupOpacity = true;
@@ -1642,18 +1645,17 @@ bool HTMLAnimationBuilder::buildForElement(
     Matrix3D savedMatrix3D = visualTarget->matrix3D;
     Point savedAnchor = visualTarget->anchor;
     float savedAnchorZ = visualTarget->anchorZ;
-    bool savedPreserve3D = visualTarget->preserve3D;
     brightnessTarget = SplitForTransformAnimation(visualTarget, _document, _idAllocator);
     visualTarget->matrix = savedMatrix;
     visualTarget->matrix3D = savedMatrix3D;
     visualTarget->anchor = savedAnchor;
     visualTarget->anchorZ = savedAnchorZ;
-    visualTarget->preserve3D = savedPreserve3D;
+    // The opacity target holds the subtree, so it keeps the 3D space it was split with: clearing it
+    // here would flatten the children away from the camera that projects them.
     brightnessTarget->matrix = Matrix::Identity();
     brightnessTarget->matrix3D = {};
     brightnessTarget->anchor = {};
     brightnessTarget->anchorZ = 0.0f;
-    brightnessTarget->preserve3D = false;
     visualTarget = brightnessTarget;
   }
 

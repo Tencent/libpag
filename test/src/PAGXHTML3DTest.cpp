@@ -1008,6 +1008,47 @@ PAG_TEST(PAGXHTML3DTest, Preserve3DWithoutOwnTransformCarriesTheParentCamera) {
 }
 
 /**
+ * Test case: a pure XY animation on a `preserve-3d` layer splits it into a layout outer plus an
+ * animated inner. The camera lives on a wrapper above the outer, so neither surface may drop
+ * `preserve3D`: flattening anywhere on the way down loses the projection of a `translateZ` grandchild
+ * (`perspective: 100px` + `translateZ(50px)` must still scale it up by 2).
+ */
+PAG_TEST(PAGXHTML3DTest, SplitForTranslateAnimationKeepsThe3DSpace) {
+  auto doc = ParseHtml(R"HTML(
+    <html><head><style>
+      @keyframes slide { 0% { transform: translateX(0px); } 100% { transform: translateX(20px); } }
+    </style></head>
+    <body style="width:300px;height:150px">
+      <div style="position:absolute;left:20px;top:20px;width:200px;height:100px;perspective:100px">
+        <div id="mid" style="position:absolute;left:0;top:0;width:100px;height:60px;
+             transform-style:preserve-3d;animation:slide 1s linear infinite">
+          <div id="deep" style="position:absolute;left:0;top:0;width:100px;height:60px;
+               background-color:#38BDF8;transform:translateZ(50px)"></div>
+        </div>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* mid = FindLayerById(doc, "mid");
+  ASSERT_NE(mid, nullptr);
+  auto* deep = FindLayerById(doc, "deep");
+  ASSERT_NE(deep, nullptr);
+  auto* wrapper = CameraWrapperOf(doc, mid);
+  ASSERT_NE(wrapper, nullptr) << "the parent camera must wrap the split outer layer";
+  EXPECT_TRUE(NearlyEqual(wrapper->perspective, 100.0f, 0.01f));
+  EXPECT_TRUE(wrapper->preserve3D);
+  // The layout outer no longer owns a pose, but it still sits between the camera and the animated
+  // inner, so it has to keep the 3D space open instead of flattening the subtree into its plane.
+  EXPECT_TRUE(mid->preserve3D) << "the split outer must keep the camera's 3D space";
+  EXPECT_TRUE(mid->matrix3D.isIdentity()) << "the pose stays on the animated inner layer";
+  ASSERT_EQ(mid->children.size(), 1u);
+  auto* inner = mid->children.front();
+  EXPECT_TRUE(inner->preserve3D) << "the animated inner keeps the space down to its children";
+  EXPECT_TRUE(NearlyEqual(deep->matrix3D.getRowColumn(2, 3), 50.0f, 0.001f));
+  EXPECT_FALSE(HasProjectionRow(deep)) << "the projection belongs to the wrapper, not the child";
+}
+
+/**
  * Test case: `perspective-origin` still conjugates the camera materialised on a `preserve-3d` layer.
  * The default origin is the parent box's centre, so the projection picks up the shear that moves the
  * vanishing point away from the layer origin.
