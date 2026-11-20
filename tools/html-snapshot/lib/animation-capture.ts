@@ -502,6 +502,27 @@ export function pagxExtractTransform(
 // the old `tx`/`ty` path for pure-translate animations (the constant linear
 // channels reduce to their endpoints), plus real scale / rotation curvature for
 // matrix keyframes. Returns null when the value is neither form.
+// Sampling vector for decimation: the full sixteen column-major components. Reducing a pose to its
+// six 2D coefficients erased motion that only lives in Z (or only in the projection row): a track such
+// as `translateZ(0) -> translateZ(300) -> translateZ(0)` projects to the same 2D matrix at every
+// sample, so every decimation channel looked flat and RDP dropped the peak. Padding a 2D pose to the
+// identity keeps one uniform channel set, so every sample of a track writes the same channels.
+export function pagxTransformToSample16(value: string): number[] | null {
+  const v = (value || '').trim();
+  if (!v) return null;
+  const values3d = pagxParseMatrix3D(v);
+  if (values3d) return values3d;
+  const m2 = v.match(/^matrix\(([^)]+)\)$/i);
+  if (m2) {
+    const parts = m2[1].split(',').map((x) => parseFloat(x.trim()));
+    if (parts.length !== 6 || parts.some((x) => isNaN(x))) return null;
+    return [parts[0], parts[1], 0, 0, parts[2], parts[3], 0, 0, 0, 0, 1, 0, parts[4], parts[5], 0, 1];
+  }
+  const t = pagxParseTranslateXY(v);
+  if (t) return [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, t[0], t[1], 0, 1];
+  return null;
+}
+
 export function pagxTransformToMatrix6(value: string): number[] | null {
   const v = (value || '').trim();
   if (!v) return null;
@@ -1242,14 +1263,11 @@ export function pagxStopScalarSeries(stops: PagxAnimStop[]): Record<string, numb
       // [1,0,0,1,tx,ty]: the constant linear channels collapse to endpoints and
       // m4/m5 behave exactly like the old tx/ty channels, so translate-only
       // output is unchanged while scale/rotate keyframes now survive.
-      const mtx = pagxTransformToMatrix6(p['transform']);
+      const mtx = pagxTransformToSample16(p['transform']);
       if (mtx) {
-        put('m0', i, mtx[0]);
-        put('m1', i, mtx[1]);
-        put('m2', i, mtx[2]);
-        put('m3', i, mtx[3]);
-        put('m4', i, mtx[4]);
-        put('m5', i, mtx[5]);
+        for (let k = 0; k < mtx.length; k++) {
+          put('m' + k, i, mtx[k]);
+        }
       }
     }
     if (p['color'] != null) {
@@ -1418,14 +1436,14 @@ export function pagxDecimateStops(stops: PagxAnimStop[], eps = 0.01): PagxAnimSt
   keep[stops.length - 1] = true;
   for (const key of Object.keys(series)) {
     const vals = series[key];
-    // Translation (matrix e/f = m4/m5), per-slot drop-shadow offset/blur
+    // Translation (matrix3d slots 12/13), per-slot drop-shadow offset/blur
     // (fd{k}x / fd{k}y / fd{k}b, and fblur), and clip-path coordinates (cp0, cp1,
     // …) are all measured in CSS pixels, so they get the absolute floor; every
     // other channel (colour, alpha, matrix scale/rotation) keeps the pure relative
     // tolerance. `/^fd\d+[xyb]$/` matches the offset/blur slots without catching
     // the colour channels fd{k}r / fd{k}g / fd{k}bl / fd{k}a.
     const absEps =
-      key === 'm4' || key === 'm5' ||
+      key === 'm12' || key === 'm13' ||
       /^fd\d+[xyb]$/.test(key) || key === 'fblur' ||
       (key[0] === 'c' && key[1] === 'p')
         ? ABS_FLOOR_PX
@@ -3603,6 +3621,7 @@ const PAGX_ANIM_FNS = [
   pagxMatrix3DFlat6,
   pagxExtractTransform,
   pagxTransformToMatrix6,
+  pagxTransformToSample16,
   pagxResolveCapturedTransformOrigin,
   pagxPickProp,
   pagxNormalizeProps,

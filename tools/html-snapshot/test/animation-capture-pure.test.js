@@ -4,6 +4,8 @@ const {
   PAGX_ANIM_PREFIX,
   pagxExtractTransform,
   pagxTransformToMatrix6,
+  pagxTransformToSample16,
+  pagxRdpKeep,
   pagxParseFilterChannels,
   pagxParseTranslateXY,
   pagxStopScalarSeries,
@@ -181,10 +183,12 @@ describe('pagxStopScalarSeries', () => {
     ];
     const series = pagxStopScalarSeries(stops);
     expect(series.opacity).toEqual([0.25, 0.75]);
+    // A 2D pose is padded up to sixteen column-major components, so the affine slots sit at the same
+    // indices as in a `matrix3d`; the padding stays constant and costs nothing in decimation.
     expect(series.m0).toEqual([2, 1]);
-    expect(series.m3).toEqual([3, 1]);
-    expect(series.m4).toEqual([10, 30]);
-    expect(series.m5).toEqual([20, 40]);
+    expect(series.m5).toEqual([3, 1]);
+    expect(series.m12).toEqual([10, 30]);
+    expect(series.m13).toEqual([20, 40]);
   });
 
   test('colour / background / fill / stroke / dashoffset each split into their channels', () => {
@@ -426,5 +430,28 @@ describe('pagxClipNormalizeD (shape branches)', () => {
   test('inset() with a round border-radius drops the rounding and keeps the rect', () => {
     expect(pagxClipNormalizeD('inset(10px 20px 30px 40px round 5px)', el))
       .toBe('M 40 10 L 80 10 L 80 70 L 40 70 Z');
+  });
+});
+
+describe('pagxTransformToSample16', () => {
+  test('pads a 2D pose to sixteen components so one channel set fits every sample', () => {
+    expect(pagxTransformToSample16('matrix(2, 0, 0, 3, 12, 34)')).toEqual([
+      2, 0, 0, 0, 0, 3, 0, 0, 0, 0, 1, 0, 12, 34, 0, 1,
+    ]);
+    expect(pagxTransformToSample16('translate(12px, -4px)')).toEqual([
+      1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 12, -4, 0, 1,
+    ]);
+  });
+
+  test('keeps the depth of a pure-Z track through decimation', () => {
+    // 0 -> 300 -> 0 in Z projects to the same 2D matrix at every sample, so the old six-term vector
+    // was flat and RDP dropped the peak. The full sixteen components keep the Z travel visible.
+    const samples = [
+      'matrix3d(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1)',
+      'matrix3d(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 300, 1)',
+      'matrix3d(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1)',
+    ].map(pagxTransformToSample16);
+    const keep = pagxRdpKeep([0, 0.5, 1], samples.map((s) => s[14]), 0.01, 0);
+    expect(keep).toEqual([true, true, true]);
   });
 });
