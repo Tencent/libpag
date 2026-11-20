@@ -112,6 +112,8 @@ bool PAGSurface::waitUntilCompleted() {
     return false;
   }
   context->flushAndSubmit();
+  // Health is sampled before the queue wait; tgfx marks the context lost while the wait is in
+  // flight, so the relock below is the authoritative device-lost check.
   auto healthy = pag::Devices::IsDeviceHealthy(context);
   context->gpu()->queue()->waitUntilCompleted();
   device->unlock();
