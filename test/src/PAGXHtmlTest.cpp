@@ -3413,6 +3413,37 @@ CLI_TEST(PAGXHtmlTest, AnimationInterpolationBezierAndHold) {
             std::string::npos);
 }
 
+CLI_TEST(PAGXHtmlTest, LateKeysKeepDelayPlusDurationEqualTheAuthoredSpan) {
+  // The printed contract: `delay + duration` must equal the authored span, so the CSS stops
+  // interpolating exactly where the runtime clamps. A window that ran longer would keep animating
+  // past `duration` - invisible to the 8-frame sampler, but wrong for anyone watching longer.
+  const char* xml = R"(<pagx width="320" height="200">
+    <Layer id="lateBox" left="40" top="70" width="80" height="60">
+      <Rectangle left="0" right="0" top="0" bottom="0"/>
+      <Fill color="#BE123C"/>
+    </Layer>
+    <Animations>
+      <Animation id="late" duration="60" frameRate="60" loop="once">
+        <Object target="lateBox">
+          <Channel name="alpha" type="float">
+            <Key time="30" value="0" interpolation="linear"/>
+            <Key time="90" value="1"/>
+          </Channel>
+        </Object>
+      </Animation>
+    </Animations>
+  </pagx>)";
+
+  pagx::HTMLExportOptions options;
+  options.extractStyleSheet = false;
+  auto html = LoadXMLAndConvert(xml, options);
+  ASSERT_FALSE(html.empty());
+  auto tag = FindTagContaining(html, "id=\"lateBox\"");
+  ASSERT_FALSE(tag.empty()) << html;
+  // 0.5s delay + 0.5s duration = the authored 1s timeline.
+  EXPECT_NE(tag.find("0.5s linear 0.5s"), std::string::npos) << tag;
+}
+
 CLI_TEST(PAGXHtmlTest, AnimationLoopModesAndDelay) {
   const char* xml = R"(<pagx width="200" height="200">
     <Layer id="onceBox" width="40" height="40">
