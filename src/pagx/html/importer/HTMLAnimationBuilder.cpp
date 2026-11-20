@@ -605,13 +605,12 @@ struct FillModeRange {
   bool writesBaseline = false;
 };
 
-FillModeRange ResolveFillModeRange(const std::string& fillMode, Frame firstKeyTime,
-                                   bool loopOnce) {
+FillModeRange ResolveFillModeRange(const std::string& fillMode, Frame firstKeyTime, bool loopOnce) {
   FillModeRange range = {};
   range.fillBackwards = (fillMode == "backwards" || fillMode == "both");
   range.fillForwards = (fillMode == "forwards" || fillMode == "both");
-  range.writesBaseline = (firstKeyTime > ZeroFrame && !range.fillBackwards) ||
-                         (loopOnce && !range.fillForwards);
+  range.writesBaseline =
+      (firstKeyTime > ZeroFrame && !range.fillBackwards) || (loopOnce && !range.fillForwards);
   return range;
 }
 

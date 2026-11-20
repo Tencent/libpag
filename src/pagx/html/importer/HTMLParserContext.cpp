@@ -844,9 +844,8 @@ void HTMLParserContext::attachParentCamera(HTMLBoxAttributes& box,
   // A `preserve-3d` layer with no pose of its own still forwards the parent camera to the 3D poses
   // below it in CSS. The wrapper cannot be inserted here, so that camera is lost for the whole
   // subtree and the child check alone would stay silent about it.
-  const bool subtreeOn3D =
-      !ownPoseOn3D && box.preserve3D &&
-      SubtreePosesOffThePlane(element, _styleCascade.get(), silentParser);
+  const bool subtreeOn3D = !ownPoseOn3D && box.preserve3D &&
+                           SubtreePosesOffThePlane(element, _styleCascade.get(), silentParser);
   if (!ownPoseOn3D && !subtreeOn3D) {
     return;
   }
