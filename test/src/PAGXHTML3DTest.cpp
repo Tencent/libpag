@@ -2185,6 +2185,11 @@ PAG_TEST(PAGXHTML3DTest, MultiValueOriginPutsEachKeywordOnItsOwnAxis) {
  * four components) drops the whole declaration, exactly like a bad keyword pair: Chromium falls back
  * to the initial `50% 50%` (the box centre) instead of pivoting at the top-left corner. The value is
  * reported once — the per-token unit warning is suppressed so the position diagnostic stands alone.
+ *
+ * Every token is validated before the box is consulted, so this case is `valid = false` with the
+ * default pivot. A token that parses but needs a size the moment does not have yet (a percentage or
+ * an `em` against an unresolved box) is a different path: the declaration stays valid and the layer
+ * size resolves it later.
  */
 PAG_TEST(PAGXHTML3DTest, UnparsableOriginTokenFallsBackToTheBoxCentre) {
   const char* values[] = {"10foo 20px", "nan% 20px", "10px 20px 30%", "10px 20px 30px 40px"};
