@@ -85,6 +85,35 @@ describe('pagxExtractTransform', () => {
     expect(pagxExtractTransform('translate(10px, 20px) scale(2)')).toBe('translate(10px, 20px)');
   });
 
+  test('a friendly chain carrying depth keeps its matrix3d form', () => {
+    // `translateZ` leaves no trace in the XY pair, so folding the chain to `translate(10px, 0px)`
+    // would erase the whole depth track (and the projection peak it drives). The probe resolves the
+    // chain to matrix3d, which the 16-component sampler then keeps.
+    global.document = {
+      createElement: () => ({ style: {}, remove() {} }),
+      body: { appendChild() {} },
+    };
+    global.getComputedStyle = () => ({
+      transform: 'matrix3d(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 10, 0, 300, 1)',
+    });
+    expect(pagxExtractTransform('translateX(10px) translateZ(300px)')).toBe(
+      'matrix3d(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 10, 0, 300, 1)',
+    );
+  });
+
+  test('a depth-free translate3d still collapses to the compact translate', () => {
+    // A zero Z carries no depth to lose, so the probe's flat matrix falls back to the exact same
+    // `translate()` form the pure-translate path produces.
+    global.document = {
+      createElement: () => ({ style: {}, remove() {} }),
+      body: { appendChild() {} },
+    };
+    global.getComputedStyle = () => ({
+      transform: 'matrix3d(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 10, 20, 0, 1)',
+    });
+    expect(pagxExtractTransform('translate3d(10px, 20px, 0)')).toBe('translate(10px, 20px)');
+  });
+
   test('a throwing probe is caught and falls through to translate-only', () => {
     global.document = { createElement() { throw new Error('no dom'); } };
     expect(pagxExtractTransform('translate(10px, 20px) rotate(45deg)')).toBe('translate(10px, 20px)');

@@ -477,8 +477,10 @@ export function pagxExtractTransform(
   // Friendly compound string (WAAPI / transition keyframe author value): if it
   // is pure translate, reuse the percentage-resolving translate path; otherwise
   // resolve the whole chain to a matrix via a throwaway element so any scale /
-  // rotate / skew is preserved.
-  if (!/\b(scale|rotate|skew|matrix)/.test(s)) {
+  // rotate / skew is preserved. A chain that touches depth takes that same probe
+  // path: `translate(0) translateZ(300px)` projects to the 2D pair `translate(0, 0)`,
+  // so folding it would erase the whole Z track (and the projection peak it drives).
+  if (!/\b(scale|rotate|skew|matrix|translatez|translate3d|perspective)/.test(s)) {
     return pagxExtractTranslate(transformStr, box);
   }
   try {
