@@ -2884,7 +2884,7 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
           style += ";height:" + CssFloatToString(maskBox.height) + "px";
         }
       }
-    } else if (maskHasAnimatedPath(layer->mask)) {
+    } else if (_ctx->animation.animatedMaskHosts.count(layer) > 0) {
       // A coverage mask with animated geometry cannot become a clip polygon without losing its
       // paint. Emit it as an inline <mask> so its content stays a live SVG subtree the keyframes
       // can animate, which keeps the soft edge and the file small.

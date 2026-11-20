@@ -376,6 +376,10 @@ class HTMLWriterContext {
     // <mask> whose geometry is animated by CSS inside the mask.
     std::unordered_set<const Path*> maskPaths = {};
     std::unordered_map<const Path*, std::string> maskPathIds = {};
+    // Masked layers that own at least one animated mask path. The static writer routes such a layer
+    // to the inline <mask> and asks this set instead of re-walking the mask subtree, so the mask
+    // traversal lives in one place (the animation index) rather than once per consumer.
+    std::unordered_set<const Layer*> animatedMaskHosts = {};
     // Masked layer -> id of the inline <mask> generated for it.
     std::unordered_map<const Layer*, std::string> svgMaskIds = {};
     // RoundCorner node -> the single shape it rounds. The radius animation rebuilds that shape's
@@ -897,8 +901,6 @@ class HTMLWriter {
   // content stays a live SVG subtree, so the weaving pass can animate the path data with CSS
   // instead of freezing a rasterized mask and clipping it with a polygon.
   std::string writeAnimatedMaskDef(const Layer* mask, MaskType type);
-  // True when the mask subtree contains a Path driven by animation.
-  bool maskHasAnimatedPath(const Layer* mask, int depth = 0) const;
   void writeClipContent(HTMLBuilder& out, const Layer* layer, const Matrix& parent);
 
   // Two-pass mask geometry walk. writeMaskCSS emits a self-contained SVG whose viewBox must

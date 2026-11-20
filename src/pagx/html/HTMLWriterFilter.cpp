@@ -554,31 +554,6 @@ std::string HTMLWriter::writeMaskCSS(const Layer* mask, MaskType type) {
   return css;
 }
 
-bool HTMLWriter::maskHasAnimatedPath(const Layer* mask, int depth) const {
-  if (mask == nullptr || depth >= HTMLWriterContext::MAX_RECURSION_DEPTH) {
-    return false;
-  }
-  for (auto* element : mask->contents) {
-    if (element != nullptr && element->nodeType() == NodeType::Path &&
-        _ctx->animation.maskPaths.count(static_cast<const Path*>(element)) > 0) {
-      return true;
-    }
-  }
-  for (auto* child : mask->children) {
-    if (maskHasAnimatedPath(child, depth + 1)) {
-      return true;
-    }
-  }
-  if (mask->composition != nullptr) {
-    for (auto* layer : mask->composition->layers) {
-      if (maskHasAnimatedPath(layer, depth + 1)) {
-        return true;
-      }
-    }
-  }
-  return false;
-}
-
 std::string HTMLWriter::writeAnimatedMaskDef(const Layer* mask, MaskType type) {
   std::string id = _ctx->nextId("mask");
   _defs->openTag("mask");

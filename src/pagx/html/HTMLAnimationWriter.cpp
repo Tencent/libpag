@@ -199,18 +199,45 @@ void IndexElements(const std::vector<Element*>& elements,
   }
 }
 
+// A mask reaches its paths through the same tree the static mask writer walks: element contents,
+// nested layers and the mounted composition. Groups wrap the mask shapes in the common authored
+// form, so a Group's own elements have to be visited too — otherwise a point animation on a path
+// inside a mask Group finds no DOM target and the whole mask stays static.
+void CollectMaskElements(const std::vector<Element*>& elements, Layer* hostLayer,
+                         std::unordered_map<const Path*, Layer*>& maskPathToLayer, int depth);
+
 void CollectMaskPaths(const Layer* maskLayer, Layer* hostLayer,
-                      std::unordered_map<const Path*, Layer*>& maskPathToLayer) {
-  if (maskLayer == nullptr || hostLayer == nullptr) {
+                      std::unordered_map<const Path*, Layer*>& maskPathToLayer, int depth = 0) {
+  if (maskLayer == nullptr || hostLayer == nullptr ||
+      depth >= HTMLWriterContext::MAX_RECURSION_DEPTH) {
     return;
   }
-  for (auto* el : maskLayer->contents) {
-    if (el != nullptr && el->nodeType() == NodeType::Path) {
-      maskPathToLayer[static_cast<const Path*>(el)] = hostLayer;
+  CollectMaskElements(maskLayer->contents, hostLayer, maskPathToLayer, depth);
+  for (auto* child : maskLayer->children) {
+    CollectMaskPaths(child, hostLayer, maskPathToLayer, depth + 1);
+  }
+  if (maskLayer->composition != nullptr) {
+    for (auto* layer : maskLayer->composition->layers) {
+      CollectMaskPaths(layer, hostLayer, maskPathToLayer, depth + 1);
     }
   }
-  for (auto* child : maskLayer->children) {
-    CollectMaskPaths(child, hostLayer, maskPathToLayer);
+}
+
+void CollectMaskElements(const std::vector<Element*>& elements, Layer* hostLayer,
+                         std::unordered_map<const Path*, Layer*>& maskPathToLayer, int depth) {
+  if (depth >= HTMLWriterContext::MAX_RECURSION_DEPTH) {
+    return;
+  }
+  for (auto* el : elements) {
+    if (el == nullptr) {
+      continue;
+    }
+    if (el->nodeType() == NodeType::Path) {
+      maskPathToLayer[static_cast<const Path*>(el)] = hostLayer;
+    } else if (el->nodeType() == NodeType::Group) {
+      CollectMaskElements(static_cast<const Group*>(el)->elements, hostLayer, maskPathToLayer,
+                          depth + 1);
+    }
   }
 }
 
@@ -4877,6 +4904,7 @@ void HTMLAnimationSession::ResolveAnimationTargets(
           // Coverage masks keep their paint, so they are emitted as an inline <mask> whose
           // geometry is animated instead of being reduced to a clip polygon.
           _ctx.animation.maskPaths.insert(pathNode);
+          _ctx.animation.animatedMaskHosts.insert(hostLayer);
         } else {
           std::string domId = !pathNode->id.empty() ? pathNode->id : StripAtPrefix(obj->target);
           if (domId.empty()) {
