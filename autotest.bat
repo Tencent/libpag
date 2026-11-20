@@ -90,6 +90,17 @@ if errorlevel 1 (
   exit /b 1
 )
 
+set "CMAKE_COMPILER_ARGS="
+if "%USE_CLANG_CL%"=="1" (
+  if defined VS_DIR if exist "%VS_DIR%\VC\Tools\Llvm\x64\bin" set "PATH=%VS_DIR%\VC\Tools\Llvm\x64\bin;%PATH%"
+  where clang-cl >nul 2>nul
+  if errorlevel 1 (
+    echo Error: clang-cl was not found. Install the C++ Clang tools for Windows component.
+    exit /b 1
+  )
+  set "CMAKE_COMPILER_ARGS=-DCMAKE_C_COMPILER=clang-cl -DCMAKE_CXX_COMPILER=clang-cl -DCMAKE_C_COMPILER_LAUNCHER=python;%WORKSPACE%\win\tools\filter_clang.py -DCMAKE_CXX_COMPILER_LAUNCHER=python;%WORKSPACE%\win\tools\filter_clang.py"
+)
+
 if exist "%BUILD_DIR%" rmdir /s /q "%BUILD_DIR%"
 echo Building PAGFullTest_%TARGET_SUFFIX% for '%BACKEND_NAME%'...
 cmake -G Ninja -S "%WORKSPACE%" -B "%BUILD_DIR%" %CMAKE_BACKEND_ARGS% %CMAKE_COMPILER_ARGS% -DPAG_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Debug
