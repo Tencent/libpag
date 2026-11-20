@@ -194,6 +194,8 @@ class PAGImageLayer;
 
 class PAGStage;
 
+class PAG_API PAGDecoder;
+
 class PAG_API PAGFont {
  public:
   /**
@@ -1211,10 +1213,12 @@ class PAG_API PAGSurface {
   /**
    * Creates a new PAGSurface from specified backend texture and origin. Note, the texture must not
    * be bound to any frame buffer. Passes true in the forAsyncThread parameter if the returned
-   * PAGSurface needs to be used for asynchronous rendering. If passing true, the PAGSurface
-   * internally creates an independent GPU context, and the caller can use semaphore objects to
-   * synchronize content (see flushAndSignalSemaphore() and wait()), otherwise, it uses the GPU
-   * context on the calling thread directly. Returns null if the texture is invalid.
+   * PAGSurface needs to be used for asynchronous rendering. If passing true, the surface uses a
+   * device suitable for another thread: an independent share context on OpenGL, or the texture's
+   * own device on Metal and D3D12, where access is serialized by the device lock. Semaphore
+   * synchronization is only available on backends that implement BackendSemaphore; on D3D12 use
+   * waitUntilCompleted() instead. Otherwise the surface uses the GPU context on the calling
+   * thread directly. Returns null if the texture is invalid.
    */
   static std::shared_ptr<PAGSurface> MakeFrom(const BackendTexture& texture, ImageOrigin origin,
                                               bool forAsyncThread = false);
@@ -1272,6 +1276,15 @@ class PAG_API PAGSurface {
    * row bytes. Returns true if pixels are copied to dstPixels.
    */
   bool readPixels(ColorType colorType, AlphaType alphaType, void* dstPixels, size_t dstRowBytes);
+
+  /**
+   * Submits pending commands and blocks until this surface's device queue finishes prior work.
+   * Does not advance playback or draw another frame. The method manages the device lock
+   * internally; callers must not already hold the same device's context lock.
+   * @return true after completion and a successful device-health check; false if the device
+   *         cannot be locked, has been lost, or completion cannot be established.
+   */
+  bool waitUntilCompleted();
 
  protected:
   explicit PAGSurface(std::shared_ptr<Drawable> drawable, bool externalContext = false);

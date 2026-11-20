@@ -111,4 +111,33 @@ class CLITest : public PAGTest {};
   PAG_REGISTER_PIXEL_TEST(test_case_name, test_name) \
   CLI_TEST(test_case_name, test_name)
 
+// MSVC cannot disable access control, so tests that inspect private members are compiled out
+// instead of failing. PAG_TEST_PRIVATE becomes an unregistered function on MSVC, while
+// PAG_PRIVATE_ACCESS removes only the private statements so shared helpers still run. Other
+// compilers keep full coverage through -fno-access-control.
+#ifdef PAG_TEST_ACCESS_PRIVATE
+#define PAG_TEST_PRIVATE(test_case_name, test_name) PAG_TEST(test_case_name, test_name)
+#define PAG_PIXEL_TEST_PRIVATE(test_case_name, test_name) PAG_PIXEL_TEST(test_case_name, test_name)
+#define PAGX_TEST_PRIVATE(test_case_name, test_name) PAGX_TEST(test_case_name, test_name)
+#define PAGX_PIXEL_TEST_PRIVATE(test_case_name, test_name) \
+  PAGX_PIXEL_TEST(test_case_name, test_name)
+#define CLI_TEST_PRIVATE(test_case_name, test_name) CLI_TEST(test_case_name, test_name)
+#define CLI_PIXEL_TEST_PRIVATE(test_case_name, test_name) CLI_PIXEL_TEST(test_case_name, test_name)
+#define PAG_PRIVATE_ACCESS(...) __VA_ARGS__
+#else
+#define PAG_TEST_PRIVATE(test_case_name, test_name) \
+  static void Disabled_##test_case_name##_##test_name()
+#define PAG_PIXEL_TEST_PRIVATE(test_case_name, test_name) \
+  static void DisabledPixel_##test_case_name##_##test_name()
+#define PAGX_TEST_PRIVATE(test_case_name, test_name) \
+  static void Disabled_##test_case_name##_##test_name()
+#define PAGX_PIXEL_TEST_PRIVATE(test_case_name, test_name) \
+  static void DisabledPixel_##test_case_name##_##test_name()
+#define CLI_TEST_PRIVATE(test_case_name, test_name) \
+  static void Disabled_##test_case_name##_##test_name()
+#define CLI_PIXEL_TEST_PRIVATE(test_case_name, test_name) \
+  static void DisabledPixel_##test_case_name##_##test_name()
+#define PAG_PRIVATE_ACCESS(...)
+#endif
+
 }  // namespace pag

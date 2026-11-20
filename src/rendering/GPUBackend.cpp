@@ -27,6 +27,10 @@ BackendTexture::BackendTexture(const MtlTextureInfo& mtlInfo, int width, int hei
     : _backend(Backend::METAL), _width(width), _height(height), mtlInfo(mtlInfo) {
 }
 
+BackendTexture::BackendTexture(const D3D12TextureInfo& d3d12Info, int width, int height)
+    : _backend(Backend::D3D12), _width(width), _height(height), d3d12Info(d3d12Info) {
+}
+
 BackendTexture::BackendTexture(const VkImageInfo& vkInfo, int width, int height)
     : _backend(Backend::VULKAN), _width(width), _height(height), vkInfo(vkInfo) {
 }
@@ -53,6 +57,9 @@ BackendTexture& BackendTexture::operator=(const BackendTexture& that) {
       break;
     case Backend::METAL:
       mtlInfo = that.mtlInfo;
+      break;
+    case Backend::D3D12:
+      d3d12Info = that.d3d12Info;
       break;
     case Backend::VULKAN:
       vkInfo = that.vkInfo;
@@ -82,6 +89,14 @@ bool BackendTexture::getMtlTextureInfo(MtlTextureInfo* mtlTextureInfo) const {
   return true;
 }
 
+bool BackendTexture::getD3D12TextureInfo(D3D12TextureInfo* d3d12TextureInfo) const {
+  if (!isValid() || _backend != Backend::D3D12 || d3d12TextureInfo == nullptr) {
+    return false;
+  }
+  *d3d12TextureInfo = d3d12Info;
+  return true;
+}
+
 bool BackendTexture::getVkImageInfo(VkImageInfo* vkImageInfo) const {
   if (!isValid() || _backend != Backend::VULKAN) {
     return false;
@@ -104,6 +119,10 @@ BackendRenderTarget::BackendRenderTarget(const GLFrameBufferInfo& glInfo, int wi
 
 BackendRenderTarget::BackendRenderTarget(const MtlTextureInfo& mtlInfo, int width, int height)
     : _backend(Backend::METAL), _width(width), _height(height), mtlInfo(mtlInfo) {
+}
+
+BackendRenderTarget::BackendRenderTarget(const D3D12TextureInfo& d3d12Info, int width, int height)
+    : _backend(Backend::D3D12), _width(width), _height(height), d3d12Info(d3d12Info) {
 }
 
 BackendRenderTarget::BackendRenderTarget(const VkImageInfo& vkInfo, int width, int height)
@@ -129,6 +148,9 @@ BackendRenderTarget& BackendRenderTarget::operator=(const BackendRenderTarget& t
     case Backend::METAL:
       mtlInfo = that.mtlInfo;
       break;
+    case Backend::D3D12:
+      d3d12Info = that.d3d12Info;
+      break;
     case Backend::VULKAN:
       vkInfo = that.vkInfo;
       break;
@@ -151,6 +173,14 @@ bool BackendRenderTarget::getMtlTextureInfo(MtlTextureInfo* mtlTextureInfo) cons
     return false;
   }
   *mtlTextureInfo = mtlInfo;
+  return true;
+}
+
+bool BackendRenderTarget::getD3D12TextureInfo(D3D12TextureInfo* d3d12TextureInfo) const {
+  if (!isValid() || _backend != Backend::D3D12 || d3d12TextureInfo == nullptr) {
+    return false;
+  }
+  *d3d12TextureInfo = d3d12Info;
   return true;
 }
 

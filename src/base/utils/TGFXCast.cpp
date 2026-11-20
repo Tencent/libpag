@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TGFXCast.h"
+#include "cast/D3D12Texture.h"
 #include "cast/MetalTexture.h"
 
 namespace pag {
@@ -195,6 +196,19 @@ tgfx::BackendTexture ToTGFX(const BackendTexture& texture) {
       sampler.format = GetMetalTexturePixelFormat(mtlInfo.texture);
       return tgfx::BackendTexture{sampler, texture.width(), texture.height()};
     }
+    case Backend::D3D12: {
+      D3D12TextureInfo d3d12Info = {};
+      if (!texture.getD3D12TextureInfo(&d3d12Info) || d3d12Info.resource == nullptr) {
+        return {};
+      }
+      tgfx::D3D12TextureInfo sampler = {};
+      sampler.resource = d3d12Info.resource;
+      sampler.format = GetD3D12TexturePixelFormat(d3d12Info.resource);
+      if (sampler.format == 0) {
+        return {};
+      }
+      return tgfx::BackendTexture{sampler, texture.width(), texture.height()};
+    }
     case Backend::WEBGPU: {
       WebGPUTextureInfo webGPUInfo = {};
       if (!texture.getWebGPUTextureInfo(&webGPUInfo) || webGPUInfo.format == 0) {
@@ -234,6 +248,15 @@ BackendTexture ToPAG(const tgfx::BackendTexture& texture) {
       sampler.texture = const_cast<void*>(mtlInfo.texture);
       return {sampler, texture.width(), texture.height()};
     }
+    case tgfx::Backend::D3D12: {
+      tgfx::D3D12TextureInfo d3d12Info = {};
+      if (!texture.getD3D12TextureInfo(&d3d12Info)) {
+        return {};
+      }
+      D3D12TextureInfo sampler = {};
+      sampler.resource = const_cast<void*>(d3d12Info.resource);
+      return {sampler, texture.width(), texture.height()};
+    }
     case tgfx::Backend::WebGPU: {
       tgfx::WebGPUTextureInfo webGPUInfo = {};
       if (!texture.getWebGPUTextureInfo(&webGPUInfo)) {
@@ -268,6 +291,19 @@ tgfx::BackendRenderTarget ToTGFX(const BackendRenderTarget& renderTarget) {
       sampler.format = GetMetalTexturePixelFormat(mtlInfo.texture);
       return tgfx::BackendRenderTarget(sampler, renderTarget.width(), renderTarget.height());
     }
+    case Backend::D3D12: {
+      D3D12TextureInfo d3d12Info = {};
+      if (!renderTarget.getD3D12TextureInfo(&d3d12Info) || d3d12Info.resource == nullptr) {
+        return {};
+      }
+      tgfx::D3D12TextureInfo sampler = {};
+      sampler.resource = d3d12Info.resource;
+      sampler.format = GetD3D12TexturePixelFormat(d3d12Info.resource);
+      if (sampler.format == 0) {
+        return {};
+      }
+      return tgfx::BackendRenderTarget(sampler, renderTarget.width(), renderTarget.height());
+    }
     case Backend::VULKAN:
     case Backend::WEBGPU:
     case Backend::MOCK:
@@ -292,6 +328,7 @@ tgfx::BackendSemaphore ToTGFX(const BackendSemaphore& semaphore) {
     case Backend::METAL:
     case Backend::VULKAN:
     case Backend::WEBGPU:
+    case Backend::D3D12:
     case Backend::MOCK:
       return {};
   }

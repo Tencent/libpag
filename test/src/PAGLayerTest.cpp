@@ -223,17 +223,18 @@ PAG_PIXEL_TEST(PAGLayerTest, preFrame) {
 /**
  * 用例描述: goToFrame测试
  */
-PAG_TEST(PAGLayerFrameTest, goToFrame) {
-  PAG_SETUP_WITH_PATH(TestPAGSurface, TestPAGPlayer, TestPAGFile, "assets/repeater.pag");
-  ASSERT_FALSE(TestPAGFile->gotoTime(0));
-  ASSERT_TRUE(TestPAGFile->gotoTime(FrameToTime(28, TestPAGFile->frameRateInternal())));
-  ASSERT_TRUE(TestPAGFile->gotoTime(FrameToTime(29, TestPAGFile->frameRateInternal())));
-  ASSERT_TRUE(TestPAGFile->gotoTime(FrameToTime(30, TestPAGFile->frameRateInternal())));
-  ASSERT_FALSE(TestPAGFile->gotoTime(FrameToTime(31, TestPAGFile->frameRateInternal())));
-  ASSERT_FALSE(TestPAGFile->gotoTime(FrameToTime(70, TestPAGFile->frameRateInternal())));
-  //从区间内切换到区间外会有一次成功
-  ASSERT_TRUE(TestPAGFile->gotoTime(FrameToTime(600, TestPAGFile->frameRateInternal())));
-  ASSERT_FALSE(TestPAGFile->gotoTime(FrameToTime(601, TestPAGFile->frameRateInternal())));
+PAG_TEST_PRIVATE(PAGLayerFrameTest, goToFrame) {
+  PAG_PRIVATE_ACCESS(
+      PAG_SETUP_WITH_PATH(TestPAGSurface, TestPAGPlayer, TestPAGFile, "assets/repeater.pag");
+      ASSERT_FALSE(TestPAGFile->gotoTime(0));
+      ASSERT_TRUE(TestPAGFile->gotoTime(FrameToTime(28, TestPAGFile->frameRateInternal())));
+      ASSERT_TRUE(TestPAGFile->gotoTime(FrameToTime(29, TestPAGFile->frameRateInternal())));
+      ASSERT_TRUE(TestPAGFile->gotoTime(FrameToTime(30, TestPAGFile->frameRateInternal())));
+      ASSERT_FALSE(TestPAGFile->gotoTime(FrameToTime(31, TestPAGFile->frameRateInternal())));
+      ASSERT_FALSE(TestPAGFile->gotoTime(FrameToTime(70, TestPAGFile->frameRateInternal())));
+      //从区间内切换到区间外会有一次成功
+      ASSERT_TRUE(TestPAGFile->gotoTime(FrameToTime(600, TestPAGFile->frameRateInternal())));
+      ASSERT_FALSE(TestPAGFile->gotoTime(FrameToTime(601, TestPAGFile->frameRateInternal())));)
 }
 
 /**

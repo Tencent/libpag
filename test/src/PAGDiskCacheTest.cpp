@@ -95,6 +95,7 @@ namespace pag {
 //  std::filesystem::remove_all(cacheDir);
 //}
 
+#ifdef PAG_TEST_ACCESS_PRIVATE
 namespace {
 static constexpr size_t InitialSequenceDiskSize = 568915u;
 
@@ -555,6 +556,7 @@ PAG_PIXEL_TEST(PAGDiskCacheTest, PAGDecoder) {
   ASSERT_NO_FATAL_FAILURE(CheckDecoderCompositionChanges(state));
   ASSERT_NO_FATAL_FAILURE(CheckDecoderFileLifetimes(state, cacheDir));
 }
+#endif
 
 /**
  * Regression test for the iOS dangling GL context crash: after MakeFrom captures the caller's
@@ -575,7 +577,7 @@ static void ReadFirstFrame(PAGDecoder* decoder, bool* success) {
 // GLDevice::CurrentNativeHandle() and keeps working after the caller destroys that context.
 // Metal / Vulkan / D3D12 / WebGPU have no thread-local "current context" concept, so the same
 // scenario does not apply; skip the case on non-GL backends.
-#ifdef TGFX_USE_OPENGL
+#if defined(TGFX_USE_OPENGL) && defined(PAG_TEST_ACCESS_PRIVATE)
 PAG_TEST(PAGDiskCacheTest, PAGDecoderContextDestroyed) {
   ScopedDiskCacheDirectory cleanup;
   ASSERT_FALSE(cleanup.directory.empty());
@@ -591,7 +593,7 @@ PAG_TEST(PAGDiskCacheTest, PAGDecoderContextDestroyed) {
   ASSERT_TRUE(callerContext != nullptr);
   auto decoder = PAGDecoder::MakeFrom(pagFile, 30, 0.5f);
   ASSERT_TRUE(decoder != nullptr);
-  EXPECT_TRUE(decoder->sharedDevice != nullptr);
+  PAG_PRIVATE_ACCESS(EXPECT_TRUE(decoder->sharedDevice != nullptr);)
 
   // Destroy the caller's context; a correct decoder no longer depends on its lifetime.
   callerDevice->unlock();
@@ -603,13 +605,14 @@ PAG_TEST(PAGDiskCacheTest, PAGDecoderContextDestroyed) {
   std::thread reader(ReadFirstFrame, decoder.get(), &success);
   reader.join();
   EXPECT_TRUE(success);
-  EXPECT_TRUE(decoder->reader != nullptr);
+  PAG_PRIVATE_ACCESS(EXPECT_TRUE(decoder->reader != nullptr);)
 
   decoder = nullptr;
   pag::PAGDiskCache::RemoveAll();
 }
-#endif  // TGFX_USE_OPENGL
+#endif  // TGFX_USE_OPENGL && PAG_TEST_ACCESS_PRIVATE
 
+#ifdef PAG_TEST_ACCESS_PRIVATE
 PAG_PIXEL_TEST(PAGDiskCacheTest, PAGDecoder_StaticTimeRanges) {
   pag::PAGDiskCache::RemoveAll();
   auto pagFile = LoadPAGFile("resources/apitest/polygon.pag");
@@ -681,6 +684,9 @@ PAG_PIXEL_TEST(PAGDiskCacheTest, PAGDecoder_StaticTimeRanges) {
   decoder = nullptr;
   pag::PAGDiskCache::RemoveAll();
 }
+#endif
+
+#ifdef PAG_TEST_ACCESS_PRIVATE
 
 PAG_TEST(PAGDiskCacheTest, FileCache) {
   ScopedDiskCacheDirectory cleanup;
@@ -701,6 +707,8 @@ PAG_TEST(PAGDiskCacheTest, FileCache) {
 /**
  * Tests for DiskIOWorker: serial execution order and waitAll behavior.
  */
+#endif  // PAG_TEST_ACCESS_PRIVATE
+
 PAG_TEST(PAGDiskCacheTest, DiskIOWorker) {
   auto worker = DiskIOWorker::GetInstance();
 
@@ -763,6 +771,8 @@ PAG_TEST(PAGDiskCacheTest, DiskIOWorker) {
  * exercises the destructor locking and the shared DiskCache paths under concurrent load, guarding
  * against regressions of #3684 without pinning down the exact race window.
  */
+#ifdef PAG_TEST_ACCESS_PRIVATE
+
 PAG_TEST(PAGDiskCacheTest, PAGDecoderTeardownRace) {
   ScopedDiskCacheDirectory cleanup;
   ASSERT_FALSE(cleanup.directory.empty());
@@ -818,6 +828,9 @@ PAG_TEST(PAGDiskCacheTest, PAGDecoderTeardownRace) {
  * graduated backoff as RenderCache, so a transient failure recovers quickly instead of freezing for
  * the full ceiling.
  */
+#endif  // PAG_TEST_ACCESS_PRIVATE
+
+#ifdef PAG_TEST_ACCESS_PRIVATE
 PAG_TEST(PAGDiskCacheTest, SequenceRetryDelayGraduatesAndCaps) {
   EXPECT_EQ(SequenceRetryDelay(0), SEQUENCE_RETRY_INITIAL_DELAY);
   EXPECT_EQ(SequenceRetryDelay(1), SEQUENCE_RETRY_INITIAL_DELAY * 2);
@@ -855,5 +868,6 @@ PAG_TEST(PAGDiskCacheTest, PAGDecoderFailedRenderCooldown) {
   EXPECT_TRUE(success);
   pag::PAGDiskCache::RemoveAll();
 }
+#endif
 
 }  // namespace pag

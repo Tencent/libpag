@@ -558,7 +558,9 @@ CLI_TEST(PAGXCliTest, VideoFindFFmpeg_PrefersManagedCacheAndRejectsInvalidEnviro
   ScopedEnvironmentVariable pathEnv("PATH", pathDirectory.u8string());
 
   auto location = pagx::cli::FindFFmpeg("");
-  EXPECT_EQ(location.path, cachedPath.u8string());
+  std::error_code equivalentError = {};
+  EXPECT_TRUE(std::filesystem::equivalent(location.path, cachedPath, equivalentError));
+  EXPECT_FALSE(equivalentError);
   EXPECT_EQ(location.source, "managed cache");
   {
     ScopedEnvironmentVariable invalidFFmpeg("FFMPEG_BIN",
@@ -677,7 +679,7 @@ CLI_TEST(PAGXCliTest, VideoEncoder_EncodesPaddedFramesWhenFFmpegIsAvailable) {
   errorMsg.clear();
   ASSERT_TRUE(encoder->finish(&errorMsg)) << errorMsg;
   EXPECT_FALSE(std::filesystem::exists(options.outputFile + ".part"));
-  EXPECT_FALSE(std::filesystem::exists(encoder->stagingDirectory));
+  PAG_PRIVATE_ACCESS(EXPECT_FALSE(std::filesystem::exists(encoder->stagingDirectory));)
   ASSERT_TRUE(std::filesystem::exists(options.outputFile));
   EXPECT_GT(std::filesystem::file_size(options.outputFile), 1000u);
 

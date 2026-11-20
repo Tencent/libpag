@@ -18,8 +18,12 @@
 
 #pragma once
 
-#include <cstddef>
-#include <cstdint>
+#include <stddef.h>
+#include <stdint.h>
+
+#ifndef __cplusplus
+#include <stdbool.h>
+#endif
 
 #if !defined(PAG_EXPORT)
 #if defined(PAG_DLL)
@@ -91,19 +95,32 @@ typedef enum {
   pag_image_origin_bottom_left,
 } pag_image_origin;
 
+/**
+ * Describes an external OpenGL texture. Callers initialize the fields explicitly; the usual
+ * defaults are target GL_TEXTURE_2D (0x0DE1) and format GL_RGBA8 (0x8058).
+ */
 typedef struct pag_gl_texture_info {
-  unsigned id = 0;
-  unsigned target = 0x0DE1;  // GL_TEXTURE_2D;
-  unsigned format = 0x8058;  // GL_RGBA8;
+  unsigned id;
+  unsigned target;
+  unsigned format;
 } pag_gl_texture_info;
 
 typedef struct pag_vk_image_info {
-  void* image = nullptr;
+  void* image;
 } pag_vk_image_info;
 
 typedef struct pag_mtl_texture_info {
-  void* texture = nullptr;
+  void* texture;
 } pag_mtl_texture_info;
+
+/**
+ * Non-owning description of an external typed 2D D3D12 texture. The pointer is an
+ * ID3D12Resource; PAG never releases it and the caller must keep it valid for the lifetime of
+ * every object created from this description and until its submitted GPU work completes.
+ */
+typedef struct pag_d3d12_texture_info {
+  void* resource;
+} pag_d3d12_texture_info;
 
 typedef struct pag_point {
   float x;
@@ -134,7 +151,7 @@ typedef struct pag_display_link_functions {
 } pag_display_link_functions;
 
 typedef struct pag_egl_globals {
-  void* display = nullptr;
+  void* display;
 } egl_globals;
 
 typedef const void* pag_object;
@@ -150,6 +167,7 @@ typedef struct pag_image pag_image;
 typedef struct pag_font pag_font;
 typedef struct pag_backend_texture pag_backend_texture;
 typedef struct pag_backend_semaphore pag_backend_semaphore;
+typedef struct pag_decoder pag_decoder;
 typedef struct pag_decoder PAGDecoder;
 typedef struct pag_animator pag_animator;
 

@@ -30,17 +30,17 @@ static std::string GetRootPath() {
 #else
   std::filesystem::path filePath = __FILE__;
   auto dir = filePath.parent_path().string();
-  return std::filesystem::path(dir + "/../../..").lexically_normal();
+  return std::filesystem::path(dir + "/../../..").lexically_normal().string();
 #endif
 }
 
 std::string ProjectPath::Absolute(const std::string& relativePath) {
   std::filesystem::path path = relativePath;
   if (path.is_absolute()) {
-    return path;
+    return path.string();
   }
   static const std::string rootPath = GetRootPath() + "/";
-  return std::filesystem::path(rootPath + relativePath).lexically_normal();
+  return std::filesystem::path(rootPath + relativePath).lexically_normal().string();
 }
 
 }  // namespace pag

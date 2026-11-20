@@ -70,19 +70,49 @@
 #include "utils/TestDir.h"
 
 namespace pag {
+
+namespace {
+
+void SetTestEnv(const char* name, const char* value) {
+#ifdef _WIN32
+  _putenv_s(name, value);
+#else
+  setenv(name, value, 1);
+#endif
+}
+
+void UnsetTestEnv(const char* name) {
+#ifdef _WIN32
+  _putenv_s(name, "");
+#else
+  unsetenv(name);
+#endif
+}
+
+}  // namespace
 using namespace tgfx;
 
-static std::string CopyToTemp(const std::string& resourceName, const std::string& tempName) {
+static std::string TempSubdir(const std::string& subdir) {
+  auto dir = TempDir();
+  if (!subdir.empty()) {
+    dir += "/" + subdir;
+    std::filesystem::create_directories(dir);
+  }
+  return dir;
+}
+
+static std::string CopyToTemp(const std::string& resourceName, const std::string& tempName,
+                              const std::string& subdir = {}) {
   auto src = TestResourcePath(resourceName);
-  auto dst = TempDir() + "/" + tempName;
+  auto dst = TempSubdir(subdir) + "/" + tempName;
   std::filesystem::copy_file(src, dst, std::filesystem::copy_options::overwrite_existing);
   return dst;
 }
 
 static std::string CopyResourceToTemp(const std::string& resourceRelPath,
-                                      const std::string& tempName) {
+                                      const std::string& tempName, const std::string& subdir = {}) {
   auto src = ProjectPath::Absolute(resourceRelPath);
-  auto dst = TempDir() + "/" + tempName;
+  auto dst = TempSubdir(subdir) + "/" + tempName;
   std::filesystem::copy_file(src, dst, std::filesystem::copy_options::overwrite_existing);
   return dst;
 }
@@ -1747,12 +1777,12 @@ CLI_TEST(PAGXCliTest, ImportFile_HtmExtensionNormalizedNoSnapshot) {
   }
   const char* previous = std::getenv("PAGX_HTML_SNAPSHOT");
   std::string saved = previous ? previous : "";
-  setenv("PAGX_HTML_SNAPSHOT", "0", 1);
+  SetTestEnv("PAGX_HTML_SNAPSHOT", "0");
   auto result = pagx::cli::ImportFile(htmPath, "", {});
   if (previous) {
-    setenv("PAGX_HTML_SNAPSHOT", saved.c_str(), 1);
+    SetTestEnv("PAGX_HTML_SNAPSHOT", saved.c_str());
   } else {
-    unsetenv("PAGX_HTML_SNAPSHOT");
+    UnsetTestEnv("PAGX_HTML_SNAPSHOT");
   }
   EXPECT_TRUE(result.error.empty());
   ASSERT_NE(result.document, nullptr);
@@ -1770,18 +1800,18 @@ CLI_TEST(PAGXCliTest, ImportFile_InvalidSnapshotBinRejected) {
   const char* previousBin = std::getenv("PAGX_HTML_SNAPSHOT_BIN");
   std::string savedEnabled = previousEnabled ? previousEnabled : "";
   std::string savedBin = previousBin ? previousBin : "";
-  setenv("PAGX_HTML_SNAPSHOT", "1", 1);
-  setenv("PAGX_HTML_SNAPSHOT_BIN", "/definitely/not/a/snapshot-driver.js", 1);
+  SetTestEnv("PAGX_HTML_SNAPSHOT", "1");
+  SetTestEnv("PAGX_HTML_SNAPSHOT_BIN", "/definitely/not/a/snapshot-driver.js");
   auto result = pagx::cli::ImportFile(htmlPath, "", {});
   if (previousEnabled) {
-    setenv("PAGX_HTML_SNAPSHOT", savedEnabled.c_str(), 1);
+    SetTestEnv("PAGX_HTML_SNAPSHOT", savedEnabled.c_str());
   } else {
-    unsetenv("PAGX_HTML_SNAPSHOT");
+    UnsetTestEnv("PAGX_HTML_SNAPSHOT");
   }
   if (previousBin) {
-    setenv("PAGX_HTML_SNAPSHOT_BIN", savedBin.c_str(), 1);
+    SetTestEnv("PAGX_HTML_SNAPSHOT_BIN", savedBin.c_str());
   } else {
-    unsetenv("PAGX_HTML_SNAPSHOT_BIN");
+    UnsetTestEnv("PAGX_HTML_SNAPSHOT_BIN");
   }
   EXPECT_NE(result.error.find("html-snapshot script not found"), std::string::npos);
   EXPECT_EQ(result.document, nullptr);
@@ -1792,12 +1822,12 @@ CLI_TEST(PAGXCliTest, ImportFile_InvalidSnapshotBinRejected) {
 CLI_TEST(PAGXCliTest, ImportFile_UrlWithoutSnapshotRejected) {
   const char* previous = std::getenv("PAGX_HTML_SNAPSHOT");
   std::string saved = previous ? previous : "";
-  setenv("PAGX_HTML_SNAPSHOT", "off", 1);
+  SetTestEnv("PAGX_HTML_SNAPSHOT", "off");
   auto result = pagx::cli::ImportFile("https://example.com/demo", "", {});
   if (previous) {
-    setenv("PAGX_HTML_SNAPSHOT", saved.c_str(), 1);
+    SetTestEnv("PAGX_HTML_SNAPSHOT", saved.c_str());
   } else {
-    unsetenv("PAGX_HTML_SNAPSHOT");
+    UnsetTestEnv("PAGX_HTML_SNAPSHOT");
   }
   EXPECT_FALSE(result.error.empty());
   EXPECT_EQ(result.document, nullptr);
@@ -2030,7 +2060,7 @@ CLI_TEST(PAGXCliTest, Export_PagxToPptx_MultipleInputs) {
                                             "--output", outputPath});
   EXPECT_EQ(ret, 0);
   ASSERT_TRUE(std::filesystem::exists(outputPath));
-  auto bytes = ReadTextFile(outputPath);
+  auto bytes = ReadBinaryTestFile(outputPath);
   EXPECT_NE(bytes.find("ppt/slides/slide1.xml"), std::string::npos);
   EXPECT_NE(bytes.find("ppt/slides/slide2.xml"), std::string::npos);
   EXPECT_EQ(bytes.find("ppt/slides/slide3.xml"), std::string::npos);
@@ -2047,7 +2077,7 @@ CLI_TEST(PAGXCliTest, Export_PagxToPptx_ThreeInputsDefaultOutput) {
   EXPECT_EQ(ret, 0);
   auto defaultOutput = TempDir() + "/ExportPPTXThree.pptx";
   ASSERT_TRUE(std::filesystem::exists(defaultOutput));
-  auto bytes = ReadTextFile(defaultOutput);
+  auto bytes = ReadBinaryTestFile(defaultOutput);
   EXPECT_NE(bytes.find("ppt/slides/slide3.xml"), std::string::npos);
   EXPECT_EQ(bytes.find("ppt/slides/slide4.xml"), std::string::npos);
 }
@@ -2060,7 +2090,7 @@ CLI_TEST(PAGXCliTest, Export_PagxToPptx_SingleInputOneSlide) {
   auto ret =
       CallRun(pagx::cli::RunExport, {"export", "--input", inputPath, "--output", outputPath});
   EXPECT_EQ(ret, 0);
-  auto bytes = ReadTextFile(outputPath);
+  auto bytes = ReadBinaryTestFile(outputPath);
   EXPECT_NE(bytes.find("ppt/slides/slide1.xml"), std::string::npos);
   EXPECT_EQ(bytes.find("ppt/slides/slide2.xml"), std::string::npos);
 }
@@ -4080,8 +4110,9 @@ CLI_TEST(PAGXCliTest, Embed_BothSkipFlags_ExitsWithError) {
 }
 
 CLI_TEST(PAGXCliTest, Embed_FontFile_AutoRegistersAndEmbeds) {
-  auto tempPagx = CopyToTemp("embed_font_file.pagx", "embed_font_file.pagx");
-  CopyResourceToTemp("resources/font/NotoSansSC-Regular.otf", "NotoSansSC-Regular.otf");
+  auto tempPagx = CopyToTemp("embed_font_file.pagx", "embed_font_file.pagx", "embed_fontfile_auto");
+  CopyResourceToTemp("resources/font/NotoSansSC-Regular.otf", "NotoSansSC-Regular.otf",
+                     "embed_fontfile_auto");
   auto outPagx = TempDir() + "/embed_fontfile_out.pagx";
   StreamCapture outCapture(std::cout);
   auto ret = CallRun(pagx::cli::RunEmbed, {"embed", tempPagx, "-o", outPagx});
@@ -4156,10 +4187,14 @@ CLI_TEST(PAGXCliTest, Embed_MissingFontFile_FailsLoud) {
 }
 
 CLI_TEST(PAGXCliTest, Embed_FontFile_ReembedPreservesNode) {
-  auto tempPagx = CopyToTemp("embed_font_file.pagx", "embed_font_file.pagx");
-  CopyResourceToTemp("resources/font/NotoSansSC-Regular.otf", "NotoSansSC-Regular.otf");
-  auto pass1 = TempDir() + "/embed_reembed_pass1.pagx";
-  auto pass2 = TempDir() + "/embed_reembed_pass2.pagx";
+  auto tempDir = TempSubdir("embed_reembed");
+  auto tempPagx = CopyToTemp("embed_font_file.pagx", "embed_font_file.pagx", "embed_reembed");
+  CopyResourceToTemp("resources/font/NotoSansSC-Regular.otf", "NotoSansSC-Regular.otf",
+                     "embed_reembed");
+  // The font reference stays relative, so the re-embed pass resolves it against the input file's
+  // directory. Keep the intermediate files next to the copied font.
+  auto pass1 = tempDir + "/embed_reembed_pass1.pagx";
+  auto pass2 = tempDir + "/embed_reembed_pass2.pagx";
   auto ret1 = CallRun(pagx::cli::RunEmbed, {"embed", tempPagx, "-o", pass1});
   EXPECT_EQ(ret1, 0);
   auto ret2 = CallRun(pagx::cli::RunEmbed, {"embed", pass1, "-o", pass2});

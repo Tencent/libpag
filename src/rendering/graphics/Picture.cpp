@@ -331,7 +331,8 @@ std::shared_ptr<Graphic> Picture::MakeFrom(ID assetID, std::shared_ptr<ImageProx
 
 std::shared_ptr<Graphic> Picture::MakeFrom(ID assetID, const tgfx::BackendTexture& texture,
                                            tgfx::ImageOrigin origin) {
-  if (!texture.isValid()) {
+  if (!texture.isValid() ||
+      !Devices::ValidateExternalResource(texture, ExternalResourceUsage::Sampled)) {
     return nullptr;
   }
   // Capture the identity of the device that owns this external texture so BackendTextureProxy can

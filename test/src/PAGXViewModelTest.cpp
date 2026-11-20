@@ -48,6 +48,7 @@
 #include "utils/ProjectPath.h"
 
 namespace pag {
+#ifdef PAG_TEST_ACCESS_PRIVATE
 
 static std::shared_ptr<pagx::PAGScene> MakeScene(pagx::PAGXDocument* doc, const std::string& vmId,
                                                  int propCount) {
@@ -3128,6 +3129,8 @@ PAGX_PIXEL_TEST(PAGXViewModelTest, TextReshapeByViewModelBaseline) {
   EXPECT_TRUE(scene->draw(surface));
   EXPECT_TRUE(Baseline::Compare(surface, "PAGXViewModelTest/TextReshapeByViewModel"));
 }
+
+#endif  // PAG_TEST_ACCESS_PRIVATE
 
 // Baseline: a document Animation drives a standalone Text's content channel with a Hold keyframe;
 // after advancing past the keyframe and drawing, the rendered pixels must match the accepted

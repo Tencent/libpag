@@ -28,6 +28,7 @@ enum class ImageOrigin;
 }
 
 namespace tgfx {
+class Device;
 class Image;
 }
 
@@ -63,14 +64,15 @@ class PAGImage {
 
   /**
    * Creates a PAGImage that wraps an existing GPU backend texture, so the host can supply a texture
-   * it already owns without re-decoding. Requires an active GL context on the calling thread. The
-   * texture must be a GL-backend texture.
+   * it already owns without re-decoding. The texture must belong to the backend this build was
+   * compiled with. The caller must keep the native resource alive until the image and all GPU work
+   * submitted from it have finished.
    * In tgfx environments, prefer pagx::MakeFrom(tgfx::Image) from pagx/tgfx.h instead.
    * This method manages the device's context lock internally. Callers must not already hold the
    * same GPU device's context lock.
    * @param texture the backend texture to wrap.
    * @param origin the texture's origin (top-left or bottom-left).
-   * @return a PAGImage, or nullptr if there is no current GL context or the texture is invalid.
+   * @return a PAGImage, or nullptr if the texture is invalid or belongs to another backend.
    */
   static std::shared_ptr<PAGImage> MakeFromTexture(const pag::BackendTexture& texture,
                                                    pag::ImageOrigin origin);
@@ -82,7 +84,11 @@ class PAGImage {
   const std::string& source() const;
 
  private:
-  PAGImage(std::shared_ptr<tgfx::Image> image, std::string source);
+  PAGImage(std::shared_ptr<tgfx::Image> image, std::shared_ptr<tgfx::Device> device,
+           std::string source);
+  // Declared before the image so the image (and its device-bound GPU resources) is destroyed
+  // before the device that owns those resources.
+  std::shared_ptr<tgfx::Device> _device = nullptr;
   std::shared_ptr<tgfx::Image> _tgfxImage = nullptr;
   std::string _source = {};
 

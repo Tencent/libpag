@@ -22,7 +22,8 @@
 namespace pag {
 
 Devices::AdoptedDevice Devices::ResolveForExternalResource(const tgfx::BackendTexture& texture,
-                                                           bool forAsyncThread) {
+                                                           bool forAsyncThread,
+                                                           ExternalResourceUsage usage) {
   if (!texture.isValid()) {
     LOGE("Devices::ResolveForExternalResource() The texture is invalid.");
     return {};
@@ -33,16 +34,16 @@ Devices::AdoptedDevice Devices::ResolveForExternalResource(const tgfx::BackendTe
         "than the current libpag build.");
     return {};
   }
+  if (!ValidateExternalResource(texture, usage)) {
+    LOGE(
+        "Devices::ResolveForExternalResource() The texture does not satisfy the requested "
+        "resource usage.");
+    return {};
+  }
   if (forAsyncThread) {
-    // The worker renders into the caller's texture, so prefer a device that can actually access
-    // it: backends reaching a device back-reference from the texture handle (Metal / D3D12)
-    // derive the worker device from the texture itself, while GL derives a share-context device
-    // from the calling thread's current context.
-    AdoptedDevice adopted = {MakeForAsyncThread(texture), false};
-    if (adopted.device == nullptr) {
-      adopted.device = MakeDefault();
-    }
-    return adopted;
+    // The worker renders into the caller's texture, so the backend must derive a device that can
+    // actually access it. A failure is reported instead of silently substituting another device.
+    return {MakeForAsyncThread(texture), false};
   }
   auto adopted = AdoptCurrent();
   if (adopted.device == nullptr) {
@@ -63,6 +64,12 @@ Devices::AdoptedDevice Devices::ResolveForExternalResource(
     LOGE(
         "Devices::ResolveForExternalResource() The render target belongs to a different GPU "
         "backend than the current libpag build.");
+    return {};
+  }
+  if (!ValidateExternalResource(renderTarget)) {
+    LOGE(
+        "Devices::ResolveForExternalResource() The render target does not satisfy the render "
+        "target resource requirements.");
     return {};
   }
   auto adopted = AdoptCurrent();

@@ -70,7 +70,11 @@
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
-  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Label="UserMacros">
+    <PagBackend Condition="'$(PagBackend)'==''">OpenGL</PagBackend>
+    <PagBackendArguments Condition="'$(PagBackend)'=='D3D12'">-DPAG_USE_D3D12=ON -DPAG_USE_OPENGL=OFF</PagBackendArguments>
+    <PagBackendArguments Condition="'$(PagBackend)'=='D3D12WARP'">-DPAG_USE_D3D12=ON -DPAG_D3D12_USE_WARP=ON -DPAG_USE_OPENGL=OFF</PagBackendArguments>
+  </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <LinkIncremental>true</LinkIncremental>
   </PropertyGroup>
@@ -99,9 +103,9 @@
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalLibraryDirectories>$(SolutionDir)..\out\release\win\x86</AdditionalLibraryDirectories>
-      <AdditionalDependencies>libpag.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>libpag.lib;d3d12.lib;dxgi.lib;d3dcompiler.lib;dcomp.lib;d3d11.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
-    <PostBuildEvent>
+    <PostBuildEvent Condition="'$(PagBackend)'=='OpenGL'">
       <Command>xcopy /Y "$(SolutionDir)..\third_party\tgfx\vendor\angle\win\x86\*.*" "$(TargetDir)"</Command>
     </PostBuildEvent>
     <PreBuildEvent>
@@ -109,7 +113,7 @@
 call npm install -g depsync --silent
 call depsync
 set CMAKE_MSVC_PATH=$(VCInstallDir)
-node .\build_pag -a x86 -DPAG_BUILD_SHARED=OFF</Command>
+node .\build_pag -a x86 -DPAG_BUILD_SHARED=OFF $(PagBackendArguments)</Command>
     </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -130,13 +134,13 @@ node .\build_pag -a x86 -DPAG_BUILD_SHARED=OFF</Command>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>libpag.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>libpag.lib;d3d12.lib;dxgi.lib;d3dcompiler.lib;dcomp.lib;d3d11.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>$(SolutionDir)..\out\release\win\x86</AdditionalLibraryDirectories>
     </Link>
     <ProjectReference>
       <UseLibraryDependencyInputs>true</UseLibraryDependencyInputs>
     </ProjectReference>
-    <PostBuildEvent>
+    <PostBuildEvent Condition="'$(PagBackend)'=='OpenGL'">
       <Command>xcopy /Y "$(SolutionDir)..\third_party\tgfx\vendor\angle\win\x86\*.*" "$(TargetDir)"</Command>
     </PostBuildEvent>
     <PreBuildEvent>
@@ -144,7 +148,7 @@ node .\build_pag -a x86 -DPAG_BUILD_SHARED=OFF</Command>
 call npm install -g depsync --silent
 call depsync
 set CMAKE_MSVC_PATH=$(VCInstallDir)
-node .\build_pag -a x86 -DPAG_BUILD_SHARED=OFF</Command>
+node .\build_pag -a x86 -DPAG_BUILD_SHARED=OFF $(PagBackendArguments)</Command>
     </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -161,7 +165,7 @@ node .\build_pag -a x86 -DPAG_BUILD_SHARED=OFF</Command>
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>libpag.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>libpag.lib;d3d12.lib;dxgi.lib;d3dcompiler.lib;dcomp.lib;d3d11.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>$(SolutionDir)..\out\release\win\x64</AdditionalLibraryDirectories>
     </Link>
     <PreBuildEvent>
@@ -169,12 +173,12 @@ node .\build_pag -a x86 -DPAG_BUILD_SHARED=OFF</Command>
 call npm install -g depsync --silent
 call depsync
 set CMAKE_MSVC_PATH=$(VCInstallDir)
-node .\build_pag -a x64 -DPAG_BUILD_SHARED=OFF</Command>
+node .\build_pag -a x64 -DPAG_BUILD_SHARED=OFF $(PagBackendArguments)</Command>
     </PreBuildEvent>
     <ProjectReference>
       <UseLibraryDependencyInputs>true</UseLibraryDependencyInputs>
     </ProjectReference>
-    <PostBuildEvent>
+    <PostBuildEvent Condition="'$(PagBackend)'=='OpenGL'">
       <Command>xcopy /Y "$(SolutionDir)..\third_party\tgfx\vendor\angle\win\x64\*.*" "$(TargetDir)"</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
@@ -198,12 +202,12 @@ node .\build_pag -a x64 -DPAG_BUILD_SHARED=OFF</Command>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalLibraryDirectories>$(SolutionDir)..\out\release\win\x64</AdditionalLibraryDirectories>
-      <AdditionalDependencies>libpag.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>libpag.lib;d3d12.lib;dxgi.lib;d3dcompiler.lib;dcomp.lib;d3d11.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <ProjectReference>
       <UseLibraryDependencyInputs>true</UseLibraryDependencyInputs>
     </ProjectReference>
-    <PostBuildEvent>
+    <PostBuildEvent Condition="'$(PagBackend)'=='OpenGL'">
       <Command>xcopy /Y "$(SolutionDir)..\third_party\tgfx\vendor\angle\win\x64\*.*" "$(TargetDir)"</Command>
     </PostBuildEvent>
     <PreBuildEvent>
@@ -211,7 +215,7 @@ node .\build_pag -a x64 -DPAG_BUILD_SHARED=OFF</Command>
 call npm install -g depsync --silent
 call depsync
 set CMAKE_MSVC_PATH=$(VCInstallDir)
-node .\build_pag -a x64 -DPAG_BUILD_SHARED=OFF</Command>
+node .\build_pag -a x64 -DPAG_BUILD_SHARED=OFF $(PagBackendArguments)</Command>
     </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -241,4 +245,8 @@ node .\build_pag -a x64 -DPAG_BUILD_SHARED=OFF</Command>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
+  <Target Name="ValidatePagBackend" BeforeTargets="PrepareForBuild">
+    <Error Condition="'$(PagBackend)' != 'OpenGL' and '$(PagBackend)' != 'D3D12' and '$(PagBackend)' != 'D3D12WARP'"
+           Text="Unsupported PagBackend '$(PagBackend)'. Use OpenGL, D3D12 or D3D12WARP." />
+  </Target>
 </Project>

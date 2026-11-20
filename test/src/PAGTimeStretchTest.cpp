@@ -16,6 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include <filesystem>
 #include <vector>
 #include "base/utils/TimeUtil.h"
 #pragma clang diagnostic push
@@ -31,9 +32,7 @@ using nlohmann::json;
 void TimeStretchTest(std::string path, std::string methodName, float scaleFactor) {
   std::vector<int> shortenArray = {0, 6, 30, 59};
   std::vector<int> stretchArray = {0, 12, 120, 239};
-  auto startIndex = path.rfind('/') + 1;
-  auto suffixIndex = path.rfind('.');
-  auto fileName = path.substr(startIndex, suffixIndex - startIndex);
+  auto fileName = std::filesystem::path(path).stem().string();
   std::vector<std::string> compareVector;
 
   auto pagFile = LoadPAGFile(path);

@@ -21,14 +21,7 @@
 
 #ifdef TGFX_USE_OPENGL
 #include "tgfx/gpu/opengl/GLDevice.h"
-#if defined(PAG_USE_SWIFTSHADER) || defined(__EMSCRIPTEN__)
-#include <GLES3/gl3.h>
-#else
-#ifndef GL_SILENCE_DEPRECATION
-#define GL_SILENCE_DEPRECATION
-#endif
-#include <OpenGL/gl3.h>
-#endif
+#include "utils/GLHeaders.h"
 #endif  // TGFX_USE_OPENGL
 
 namespace pag {

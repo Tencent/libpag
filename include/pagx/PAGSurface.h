@@ -102,6 +102,15 @@ class PAGSurface {
    */
   bool readPixels(void* dstPixels, size_t dstRowBytes);
 
+  /**
+   * Submits pending commands and blocks until the surface's device queue finishes prior work.
+   * Does not draw another frame. The method manages the device lock internally; callers must not
+   * already hold the same GPU device's context lock.
+   * @return true after completion and a successful device-health check; false if the device
+   *         cannot be locked, has been lost, or completion cannot be established.
+   */
+  bool waitUntilCompleted();
+
  private:
   explicit PAGSurface(std::shared_ptr<Drawable> drawable);
 
