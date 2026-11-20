@@ -7,6 +7,7 @@ const {
   transformOriginDepth,
   perspectiveOriginXY,
   perspectiveOriginAtBoxCentre,
+  insideAncestorCamera,
   recordCameraSkip,
   pagxCameraSkips,
   staticCameraFor,
@@ -102,8 +103,11 @@ describe('liftBoxOntoCameraWrapper', () => {
 
 describe('rewritePerspectiveKeyframes', () => {
   beforeEach(() => {
-    // The camera map lives on globalThis so it survives the browser payload boundary.
+    // The registries live on globalThis so they survive the browser payload boundary.
     delete globalThis.__pagxAnimCameras;
+    delete globalThis.__pagxAnimProjected;
+    delete globalThis.__pagxAnimCameraClones;
+    delete globalThis.__pagxCameraSkips;
   });
 
   test('keeps the block when the stops disagree on the distance', () => {
@@ -167,6 +171,33 @@ describe('rewritePerspectiveKeyframes', () => {
   test('leaves flights without a projection alone', () => {
     const css = '@keyframes pagxAnim2 { 0% { transform: matrix(1, 0, 0, 1, 10, 0); } }';
     expect(rewritePerspectiveKeyframes(css)).toBe(css);
+  });
+
+  test('a skewed projection row keeps the block as authored', () => {
+    // `qx` is the projection term that shifts the vanishing point inside the projected plane.
+    // `perspective` cannot express it, so a split would strip `qx` from the matrix and put only `qz`
+    // back on the wrapper, moving the camera. Only a full, exact decomposition may be rewritten.
+    const skewed = 'matrix3d(1, 0, 0, 0.001, 0, 1, 0, 0, 0, 0, 1, -0.00166667, 0, 0, 0, 1)';
+    const css =
+      '@keyframes skewedCamera { 0% { transform: ' + skewed + '; } 100% { transform: ' + skewed + '; } }';
+    expect(rewritePerspectiveKeyframes(css)).toBe(css);
+    expect(globalThis.__pagxAnimCameras['skewedCamera']).toBeUndefined();
+    // The projection is kept, so an element playing this block must decline the wrapper.
+    expect(pagxAnimProjectedNames()['skewedCamera']).toBe(true);
+    expect(pagxCameraSkips()['keyframes-not-separable']).toBe(1);
+  });
+
+  test('a non-normalised m44 keeps the block as authored', () => {
+    // `m44 = 2` scales the homogeneous w. The wrapper only supplies the projection row and the
+    // `matrix(...)` collapse drops everything outside the 2D affine, so neither form can reproduce
+    // the pose: refuse the split instead of quietly turning the stop 2D.
+    const scaledW = 'matrix3d(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, -0.00166667, 0, 0, 0, 2)';
+    const css =
+      '@keyframes scaledW { 0% { transform: ' + scaledW + '; } 100% { transform: ' + scaledW + '; } }';
+    expect(rewritePerspectiveKeyframes(css)).toBe(css);
+    expect(globalThis.__pagxAnimCameras['scaledW']).toBeUndefined();
+    expect(pagxAnimProjectedNames()['scaledW']).toBe(true);
+    expect(pagxCameraSkips()['keyframes-not-separable']).toBe(1);
   });
 });
 
@@ -410,5 +441,58 @@ describe('one element never mixes two camera modes', () => {
     // block + its element as two affected elements.
     expect(pagxCameraSkips()['keyframes-mixed']).toBe(1);
     expect(pagxCameraSkips()['element-keyframes-mixed']).toBe(1);
+  });
+});
+
+describe('an ancestor camera keeps the element out of a wrapper', () => {
+  const affine =
+    'matrix3d(0.707107, 0, 0.707107, 0, 0, 1, 0, 0, -0.707107, 0, 0.707107, 0, 0, 0, 0, 1)';
+  const originalGetComputedStyle = global.getComputedStyle;
+
+  beforeEach(() => {
+    delete globalThis.__pagxCameraSkips;
+    delete globalThis.__pagxAnimCameras;
+    delete globalThis.__pagxAnimCameraClones;
+    delete globalThis.__pagxAnimProjected;
+  });
+
+  afterEach(() => {
+    global.getComputedStyle = originalGetComputedStyle;
+  });
+
+  const ancestorStyle = (properties) => () => ({
+    getPropertyValue: (prop) => (prop in properties ? properties[prop] : ''),
+  });
+
+  test('a wrapper would cut the element out of the ancestor projection', () => {
+    // The ancestor's `perspective` applies to its direct children's transforms. Inserting a flat
+    // camera wrapper in between makes the element a grandchild, so the ancestor's camera would stop
+    // projecting the pose and a `perspective` of its own on the wrapper would double-project instead.
+    rewritePerspectiveKeyframes(
+      '@keyframes card { 0% { transform: ' + ROTATE_Y_45_PROJECTED + '; } 100% { transform: ' +
+        ROTATE_Y_45_PROJECTED + '; } }',
+    );
+    global.getComputedStyle = ancestorStyle({ perspective: '800px' });
+    const html =
+      '<div style="position: absolute; left: 0px; top: 0px; width: 80px; height: 40px; transform: ' +
+      affine + '; animation-name: card">x</div>';
+    const el = { parentElement: { parentElement: null } };
+    const result = withPerspectiveCamera(
+      html, {}, { animationName: 'card' }, { distance: 600, original: ROTATE_Y_45_PROJECTED, affine }, el,
+    );
+    expect(result).not.toContain('perspective: 600px');
+    // The pose keeps its authored projection and plays the un-stripped keyframes block.
+    expect(result).toContain(ROTATE_Y_45_PROJECTED);
+    expect(result).toContain('animation-name: card__pagxCam');
+    expect(pagxCameraSkips()['ancestor-camera']).toBe(1);
+  });
+
+  test('a preserve-3d ancestor is detected too', () => {
+    global.getComputedStyle = ancestorStyle({ 'transform-style': 'preserve-3d' });
+    expect(insideAncestorCamera({ parentElement: { parentElement: null } })).toBe(true);
+    global.getComputedStyle = ancestorStyle({ perspective: 'none', 'transform-style': 'flat' });
+    expect(insideAncestorCamera({ parentElement: { parentElement: null } })).toBe(false);
+    // A detached element has no ancestor space to preserve.
+    expect(insideAncestorCamera({ parentElement: null })).toBe(false);
   });
 });

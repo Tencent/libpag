@@ -1984,9 +1984,19 @@ function invert3x3(matrix) {
   ];
 }
 
-// Splits `matrix3d` into the projection distance and the affine remainder. Returns null when the
-// matrix carries no projection (the common case) or when the projection is not a plain
-// `perspective(d)` (mixed projection terms keep the old behaviour).
+// Whether the matrix carries a camera at all, i.e. a non-zero projection row. Lets a caller tell "no
+// projection, nothing to split" (leave the value alone, no diagnostic) from "a projection the wrapper
+// cannot reproduce" (keep it and report the decline).
+function hasProjectionRow(transform) {
+  const values = parseMatrix3DValues(transform);
+  if (!values) return false;
+  return Math.abs(values[3]) > 1e-9 || Math.abs(values[7]) > 1e-9 || Math.abs(values[11]) > 1e-9;
+}
+
+// Splits `matrix3d` into the projection distance and the affine remainder. Returns null when there is
+// nothing to split or when the pair cannot reproduce the pose exactly: a `perspective` wrapper
+// supplies only a `perspective(d)` camera, so a skewed projection row or a `w`-scaling `m44` has no
+// wrapper form and the authored matrix has to stay on the element.
 function splitProjectiveTransform(transform) {
   const values = parseMatrix3DValues(transform);
   if (!values) return null;
@@ -2005,6 +2015,8 @@ function splitProjectiveTransform(transform) {
     (column) =>
       row3[0] * inverse[0][column] + row3[1] * inverse[1][column] + row3[2] * inverse[2][column],
   );
+  // `qx` / `qy` shift the vanishing point inside the projected plane. `perspective` cannot express
+  // that, so splitting would strip the term and only put `qz` back on the wrapper.
   if (Math.abs(projection[0]) > 1e-6 || Math.abs(projection[1]) > 1e-6) return null;
   const distance = projection[2] < -1e-9 ? -1 / projection[2] : 0;
   if (!(distance > 0)) return null;
@@ -2019,6 +2031,10 @@ function splitProjectiveTransform(transform) {
         projection[1] * values[column * 4 + 1] +
         projection[2] * values[column * 4 + 2]);
   }
+  // The remainder has to be a plain affine: `m44 != 1` scales the homogeneous `w`, which the wrapper
+  // does not restore, and neither the `matrix(...)` collapse nor the importer can carry it. Keep the
+  // authored matrix instead of silently dropping the scale.
+  if (Math.abs(affine[15] - 1) > 1e-6) return null;
   const flat =
     Math.abs(affine[2]) < 1e-6 && Math.abs(affine[6]) < 1e-6 && Math.abs(affine[10] - 1) < 1e-6 &&
     Math.abs(affine[14]) < 1e-6 && Math.abs(affine[8]) < 1e-6 && Math.abs(affine[9]) < 1e-6 &&
@@ -2161,13 +2177,19 @@ function rewritePerspectiveKeyframes(cssText) {
     // do not; counting the transform declarations catches stops that carry no projection at all.
     const transformCount = (block.match(/transform\s*:/g) || []).length;
     let projectedCount = 0;
+    let unsplittable = false;
     let distance = 0;
     let consistent = true;
     const rewritten = block.replace(/matrix3d\([^)]*\)/g, (value) => {
       const split = splitProjectiveTransform(value);
       // A stop that carries no projection at all is caught by the `projectedCount !== transformCount`
-      // check below, which does not depend on locating the declaration text.
-      if (!split) return value;
+      // check below, which does not depend on locating the declaration text. A stop that does carry a
+      // camera but cannot be factored exactly (skewed projection row, `m44 != 1`, singular linear part)
+      // must not be partially stripped: the whole block stays as authored.
+      if (!split) {
+        if (hasProjectionRow(value)) unsplittable = true;
+        return value;
+      }
       projectedCount++;
       if (distance === 0) {
         distance = split.distance;
@@ -2179,7 +2201,7 @@ function rewritePerspectiveKeyframes(cssText) {
     if (projectedCount !== transformCount) {
       consistent = false;
     }
-    if (distance > 0 && consistent) {
+    if (distance > 0 && consistent && !unsplittable) {
       out += cssText.slice(index, open + 1) + rewritten + '}';
       if (name) {
         cameras[name] = distance;
@@ -2189,7 +2211,13 @@ function rewritePerspectiveKeyframes(cssText) {
         out += '@keyframes ' + name + '__pagxCam ' + cssText.slice(open, close + 1);
       }
     } else {
-      if (distance > 0) {
+      if (unsplittable) {
+        // Block-level reason: recorded once per `@keyframes` block. The block keeps every authored
+        // projection, and `projected` marks the name so an element playing it declines the wrapper
+        // (and is counted under 'element-keyframes-mixed') instead of being projected twice.
+        recordCameraSkip('keyframes-not-separable');
+        if (name) projected[name] = true;
+      } else if (distance > 0) {
         // Block-level reason: recorded once per `@keyframes` block, not once per element using it.
         // Elements declined because of this block are counted separately ('element-keyframes-mixed').
         recordCameraSkip('keyframes-mixed');
@@ -4754,7 +4782,7 @@ function render(el, parentRect, opts, precomputed) {
   // Name the element's own box before the camera wrapper is added: an author `name` identifies the
   // layer that carries the content and the animation, not the structural camera layer above it.
   const named = applyLayerName(el, renderElementBox(el, parentRect, opts, computed), opts, computed);
-  return withPerspectiveCamera(named, opts, computed, camera);
+  return withPerspectiveCamera(named, opts, computed, camera, el);
 }
 
 // Camera carried by the element's own static transform (`transform: perspective(<d>) ...`), read
@@ -4842,7 +4870,24 @@ function useProjectedKeyframes(html, computed) {
   return out;
 }
 
-function withPerspectiveCamera(html, opts, computed, staticCamera) {
+// Whether an ancestor already projects this element (`perspective`) or shares a 3D space with it
+// (`transform-style: preserve-3d`). A wrapper is a flat `perspective` box inserted *between* that
+// ancestor and the element: the ancestor's camera only applies to its direct children's transforms, so
+// the element's pose would stop composing with it and the whole subtree would be flattened out of the
+// ancestor's 3D space. Those elements keep the projection inside their own pose instead.
+function insideAncestorCamera(el) {
+  if (!el || !el.parentElement) return false;
+  for (let parent = el.parentElement; parent; parent = parent.parentElement) {
+    const style = getComputedStyle(parent);
+    const perspective = String(style.getPropertyValue('perspective') || '').trim();
+    if (perspective && perspective !== 'none') return true;
+    const transformStyle = String(style.getPropertyValue('transform-style') || '').trim();
+    if (transformStyle === 'preserve-3d') return true;
+  }
+  return false;
+}
+
+function withPerspectiveCamera(html, opts, computed, staticCamera, el) {
   if (!html) return html;
   if (opts && opts._strippedTransform) return html;
   const distance =
@@ -4866,6 +4911,11 @@ function withPerspectiveCamera(html, opts, computed, staticCamera) {
   };
   if (Math.abs(transformOriginDepth(computed)) > 1e-6) {
     return declined('depth-pivot');
+  }
+  // A wrapper between an ancestor camera and this element would cut the element out of that camera's
+  // 3D space, so the pose keeps its own projection (and the `__pagxCam` clone of its keyframes).
+  if (insideAncestorCamera(el)) {
+    return declined('ancestor-camera');
   }
   // The same element can play several animations; a wrapper would add a second projection on top of
   // any keyframe set that kept its own `perspective()`, so decline instead of mixing the two modes.
@@ -5620,6 +5670,7 @@ const HELPER_FNS = [
   pagxAnimCameras,
   parseMatrix3DValues,
   invert3x3,
+  hasProjectionRow,
   splitProjectiveTransform,
   liftBoxOntoCameraWrapper,
   rewritePerspectiveKeyframes,
@@ -5627,6 +5678,7 @@ const HELPER_FNS = [
   staticCameraFor,
   transformOriginDepth,
   perspectiveOriginXY,
+  insideAncestorCamera,
   withPerspectiveCamera,
   normalizeFontFamily,
   normalizeOverflow,
@@ -6914,6 +6966,7 @@ export {
   transformOriginDepth,
   perspectiveOriginXY,
   perspectiveOriginAtBoxCentre,
+  insideAncestorCamera,
   splitProjectiveTransform,
   liftBoxOntoCameraWrapper,
   rewritePerspectiveKeyframes,
