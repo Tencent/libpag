@@ -204,8 +204,11 @@ std::shared_ptr<DeviceEntry> GetOrCreateEntry(ID3D12Resource* resource) {
   auto device = tgfx::D3D12Device::MakeFrom(nativeDevice);
   nativeDevice->Release();
   if (device == nullptr) {
+    auto& registry = GetRegistry();
+    std::lock_guard<std::mutex> autoLock(registry.locker);
+    auto existing = FindEntryLocked(registry, identity);
     identity->Release();
-    return nullptr;
+    return existing;
   }
   return PublishEntry(identity, std::move(device));
 }
@@ -300,17 +303,17 @@ std::shared_ptr<tgfx::Device> Devices::MakeDefault() {
   if (entry == nullptr) {
     return nullptr;
   }
+  std::shared_ptr<DeviceEntry> selected = nullptr;
   {
     auto& registry = GetRegistry();
     std::lock_guard<std::mutex> autoLock(registry.locker);
-    auto existing = registry.defaultEntry.lock();
-    if (existing == nullptr) {
-      registry.defaultEntry = entry;
-    } else {
-      entry = existing;
+    selected = registry.defaultEntry.lock();
+    if (selected == nullptr) {
+      selected = entry;
+      registry.defaultEntry = selected;
     }
   }
-  return MakeAliasedDevice(entry);
+  return MakeAliasedDevice(selected);
 }
 
 bool Devices::SupportsBackend(tgfx::Backend backend) {

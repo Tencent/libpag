@@ -35,6 +35,8 @@ namespace {
 void RedirectStdioToLogFile(const std::filesystem::path& logPath) {
   FILE* stdoutStream = nullptr;
   _wfreopen_s(&stdoutStream, logPath.c_str(), L"w", stdout);
+  FILE* stderrStream = nullptr;
+  _wfreopen_s(&stderrStream, logPath.c_str(), L"a", stderr);
 }
 }  // namespace
 

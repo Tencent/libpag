@@ -53,9 +53,9 @@ Notes on the `ms-build` commands:
 
 ## Run
 
-The build writes `win\x64\Release\WinPAGDemo.exe`. The demo looks for `assets/test2.pag` and the
-fallback fonts next to the executable first and falls back to the working directory, so it can be
-started from any directory:
+The build writes `win\x64\Release\WinPAGDemo.exe`. The demo resolves `assets/test2.pag` and the fallback
+fonts by walking up from the executable to the repository root first, then falls back to the
+working directory, so it can be started from any directory:
 
 ```powershell
 .\win\x64\Release\WinPAGDemo.exe

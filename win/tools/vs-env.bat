@@ -15,7 +15,7 @@ rem and the ucrt/um import libraries are available even when VS did not register
 set "SDK_ROOT=%PF86%\Windows Kits\10"
 set "SDK_VERSION="
 if defined WindowsSDKVersion set "SDK_VERSION=%WindowsSDKVersion:\=%"
-if not defined SDK_VERSION if exist "%SDK_ROOT%\Include" for /d %%i in ("%SDK_ROOT%\Include\*") do set "SDK_VERSION=%%~nxi"
+if not defined SDK_VERSION if exist "%SDK_ROOT%\Include" for /f "delims=" %%i in ('dir /b /ad /o:n "%SDK_ROOT%\Include" 2^>nul') do set "SDK_VERSION=%%i"
 if defined SDK_VERSION if exist "%SDK_ROOT%\Include\%SDK_VERSION%\um" (
   if defined INCLUDE (
     set "INCLUDE=%INCLUDE%;%SDK_ROOT%\Include\%SDK_VERSION%\ucrt;%SDK_ROOT%\Include\%SDK_VERSION%\shared;%SDK_ROOT%\Include\%SDK_VERSION%\um;%SDK_ROOT%\Include\%SDK_VERSION%\winrt"

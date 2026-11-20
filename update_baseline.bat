@@ -23,6 +23,7 @@ set "WORKSPACE=%CD%"
 set "STATUS=0"
 set "RESTORE_NEEDED=0"
 set "STASH_CREATED=0"
+set "CHECKED_OUT=0"
 set "BACKEND="
 set "SKIP_IMAGES=0"
 set "NO_CHECKOUT=0"
@@ -124,10 +125,12 @@ rem version.json can belong to a broken cache. This mirrors update_baseline.sh's
 if exist "%CACHE_DIR%\version.json" if exist "%CACHE_DIR%\md5.json" (
   git diff --no-index --quiet --ignore-cr-at-eol -- "%TEMP%\pag_main_version.json" "%CACHE_DIR%\version.json" >nul 2>nul
   if not errorlevel 1 (
+    del "%TEMP%\pag_main_version.json" >nul 2>nul
     echo Baseline cache for '%BACKEND_NAME%' is up to date.
     exit /b 0
   )
 )
+del "%TEMP%\pag_main_version.json" >nul 2>nul
 
 set "CURRENT_BRANCH="
 for /f "delims=" %%i in ('git rev-parse --abbrev-ref HEAD') do set "CURRENT_BRANCH=%%i"
@@ -143,12 +146,13 @@ if errorlevel 1 (
 set "STASH_AFTER="
 for /f "delims=" %%i in ('git rev-parse --verify -q refs/stash 2^>nul') do set "STASH_AFTER=%%i"
 if not "%STASH_BEFORE%"=="%STASH_AFTER%" set "STASH_CREATED=1"
+set "RESTORE_NEEDED=1"
 git switch --detach %MAIN_COMMIT% --quiet
 if errorlevel 1 (
   call :Fail "git switch --detach failed."
   goto :cleanup
 )
-set "RESTORE_NEEDED=1"
+set "CHECKED_OUT=1"
 
 :skip_checkout
 where depsync >nul 2>nul
@@ -276,12 +280,14 @@ exit /b 0
 
 :RestoreWorkspace
 cd /d "%WORKSPACE%"
-if /i "%CURRENT_BRANCH%"=="HEAD" (
-  git checkout %CURRENT_COMMIT% --quiet
-) else (
-  git switch "%CURRENT_BRANCH%" --quiet
+if "%CHECKED_OUT%"=="1" (
+  if /i "%CURRENT_BRANCH%"=="HEAD" (
+    git checkout %CURRENT_COMMIT% --quiet
+  ) else (
+    git switch "%CURRENT_BRANCH%" --quiet
+  )
+  if errorlevel 1 exit /b 1
 )
-if errorlevel 1 exit /b 1
 if "%STASH_CREATED%"=="1" (
   git stash pop --index --quiet
   if errorlevel 1 exit /b 1

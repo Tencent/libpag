@@ -1217,8 +1217,9 @@ class PAG_API PAGSurface {
    * device suitable for another thread: an independent share context on OpenGL, or the texture's
    * own device on Metal and D3D12, where access is serialized by the device lock. Semaphore
    * synchronization is only available on backends that implement BackendSemaphore; on D3D12 use
-   * waitUntilCompleted() instead. Otherwise the surface uses the GPU context on the calling
-   * thread directly. Returns null if the texture is invalid.
+   * waitUntilCompleted() instead. Otherwise the surface uses the calling thread's current GL
+   * context on OpenGL, or the texture's own device on Metal and D3D12. Returns null if the
+   * texture is invalid.
    */
   static std::shared_ptr<PAGSurface> MakeFrom(const BackendTexture& texture, ImageOrigin origin,
                                               bool forAsyncThread = false);
@@ -1278,9 +1279,11 @@ class PAG_API PAGSurface {
   bool readPixels(ColorType colorType, AlphaType alphaType, void* dstPixels, size_t dstRowBytes);
 
   /**
-   * Submits pending commands and blocks until this surface's device queue finishes prior work.
-   * Does not advance playback or draw another frame. The method manages the device lock
-   * internally; callers must not already hold the same device's context lock.
+   * Submits pending commands and blocks until the command queue of this surface's device
+   * finishes prior work. On D3D12 all surfaces that share the same native device share that
+   * queue, so the wait is device-wide. On WebGPU no synchronous fence is available and only the
+   * submission is guaranteed. Does not advance playback or draw another frame. The method manages
+   * the device lock internally; callers must not already hold the same device's context lock.
    * @return true after completion and a successful device-health check; false if the device
    *         cannot be locked, has been lost, or completion cannot be established.
    */

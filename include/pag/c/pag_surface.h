@@ -32,8 +32,11 @@ PAG_EXPORT bool pag_surface_read_pixels(pag_surface* surface, pag_color_type col
                                      pag_alpha_type alphaType, void* dstPixels, size_t dstRowBytes);
 
 /**
- * Submits pending commands and blocks until the surface's device queue finishes prior work.
- * Returns true after completion and a successful device-health check.
+ * Submits pending commands and blocks until the command queue of the surface's device finishes
+ * prior work. On D3D12 all surfaces sharing the same native device share that queue. Returns true
+ * after completion and a successful device-health check; returns false if the surface is null,
+ * the device lock cannot be acquired, the device has been lost, or completion cannot be
+ * established. The caller must not already hold the same device's context lock.
  */
 PAG_EXPORT bool pag_surface_wait_until_completed(pag_surface* surface);
 

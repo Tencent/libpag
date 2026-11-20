@@ -74,6 +74,9 @@
     <PagBackend Condition="'$(PagBackend)'==''">OpenGL</PagBackend>
     <PagBackendArguments Condition="'$(PagBackend)'=='D3D12'">-DPAG_USE_D3D12=ON -DPAG_USE_OPENGL=OFF</PagBackendArguments>
     <PagBackendArguments Condition="'$(PagBackend)'=='D3D12WARP'">-DPAG_USE_D3D12=ON -DPAG_D3D12_USE_WARP=ON -DPAG_USE_OPENGL=OFF</PagBackendArguments>
+    <PagSystemLibs>libpag.lib</PagSystemLibs>
+    <PagSystemLibs Condition="'$(PagBackend)'=='D3D12'">libpag.lib;d3d12.lib;dxgi.lib;d3dcompiler.lib;dcomp.lib;d3d11.lib</PagSystemLibs>
+    <PagSystemLibs Condition="'$(PagBackend)'=='D3D12WARP'">libpag.lib;d3d12.lib;dxgi.lib;d3dcompiler.lib;dcomp.lib;d3d11.lib</PagSystemLibs>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <LinkIncremental>true</LinkIncremental>
@@ -103,7 +106,7 @@
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalLibraryDirectories>$(SolutionDir)..\out\release\win\x86</AdditionalLibraryDirectories>
-      <AdditionalDependencies>libpag.lib;d3d12.lib;dxgi.lib;d3dcompiler.lib;dcomp.lib;d3d11.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>$(PagSystemLibs);%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PostBuildEvent Condition="'$(PagBackend)'=='OpenGL'">
       <Command>xcopy /Y "$(SolutionDir)..\third_party\tgfx\vendor\angle\win\x86\*.*" "$(TargetDir)"</Command>
@@ -134,7 +137,7 @@ node .\build_pag -a x86 -DPAG_BUILD_SHARED=OFF $(PagBackendArguments)</Command>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>libpag.lib;d3d12.lib;dxgi.lib;d3dcompiler.lib;dcomp.lib;d3d11.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>$(PagSystemLibs);%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>$(SolutionDir)..\out\release\win\x86</AdditionalLibraryDirectories>
     </Link>
     <ProjectReference>
@@ -165,7 +168,7 @@ node .\build_pag -a x86 -DPAG_BUILD_SHARED=OFF $(PagBackendArguments)</Command>
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>libpag.lib;d3d12.lib;dxgi.lib;d3dcompiler.lib;dcomp.lib;d3d11.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>$(PagSystemLibs);%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>$(SolutionDir)..\out\release\win\x64</AdditionalLibraryDirectories>
     </Link>
     <PreBuildEvent>
@@ -202,7 +205,7 @@ node .\build_pag -a x64 -DPAG_BUILD_SHARED=OFF $(PagBackendArguments)</Command>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalLibraryDirectories>$(SolutionDir)..\out\release\win\x64</AdditionalLibraryDirectories>
-      <AdditionalDependencies>libpag.lib;d3d12.lib;dxgi.lib;d3dcompiler.lib;dcomp.lib;d3d11.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>$(PagSystemLibs);%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <ProjectReference>
       <UseLibraryDependencyInputs>true</UseLibraryDependencyInputs>

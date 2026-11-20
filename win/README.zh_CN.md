@@ -48,7 +48,7 @@ node third_party/vendor_tools/ms-build -a x64 win/Win32Demo.sln /p:Configuration
 
 ## 运行
 
-构建产物是 `win\x64\Release\WinPAGDemo.exe`。示例会先按可执行文件所在位置查找 `assets/test2.pag` 和兜底字体，
+构建产物是 `win\x64\Release\WinPAGDemo.exe`。示例会先从可执行文件向上回溯到仓库根目录查找 `assets/test2.pag` 和兜底字体，
 找不到时再按当前工作目录查找，因此可以从任意目录启动：
 
 ```powershell

@@ -130,8 +130,13 @@ struct MtlTextureInfo {
 /**
  * Non-owning description of an external typed 2D D3D12 texture. The caller must keep the
  * resource valid until every object using it is released and its submitted GPU work completes.
- * The resource must be a single-sample, single-plane 2D texture whose format has an unambiguous
- * view interpretation; typeless, array, multisampled and multi-plane resources are rejected.
+ * The resource must be a single-sample, single-plane 2D texture in
+ * D3D12_RESOURCE_STATE_COMMON with an unambiguous typed format. Typeless, array, multisampled and
+ * multi-plane resources are rejected. Rendering into the texture additionally requires
+ * D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET; sampling requires that
+ * D3D12_RESOURCE_FLAG_DENY_SHADER_RESOURCE is not set. Only R8_UNORM and RGBA8/BGRA8 (UNORM or
+ * SRGB) are accepted; A8_UNORM and R8G8_UNORM are currently rejected. The texture's native device
+ * must match the device of every surface that samples it.
  */
 struct D3D12TextureInfo {
   /**

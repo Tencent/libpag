@@ -753,10 +753,13 @@ elseif (WIN32)
     list(APPEND PAG_DEFINES NOMINMAX _USE_MATH_DEFINES)
 
     if (PAG_USE_D3D12)
-        find_library(D3D12_LIB d3d12 REQUIRED)
-        find_library(DXGI_LIB dxgi REQUIRED)
-        find_library(D3DCOMPILER_LIB d3dcompiler REQUIRED)
-        find_library(DCOMP_LIB dcomp REQUIRED)
+        find_library(D3D12_LIB d3d12)
+        find_library(DXGI_LIB dxgi)
+        find_library(D3DCOMPILER_LIB d3dcompiler)
+        find_library(DCOMP_LIB dcomp)
+        if (NOT D3D12_LIB OR NOT DXGI_LIB OR NOT D3DCOMPILER_LIB OR NOT DCOMP_LIB)
+            message(FATAL_ERROR "PAG_USE_D3D12 requires the d3d12, dxgi, d3dcompiler and dcomp libraries.")
+        endif ()
         list(APPEND PAG_SHARED_LIBS ${D3D12_LIB} ${DXGI_LIB} ${D3DCOMPILER_LIB} ${DCOMP_LIB})
     endif ()
 
@@ -1333,8 +1336,7 @@ if (PAG_BUILD_TESTS)
     list(APPEND PAG_TEST_INCLUDES vendor/ffavc/include)
 
     list(APPEND PAG_TEST_COMPILE_OPTIONS ${PAG_COMPILE_OPTIONS})
-    if (CMAKE_CXX_COMPILER_ID MATCHES "Clang"
-            AND CMAKE_CXX_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC")
+    if (MSVC AND CMAKE_CXX_COMPILER_ID MATCHES "Clang")
         # clang-cl ignores the GNU flag unless it is forwarded to the clang driver.
         list(APPEND PAG_TEST_COMPILE_OPTIONS /clang:-fno-access-control)
         list(APPEND PAG_TEST_DEFINES PAG_TEST_ACCESS_PRIVATE)

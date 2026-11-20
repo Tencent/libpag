@@ -57,8 +57,9 @@ class PAGSurface {
 
   /**
    * Creates a PAGSurface from the specified backend texture. The texture must not be bound to any
-   * framebuffer. The PAGSurface uses the GPU context on the calling thread directly via
-   * GLDevice::Current(). Returns nullptr if the texture is invalid or no GPU context is available.
+   * framebuffer. On OpenGL the PAGSurface uses the calling thread's current GL context; Metal
+   * and D3D12 use the device that owns the texture. Returns nullptr if the texture is invalid or
+   * the device cannot be resolved.
    * @param texture the backend texture to render into.
    * @param origin  the origin of the texture coordinate system.
    */
@@ -66,9 +67,9 @@ class PAGSurface {
                                               pag::ImageOrigin origin);
 
   /**
-   * Creates a PAGSurface from the specified backend render target. The PAGSurface uses the GPU
-   * context on the calling thread directly via GLDevice::Current(). Returns nullptr if the render
-   * target is invalid or no GPU context is available.
+   * Creates a PAGSurface from the specified backend render target. On OpenGL the PAGSurface uses
+   * the calling thread's current GL context; Metal and D3D12 use the device that owns the render
+   * target. Returns nullptr if the render target is invalid or the device cannot be resolved.
    * @param renderTarget the backend render target to render into.
    * @param origin       the origin of the render target coordinate system.
    */
@@ -103,9 +104,10 @@ class PAGSurface {
   bool readPixels(void* dstPixels, size_t dstRowBytes);
 
   /**
-   * Submits pending commands and blocks until the surface's device queue finishes prior work.
-   * Does not draw another frame. The method manages the device lock internally; callers must not
-   * already hold the same GPU device's context lock.
+   * Submits pending commands and blocks until the command queue of the surface's device finishes
+   * prior work. On D3D12 all surfaces sharing the same native device share that queue. On WebGPU
+   * only the submission is guaranteed. Does not draw another frame. The method manages the device
+   * lock internally; callers must not already hold the same GPU device's context lock.
    * @return true after completion and a successful device-health check; false if the device
    *         cannot be locked, has been lost, or completion cannot be established.
    */

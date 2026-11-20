@@ -101,6 +101,26 @@ if "%USE_CLANG_CL%"=="1" (
   set "CMAKE_COMPILER_ARGS=-DCMAKE_C_COMPILER=clang-cl -DCMAKE_CXX_COMPILER=clang-cl -DCMAKE_C_COMPILER_LAUNCHER=python;%WORKSPACE%\win\tools\filter_clang.py -DCMAKE_CXX_COMPILER_LAUNCHER=python;%WORKSPACE%\win\tools\filter_clang.py"
 )
 
+where node >nul 2>nul
+if errorlevel 1 (
+  echo Error: Node.js was not found.
+  exit /b 1
+)
+where depsync >nul 2>nul
+if not errorlevel 1 goto :depsync_ready
+echo Installing depsync...
+call npm install -g depsync
+if errorlevel 1 (
+  echo Error: installing depsync failed.
+  exit /b 1
+)
+:depsync_ready
+call depsync
+if errorlevel 1 (
+  echo Error: depsync failed.
+  exit /b 1
+)
+
 if exist "%BUILD_DIR%" rmdir /s /q "%BUILD_DIR%"
 echo Building PAGFullTest_%TARGET_SUFFIX% for '%BACKEND_NAME%'...
 cmake -G Ninja -S "%WORKSPACE%" -B "%BUILD_DIR%" %CMAKE_BACKEND_ARGS% %CMAKE_COMPILER_ARGS% -DPAG_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Debug
@@ -108,7 +128,7 @@ if errorlevel 1 (
   echo Error: CMake configuration failed.
   exit /b 1
 )
-cmake --build "%BUILD_DIR%" --target PAGFullTest_%TARGET_SUFFIX% --parallel 12
+cmake --build "%BUILD_DIR%" --target PAGFullTest_%TARGET_SUFFIX% --parallel
 if errorlevel 1 (
   echo Error: building PAGFullTest_%TARGET_SUFFIX% failed.
   exit /b 1
@@ -117,7 +137,9 @@ if errorlevel 1 (
 if exist "%RESULT_DIR%" rmdir /s /q "%RESULT_DIR%"
 mkdir "%RESULT_DIR%"
 pushd "%BUILD_DIR%"
-PAGFullTest_%TARGET_SUFFIX%.exe --gtest_output=json:PAGFullTest.json %FILTER_ARG%
+set "TEST_FILTER_ARGS="
+if defined FILTER_ARG set TEST_FILTER_ARGS="%FILTER_ARG%"
+PAGFullTest_%TARGET_SUFFIX%.exe --gtest_output=json:PAGFullTest.json %TEST_FILTER_ARGS%
 set "TEST_RESULT=%errorlevel%"
 copy /y *.json "%RESULT_DIR%\" >nul 2>nul
 popd
