@@ -15,6 +15,8 @@ const {
   useProjectedKeyframes,
   pagxAnimCameraClones,
   pagxAnimProjectedNames,
+  HELPERS_SRC,
+  PAYLOAD_CONSTANTS_SRC,
 } = require('../dist/lib/browser-snapshot');
 
 // `perspective(600px) rotateY(-45deg)`: row 3 = (0, 0, -cos45/600, 1), row 1..2 carry ±sin45.
@@ -198,6 +200,59 @@ describe('perspective-origin default suppression', () => {
     // Without a box there is no centre to compare against, so the authored value is kept.
     expect(perspectiveOriginAtBoxCentre('50% 50%', 0, 0)).toBe(false);
     expect(perspectiveOriginAtBoxCentre('', 200, 100)).toBe(false);
+  });
+
+  // `buildStyle` only runs inside the stringified page payload (its schema constants live in
+  // PAYLOAD_CONSTANTS_SRC), so evaluate exactly the source the payload ships.
+  const payloadScope = new Function(
+    HELPERS_SRC + '\n' + PAYLOAD_CONSTANTS_SRC + '\nreturn { buildStyle };',
+  )();
+  const computedWith = (props) => ({
+    getPropertyValue: (prop) => (prop in props ? props[prop] : ''),
+    transform: 'none',
+    transformOrigin: '',
+    animationName: 'none',
+  });
+
+  test('the centre is judged against the output box, not the measurement', () => {
+    // A measured 100.0625px box is emitted as `width: 100.1px` (px() keeps one decimal), so the
+    // output box's centre is 50.05px; an origin measured at 50.0312px is 0.0188px off it and is a
+    // real vanishing point, not float noise.
+    const offCentre = payloadScope.buildStyle(0, 0, 100.0625, 100, computedWith({
+      perspective: '600px',
+      'perspective-origin': '50.0312px 50px',
+    }), { box: true });
+    expect(offCentre).toContain('width: 100.1px');
+    expect(offCentre).toContain('perspective-origin: 50.0312px 50px');
+
+    // Judged against the measurement instead, the same value would look like the centre (50.03125)
+    // and be dropped, moving the vanishing point.
+    expect(perspectiveOriginAtBoxCentre('50.0312px 50px', 100.0625, 100)).toBe(true);
+
+    // Exactly the output box centre is the CSS initial value and is dropped.
+    const centred = payloadScope.buildStyle(0, 0, 100.0625, 100, computedWith({
+      perspective: '600px',
+      'perspective-origin': '50.05px 50px',
+    }), { box: true });
+    expect(centred).not.toContain('perspective-origin');
+
+    // 0.05px off that centre is still kept.
+    const slightlyOff = payloadScope.buildStyle(0, 0, 100.0625, 100, computedWith({
+      perspective: '600px',
+      'perspective-origin': '50px 50px',
+    }), { box: true });
+    expect(slightlyOff).toContain('perspective-origin: 50px 50px');
+  });
+
+  test('a box whose size the style does not pin is not judged', () => {
+    // A content-sized flex item emits no `width`, so the output box is whatever the importer lays out;
+    // guessing from Chromium's measurement could drop a real camera, so the authored value is kept.
+    const style = payloadScope.buildStyle(0, 0, 100.0625, 100, computedWith({
+      perspective: '600px',
+      'perspective-origin': '50.05px 50px',
+    }), { box: true, flexItem: true, flexContentSized: true });
+    expect(style).not.toContain('width:');
+    expect(style).toContain('perspective-origin: 50.05px 50px');
   });
 });
 

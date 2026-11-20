@@ -622,6 +622,21 @@ function px(n) {
   return `${roundPx(n)}px`;
 }
 
+// Box size the style under construction pins on `axis` (`width` / `height`), read back from the
+// declarations already written: that value is the box the reopened subset will have. Returns null
+// when the axis is not pinned (a content-sized flex item / glyph-sized text leaf), where the output
+// box is unknown and must not be guessed from the measurement.
+function pinnedAxisSize(parts, axis) {
+  const prefix = axis + ': ';
+  for (const part of parts) {
+    if (part.indexOf(prefix) === 0) {
+      const value = parseFloat(part.slice(prefix.length));
+      return isFinite(value) ? value : null;
+    }
+  }
+  return null;
+}
+
 // Format a numeric `flex-grow` for the subset HTML's `flex: <N>` shorthand.
 // Integers stay integer-shaped (`flex: 1`) so the imported PAGX renders the
 // canonical form; non-integers keep up to three decimals to round-trip the
@@ -1210,13 +1225,17 @@ function classify(el, computed) {
 // to what an omitted declaration — the CSS initial `50% 50%` — would produce. Chromium reports the
 // property in px (`100px 50px` for the centre of a 200×100 box), so the schema's string compare
 // against `50% 50%` never fires and every emitted box would carry the declaration. `boxWidth` /
-// `boxHeight` must be the size of the box the subset will have (the measured border box for a
-// rendered div, the canvas for `<body>`), because the emitted px value is read back in that box's
-// local coordinates; a mismatch there would move the vanishing point instead of just dropping noise.
+// `boxHeight` must be the size of the box the subset will have — the `width` / `height` the style
+// writes (the canvas for `<body>`), *not* the measured border box, because the emitted px value is
+// read back against the output box. `px()` rounds the measurement to one decimal, so a measured
+// 100.0625 box is emitted as `100.1px`: judging the centre against the measurement would delete an
+// origin that is 0.0188px off the output box's centre.
 function perspectiveOriginAtBoxCentre(value, boxWidth, boxHeight) {
-  // Only a value that resolves to the centre *exactly* is the CSS initial `50% 50%`. A sub-pixel
-  // offset such as `100.25px` is a real vanishing point: dropping it magnifies the error near the
-  // projection plane, so the comparison keeps 1e-3px of float noise rather than half a pixel.
+  // Only a value that resolves to the centre *exactly* is the CSS initial `50% 50%`, and the
+  // reference box above is already the output box, so `epsilon` only absorbs float noise (the
+  // computed px and the emitted one-decimal size both come from the same layout). A real sub-pixel
+  // offset such as `100.25px` is a vanishing point: dropping it magnifies the error near the
+  // projection plane.
   const epsilon = 1e-3;
   if (!(boxWidth > 0) || !(boxHeight > 0)) return false;
   const tokens = String(value || '').trim().split(/\s+/);
@@ -1587,9 +1606,15 @@ function buildStyle(left, top, width, height, computed, opts) {
   }
 
   if (opts.box) {
-    // The box's own border-box size is what a computed `perspective-origin` resolves against, so the
-    // schema needs it to recognise the centre-pointed (initial) value.
-    const boxCtx = { boxWidth: width, boxHeight: height };
+    // The camera's reference box is the box the subset will have, i.e. the `width` / `height` just
+    // written above, not the measured border box: the emitted px origin is resolved against the
+    // output box. A box whose size this style does not pin (content-sized flex item, glyph-sized text
+    // leaf) has no known output box, so the judgement is skipped and the authored origin is kept
+    // rather than guessed from the measurement.
+    const boxCtx = {
+      boxWidth: pinnedAxisSize(parts, 'width'),
+      boxHeight: pinnedAxisSize(parts, 'height'),
+    };
     for (const entry of STYLE_SCHEMA_BOX) {
       appendStyleProp(parts, computed, entry, boxCtx);
     }
@@ -5623,6 +5648,7 @@ const HELPER_FNS = [
   normalizeWritingMode,
   roundPx,
   px,
+  pinnedAxisSize,
   formatFlexGrow,
   canForwardFlexGrow,
   escapeHtml,
@@ -6891,6 +6917,7 @@ export {
   splitProjectiveTransform,
   liftBoxOntoCameraWrapper,
   rewritePerspectiveKeyframes,
+  buildStyle,
   takeSnapshot,
   SNAPSHOT_INIT_SCRIPT,
   TAKE_SNAPSHOT_EXPR,
