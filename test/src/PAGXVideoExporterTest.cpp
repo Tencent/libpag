@@ -42,18 +42,8 @@
 #include "rendering/gpu/Devices.h"
 #include "tgfx/core/Surface.h"
 #include "utils/DevicePool.h"
+#include "utils/GLHeaders.h"
 #include "utils/TestUtils.h"
-
-#ifdef TGFX_USE_OPENGL
-#if defined(PAG_USE_SWIFTSHADER) || defined(__EMSCRIPTEN__)
-#include <GLES3/gl3.h>
-#else
-#ifndef GL_SILENCE_DEPRECATION
-#define GL_SILENCE_DEPRECATION
-#endif
-#include <OpenGL/gl3.h>
-#endif
-#endif
 
 static_assert(!std::is_copy_constructible_v<pagx::VideoExporter>);
 static_assert(!std::is_copy_assignable_v<pagx::VideoExporter>);

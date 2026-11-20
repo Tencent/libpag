@@ -577,7 +577,7 @@ static void ReadFirstFrame(PAGDecoder* decoder, bool* success) {
 // GLDevice::CurrentNativeHandle() and keeps working after the caller destroys that context.
 // Metal / Vulkan / D3D12 / WebGPU have no thread-local "current context" concept, so the same
 // scenario does not apply; skip the case on non-GL backends.
-#ifdef TGFX_USE_OPENGL
+#if defined(TGFX_USE_OPENGL) && defined(PAG_TEST_ACCESS_PRIVATE)
 PAG_TEST(PAGDiskCacheTest, PAGDecoderContextDestroyed) {
   ScopedDiskCacheDirectory cleanup;
   ASSERT_FALSE(cleanup.directory.empty());
@@ -610,7 +610,7 @@ PAG_TEST(PAGDiskCacheTest, PAGDecoderContextDestroyed) {
   decoder = nullptr;
   pag::PAGDiskCache::RemoveAll();
 }
-#endif  // TGFX_USE_OPENGL
+#endif  // TGFX_USE_OPENGL && PAG_TEST_ACCESS_PRIVATE
 
 #ifdef PAG_TEST_ACCESS_PRIVATE
 PAG_PIXEL_TEST(PAGDiskCacheTest, PAGDecoder_StaticTimeRanges) {
