@@ -2029,12 +2029,8 @@ BundleTimingInfo ComputeBundleTiming(const Animation* anim, int64_t evalOffsetFr
   }
 
   timing.effectiveDuration = anim->duration;
-  if (timing.bundleShiftFrames > 0) {
-    if (maxKeyTime > anim->duration) {
-      timing.effectiveDuration = maxKeyTime - timing.bundleShiftFrames;
-    } else if (anim->duration > timing.bundleShiftFrames) {
-      timing.effectiveDuration = anim->duration - timing.bundleShiftFrames;
-    }
+  if (timing.bundleShiftFrames > 0 && anim->duration > timing.bundleShiftFrames) {
+    timing.effectiveDuration = anim->duration - timing.bundleShiftFrames;
   }
   // A key past the duration is only an interpolation target: the runtime never advances beyond
   // anim->duration, so entering the window at that boundary already yields the interpolated value.
