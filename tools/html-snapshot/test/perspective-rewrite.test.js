@@ -44,6 +44,16 @@ describe('splitProjectiveTransform', () => {
     expect(values[8]).toBeCloseTo(-0.707107, 4);
   });
 
+  test('splits a projection row that carries serialisation residue', () => {
+    // `perspective(500px) rotateY(30deg)` as the browser serialises it: `qx` should be 0, and the
+    // six-decimal matrix leaves ~2.5e-8 behind. An exact-zero gate would refuse every real camera.
+    const measured =
+      'matrix3d(0.866025, 0, -0.5, 0.001, 0, 1, 0, 0, 0.5, 0, 0.866025, -0.001732, 0, 0, 0, 1)';
+    const split = splitProjectiveTransform(measured);
+    expect(split).not.toBeNull();
+    expect(split.distance).toBeCloseTo(500, 1);
+  });
+
   test('leaves a plane transform alone', () => {
     expect(splitProjectiveTransform('matrix(2, 0, 0, 2, 10, 20)')).toBeNull();
     // A flat matrix3d (scale only) carries no projection row either.
@@ -174,10 +184,42 @@ describe('rewritePerspectiveKeyframes', () => {
     expect(rewritePerspectiveKeyframes(css)).toBe(css);
   });
 
+  test('a qx inside the serialisation noise floor counts as zero', () => {
+    // `qx` / `qy` are derived as `row3·L^-1`, and a `matrix3d` reaches us serialised with six
+    // decimals, so a float residue is unavoidable: a real `perspective(600px) rotateY(30deg)` pose
+    // measures ~2.5e-8. Treating that as a vanishing-point shift would decline every real camera,
+    // so anything at or below the noise floor is equivalent to an unshifted projection row.
+    const noisy = 'matrix3d(1, 0, 0, 0.00000001, 0, 1, 0, 0, 0, 0, 1, -0.00166667, 0, 0, 0, 1)';
+    const css =
+      '@keyframes noisyQx { 0% { transform: ' + noisy + '; } 100% { transform: ' + noisy + '; } }';
+    const rewritten = rewritePerspectiveKeyframes(css);
+    const stripped = rewritten.slice(0, rewritten.indexOf('__pagxCam'));
+    expect(stripped).not.toContain('0.00000001');
+    expect(stripped).toContain('@keyframes noisyQx {');
+    expect(stripped).toContain('matrix(1, 0, 0, 1, 0, 0)');
+    // The `__pagxCam` clone keeps the projection for elements whose wrapper is declined, so the
+    // authored residue stays there by design.
+    expect(rewritten.slice(rewritten.indexOf('__pagxCam'))).toContain('0.00000001');
+    expect(globalThis.__pagxAnimCameras['noisyQx']).toBeCloseTo(600, 2);
+  });
+
+  test('a qx above the noise floor keeps the block as authored', () => {
+    // 1e-5 is ten times the floor: that is an authored vanishing-point shift, which `perspective`
+    // cannot reproduce, so the camera has to stay inside the matrix.
+    const shifted = 'matrix3d(1, 0, 0, 0.00001, 0, 1, 0, 0, 0, 0, 1, -0.00166667, 0, 0, 0, 1)';
+    const css =
+      '@keyframes shiftedQx { 0% { transform: ' + shifted + '; } 100% { transform: ' + shifted + '; } }';
+    expect(rewritePerspectiveKeyframes(css)).toBe(css);
+    expect(globalThis.__pagxAnimCameras['shiftedQx']).toBeUndefined();
+    expect(pagxAnimProjectedNames()['shiftedQx']).toBe(true);
+    expect(pagxCameraSkips()['keyframes-not-separable']).toBe(1);
+  });
+
   test('a skewed projection row keeps the block as authored', () => {
     // `qx` is the projection term that shifts the vanishing point inside the projected plane.
     // `perspective` cannot express it, so a split would strip `qx` from the matrix and put only `qz`
-    // back on the wrapper, moving the camera. Only a full, exact decomposition may be rewritten.
+    // back on the wrapper, moving the camera. 1e-3 is far above the noise floor, so this is an
+    // authored shift and the matrix may not be rewritten.
     const skewed = 'matrix3d(1, 0, 0, 0.001, 0, 1, 0, 0, 0, 0, 1, -0.00166667, 0, 0, 0, 1)';
     const css =
       '@keyframes skewedCamera { 0% { transform: ' + skewed + '; } 100% { transform: ' + skewed + '; } }';

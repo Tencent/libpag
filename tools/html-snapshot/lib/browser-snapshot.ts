@@ -1994,9 +1994,10 @@ function hasProjectionRow(transform) {
 }
 
 // Splits `matrix3d` into the projection distance and the affine remainder. Returns null when there is
-// nothing to split or when the pair cannot reproduce the pose exactly: a `perspective` wrapper
-// supplies only a `perspective(d)` camera, so a skewed projection row or a `w`-scaling `m44` has no
-// wrapper form and the authored matrix has to stay on the element.
+// nothing to split or when the pair cannot reproduce the pose: a `perspective` wrapper supplies only
+// a `perspective(d)` camera, so a projection row shifted in `qx`/`qy` (above the serialisation noise
+// floor documented at the gate below) or a `w`-scaling `m44` has no wrapper form and the authored
+// matrix has to stay on the element.
 function splitProjectiveTransform(transform) {
   const values = parseMatrix3DValues(transform);
   if (!values) return null;
@@ -2016,7 +2017,13 @@ function splitProjectiveTransform(transform) {
       row3[0] * inverse[0][column] + row3[1] * inverse[1][column] + row3[2] * inverse[2][column],
   );
   // `qx` / `qy` shift the vanishing point inside the projected plane. `perspective` cannot express
-  // that, so splitting would strip the term and only put `qz` back on the wrapper.
+  // that, so splitting would strip the term and only put `qz` back on the wrapper. The gate is a
+  // noise floor, not an exact-zero test: a `matrix3d` arrives serialised with six decimals and
+  // `row3·L^-1` propagates that rounding into `qx`/`qy`, so a plain `perspective(600px) rotateY(30deg)`
+  // pose already measures ~2.5e-8; requiring exact zeros would decline every real camera. Below 1e-6
+  // the term is indistinguishable from that serialisation error and dropping it moves the projected
+  // scale by `|qx·x| < 1e-3` over a 1000px extent (under a tenth of a percent); above it the shift
+  // is authored, so the matrix stays as written.
   if (Math.abs(projection[0]) > 1e-6 || Math.abs(projection[1]) > 1e-6) return null;
   const distance = projection[2] < -1e-9 ? -1 / projection[2] : 0;
   if (!(distance > 0)) return null;
