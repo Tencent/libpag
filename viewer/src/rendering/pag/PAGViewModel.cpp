@@ -60,6 +60,10 @@ bool PAGViewModel::hasAnimation() const {
   return true;
 }
 
+bool PAGViewModel::isSeekable() const {
+  return pagFile != nullptr;
+}
+
 int PAGViewModel::getEditableTextLayerCount() const {
   return editableTextLayerCount;
 }

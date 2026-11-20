@@ -19,19 +19,29 @@
 #include "ContentView.h"
 #include <QQuickWindow>
 #include <QSGImageNode>
+#include <algorithm>
+#include <cmath>
 #include "RenderThread.h"
 
 namespace pag {
+
+// Delay applied to window resizes before the drawable surface is reallocated.
+static constexpr int ResizeDebounceMs = 400;
 
 ContentView::ContentView(QQuickItem* parent) : QQuickItem(parent) {
   setFlag(ItemHasContents, true);
   resizeTimer = std::make_unique<QTimer>();
   connect(resizeTimer.get(), &QTimer::timeout, this, &ContentView::sizeChangedDelayHandle);
+  contentResizeTimer = std::make_unique<QTimer>();
+  contentResizeTimer->setSingleShot(true);
+  contentResizeTimer->setInterval(ResizeDebounceMs);
+  connect(contentResizeTimer.get(), &QTimer::timeout, this, &ContentView::endContentResize);
   connect(this, &QQuickItem::windowChanged, this, &ContentView::onWindowChanged);
 }
 
 ContentView::~ContentView() {
   resizeTimer->stop();
+  contentResizeTimer->stop();
   releaseDrawable();
 }
 
@@ -69,12 +79,14 @@ void ContentView::prepareForRemoval() {
 
 void ContentView::zoomAt(double factor, double x, double y) {
   auto pixelRatio = window() == nullptr ? 1.0 : window()->devicePixelRatio();
-  getViewModel()->zoomAt(factor, x * pixelRatio, y * pixelRatio);
+  getViewModel()->zoomAt(factor, x * pixelRatio, y * pixelRatio,
+                         QSizeF(std::ceil(width() * pixelRatio), std::ceil(height() * pixelRatio)));
 }
 
 void ContentView::panBy(double deltaX, double deltaY) {
   auto pixelRatio = window() == nullptr ? 1.0 : window()->devicePixelRatio();
-  getViewModel()->panBy(deltaX * pixelRatio, deltaY * pixelRatio);
+  getViewModel()->panBy(deltaX * pixelRatio, deltaY * pixelRatio,
+                        QSizeF(std::ceil(width() * pixelRatio), std::ceil(height() * pixelRatio)));
 }
 
 void ContentView::resetView() {
@@ -93,12 +105,33 @@ void ContentView::sizeChangedDelayHandle() {
   }
 }
 
+void ContentView::beginContentResize() {
+  // A dedicated single-shot timer ends the mode. Reusing resizeTimer would let every geometry
+  // change restart it, so a window drag started within the debounce interval of a content-driven
+  // resize would keep the mode alive for the whole drag and turn the debounced surface reallocation
+  // into a per-frame one. It also covers the case where the item already had the preferred size and
+  // no geometry change follows.
+  contentResizing = true;
+  contentResizeTimer->start();
+}
+
+void ContentView::endContentResize() {
+  contentResizing = false;
+}
+
 void ContentView::geometryChange(const QRectF& newGeometry, const QRectF& oldGeometry) {
   if (newGeometry == oldGeometry) {
     return;
   }
   QQuickItem::geometryChange(newGeometry, oldGeometry);
-  resizeTimer->start(400);
+  if (contentResizing) {
+    // The intermediate geometries produced while the window is fitted to newly loaded content are
+    // not worth debouncing: waiting for the timer keeps the previous texture stretched onto every
+    // one of them, which is visible as a wrong aspect ratio right after a file is opened.
+    sizeChanged = true;
+    triggerFlush();
+  }
+  resizeTimer->start(ResizeDebounceMs);
 }
 
 RenderThread* ContentView::getRenderThread() const {
@@ -107,6 +140,14 @@ RenderThread* ContentView::getRenderThread() const {
 
 bool ContentView::takeSizeChanged() {
   return sizeChanged.exchange(false);
+}
+
+bool ContentView::isRenderActive() const {
+  return renderActive;
+}
+
+void ContentView::setRenderActive(bool active) {
+  renderActive = active;
 }
 
 GPUDrawable* ContentView::getDrawable() const {
@@ -129,10 +170,42 @@ QSGNode* ContentView::updateTextureNode(QSGNode* oldNode) {
       }
       node->setTexture(texture);
       node->markDirty(QSGNode::DirtyMaterial);
-      node->setRect(boundingRect());
+      node->setRect(textureRect(texture));
     }
   }
   return node;
+}
+
+QRectF ContentView::textureRect(QSGTexture* texture) const {
+  auto rect = boundingRect();
+  auto textureSize = texture->textureSize();
+  auto viewModel = getViewModel();
+  if (viewModel == nullptr || textureSize.isEmpty() || rect.isEmpty()) {
+    return rect;
+  }
+  auto contentWidth = static_cast<double>(viewModel->getWidth());
+  auto contentHeight = static_cast<double>(viewModel->getHeight());
+  if (contentWidth <= 0 || contentHeight <= 0) {
+    return rect;
+  }
+  auto textureWidth = static_cast<double>(textureSize.width());
+  auto textureHeight = static_cast<double>(textureSize.height());
+  auto pixelRatio = window() == nullptr ? 1.0 : window()->devicePixelRatio();
+  auto targetWidth = std::ceil(rect.width() * pixelRatio);
+  auto targetHeight = std::ceil(rect.height() * pixelRatio);
+  auto textureFit = std::min(textureWidth / contentWidth, textureHeight / contentHeight);
+  auto canvasFit = std::min(targetWidth / contentWidth, targetHeight / contentHeight);
+  if (textureFit <= 0) {
+    return rect;
+  }
+  // Scale the previous canvas around its center so the same content point remains centered.
+  // Do not infer old frame placement from the current mutable user transform.
+  auto ratio = canvasFit / textureFit;
+  auto width = textureWidth * ratio;
+  auto height = textureHeight * ratio;
+  return {rect.x() + (targetWidth - width) / (2 * pixelRatio),
+          rect.y() + (targetHeight - height) / (2 * pixelRatio), width / pixelRatio,
+          height / pixelRatio};
 }
 
 }  // namespace pag

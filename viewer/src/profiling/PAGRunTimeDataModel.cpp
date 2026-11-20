@@ -135,28 +135,29 @@ void PAGRunTimeDataModel::setPAGXDocument(std::shared_ptr<pagx::PAGXDocument> pa
     auto* firstAnim = pagxDocument->animations[0];
     if (firstAnim != nullptr && firstAnim->nodeType() == pagx::NodeType::Animation) {
       auto* anim = static_cast<pagx::Animation*>(firstAnim);
-      // Derive totalFrame from the microsecond duration using the same two-step rounding as the
-      // render path (PAGTimeline::duration truncates frames→microseconds, then frames are recovered
-      // via round). Using anim->duration directly would diverge by up to one frame at non-integer
-      // frame rates, causing the render-side clamped last frame to be dropped by updateData's guard.
+      // Match PAGAnimation::playbackPeriod by truncating the one-way frame duration to microseconds,
+      // doubling that duration for PingPong, then recovering frames via round. Rounding before
+      // doubling can diverge at non-integer frame rates and cause updateData's guard to drop valid
+      // profiling samples from the return leg.
       if (anim->frameRate > 0.0f && anim->duration > 0) {
         auto durationUs = static_cast<int64_t>(static_cast<double>(anim->duration) * 1000000.0 /
                                                static_cast<double>(anim->frameRate));
+        auto periodUs = anim->loop == pagx::LoopMode::PingPong ? durationUs * 2 : durationUs;
         totalFrame = static_cast<int64_t>(std::round(
-            static_cast<double>(durationUs) * static_cast<double>(anim->frameRate) / 1000000.0));
+            static_cast<double>(periodUs) * static_cast<double>(anim->frameRate) / 1000000.0));
       } else {
         totalFrame = 0;
       }
       if (totalFrame < 1) {
         totalFrame = 1;
       }
+      frameModeEnabled = true;
     } else {
-      // A StateMachine-first document has no single duration/frameRate to derive a frame count
-      // from; fall back to a single frame so frame mode does not run with a stale/invalid value,
-      // matching PAGXViewModel::updateAnimationState()'s no-animation fallback.
+      // A StateMachine-first document has no time base: PAGXRenderer reports no frame for it, so
+      // frame mode must stay off instead of showing a frame axis with a single frame.
       totalFrame = 1;
+      frameModeEnabled = false;
     }
-    frameModeEnabled = true;
   } else {
     totalFrame = pagxDocument ? 1 : 0;
     frameModeEnabled = false;

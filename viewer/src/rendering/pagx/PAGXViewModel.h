@@ -56,6 +56,7 @@ class PAGXViewModel : public ContentViewModel {
   int getWidth() const override;
   int getHeight() const override;
   bool hasAnimation() const override;
+  bool isSeekable() const override;
   bool isPlaying() const override;
   double getProgress() const override;
   QString getTotalFrame() const override;
@@ -179,6 +180,9 @@ class PAGXViewModel : public ContentViewModel {
 
   struct RenderState {
     std::shared_ptr<pagx::PAGScene> scene;
+    // Default playback driver, either an animation or a state machine.
+    std::shared_ptr<pagx::PAGTimeline> timeline;
+    // Non-null only when the default timeline is an animation; state machines have no time base.
     std::shared_ptr<pagx::PAGAnimation> animation;
     pagx::LoopMode loopMode = pagx::LoopMode::Once;
     int contentWidth = 0;
@@ -244,11 +248,19 @@ class PAGXViewModel : public ContentViewModel {
  private:
   void clearContent();
   void clearDocumentXml();
+  // Installs a freshly built document and scene, replacing whatever was loaded before. Callers must
+  // hold renderMutex, which is what makes the new objects visible to the render thread safely.
+  void installDocument(const std::shared_ptr<pagx::PAGXDocument>& document,
+                       const std::shared_ptr<pagx::PAGScene>& newScene);
+  // Emits the content-level change signals shared by loadFile and applyXmlChanges.
+  void notifyDocumentReplaced();
+  // Drops the editor text and the file path of a load that could not produce a document.
+  void failLoad();
   Q_SLOT void appendEditorChunk();
   Q_SLOT void onEditorContentsChange();
   void rebuildEditorGeometry();
   int editorLineCount() const;
-  void resolveDefaultAnimation(const std::shared_ptr<pagx::PAGXDocument>& document);
+  void resolveDefaultTimeline(const std::shared_ptr<pagx::PAGXDocument>& document);
   void updateAnimationState();
 
   // Emits the content-state reset signals shared by loadFile (both success and failure paths) and
@@ -273,6 +285,7 @@ class PAGXViewModel : public ContentViewModel {
   std::mutex renderMutex = {};
   std::shared_ptr<pagx::PAGXDocument> pagxDocument = nullptr;
   std::shared_ptr<pagx::PAGScene> scene = nullptr;
+  std::shared_ptr<pagx::PAGTimeline> defaultTimeline = nullptr;
   std::shared_ptr<pagx::PAGAnimation> defaultAnimation = nullptr;
   pagx::LoopMode defaultLoopMode = pagx::LoopMode::Once;
   int pagxWidth = 0;

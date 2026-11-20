@@ -67,13 +67,14 @@ void PAGXView::initDrawable() {
 }
 
 void PAGXView::onRequestSizeChanged() {
-  resizeTimer->stop();
+  beginContentResize();
   sizeChanged = true;
   viewModel->markNeedsRender();
   triggerFlush();
 }
 
 void PAGXView::onPreferredSizeChanged() {
+  beginContentResize();
   setSize(viewModel->getPreferredSize());
 }
 
@@ -82,7 +83,7 @@ void PAGXView::onSizeChangedDelayHandled() {
 }
 
 void PAGXView::flush() const {
-  if (viewModel->hasContent() && viewModel->isPlaying()) {
+  if (viewModel->hasContent() && viewModel->isPlaying() && isRenderActive()) {
     viewModel->markNeedsRender();
     triggerFlush();
   }
