@@ -981,6 +981,34 @@ enum class TargetChannelRole {
   LetterSpacing,
 };
 
+// True for the channel roles that build the layer / group transform list. A `matrix` channel
+// replaces that whole list, so the pose components are what a matrix competes with.
+bool IsPoseComponentRole(TargetChannelRole role) {
+  switch (role) {
+    case TargetChannelRole::LayerX:
+    case TargetChannelRole::LayerY:
+    case TargetChannelRole::GroupPosX:
+    case TargetChannelRole::GroupPosY:
+    case TargetChannelRole::Rotation:
+    case TargetChannelRole::ScaleX:
+    case TargetChannelRole::ScaleY:
+    case TargetChannelRole::AnchorX:
+    case TargetChannelRole::AnchorY:
+    case TargetChannelRole::Skew:
+    case TargetChannelRole::SkewAxis:
+    case TargetChannelRole::LayerSkewX:
+    case TargetChannelRole::LayerSkewY:
+    case TargetChannelRole::AnchorZ:
+    case TargetChannelRole::LayerRotationX:
+    case TargetChannelRole::LayerRotationY:
+    case TargetChannelRole::LayerZ:
+    case TargetChannelRole::LayerPerspective:
+      return true;
+    default:
+      return false;
+  }
+}
+
 // True for the channel roles that drive a Repeater: they are all fanned out over the copies.
 bool IsRepeaterRole(TargetChannelRole role) {
   switch (role) {
@@ -1868,6 +1896,13 @@ BundleChannelSet CollectBundleChannels(
     if (objTarget == nullptr) {
       continue;
     }
+    // A `matrix` replaces the whole transform, but only inside the animation that writes it: a later
+    // animation posing the same layer overrides that matrix with its own components (composite/24,
+    // where a matrix3D timeline is followed by an independent position timeline).
+    bool poseComponentInObject = false;
+    const bool matrixFromEarlierObject =
+        result.matrixCh != nullptr || result.layerMatrix3DCh != nullptr;
+    bool matrixInObject = false;
     for (auto* ch : obj->channels) {
       if (ch == nullptr) {
         continue;
@@ -1893,6 +1928,11 @@ BundleChannelSet CollectBundleChannels(
           }
         }
         auto role = LookupChannelRole(objTarget->nodeType(), ch->name);
+        if (role == TargetChannelRole::LayerMatrix || role == TargetChannelRole::LayerMatrix3D) {
+          matrixInObject = true;
+        } else if (IsPoseComponentRole(role)) {
+          poseComponentInObject = true;
+        }
         if (role == TargetChannelRole::PolystarPointCount) {
           // The point count decides how many vertices the outline has, which CSS cannot interpolate;
           // the crossing stops and the floored `d` already express its jump. Letting its `hold` keys
@@ -1927,6 +1967,13 @@ BundleChannelSet CollectBundleChannels(
               result.holdEndsByStart);
         }
       }
+    }
+    if (poseComponentInObject && matrixFromEarlierObject && !matrixInObject) {
+      // This animation poses the layer with its own components, so the matrix an earlier animation
+      // wrote no longer describes the layer. Dropping it here is what makes the priority local to
+      // each animation instead of spanning the whole bundle.
+      result.matrixCh = nullptr;
+      result.layerMatrix3DCh = nullptr;
     }
   }
   for (const auto& entry : result.opacityGroupEasings) {
@@ -5038,10 +5085,16 @@ std::string HTMLAnimationSession::emitKeyframesAndWeave(std::string& bodyHtml) {
     bool playing = true;
     std::vector<AnimationObject*> objects = {};
     std::unordered_set<const AnimationObject*> seen = {};
+    // Index of the last authored mount that joined this group. Rules have to be emitted in this
+    // order: a group created early can still own the later writer, and CSS applies the claim of the
+    // last `animation` in the list (composite/23 interleaves 60/120/60 frame mounts).
+    size_t lastMountIndex = 0;
   };
   std::vector<MountGroup> groups = {};
   std::map<std::tuple<int64_t, float, int, size_t, int64_t, bool>, size_t> groupIndex = {};
+  size_t mountIndex = 0;
   for (const auto& mount : mounts) {
+    size_t thisMountIndex = mountIndex++;
     const auto* anim = mount.animation;
     if (anim->duration <= 0 || anim->frameRate <= 0.0f || anim->objects.empty()) {
       continue;
@@ -5060,12 +5113,16 @@ std::string HTMLAnimationSession::emitKeyframesAndWeave(std::string& bodyHtml) {
       groups.push_back(std::move(group));
     }
     auto& group = groups[it->second];
+    group.lastMountIndex = thisMountIndex;
     for (auto* obj : anim->objects) {
       if (obj != nullptr && group.seen.insert(obj).second) {
         group.objects.push_back(obj);
       }
     }
   }
+  std::stable_sort(groups.begin(), groups.end(), [](const MountGroup& a, const MountGroup& b) {
+    return a.lastMountIndex < b.lastMountIndex;
+  });
 
   for (const auto& mount : groups) {
     const auto* anim = mount.animation;
