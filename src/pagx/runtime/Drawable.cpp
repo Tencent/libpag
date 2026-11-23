@@ -18,6 +18,7 @@
 
 #include "Drawable.h"
 #include "base/utils/Log.h"
+#include "rendering/gpu/Devices.h"
 #include "tgfx/gpu/Context.h"
 
 namespace pagx {
@@ -32,6 +33,7 @@ std::shared_ptr<Drawable> Drawable::MakeFrom(std::shared_ptr<tgfx::Device> devic
     LOGE("pagx::Drawable::MakeFrom() requires a surface created on the supplied device.");
     return nullptr;
   }
+  pag::Devices::TrackContextDevice(device);
   return std::shared_ptr<Drawable>(new Drawable(std::move(device), std::move(surface)));
 }
 

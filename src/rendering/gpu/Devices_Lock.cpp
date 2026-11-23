@@ -39,6 +39,7 @@ DeviceLockScope::DeviceLockScope(std::shared_ptr<tgfx::Device> device)
 #if DEBUG && !defined(NO_LOG)
     DEBUG_ASSERT(HeldDeviceScopes().count(_device.get()) == 0);
 #endif
+    Devices::TrackContextDevice(_device);
     _context = _device->lockContext();
 #if DEBUG && !defined(NO_LOG)
     if (_context != nullptr) {

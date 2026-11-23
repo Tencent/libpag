@@ -461,6 +461,15 @@ jobs:
           cmake -G Ninja -B build-win-gl -DPAG_BUILD_TESTS=ON -DPAG_USE_OPENGL=ON -DCMAKE_BUILD_TYPE=Debug
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           cmake --build build-win-gl --target PAGFullTest_OpenGL --parallel
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+        shell: pwsh
+
+      # Smoke tests only: screenshot baselines and non-default hardware devices are not required.
+      - name: Run OpenGL smoke tests
+        working-directory: build-win-gl
+        run: |
+          & .\PAGFullTest_OpenGL.exe "--gtest_filter=DeviceLockScopeTest.*:BackendSemaphoreTest.*:TGFXCastTest.*"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
         shell: pwsh
 
       - name: Build D3D12 WARP tests
@@ -468,19 +477,46 @@ jobs:
           cmake -G Ninja -B build-win-d3d12 -DPAG_BUILD_TESTS=ON -DPAG_USE_D3D12=ON -DPAG_D3D12_USE_WARP=ON -DPAG_USE_OPENGL=OFF -DCMAKE_BUILD_TYPE=Debug
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           cmake --build build-win-d3d12 --target PAGFullTest_D3D12 --parallel
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+        shell: pwsh
+
+      - name: Run D3D12 WARP smoke tests
+        working-directory: build-win-d3d12
+        run: |
+          $filter = "DeviceLockScopeTest.*:BackendSemaphoreTest.*:TGFXCastTest.*"
+          $filter += ":D3D12Test.BackendTextureRoundTrip:D3D12Test.SameNativeDeviceReturnsSameDevice:D3D12Test.HealthyDeviceReportsHealthy"
+          $filter += ":D3D12Test.ResourceUsageValidation:D3D12Test.TypelessResourceRejected:D3D12Test.SurfaceFromTextureAndCompletion:D3D12Test.OffscreenCompletion"
+          $filter += ":D3D12Test.ExternalRenderTargetOriginReadback:D3D12Test.IndependentQueueCompletion:D3D12Test.ContextIdentityCacheDoesNotRetainDevice:D3D12Test.ContextIdentityCacheReusesProbe"
+          & .\PAGFullTest_D3D12.exe "--gtest_filter=$filter"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
         shell: pwsh
 
       - name: Build clang-cl tests
         run: |
           $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
           $clang = & $vswhere -latest -find "VC\Tools\Llvm\x64\bin\clang-cl.exe"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           if (-not $clang) { $clang = "C:\Program Files\LLVM\bin\clang-cl.exe" }
           if (-not (Test-Path $clang)) { throw "clang-cl was not found" }
           $env:PATH = (Split-Path $clang) + ";" + $env:PATH
           where.exe clang-cl
-          cmake -G Ninja -B build-win-clang -DPAG_BUILD_TESTS=ON -DPAG_USE_D3D12=ON -DPAG_D3D12_USE_WARP=ON -DPAG_USE_OPENGL=OFF -DCMAKE_C_COMPILER=clang-cl -DCMAKE_CXX_COMPILER=clang-cl "-DCMAKE_C_COMPILER_LAUNCHER=python;win/tools/filter_clang.py" "-DCMAKE_CXX_COMPILER_LAUNCHER=python;win/tools/filter_clang.py" -DCMAKE_BUILD_TYPE=Debug
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $filterClang = (Resolve-Path -LiteralPath "$env:GITHUB_WORKSPACE\win\tools\filter_clang.py").Path.Replace('\', '/')
+          cmake -G Ninja -B build-win-clang -DPAG_BUILD_TESTS=ON -DPAG_USE_D3D12=ON -DPAG_D3D12_USE_WARP=ON -DPAG_USE_OPENGL=OFF -DCMAKE_C_COMPILER=clang-cl -DCMAKE_CXX_COMPILER=clang-cl "-DCMAKE_C_COMPILER_LAUNCHER=python;$filterClang" "-DCMAKE_CXX_COMPILER_LAUNCHER=python;$filterClang" -DCMAKE_BUILD_TYPE=Debug
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           cmake --build build-win-clang --target PAGFullTest_D3D12 --parallel
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+        shell: pwsh
+
+      - name: Run clang-cl D3D12 WARP smoke tests
+        working-directory: build-win-clang
+        run: |
+          $filter = "DeviceLockScopeTest.*:BackendSemaphoreTest.*:TGFXCastTest.*"
+          $filter += ":D3D12Test.BackendTextureRoundTrip:D3D12Test.SameNativeDeviceReturnsSameDevice:D3D12Test.HealthyDeviceReportsHealthy"
+          $filter += ":D3D12Test.ResourceUsageValidation:D3D12Test.TypelessResourceRejected:D3D12Test.SurfaceFromTextureAndCompletion:D3D12Test.OffscreenCompletion"
+          $filter += ":D3D12Test.ExternalRenderTargetOriginReadback:D3D12Test.IndependentQueueCompletion:D3D12Test.ContextIdentityCacheDoesNotRetainDevice:D3D12Test.ContextIdentityCacheReusesProbe"
+          & .\PAGFullTest_D3D12.exe "--gtest_filter=$filter"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
         shell: pwsh
 
   win:

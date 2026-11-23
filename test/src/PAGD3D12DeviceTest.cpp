@@ -31,6 +31,7 @@
 #include "tgfx/gpu/Context.h"
 #include "tgfx/gpu/GPU.h"
 #include "tgfx/gpu/Texture.h"
+#include "tgfx/gpu/d3d12/D3D12Device.h"
 #include "utils/D3D12TestUtils.h"
 
 namespace pag {
@@ -148,6 +149,41 @@ PAG_TEST(D3D12Test, HealthyDeviceReportsHealthy) {
   EXPECT_TRUE(Devices::IsDeviceHealthy(scope.context()));
 }
 
+/**
+ * An identity cached for an external device must not keep that device alive after its owner exits.
+ */
+PAG_TEST(D3D12Test, ContextIdentityCacheDoesNotRetainDevice) {
+  auto cacheCountBefore = Devices::GetContextIdentityCacheCountForTesting();
+  auto device = tgfx::D3D12Device::MakeWarp();
+  ASSERT_TRUE(device != nullptr);
+  std::weak_ptr<tgfx::Device> weakDevice = device;
+  {
+    DeviceLockScope scope(device);
+    ASSERT_TRUE(static_cast<bool>(scope));
+    ASSERT_TRUE(Devices::IsDeviceHealthy(scope.context()));
+    EXPECT_EQ(Devices::GetContextIdentityCacheCountForTesting(), cacheCountBefore + 1);
+  }
+  device.reset();
+  EXPECT_TRUE(weakDevice.expired());
+  EXPECT_EQ(Devices::GetContextIdentityCacheCountForTesting(), cacheCountBefore);
+}
+
+/**
+ * Repeated checks and lock scopes on a live external device must reuse its one-time identity probe.
+ */
+PAG_TEST(D3D12Test, ContextIdentityCacheReusesProbe) {
+  auto device = tgfx::D3D12Device::MakeWarp();
+  ASSERT_TRUE(device != nullptr);
+  auto captureCountBefore = Devices::GetIdentityCaptureCountForTesting();
+  for (int index = 0; index < 3; index++) {
+    DeviceLockScope scope(device);
+    ASSERT_TRUE(static_cast<bool>(scope));
+    EXPECT_TRUE(Devices::IsDeviceHealthy(scope.context()));
+    EXPECT_TRUE(Devices::IsDeviceHealthy(scope.context()));
+    EXPECT_EQ(Devices::GetIdentityCaptureCountForTesting(), captureCountBefore + 1);
+  }
+}
+
 PAG_TEST(D3D12Test, ResourceUsageValidation) {
   DeviceLockScope scope;
   ASSERT_TRUE(static_cast<bool>(scope));
@@ -235,6 +271,7 @@ PAG_TEST(D3D12Test, DeviceRegistryIsThreadSafe) {
   }
   constexpr int ThreadCount = 8;
   auto deviceCountBefore = Devices::GetRegisteredDeviceCount();
+  auto creationCountBefore = Devices::GetDeviceCreationCountForTesting();
   std::vector<std::shared_ptr<tgfx::Device>> results(ThreadCount);
   std::vector<std::thread> threads = {};
   for (int i = 0; i < ThreadCount; i++) {
@@ -251,6 +288,7 @@ PAG_TEST(D3D12Test, DeviceRegistryIsThreadSafe) {
   }
   EXPECT_EQ(Devices::MakeForTexture(secondary.texture).get(), canonical.get());
   EXPECT_EQ(Devices::GetRegisteredDeviceCount(), deviceCountBefore + 1);
+  EXPECT_EQ(Devices::GetDeviceCreationCountForTesting(), creationCountBefore + 1);
   EXPECT_NE(canonical.get(), Devices::MakeDefault().get());
 }
 

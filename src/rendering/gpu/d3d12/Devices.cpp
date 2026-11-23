@@ -163,6 +163,36 @@ size_t Devices::GetRegisteredDeviceCount() {
   return CountRegisteredDevices();
 }
 
+void Devices::TrackContextDevice(const std::shared_ptr<tgfx::Device>& device) {
+  if (device == nullptr) {
+    return;
+  }
+  auto& registry = GetRegistry();
+  std::lock_guard<std::mutex> autoLock(registry.locker);
+  PurgeContextIdentitiesLocked(registry);
+  auto& record = registry.contextIdentities[device->uniqueID()];
+  record.owner = device;
+}
+
+size_t Devices::GetContextIdentityCacheCountForTesting() {
+  auto& registry = GetRegistry();
+  std::lock_guard<std::mutex> autoLock(registry.locker);
+  PurgeContextIdentitiesLocked(registry);
+  return registry.contextIdentities.size();
+}
+
+size_t Devices::GetIdentityCaptureCountForTesting() {
+  auto& registry = GetRegistry();
+  std::lock_guard<std::mutex> autoLock(registry.locker);
+  return registry.identityCaptureCount;
+}
+
+size_t Devices::GetDeviceCreationCountForTesting() {
+  auto& registry = GetRegistry();
+  std::lock_guard<std::mutex> autoLock(registry.locker);
+  return registry.deviceCreationCount;
+}
+
 bool Devices::SupportsBackend(tgfx::Backend backend) {
   return backend == tgfx::Backend::D3D12;
 }

@@ -20,6 +20,8 @@ rem cache; it never commits anything.
 
 cd /d "%~dp0"
 set "WORKSPACE=%CD%"
+set "RECOVERY_FILE=%WORKSPACE%\build-update-baseline-recovery.txt"
+set "RECOVERY_OWNED=0"
 set "STATUS=0"
 set "RESTORE_NEEDED=0"
 set "STASH_CREATED=0"
@@ -61,6 +63,11 @@ exit /b 1
 
 :args_done
 if not defined BACKEND set "BACKEND=USE_OPENGL"
+if exist "%RECOVERY_FILE%" (
+  echo Error: recovery details already exist at "!RECOVERY_FILE!". 1>&2
+  echo Restore and verify the previous workspace before removing that file and running again. 1>&2
+  exit /b 1
+)
 
 call "win\tools\backend-args.bat" "%BACKEND%"
 if not "%PAG_BACKEND_SUPPORTED%"=="1" exit /b 1
@@ -136,6 +143,14 @@ set "CURRENT_BRANCH="
 for /f "delims=" %%i in ('git rev-parse --abbrev-ref HEAD') do set "CURRENT_BRANCH=%%i"
 set "CURRENT_COMMIT="
 for /f "delims=" %%i in ('git rev-parse HEAD') do set "CURRENT_COMMIT=%%i"
+if not defined CURRENT_BRANCH (
+  call :Fail "Cannot identify the original branch."
+  goto :cleanup
+)
+if not defined CURRENT_COMMIT (
+  call :Fail "Cannot identify the original commit."
+  goto :cleanup
+)
 set "STASH_BEFORE="
 for /f "delims=" %%i in ('git rev-parse --verify -q refs/stash 2^>nul') do set "STASH_BEFORE=%%i"
 git stash push --include-untracked --quiet
@@ -145,18 +160,18 @@ if errorlevel 1 (
 )
 set "STASH_AFTER="
 for /f "delims=" %%i in ('git rev-parse --verify -q refs/stash 2^>nul') do set "STASH_AFTER=%%i"
-if not "%STASH_BEFORE%"=="%STASH_AFTER%" set "STASH_CREATED=1"
+if defined STASH_AFTER if not "%STASH_BEFORE%"=="%STASH_AFTER%" set "STASH_CREATED=1"
 set "RESTORE_NEEDED=1"
-set "RECOVERY_FILE=%WORKSPACE%\build-update-baseline-recovery.txt"
-set "RECOVERY_SWITCH=git switch "%CURRENT_BRANCH%""
-if /i "%CURRENT_BRANCH%"=="HEAD" set "RECOVERY_SWITCH=git checkout %CURRENT_COMMIT%"
-> "%RECOVERY_FILE%" echo update_baseline.bat was interrupted before the workspace was restored.
->> "%RECOVERY_FILE%" echo Original branch: %CURRENT_BRANCH%
->> "%RECOVERY_FILE%" echo Original commit: %CURRENT_COMMIT%
->> "%RECOVERY_FILE%" echo Your changes are in the top stash entry.
->> "%RECOVERY_FILE%" echo Recover with:
->> "%RECOVERY_FILE%" echo   %RECOVERY_SWITCH%
->> "%RECOVERY_FILE%" echo   git stash pop --index
+set "RECOVERY_SWITCH=git switch "!CURRENT_BRANCH!""
+if /i "%CURRENT_BRANCH%"=="HEAD" set "RECOVERY_SWITCH=git switch --detach "!CURRENT_COMMIT!""
+call :WriteRecoveryDetails
+if errorlevel 1 (
+  call :Fail "Cannot write complete recovery details. Stopping before switching branches and attempting to restore the original workspace."
+  echo Original branch: !CURRENT_BRANCH! 1>&2
+  echo Original commit: !CURRENT_COMMIT! 1>&2
+  if "!STASH_CREATED!"=="1" echo Stash created by this run: !STASH_AFTER! 1>&2
+  goto :cleanup
+)
 echo Recovery details written to "%RECOVERY_FILE%".
 git switch --detach %MAIN_COMMIT% --quiet
 if errorlevel 1 (
@@ -276,12 +291,81 @@ echo   --no-checkout          Build the current working tree instead of origin/m
 echo   --no-fetch             Skip git fetch and use the locally known origin/main.
 echo.
 echo By default the script stashes local changes and checks out origin/main, then restores the
-echo original branch and stash. Run one backend at a time; test\out and version.json are shared.
+echo original branch and changes. Any stash created by this run is applied by exact OID and retained.
+echo Existing recovery details block a new run. Interruptions require manual recovery using that file.
+echo Run one backend at a time; test\out and version.json are shared.
 exit /b 0
 
 :Fail
 echo Error: %~1 1>&2
 set "STATUS=1"
+exit /b 0
+
+:WriteRecoveryDetails
+if exist "%RECOVERY_FILE%" (
+  echo Error: recovery details appeared at "!RECOVERY_FILE!". Keeping that file unchanged. 1>&2
+  exit /b 1
+)
+set "RECOVERY_OWNED=1"
+set "RECOVERY_LINE=Workspace recovery details for update_baseline.bat."
+call :ClearErrorLevel
+> "%RECOVERY_FILE%" echo(!RECOVERY_LINE!
+call :VerifyRecoveryLine
+if errorlevel 1 exit /b 1
+set "RECOVERY_LINE=Original branch: !CURRENT_BRANCH!"
+call :WriteRecoveryLine
+if errorlevel 1 exit /b 1
+set "RECOVERY_LINE=Original commit: !CURRENT_COMMIT!"
+call :WriteRecoveryLine
+if errorlevel 1 exit /b 1
+set "RECOVERY_LINE=Stash created: !STASH_CREATED!"
+call :WriteRecoveryLine
+if errorlevel 1 exit /b 1
+if "%STASH_CREATED%"=="1" (
+  set "RECOVERY_LINE=Stash created by this run: !STASH_AFTER!"
+  call :WriteRecoveryLine
+  if errorlevel 1 exit /b 1
+)
+set "RECOVERY_LINE=Recover with:"
+call :WriteRecoveryLine
+if errorlevel 1 exit /b 1
+set "RECOVERY_LINE=  !RECOVERY_SWITCH!"
+call :WriteRecoveryLine
+if errorlevel 1 exit /b 1
+set "RECOVERY_LINE=Verify HEAD matches the original branch and commit after switching."
+call :WriteRecoveryLine
+if errorlevel 1 exit /b 1
+if not "%STASH_CREATED%"=="1" (
+  set "RECOVERY_LINE=No stash was created by this run. Existing stash entries must be left unchanged."
+  call :WriteRecoveryLine
+  exit /b !ERRORLEVEL!
+)
+set "RECOVERY_LINE=Verify these changes have not already been restored before applying the stash."
+call :WriteRecoveryLine
+if errorlevel 1 exit /b 1
+set "RECOVERY_LINE=  git stash apply --index "!STASH_AFTER!""
+call :WriteRecoveryLine
+if errorlevel 1 exit /b 1
+set "RECOVERY_LINE=The applied stash is retained. Remove it manually only after verifying its exact identity and the restored workspace."
+call :WriteRecoveryLine
+exit /b %ERRORLEVEL%
+
+:WriteRecoveryLine
+if not exist "%RECOVERY_FILE%" exit /b 1
+call :ClearErrorLevel
+>> "%RECOVERY_FILE%" echo(!RECOVERY_LINE!
+call :VerifyRecoveryLine
+exit /b %ERRORLEVEL%
+
+:VerifyRecoveryLine
+rem Redirection failures do not reliably change ERRORLEVEL for echo. Verify the complete last line.
+if not exist "%RECOVERY_FILE%" exit /b 1
+set "WRITTEN_RECOVERY_LINE="
+for /f "usebackq delims=" %%L in ("%RECOVERY_FILE%") do set "WRITTEN_RECOVERY_LINE=%%L"
+if not "!WRITTEN_RECOVERY_LINE!"=="!RECOVERY_LINE!" exit /b 1
+exit /b 0
+
+:ClearErrorLevel
 exit /b 0
 
 :RestoreWorkspace
@@ -303,11 +387,22 @@ for /f "delims=" %%i in ('git rev-parse HEAD 2^>nul') do set "RESTORED_COMMIT=%%
 if not "%RESTORED_BRANCH%"=="%CURRENT_BRANCH%" exit /b 1
 if not "%RESTORED_COMMIT%"=="%CURRENT_COMMIT%" exit /b 1
 if "%STASH_CREATED%"=="1" (
-  git stash pop --index --quiet
+  git stash apply --index --quiet "!STASH_AFTER!"
   if errorlevel 1 exit /b 1
   set "STASH_CREATED=0"
+  rem Checking refs/stash before dropping it is not atomic across terminals. Keep the exact entry.
+  echo Warning: restored changes from stash !STASH_AFTER!; that stash was retained. 1>&2
+  echo Remove it manually only after verifying its exact identity and the restored workspace. 1>&2
 )
-del "%WORKSPACE%\build-update-baseline-recovery.txt" >nul 2>nul
+if "%RECOVERY_OWNED%"=="1" (
+  del "!RECOVERY_FILE!" >nul 2>nul
+  if exist "!RECOVERY_FILE!" (
+    echo Error: workspace restored but recovery details could not be removed at "!RECOVERY_FILE!". 1>&2
+    echo Verify the restored workspace before removing that file. Do not apply the stash again. 1>&2
+    exit /b 1
+  )
+  set "RECOVERY_OWNED=0"
+)
 exit /b 0
 
 :RequireFile
@@ -331,6 +426,5 @@ if "!RESTORE_NEEDED!"=="1" (
 )
 if "!STATUS!"=="0" (
   if exist "%BUILD_DIR%" rmdir /s /q "%BUILD_DIR%"
-  del "%WORKSPACE%\build-update-baseline-recovery.txt" >nul 2>nul
 )
 exit /b !STATUS!

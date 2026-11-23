@@ -34,18 +34,34 @@ struct DeviceEntry {
   }
 };
 
+/**
+ * Borrows the native identity only while the tracked tgfx device is alive. The cache must not
+ * retain either device: an expired owner invalidates the borrowed pointer without dereferencing it.
+ */
+struct ContextIdentity {
+  std::weak_ptr<tgfx::Device> owner = {};
+  IUnknown* identity = nullptr;
+};
+
 struct Registry {
   std::mutex locker = {};
   std::vector<std::weak_ptr<DeviceEntry>> entries = {};
   std::weak_ptr<DeviceEntry> defaultEntry = {};
-  std::unordered_map<uint32_t, IUnknown*> contextIdentities = {};
+  std::unordered_map<uint32_t, ContextIdentity> contextIdentities = {};
+  size_t identityCaptureCount = 0;
+  size_t deviceCreationCount = 0;
+};
 
-  ~Registry() {
-    for (auto& item : contextIdentities) {
-      item.second->Release();
+void PurgeContextIdentitiesLocked(Registry& registry) {
+  for (auto iterator = registry.contextIdentities.begin();
+       iterator != registry.contextIdentities.end();) {
+    if (iterator->second.owner.expired()) {
+      iterator = registry.contextIdentities.erase(iterator);
+    } else {
+      ++iterator;
     }
   }
-};
+}
 
 std::mutex& GetCreationLocker() {
   static std::mutex locker = {};
@@ -149,49 +165,6 @@ IUnknown* CaptureIdentityFromResource(ID3D12Resource* resource) {
   return identity;
 }
 
-IUnknown* CaptureIdentityFromContext(tgfx::Context* context) {
-  if (context == nullptr || context->device() == nullptr) {
-    return nullptr;
-  }
-  auto deviceID = context->device()->uniqueID();
-  {
-    auto& registry = GetRegistry();
-    std::lock_guard<std::mutex> autoLock(registry.locker);
-    auto iterator = registry.contextIdentities.find(deviceID);
-    if (iterator != registry.contextIdentities.end()) {
-      iterator->second->AddRef();
-      return iterator->second;
-    }
-  }
-  IUnknown* identity = nullptr;
-  {
-    tgfx::TextureDescriptor descriptor(1, 1, tgfx::PixelFormat::RGBA_8888, false, 1,
-                                       tgfx::TextureUsage::TEXTURE_BINDING);
-    auto texture = context->gpu()->createTexture(descriptor);
-    if (texture != nullptr) {
-      auto backendTexture = texture->getBackendTexture();
-      tgfx::D3D12TextureInfo info = {};
-      if (backendTexture.getD3D12TextureInfo(&info)) {
-        identity = CaptureIdentityFromResource(GetResource(info));
-      }
-    }
-  }
-  if (identity != nullptr) {
-    auto& registry = GetRegistry();
-    std::lock_guard<std::mutex> autoLock(registry.locker);
-    auto iterator = registry.contextIdentities.find(deviceID);
-    if (iterator != registry.contextIdentities.end()) {
-      identity->Release();
-      identity = iterator->second;
-      identity->AddRef();
-    } else {
-      registry.contextIdentities[deviceID] = identity;
-      identity->AddRef();
-    }
-  }
-  return identity;
-}
-
 std::shared_ptr<DeviceEntry> RegisterContextDevice(tgfx::Context* context) {
   if (context == nullptr) {
     return nullptr;
@@ -209,10 +182,70 @@ std::shared_ptr<DeviceEntry> RegisterContextDevice(tgfx::Context* context) {
   return nullptr;
 }
 
+IUnknown* CaptureIdentityFromContext(tgfx::Context* context) {
+  if (context == nullptr || context->device() == nullptr) {
+    return nullptr;
+  }
+  auto entry = RegisterContextDevice(context);
+  if (entry != nullptr) {
+    entry->identity->AddRef();
+    return entry->identity;
+  }
+  auto deviceID = context->device()->uniqueID();
+  std::shared_ptr<tgfx::Device> owner = nullptr;
+  IUnknown* identity = nullptr;
+  {
+    auto& registry = GetRegistry();
+    std::lock_guard<std::mutex> autoLock(registry.locker);
+    PurgeContextIdentitiesLocked(registry);
+    auto iterator = registry.contextIdentities.find(deviceID);
+    if (iterator != registry.contextIdentities.end()) {
+      owner = iterator->second.owner.lock();
+      if (owner.get() == context->device() && iterator->second.identity != nullptr) {
+        identity = iterator->second.identity;
+        identity->AddRef();
+      }
+    }
+    if (identity == nullptr) {
+      registry.identityCaptureCount++;
+    }
+  }
+  if (identity != nullptr) {
+    return identity;
+  }
+  {
+    tgfx::TextureDescriptor descriptor(1, 1, tgfx::PixelFormat::RGBA_8888, false, 1,
+                                       tgfx::TextureUsage::TEXTURE_BINDING);
+    auto texture = context->gpu()->createTexture(descriptor);
+    if (texture != nullptr) {
+      auto backendTexture = texture->getBackendTexture();
+      tgfx::D3D12TextureInfo info = {};
+      if (backendTexture.getD3D12TextureInfo(&info)) {
+        identity = CaptureIdentityFromResource(GetResource(info));
+      }
+    }
+  }
+  if (identity != nullptr && owner.get() == context->device()) {
+    auto& registry = GetRegistry();
+    std::lock_guard<std::mutex> autoLock(registry.locker);
+    auto iterator = registry.contextIdentities.find(deviceID);
+    if (iterator != registry.contextIdentities.end()) {
+      iterator->second.identity = identity;
+    }
+  }
+  return identity;
+}
+
 std::shared_ptr<DeviceEntry> RegisterNewDevice(std::shared_ptr<tgfx::D3D12Device> device) {
   if (device == nullptr) {
     return nullptr;
   }
+  {
+    auto& registry = GetRegistry();
+    std::lock_guard<std::mutex> autoLock(registry.locker);
+    registry.deviceCreationCount++;
+  }
+  Devices::TrackContextDevice(device);
   auto context = device->lockContext();
   if (context == nullptr) {
     LOGE("Devices::MakeDefault() Failed to lock the new D3D12 device.");
@@ -276,6 +309,11 @@ std::shared_ptr<DeviceEntry> GetOrCreateEntry(ID3D12Resource* resource) {
     auto existing = FindEntryLocked(registry, identity);
     identity->Release();
     return existing;
+  }
+  {
+    auto& registry = GetRegistry();
+    std::lock_guard<std::mutex> autoLock(registry.locker);
+    registry.deviceCreationCount++;
   }
   return PublishEntry(identity, std::move(device));
 }

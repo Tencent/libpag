@@ -262,6 +262,29 @@ class Devices {
   static bool WaitForQueue(tgfx::Context* context);
 
   /**
+   * Tracks shared ownership for the D3D12 context identity cache without retaining the device.
+   * Other backends do not need a context identity cache and leave this operation empty.
+   */
+  static void TrackContextDevice(const std::shared_ptr<tgfx::Device>& device);
+
+#if defined(TGFX_USE_D3D12)
+  /**
+   * Returns the number of context identity records whose tracked owner is still alive.
+   */
+  static size_t GetContextIdentityCacheCountForTesting();
+
+  /**
+   * Returns the number of native identity capture attempts made through a temporary texture.
+   */
+  static size_t GetIdentityCaptureCountForTesting();
+
+  /**
+   * Returns the number of successful tgfx device creations performed by the D3D12 registry.
+   */
+  static size_t GetDeviceCreationCountForTesting();
+#endif
+
+  /**
    * Returns the number of live devices currently published in the D3D12 registry. Intended for
    * tests that verify concurrent imports converge on a single device.
    */

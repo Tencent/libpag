@@ -24,6 +24,11 @@
 
 namespace pag {
 
+#if !defined(TGFX_USE_D3D12)
+void Devices::TrackContextDevice(const std::shared_ptr<tgfx::Device>&) {
+}
+#endif
+
 bool Devices::WaitForQueue(tgfx::Context* context) {
   if (context == nullptr) {
     return false;
