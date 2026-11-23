@@ -58,8 +58,8 @@ class PAGSurface {
   /**
    * Creates a PAGSurface from the specified backend texture. The texture must not be bound to any
    * framebuffer. On OpenGL the PAGSurface uses the calling thread's current GL context; Metal
-   * and D3D12 use the device that owns the texture. Returns nullptr if the texture is invalid or
-   * the device cannot be resolved.
+   * and D3D12 use the device that owns the texture. WebGPU uses the runtime's default GPUDevice.
+   * Returns nullptr if the texture is invalid or the device cannot be resolved.
    * @param texture the backend texture to render into.
    * @param origin  the origin of the texture coordinate system.
    */
@@ -104,12 +104,14 @@ class PAGSurface {
   bool readPixels(void* dstPixels, size_t dstRowBytes);
 
   /**
-   * Submits pending commands and blocks until the command queue of the surface's device finishes
-   * prior work. On D3D12 all surfaces sharing the same native device share that queue. On WebGPU
-   * only the submission is guaranteed. Does not draw another frame. The method manages the device
+   * Submits pending commands. Backends with synchronous completion support also wait for prior
+   * work on the surface's device queue. D3D12 surfaces using the same libpag registry device
+   * share that queue; the wait does not cover other host queues. WebGPU only guarantees
+   * submission, not GPU completion. Does not draw another frame. The method manages the device
    * lock internally; callers must not already hold the same GPU device's context lock.
-   * @return true after completion and a successful device-health check; false if the device
-   *         cannot be locked, has been lost, or completion cannot be established.
+   * @return true after submission and successful backend device-health checks. On WebGPU true
+   *         does not mean that GPU work has completed. Returns false if the device cannot be
+   *         locked, fails a health check, or its context has been lost.
    */
   bool waitUntilCompleted();
 

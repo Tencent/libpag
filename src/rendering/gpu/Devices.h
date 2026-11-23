@@ -247,11 +247,11 @@ class Devices {
 
   /**
    * Returns true when `context` can safely sample a resource whose device identity was previously
-   * captured as `deviceRef`. When deviceRef is null (Vulkan/WebGPU capture, or a call site that
-   * did not capture identity) the result is unconditionally true on Vulkan/WebGPU. D3D12 always
-   * captures an identity and rejects a null deviceRef. Otherwise the render context's device is
-   * compared against the captured one — a mismatch means the resource cannot be used by that
-   * context and the caller must reject drawing.
+   * captured as `deviceRef`. OpenGL, Metal, Vulkan and WebGPU treat a null deviceRef as trusting
+   * the caller. D3D12 requires a captured identity and rejects a null deviceRef; callers use
+   * RequiresCapturedIdentity() to reject failed captures before drawing. For a non-null ref the
+   * render context's device is compared against the captured identity, and a mismatch prevents
+   * the resource from being sampled.
    */
   static bool CanSampleFrom(tgfx::Context* context, const ExternalDeviceRef* deviceRef);
 

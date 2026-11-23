@@ -259,8 +259,10 @@ class PAG_API BackendTexture {
   bool getMtlTextureInfo(MtlTextureInfo* mtlTextureInfo) const;
 
   /**
-   * If the backend API is D3D12, copies the non-owning D3D12 description into the passed in
-   * pointer and returns true. Otherwise returns false.
+   * Copies the non-owning D3D12 description into the output pointer.
+   * @param d3d12TextureInfo the destination description, or nullptr to return false.
+   * @return true for an initialized D3D12 backend object with a non-null output pointer;
+   *         false otherwise.
    */
   bool getD3D12TextureInfo(D3D12TextureInfo* d3d12TextureInfo) const;
 
@@ -368,8 +370,10 @@ class PAG_API BackendRenderTarget {
   bool getMtlTextureInfo(MtlTextureInfo* mtlTextureInfo) const;
 
   /**
-   * If the backend API is D3D12, copies the non-owning D3D12 description into the passed in
-   * pointer and returns true. Otherwise returns false.
+   * Copies the non-owning D3D12 description into the output pointer.
+   * @param d3d12TextureInfo the destination description, or nullptr to return false.
+   * @return true for an initialized D3D12 backend object with a non-null output pointer;
+   *         false otherwise.
    */
   bool getD3D12TextureInfo(D3D12TextureInfo* d3d12TextureInfo) const;
 

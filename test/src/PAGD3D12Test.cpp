@@ -140,6 +140,9 @@ PAG_TEST(D3D12Test, BackendTextureRoundTrip) {
   D3D12TextureInfo result = {};
   EXPECT_TRUE(texture.getD3D12TextureInfo(&result));
   EXPECT_EQ(result.resource, nullptr);
+  EXPECT_FALSE(texture.getD3D12TextureInfo(nullptr));
+  BackendRenderTarget renderTarget(info, 16, 16);
+  EXPECT_FALSE(renderTarget.getD3D12TextureInfo(nullptr));
   MtlTextureInfo metalInfo = {};
   EXPECT_FALSE(texture.getMtlTextureInfo(&metalInfo));
 }

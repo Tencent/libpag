@@ -23,7 +23,6 @@ set "WORKSPACE=%CD%"
 set "STATUS=0"
 set "RESTORE_NEEDED=0"
 set "STASH_CREATED=0"
-set "CHECKED_OUT=0"
 set "BACKEND="
 set "SKIP_IMAGES=0"
 set "NO_CHECKOUT=0"
@@ -152,7 +151,6 @@ if errorlevel 1 (
   call :Fail "git switch --detach failed."
   goto :cleanup
 )
-set "CHECKED_OUT=1"
 
 :skip_checkout
 where depsync >nul 2>nul
@@ -275,15 +273,23 @@ set "STATUS=1"
 exit /b 0
 
 :RestoreWorkspace
+set "RESTORE_NEEDED=0"
 cd /d "%WORKSPACE%"
-if "%CHECKED_OUT%"=="1" (
-  if /i "%CURRENT_BRANCH%"=="HEAD" (
-    git checkout %CURRENT_COMMIT% --quiet
-  ) else (
-    git switch "%CURRENT_BRANCH%" --quiet
-  )
-  if errorlevel 1 exit /b 1
+if errorlevel 1 exit /b 1
+rem A post-checkout hook may fail after HEAD has already changed. Restore unconditionally before
+rem applying the stash, and never retry automatically after a failed restoration.
+if /i "%CURRENT_BRANCH%"=="HEAD" (
+  git switch --detach "%CURRENT_COMMIT%" --quiet
+) else (
+  git switch "%CURRENT_BRANCH%" --quiet
 )
+if errorlevel 1 exit /b 1
+set "RESTORED_BRANCH="
+for /f "delims=" %%i in ('git rev-parse --abbrev-ref HEAD 2^>nul') do set "RESTORED_BRANCH=%%i"
+set "RESTORED_COMMIT="
+for /f "delims=" %%i in ('git rev-parse HEAD 2^>nul') do set "RESTORED_COMMIT=%%i"
+if not "%RESTORED_BRANCH%"=="%CURRENT_BRANCH%" exit /b 1
+if not "%RESTORED_COMMIT%"=="%CURRENT_COMMIT%" exit /b 1
 if "%STASH_CREATED%"=="1" (
   git stash pop --index --quiet
   if errorlevel 1 exit /b 1

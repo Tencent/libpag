@@ -1204,8 +1204,11 @@ class PAG_API PAGSurface {
   static std::shared_ptr<PAGSurface> MakeFrom(std::shared_ptr<Drawable> drawable);
 
   /**
-   * Creates a new PAGSurface from specified backend render target and origin. The PAGSurface uses
-   * the GPU context on the calling thread directly. Returns null if the render target is invalid.
+   * Creates a new PAGSurface from the specified backend render target and origin. OpenGL uses
+   * the calling thread's current GL context; Metal and D3D12 use the render target's own device.
+   * @param renderTarget the backend render target to render into.
+   * @param origin the origin of the render target coordinate system.
+   * @return a surface, or nullptr if the render target is invalid or its device cannot be resolved.
    */
   static std::shared_ptr<PAGSurface> MakeFrom(const BackendRenderTarget& renderTarget,
                                               ImageOrigin origin);
@@ -1218,8 +1221,9 @@ class PAG_API PAGSurface {
    * own device on Metal and D3D12, where access is serialized by the device lock. Semaphore
    * synchronization is only available on backends that implement BackendSemaphore; on D3D12 use
    * waitUntilCompleted() instead. Otherwise the surface uses the calling thread's current GL
-   * context on OpenGL, or the texture's own device on Metal and D3D12. Returns null if the
-   * texture is invalid.
+   * context on OpenGL, or the texture's own device on Metal and D3D12. WebGPU uses the runtime's
+   * default GPUDevice and is limited to the main runtime thread. Returns null if the texture is
+   * invalid or its device cannot be resolved.
    */
   static std::shared_ptr<PAGSurface> MakeFrom(const BackendTexture& texture, ImageOrigin origin,
                                               bool forAsyncThread = false);
@@ -1279,13 +1283,15 @@ class PAG_API PAGSurface {
   bool readPixels(ColorType colorType, AlphaType alphaType, void* dstPixels, size_t dstRowBytes);
 
   /**
-   * Submits pending commands and blocks until the command queue of this surface's device
-   * finishes prior work. On D3D12 all surfaces that share the same native device share that
-   * queue, so the wait is device-wide. On WebGPU no synchronous fence is available and only the
-   * submission is guaranteed. Does not advance playback or draw another frame. The method manages
-   * the device lock internally; callers must not already hold the same device's context lock.
-   * @return true after completion and a successful device-health check; false if the device
-   *         cannot be locked, has been lost, or completion cannot be established.
+   * Submits pending commands. Backends with synchronous completion support also wait for prior
+   * work on this surface's device queue. D3D12 surfaces using the same libpag registry device
+   * share that queue; the wait is not limited to this surface and does not cover other host
+   * queues. WebGPU only guarantees submission, not GPU completion. Does not advance playback or
+   * draw another frame. The method manages the device lock internally; callers must not already
+   * hold the same device's context lock.
+   * @return true after submission and successful backend device-health checks. On WebGPU true
+   *         does not mean that GPU work has completed. Returns false if the device cannot be
+   *         locked, fails a health check, or its context has been lost.
    */
   bool waitUntilCompleted();
 

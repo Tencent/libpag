@@ -90,7 +90,7 @@ bool BackendTexture::getMtlTextureInfo(MtlTextureInfo* mtlTextureInfo) const {
 }
 
 bool BackendTexture::getD3D12TextureInfo(D3D12TextureInfo* d3d12TextureInfo) const {
-  if (!isValid() || _backend != Backend::D3D12) {
+  if (!isValid() || _backend != Backend::D3D12 || d3d12TextureInfo == nullptr) {
     return false;
   }
   *d3d12TextureInfo = d3d12Info;

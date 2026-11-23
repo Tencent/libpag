@@ -19,24 +19,30 @@
 #pragma once
 
 #include "WinPAGDemo.h"
-
+#include <io.h>
 #include <algorithm>
 #include <cstdio>
 #include <filesystem>
 #include <iostream>
 #include <string>
-
 #include "framework.h"
 #include "win32_example_window.h"
 
 #define BUFSIZE MAX_PATH
 
 namespace {
-void RedirectStdioToLogFile(const std::filesystem::path& logPath) {
+bool RedirectStdioToLogFile(const std::filesystem::path& logPath) {
   FILE* stdoutStream = nullptr;
-  _wfreopen_s(&stdoutStream, logPath.c_str(), L"w", stdout);
+  if (_wfreopen_s(&stdoutStream, logPath.c_str(), L"w", stdout) != 0) {
+    return false;
+  }
   FILE* stderrStream = nullptr;
-  _wfreopen_s(&stderrStream, logPath.c_str(), L"a", stderr);
+  if (_wfreopen_s(&stderrStream, L"NUL", L"w", stderr) != 0) {
+    return false;
+  }
+  // A GUI process may start without a usable stderr descriptor. Initialize it on the null device,
+  // then share stdout's file position without opening the log a second time.
+  return _dup2(_fileno(stdoutStream), _fileno(stderrStream)) == 0;
 }
 }  // namespace
 
@@ -48,7 +54,9 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
   if (modulePathLength != 0 && modulePathLength < MAX_PATH) {
     logPath = std::filesystem::path(modulePath).parent_path() / "WinPAGDemo.log";
   }
-  RedirectStdioToLogFile(logPath);
+  if (!RedirectStdioToLogFile(logPath)) {
+    return 1;
+  }
   std::cout << "[PAGDemo] starting, log file: " << logPath.string() << std::endl;
 
   int width = 600;
