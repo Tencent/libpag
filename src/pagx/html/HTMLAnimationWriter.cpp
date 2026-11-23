@@ -79,6 +79,10 @@ using pag::RadiansToDegrees;
 // serves the whole document: custom properties are per element, so spans that share a keyframes rule
 // still animate their own copy. Chromium does not interpolate `-webkit-text-stroke-width` itself.
 constexpr const char* kTextStrokeWidthVar = "--pagx-text-stroke-width";
+// Registered custom property that carries a distributing layer's alpha. Each paint reads it in
+// its own `opacity`, so every paint fades on its own and an overlap keeps the opacity the second
+// paint adds, without the animation having to target the paint elements.
+constexpr const char* kFadeVariable = "--pagx-fade";
 
 // tgfx fakes italic by shearing the chosen face with Matrix::postSkew(ITALIC_SKEW = -0.2, 0) about
 // the baseline, so the CSS equivalent is a skew of atan(0.2) pivoting on that same baseline.
@@ -1417,6 +1421,12 @@ struct BundleChannelSet {
   std::unordered_map<Frame, Frame> steppedGroupEasingEnds = {};
   std::unordered_map<Frame, Frame> opacityGroupEasingEnds = {};
   std::unordered_map<Frame, Frame> transformGroupEasingEnds = {};
+  // This rule drives a distributing layer's alpha. The stops write the registered `--pagx-fade`
+  // ratio instead of `opacity`, because the paints consume it themselves.
+  bool fadeViaVariable = false;
+  // The layer's authored alpha: the ratio in the stops is relative to it, since the paints' static
+  // `calc(var(--pagx-fade,1) * <product>)` already contains it.
+  float fadeBase = 1.0f;
 };
 
 struct BundleTimingInfo {
@@ -3058,7 +3068,14 @@ std::string EvaluateKeyframeCssDecls(const DomTargetBundle& bundle, const Bundle
   const bool wantsStepped = (chSet.propertyGroups & 4) != 0;
   if (wantsOpacity && chSet.alphaCh != nullptr) {
     float a = alphaOverride != nullptr ? *alphaOverride : EvalFloatChannel(chSet.alphaCh, t, 1.0f);
-    AppendCssDecl(decls, "opacity", CssFloatToString(a));
+    if (chSet.fadeViaVariable) {
+      // The paints already carry the authored alpha in `calc(var(...) * <product>)`, so the stop
+      // publishes the ratio that brings them to this frame's value.
+      float ratio = chSet.fadeBase > 0.0f ? a / chSet.fadeBase : 0.0f;
+      AppendCssDecl(decls, kFadeVariable, CssFloatToString(ratio));
+    } else {
+      AppendCssDecl(decls, "opacity", CssFloatToString(a));
+    }
   }
   if (chSet.blendModeCh != nullptr && bundle.primaryHost != nullptr &&
       bundle.primaryHost->nodeType() == NodeType::Layer) {
@@ -5421,11 +5438,34 @@ std::string HTMLAnimationSession::emitKeyframesAndWeave(std::string& bodyHtml) {
           const BundleChannelSet& ruleSet = ruleSets[ruleIndex];
           const BundleTimingInfo& ruleTiming = ruleTimings[ruleIndex];
           std::string ruleKey = element.tagName + "#" + std::to_string(ruleIndex);
+          // `groupOpacity=false` means the runtime multiplies the alpha into every child, not into
+          // one group surface: two overlapping children at 0.5 composite to 0.75 that way and to
+          // 0.5 through a container opacity. The opacity half of the rule therefore reaches the
+          // paints inside the layer instead of the layer itself.
+          // A rule that writes nothing but `opacity` is the alpha half; with an empty rest group it
+          // is the only thing the bundle drives.
+          const auto* alphaHost =
+              bundle.primaryHost != nullptr && bundle.primaryHost->nodeType() == NodeType::Layer
+                  ? static_cast<const Layer*>(bundle.primaryHost)
+                  : nullptr;
+          // A `groupOpacity=false` layer multiplies its alpha into every paint, not into one group
+          // surface: two overlapping paints at 0.5 composite to 0.75 that way and to 0.5 through a
+          // container opacity. The rule therefore publishes the registered variable the paints read,
+          // which keeps one rule for the layer and needs no selector to find them.
+          // A layer authored fully transparent has nothing to divide by and keeps the container path.
+          BundleChannelSet stopSet = ruleSet;
+          const bool fadeOnPaints = ruleSet.alphaCh != nullptr && alphaHost != nullptr &&
+                                    !alphaHost->groupOpacity && alphaHost->alpha > 0.0f;
+          if (fadeOnPaints) {
+            stopSet.fadeViaVariable = true;
+            stopSet.fadeBase = alphaHost->alpha;
+            edits.fadeVariable = true;
+          }
           auto nameIt = keyframesNameByTag.find(ruleKey);
           if (nameIt == keyframesNameByTag.end()) {
             std::string stops = mixedLayout != nullptr
-                                    ? MixedGlyphStops(ruleSet, ruleTiming, *mixedLayout)
-                                    : EmitBundleKeyframeStops(bundle, ruleSet, ruleTiming,
+                                    ? MixedGlyphStops(stopSet, ruleTiming, *mixedLayout)
+                                    : EmitBundleKeyframeStops(bundle, stopSet, ruleTiming,
                                                               element.tagName, needsZeroOrigin);
             std::string kfName = {};
             for (const auto& rule : emittedRules) {
@@ -5443,32 +5483,7 @@ std::string HTMLAnimationSession::emitKeyframesAndWeave(std::string& bodyHtml) {
           }
           const std::string shorthand = BuildAnimationShorthand(anim, nameIt->second, ruleTiming,
                                                                 mount.offset, mount.scope != 0);
-          // `groupOpacity=false` means the runtime multiplies the alpha into every child, not into
-          // one group surface: two overlapping children at 0.5 composite to 0.75 that way and to
-          // 0.5 through a container opacity. The opacity half of the rule therefore targets the
-          // children, which is also what keeps it off the transform half.
-          // A rule that writes nothing but `opacity` is the alpha half; with an empty rest group it
-          // is the only thing the bundle drives.
-          const bool opacityOnlyRule =
-              ruleSet.propertyGroups == 1 ||
-              (ruleSet.alphaCh != nullptr && ruleSet.rotCh == nullptr &&
-               ruleSet.posXCh == nullptr && ruleSet.posYCh == nullptr &&
-               ruleSet.scaleXCh == nullptr && ruleSet.scaleYCh == nullptr &&
-               ruleSet.skewCh == nullptr && ruleSet.skewAxisCh == nullptr &&
-               ruleSet.matrixCh == nullptr && ruleSet.fillColorCh == nullptr &&
-               ruleSet.fillAlphaCh == nullptr && ruleSet.strokeColorCh == nullptr &&
-               ruleSet.strokeAlphaCh == nullptr && ruleSet.strokeWidthCh == nullptr &&
-               ruleSet.fontSizeCh == nullptr && ruleSet.letterSpacingCh == nullptr &&
-               !ruleSet.hasFilterAnim && !ruleSet.hasPolystarGeometry &&
-               ruleSet.geometryWidthCh == nullptr && ruleSet.geometryHeightCh == nullptr &&
-               ruleSet.visibleCh == nullptr && ruleSet.blendModeCh == nullptr);
-          const bool alphaOnChildren = opacityOnlyRule && bundle.primaryHost != nullptr &&
-                                       bundle.primaryHost->nodeType() == NodeType::Layer &&
-                                       !static_cast<const Layer*>(bundle.primaryHost)->groupOpacity;
-          if (alphaOnChildren) {
-            keyframesCss += "#" + element.id + " > * { animation: " + shorthand + "; }\n";
-            continue;
-          }
+
           if (edits.animDecls.find(element.id) == edits.animDecls.end()) {
             edits.idOrder.push_back(element.id);
           }
@@ -5512,6 +5527,11 @@ std::string HTMLAnimationSession::emitKeyframesAndWeave(std::string& bodyHtml) {
 
   ApplyElementEdits(bodyHtml, tagIndex.rangeById, edits);
 
+  if (edits.fadeVariable) {
+    keyframesCss = std::string("@property ") + kFadeVariable +
+                   " {\n  syntax: '<number>';\n  inherits: true;\n  initial-value: 1;\n}\n" +
+                   keyframesCss;
+  }
   if (!edits.textStrokeWidthVars.empty()) {
     keyframesCss = std::string("@property ") + kTextStrokeWidthVar +
                    " {\n  syntax: '<length>';\n  inherits: false;\n  initial-value: 0px;\n}\n" +

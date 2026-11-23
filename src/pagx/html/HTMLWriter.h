@@ -235,8 +235,20 @@ void SampleArcLengthLUT(const ArcLengthLUT& lut, float arcLength, Point* outPos,
 // HTMLWriterContext
 //==============================================================================
 
+// Registered custom property a distributing layer animates. Each paint reads it in its own
+// `opacity`, so `groupOpacity=false` fades every paint on its own and an overlap keeps the opacity
+// the second paint adds. The animation publishes a ratio, hence the `1` fallback.
+inline constexpr const char* kFadeVariableName = "--pagx-fade";
+
+// `groupOpacity=false` layer alpha reaches the paints, not a container: the emitted value has to
+// read the animated variable instead of a literal.
+std::string PaintOpacityCss(bool viaVariable, float value);
+
 class HTMLWriterContext {
  public:
+  // Set while writing the contents of a layer whose alpha is animated and distributed to the
+  // paints, so each paint declares the animated variable instead of a literal opacity.
+  bool fadePaints = false;
   float docWidth = 0;
   float docHeight = 0;
   // True when the document carries keyframe animations and the caller asked for them. The body is

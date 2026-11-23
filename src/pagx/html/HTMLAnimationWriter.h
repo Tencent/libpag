@@ -94,6 +94,9 @@ class HTMLAnimationSession {
       FauxBoldWidth = 2,
     };
     std::unordered_map<std::string, unsigned> textStrokeWidthVars = {};
+    // Set once any distributing layer publishes its alpha through the registered `--pagx-fade`
+    // property, so the rule is emitted only when something reads it.
+    bool fadeVariable = false;
     // Elements whose animated `filter` would otherwise carry a residual SVG reference (a blend, an
     // inner shadow). Value is the ready-made `url(#id)` reference that goes on the wrapper. Chromium
     // treats a filter list containing a `url()` as non-interpolable and steps the whole list, so the

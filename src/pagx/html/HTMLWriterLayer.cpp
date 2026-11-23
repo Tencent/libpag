@@ -1917,6 +1917,14 @@ static ShadowShape FindLayerShadowShape(const Layer* layer) {
   return s;
 }
 
+std::string PaintOpacityCss(bool viaVariable, float value) {
+  if (!viaVariable) {
+    return ";opacity:" + CssFloatToString(value);
+  }
+  return ";opacity:calc(var(" + std::string(kFadeVariableName) + ", 1) * " +
+         CssFloatToString(value) + ")";
+}
+
 void HTMLWriter::writeLayerContents(HTMLBuilder& out, const Layer* layer, float alpha,
                                     bool distribute, LayerPlacement targetPlacement) {
   // Forward the layer's padding (when non-zero) so inner GeoInfo carries it. Skipping the
@@ -1928,8 +1936,13 @@ void HTMLWriter::writeLayerContents(HTMLBuilder& out, const Layer* layer, float 
   // does the same through the `> *` rule while the authored value is still 1.
   bool fadesChildren =
       distribute || (!layer->groupOpacity && _ctx->animation.alphaAnimatedNodes.count(layer) > 0);
+  // The paints of an alpha-animated distributing layer read the animated variable, so they fade on
+  // their own instead of through one container opacity.
+  bool savedFadePaints = _ctx->fadePaints;
+  _ctx->fadePaints = !layer->groupOpacity && _ctx->animation.alphaAnimatedNodes.count(layer) > 0;
   writeElements(out, layer->contents, alpha, distribute, fadesChildren, targetPlacement,
                 layerPadding);
+  _ctx->fadePaints = savedFadePaints;
 }
 
 //==============================================================================
