@@ -2767,10 +2767,11 @@ void EmitFilterCssAtFrame(const DomTargetBundle& bundle, const BundleChannelSet&
       auto* bf = static_cast<const BlurFilter*>(f);
       float bx = fc ? EvalFloatChannel(fc->blurX, t, bf->blurX) : bf->blurX;
       float by = fc ? EvalFloatChannel(fc->blurY, t, bf->blurY) : bf->blurY;
-      // CSS blur() takes a single radius applied to both axes, so differing blurX and blurY can
-      // only be approximated here by the larger one. A per-axis blur needs an SVG feGaussianBlur,
-      // whose stdDeviation is an attribute that CSS keyframes cannot animate.
-      float r = std::max(bx, by);
+      // CSS blur() takes a single radius applied to both axes, so differing blurX and blurY can only
+      // be approximated. Averaging them is what the static shadow-box path does, so the same authored
+      // value renders the same way whether or not the layer is animated. A per-axis blur needs an SVG
+      // feGaussianBlur, whose stdDeviation is an attribute CSS keyframes cannot animate.
+      float r = (bx + by) * 0.5f;
       if (!filterVal.empty()) filterVal += ' ';
       filterVal += "blur(" + CssFloatToString(r) + "px)";
     } else if (f->nodeType() == NodeType::DropShadowFilter) {
@@ -2784,8 +2785,10 @@ void EmitFilterCssAtFrame(const DomTargetBundle& bundle, const BundleChannelSet&
       // separate alpha field (the runtime uses the colour as-is), so handing it `col.alpha` again
       // squared a 0.5 shadow down to 0.25 whenever any channel of the chain was animated.
       if (!filterVal.empty()) filterVal += ' ';
+      // Same axis averaging as the raw blur above: CSS drop-shadow() has one radius too.
+      float shadowBlur = (bx + by) * 0.5f;
       filterVal += "drop-shadow(" + CssFloatToString(ox) + "px " + CssFloatToString(oy) + "px " +
-                   CssFloatToString(std::max(bx, by)) + "px " + ColorToRGBA(col) + ")";
+                   CssFloatToString(shadowBlur) + "px " + ColorToRGBA(col) + ")";
     }
   }
   // The stages CSS cannot rewrite per frame (a blend, an inner shadow) are NOT appended here. A
