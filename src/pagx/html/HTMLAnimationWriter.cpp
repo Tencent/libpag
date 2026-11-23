@@ -1211,6 +1211,9 @@ TargetChannelRole LookupChannelRole(NodeType nodeType, const std::string& channe
 struct DomTargetBundle {
   std::string domId;
   const Node* primaryHost = nullptr;
+  // The host layer is placed by a parent's flex layout, so its slot must not be folded into the
+  // animated transform as well.
+  bool primaryHostPlacedByFlex = false;
   std::vector<const AnimationObject*> objects = {};
   // Set for a Repeater copy bundle: which copy this tag paints.
   int repeaterIndex = -1;
@@ -2318,9 +2321,13 @@ void EmitTransformCssAtFrame(const DomTargetBundle& bundle, const BundleChannelS
     // `renderPosition()`/`layoutPosition()` read the live `x`/`y`, which the animation state has
     // already overwritten with the value at the sampling frame; the authored `left`/`top` still hold
     // the box's origin, so prefer them and fall back to the live position.
+    // A flex item is already placed by its container: folding the slot position into the transform
+    // put a second copy of the slot on screen, so `composite/33` showed the red box one slot to the
+    // right of where it belongs. Only a driven x/y channel may translate such a layer.
+    bool placedByFlex = bundle.primaryHostPlacedByFlex;
     auto livePos = hostLayer->renderPosition();
-    float baseX = std::isnan(hostLayer->left) ? livePos.x : hostLayer->left;
-    float baseY = std::isnan(hostLayer->top) ? livePos.y : hostLayer->top;
+    float baseX = placedByFlex ? 0.0f : (std::isnan(hostLayer->left) ? livePos.x : hostLayer->left);
+    float baseY = placedByFlex ? 0.0f : (std::isnan(hostLayer->top) ? livePos.y : hostLayer->top);
     float px = EvalFloatChannel(xCh, t, baseX);
     float py = EvalFloatChannel(yCh, t, baseY);
     if (!FloatNearlyZero(px) || !FloatNearlyZero(py) || !FloatNearlyZero(z) ||
@@ -5223,6 +5230,11 @@ std::string HTMLAnimationSession::emitKeyframesAndWeave(std::string& bodyHtml) {
     auto bundles = GroupObjectsIntoDomBundles(_doc, anim, _ctx, _solidToPainter, _filterToLayer,
                                               _maskPathToLayer, &mount.objects);
     MergeBundlesByDomId(bundles);
+    for (auto& bundle : bundles) {
+      bundle.primaryHostPlacedByFlex =
+          bundle.primaryHost != nullptr && bundle.primaryHost->nodeType() == NodeType::Layer &&
+          _ctx.animation.flexItems.count(static_cast<const Layer*>(bundle.primaryHost)) > 0;
+    }
     // Identical stops share one rule, even across bundles: a per-glyph fan-out where every glyph
     // ends up with the same keyframes (a uniform modifier colour, say) must not emit N copies.
     std::vector<std::pair<std::string, std::string>> emittedRules = {};

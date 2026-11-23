@@ -3322,6 +3322,11 @@ void HTMLWriter::writeLayerInner(HTMLBuilder& out, const Layer* layer, float con
       continue;
     }
     bool childIsFlexItem = isFlexContainer && child->includeInLayout;
+    if (childIsFlexItem) {
+      // The flex container already places this child in its slot. The animated transform has to
+      // know, or it folds the slot position into `translate` a second time (composite/33).
+      _ctx->animation.flexItems.insert(child);
+    }
     _ctx->childLayerOffsetX = childOffX;
     _ctx->childLayerOffsetY = childOffY;
     writeLayer(out, child, contentAlpha, childDistribute, childIsFlexItem, layer->layout);

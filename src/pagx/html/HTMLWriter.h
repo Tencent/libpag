@@ -402,6 +402,9 @@ class HTMLWriterContext {
     // to the inline <mask> and asks this set instead of re-walking the mask subtree, so the mask
     // traversal lives in one place (the animation index) rather than once per consumer.
     std::unordered_set<const Layer*> animatedMaskHosts = {};
+    // Layers placed by a parent's flex layout. Their slot is already applied by flexbox, so an
+    // animated transform must not carry it as a translation too.
+    std::unordered_set<const Layer*> flexItems = {};
     // Masked layer -> id of the inline <mask> generated for it.
     std::unordered_map<const Layer*, std::string> svgMaskIds = {};
     // RoundCorner node -> the single shape it rounds. The radius animation rebuilds that shape's
