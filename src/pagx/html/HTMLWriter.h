@@ -375,6 +375,10 @@ class HTMLWriterContext {
     // Animated Paths inside a mask, and the SVG element ids handed to them. A coverage mask (Alpha /
     // Luminance) cannot be expressed as a clip polygon, so such a mask is emitted as an inline SVG
     // <mask> whose geometry is animated by CSS inside the mask.
+    // Nodes with an animated `alpha` channel. A layer with `groupOpacity=false` distributes its
+    // alpha to the children it renders, so such a layer must not merge several draws into one <svg>
+    // whose single opacity then applies once for the whole paint.
+    std::unordered_set<const Node*> alphaAnimatedNodes = {};
     std::unordered_set<const Path*> maskPaths = {};
     // Mask path node -> how many tags it has already rendered into. A mask source mounted several
     // times renders once per instance, and each copy needs its own DOM id so its keyframes can be
@@ -787,7 +791,7 @@ class HTMLWriter {
   // (left=right=top=bottom=0) can detect a padded parent and avoid the `inset:0` shortcut that
   // would otherwise paint into the full border box instead of the padded content box.
   void writeElements(HTMLBuilder& out, const std::vector<Element*>& elements, float alpha,
-                     bool distribute, LayerPlacement targetPlacement,
+                     bool distribute, bool fadesChildren, LayerPlacement targetPlacement,
                      const Padding* containerPadding = nullptr);
   // Renders a TextBox that has inline child elements (Text, Fill, Stroke, Group) as a positioned
   // container with per-span CSS spans. The two TextBox emission paths are split out from

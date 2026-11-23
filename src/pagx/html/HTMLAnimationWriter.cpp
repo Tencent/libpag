@@ -4717,6 +4717,14 @@ void HTMLAnimationSession::ResolveAnimationTargets(
       if (targetNode == nullptr) {
         continue;
       }
+      for (auto* ch : obj->channels) {
+        if (ch != nullptr && ch->name == "alpha") {
+          // A layer that fades its children one by one cannot share one opacity for the draws of a
+          // single paint: the overlap would lose the extra opacity the second paint adds.
+          _ctx.animation.alphaAnimatedNodes.insert(targetNode);
+          break;
+        }
+      }
       auto nType = targetNode->nodeType();
       if (nType == NodeType::InnerShadowFilter || nType == NodeType::BlendFilter) {
         for (auto* ch : obj->channels) {

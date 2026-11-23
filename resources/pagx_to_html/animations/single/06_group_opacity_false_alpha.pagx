@@ -1,13 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: A groupOpacity=false layer fades each child paint on its own, so the overlapping band
+     keeps the extra opacity the second paint adds. Target: Layer Channel: alpha Type: float Ref: R16
+     Each rectangle sits in its own Group on purpose: with both shapes sharing one layer-level Fill
+     the static writer paints them as one draw, and the layer alpha then composites that draw once,
+     which loses the accumulation in the overlap. That grouping is an unrelated static difference, so
+     the fixture keeps the shapes apart and the animation itself is what gets measured. -->
 <pagx width="320" height="200">
   <Layer left="0" right="0" top="0" bottom="0">
     <Rectangle left="0" right="0" top="0" bottom="0"/>
     <Fill color="#F8FAFC"/>
   </Layer>
   <Layer id="grp" left="0" top="0" right="0" bottom="0" groupOpacity="false">
-    <Rectangle position="120,100" size="100,100"/>
-    <Fill color="#BE123C"/>
-    <Rectangle position="160,100" size="100,100"/>
-    <Fill color="#1D4ED8"/>
+    <Group><Rectangle position="120,100" size="100,100"/><Fill color="#BE123C"/></Group>
+    <Group><Rectangle position="160,100" size="100,100"/><Fill color="#1D4ED8"/></Group>
   </Layer>
   <Animations>
     <Animation id="fade" duration="60" frameRate="60" loop="once">

@@ -72,13 +72,13 @@ void HTMLWriter::writeGroup(HTMLBuilder& out, const Group* group, float alpha, b
                            propagatedPainters->end());
     elements = &paintedElements;
   }
-  writeElements(out, *elements, 1.0f, false, LayerPlacement::Background, groupPadding);
+  writeElements(out, *elements, 1.0f, false, false, LayerPlacement::Background, groupPadding);
   // Recurse through nested Group / TextBox containers so a foreground painter inside a child
   // Group still triggers the second pass — the shallow flat-list scan would otherwise leave it
   // suppressed by both passes' filters.
   bool hasForegroundPainter = HasForegroundPainter(*elements);
   if (hasForegroundPainter) {
-    writeElements(out, *elements, 1.0f, false, LayerPlacement::Foreground, groupPadding);
+    writeElements(out, *elements, 1.0f, false, false, LayerPlacement::Foreground, groupPadding);
   }
   out.closeTag();
 }

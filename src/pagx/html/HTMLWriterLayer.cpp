@@ -435,7 +435,7 @@ void HTMLWriter::paintGeos(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
 }
 
 void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& elements, float alpha,
-                               bool distribute, LayerPlacement targetPlacement,
+                               bool distribute, bool fadesChildren, LayerPlacement targetPlacement,
                                const Padding* containerPadding) {
   RecursionGuard guard(_ctx);
   if (guard.overflowed()) {
@@ -446,7 +446,10 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
   _pendingSVGDraws.clear();
   // Group SVG draws only when exporting animations. Static documents must retain their original
   // per-draw viewBoxes: sharing one SVG changes clipping and gradient/stroke rasterization.
-  _coalesceSVGDraws = !_ctx->animation.elementIds.empty();
+  // A layer that fades its children one by one (`groupOpacity=false`) keeps them apart as well:
+  // draws merged into one <svg> share a single opacity, so an overlap would lose the extra opacity
+  // its second paint adds.
+  _coalesceSVGDraws = !_ctx->animation.elementIds.empty() && !fadesChildren;
   ElementDispatchState state;
   const TextBox* curTextBox = nullptr;
   float roundCornerRadius = 0.0f;
@@ -1919,7 +1922,14 @@ void HTMLWriter::writeLayerContents(HTMLBuilder& out, const Layer* layer, float 
   // Forward the layer's padding (when non-zero) so inner GeoInfo carries it. Skipping the
   // pointer when padding is zero keeps downstream fast paths unchanged for the common case.
   const Padding* layerPadding = layer->padding.isZero() ? nullptr : &layer->padding;
-  writeElements(out, layer->contents, alpha, distribute, targetPlacement, layerPadding);
+  // A layer that fades its children one by one keeps them apart: merging their draws into one <svg>
+  // would give the whole paint a single opacity, so an overlap would lose the extra opacity its
+  // second paint adds. `distribute` already says the children carry the alpha; an animated alpha
+  // does the same through the `> *` rule while the authored value is still 1.
+  bool fadesChildren =
+      distribute || (!layer->groupOpacity && _ctx->animation.alphaAnimatedNodes.count(layer) > 0);
+  writeElements(out, layer->contents, alpha, distribute, fadesChildren, targetPlacement,
+                layerPadding);
 }
 
 //==============================================================================
