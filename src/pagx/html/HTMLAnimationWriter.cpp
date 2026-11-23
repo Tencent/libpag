@@ -2547,15 +2547,24 @@ void EmitTransformCssAtFrame(const DomTargetBundle& bundle, const BundleChannelS
     if (chSet.rotCh != nullptr || !FloatNearlyZero(rot)) {
       appendFunction("rotate(" + CssFloatToString(rot) + "deg)");
     }
-    if (chSet.layerSkewXCh != nullptr || chSet.layerSkewYCh != nullptr) {
+    // The keyframes replace the tag's static transform, so a skew that is not animated still has to
+    // be re-emitted; otherwise a pose on a skewed layer loses the skew (R30).
+    if (chSet.layerSkewXCh != nullptr || chSet.layerSkewYCh != nullptr ||
+        !FloatNearlyZero(baseSkewX) || !FloatNearlyZero(baseSkewY)) {
       // Layer skew.x / skew.y already are the CSS skew angles (the 2D shear is [[1, tan(x)],
       // [tan(y), 1]]), so they map straight onto the two CSS functions.
       float skewX = EvalFloatChannel(chSet.layerSkewXCh, t, baseSkewX);
       float skewY = EvalFloatChannel(chSet.layerSkewYCh, t, baseSkewY);
-      if (chSet.layerSkewXCh != nullptr || !FloatNearlyZero(skewX)) {
+      // One shear matrix carries both axes in the runtime: [[1, tan(x)], [tan(y), 1]]. Chaining
+      // `skewX(a) skewY(b)` multiplies two matrices instead, which adds a tan(x)*tan(y) term to the
+      // first element and overshoots whenever both angles are non-zero (R31).
+      if (!FloatNearlyZero(skewX) && !FloatNearlyZero(skewY)) {
+        constexpr float kDegToRad = 3.14159265358979323846f / 180.0f;
+        appendFunction("matrix(1, " + CssFloatToString(std::tan(skewY * kDegToRad)) + ", " +
+                       CssFloatToString(std::tan(skewX * kDegToRad)) + ", 1, 0, 0)");
+      } else if (chSet.layerSkewXCh != nullptr || !FloatNearlyZero(skewX)) {
         appendFunction("skewX(" + CssFloatToString(skewX) + "deg)");
-      }
-      if (chSet.layerSkewYCh != nullptr || !FloatNearlyZero(skewY)) {
+      } else if (chSet.layerSkewYCh != nullptr || !FloatNearlyZero(skewY)) {
         appendFunction("skewY(" + CssFloatToString(skewY) + "deg)");
       }
     } else if (chSet.skewCh != nullptr || !FloatNearlyZero(baseSkew)) {
@@ -4060,11 +4069,16 @@ std::string ModifierGlyphDecls(const RangeSelectorGlyph& glyph, const BundleChan
     // A modifier only modulates a stroke the text already has: without a Stroke painter the runtime
     // draws nothing, so emitting one here would invent an outline (composite/15 was authored
     // without one and the reference has zero stroke pixels).
-    if (chSet.modStrokeColorCh != nullptr && glyph.hasBaseStrokeWidth) {
+    // Width and colour are independent channels: a modifier that only animates the width still has
+    // to reach the span, and one that only animates the colour keeps the glyph's own width.
+    if ((chSet.modStrokeColorCh != nullptr || chSet.modStrokeWidthCh != nullptr) &&
+        glyph.hasBaseStrokeWidth) {
       Color strokeColor =
-          EvalColorChannel(chSet.modStrokeColorCh, t, modifier->strokeColor.value_or(Color()));
-      float width =
-          EvalFloatChannel(chSet.modStrokeWidthCh, t, modifier->strokeWidth.value_or(0.0f));
+          chSet.modStrokeColorCh != nullptr
+              ? EvalColorChannel(chSet.modStrokeColorCh, t,
+                                 modifier->strokeColor.value_or(glyph.baseStrokeColor))
+              : glyph.baseStrokeColor;
+      float width = EvalFloatChannel(chSet.modStrokeWidthCh, t, glyph.baseStrokeWidth);
       if (width > 0.0f) {
         AppendCssDecl(decls, "-webkit-text-stroke",
                       CssFloatToString(width) + "px " + ColorToRGBA(strokeColor));
@@ -4091,7 +4105,9 @@ std::string ModifierGlyphDecls(const RangeSelectorGlyph& glyph, const BundleChan
       AppendCssDecl(decls, "stroke-width", CssFloatToString(width) + "px");
     }
   }
-  if (glyph.composed || alpha < 1.0f) {
+  // An animated modifier alpha owns the glyph's opacity for the whole rule, so the stop has to say
+  // `1` as well: omitting it at 1 left the attribute's authored base showing through (R32).
+  if (glyph.composed || chSet.modAlphaCh != nullptr || alpha < 1.0f) {
     AppendCssDecl(decls, "opacity",
                   CssFloatToString(1.0f + (alpha - 1.0f) * (glyph.composed ? absF : f)));
   }
