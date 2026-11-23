@@ -137,3 +137,4 @@ web/test/pag-test.wasm
 web/test/pag-test.data
 /build-autotest
 /build-update-baseline
+/build-update-baseline-recovery.txt

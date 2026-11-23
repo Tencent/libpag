@@ -147,7 +147,17 @@ set "STASH_AFTER="
 for /f "delims=" %%i in ('git rev-parse --verify -q refs/stash 2^>nul') do set "STASH_AFTER=%%i"
 if not "%STASH_BEFORE%"=="%STASH_AFTER%" set "STASH_CREATED=1"
 set "RESTORE_NEEDED=1"
-echo Stashed local changes. Recovery: git switch "%CURRENT_BRANCH%" ^&^& git stash pop --index
+set "RECOVERY_FILE=%WORKSPACE%\build-update-baseline-recovery.txt"
+set "RECOVERY_SWITCH=git switch "%CURRENT_BRANCH%""
+if /i "%CURRENT_BRANCH%"=="HEAD" set "RECOVERY_SWITCH=git checkout %CURRENT_COMMIT%"
+> "%RECOVERY_FILE%" echo update_baseline.bat was interrupted before the workspace was restored.
+>> "%RECOVERY_FILE%" echo Original branch: %CURRENT_BRANCH%
+>> "%RECOVERY_FILE%" echo Original commit: %CURRENT_COMMIT%
+>> "%RECOVERY_FILE%" echo Your changes are in the top stash entry.
+>> "%RECOVERY_FILE%" echo Recover with:
+>> "%RECOVERY_FILE%" echo   %RECOVERY_SWITCH%
+>> "%RECOVERY_FILE%" echo   git stash pop --index
+echo Recovery details written to "%RECOVERY_FILE%".
 git switch --detach %MAIN_COMMIT% --quiet
 if errorlevel 1 (
   call :Fail "git switch --detach failed."
@@ -297,6 +307,7 @@ if "%STASH_CREATED%"=="1" (
   if errorlevel 1 exit /b 1
   set "STASH_CREATED=0"
 )
+del "%WORKSPACE%\build-update-baseline-recovery.txt" >nul 2>nul
 exit /b 0
 
 :RequireFile
@@ -318,5 +329,8 @@ if "!RESTORE_NEEDED!"=="1" (
     set "STATUS=1"
   )
 )
-if "!STATUS!"=="0" if exist "%BUILD_DIR%" rmdir /s /q "%BUILD_DIR%"
+if "!STATUS!"=="0" (
+  if exist "%BUILD_DIR%" rmdir /s /q "%BUILD_DIR%"
+  del "%WORKSPACE%\build-update-baseline-recovery.txt" >nul 2>nul
+)
 exit /b !STATUS!
