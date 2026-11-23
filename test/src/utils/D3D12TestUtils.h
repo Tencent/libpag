@@ -20,6 +20,9 @@
 
 #ifdef TGFX_USE_D3D12
 
+#include <d3d12.h>
+#include <dxgi1_4.h>
+#include <wrl/client.h>
 #include <memory>
 #include "base/utils/TGFXCast.h"
 #include "pag/pag.h"
@@ -65,6 +68,57 @@ inline BackendRenderTarget MakeD3D12RenderTarget(const std::shared_ptr<tgfx::Tex
   info.resource = const_cast<void*>(textureInfo.resource);
   return BackendRenderTarget(info, width, height);
 }
+
+/**
+ * A native device that is intentionally not the registry's default entry. The default device is
+ * covered by the other D3D12 tests (including WARP builds); this secondary device only exercises
+ * non-default registration and ownership. Prefer a different adapter so the two devices cannot
+ * collapse into the same registry entry.
+ */
+struct SecondaryDeviceTexture {
+  Microsoft::WRL::ComPtr<ID3D12Device> device = nullptr;
+  Microsoft::WRL::ComPtr<ID3D12Resource> resource = nullptr;
+  tgfx::BackendTexture texture = {};
+
+  bool init(int width, int height) {
+    auto result = D3D12CreateDevice(nullptr, D3D_FEATURE_LEVEL_11_0,
+                                    IID_PPV_ARGS(device.ReleaseAndGetAddressOf()));
+    if (FAILED(result)) {
+      Microsoft::WRL::ComPtr<IDXGIFactory4> factory = nullptr;
+      Microsoft::WRL::ComPtr<IDXGIAdapter> warpAdapter = nullptr;
+      if (FAILED(CreateDXGIFactory1(IID_PPV_ARGS(factory.ReleaseAndGetAddressOf()))) ||
+          FAILED(factory->EnumWarpAdapter(IID_PPV_ARGS(warpAdapter.ReleaseAndGetAddressOf())))) {
+        return false;
+      }
+      result = D3D12CreateDevice(warpAdapter.Get(), D3D_FEATURE_LEVEL_11_0,
+                                 IID_PPV_ARGS(device.ReleaseAndGetAddressOf()));
+    }
+    if (FAILED(result)) {
+      return false;
+    }
+    D3D12_HEAP_PROPERTIES heap = {};
+    heap.Type = D3D12_HEAP_TYPE_DEFAULT;
+    D3D12_RESOURCE_DESC desc = {};
+    desc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+    desc.Width = static_cast<UINT64>(width);
+    desc.Height = static_cast<UINT>(height);
+    desc.DepthOrArraySize = 1;
+    desc.MipLevels = 1;
+    desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+    desc.SampleDesc.Count = 1;
+    desc.Flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
+    if (FAILED(device->CreateCommittedResource(&heap, D3D12_HEAP_FLAG_NONE, &desc,
+                                               D3D12_RESOURCE_STATE_COMMON, nullptr,
+                                               IID_PPV_ARGS(resource.ReleaseAndGetAddressOf())))) {
+      return false;
+    }
+    tgfx::D3D12TextureInfo info = {};
+    info.resource = resource.Get();
+    info.format = DXGI_FORMAT_R8G8B8A8_UNORM;
+    texture = tgfx::BackendTexture(info, width, height);
+    return true;
+  }
+};
 
 }  // namespace pag
 
