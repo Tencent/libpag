@@ -3148,7 +3148,6 @@ std::string EvaluateKeyframeCssDecls(const DomTargetBundle& bundle, const Bundle
     // The emulated width rides the same registered variable as a real Stroke's width: both paint the
     // one CSS property, so the rule that comes later has to stay the winner.
     AppendCssDecl(decls, kTextStrokeWidthVar, CssFloatToString(width) + "px");
-    AppendCssDecl(decls, "-webkit-text-stroke-color", "currentColor");
   }
   if (!wantsRest) {
     AppendStopTimingFunction(chSet, timing, t, decls);
