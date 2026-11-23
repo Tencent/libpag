@@ -18,8 +18,21 @@
 
 #include "rendering/gpu/Devices.h"
 #include "base/utils/Log.h"
+#include "tgfx/gpu/CommandQueue.h"
+#include "tgfx/gpu/Context.h"
+#include "tgfx/gpu/GPU.h"
 
 namespace pag {
+
+bool Devices::WaitForQueue(tgfx::Context* context) {
+  if (context == nullptr) {
+    return false;
+  }
+  context->flushAndSubmit();
+  auto healthy = IsDeviceHealthy(context);
+  context->gpu()->queue()->waitUntilCompleted();
+  return healthy;
+}
 
 Devices::AdoptedDevice Devices::ResolveForExternalResource(const tgfx::BackendTexture& texture,
                                                            bool forAsyncThread,

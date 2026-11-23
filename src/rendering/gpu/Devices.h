@@ -256,6 +256,12 @@ class Devices {
   static bool CanSampleFrom(tgfx::Context* context, const ExternalDeviceRef* deviceRef);
 
   /**
+   * Submits pending work and waits for the backend's completion primitive, returning the device
+   * health sampled before the wait. Backends without a synchronous fence only submit.
+   */
+  static bool WaitForQueue(tgfx::Context* context);
+
+  /**
    * Returns true when the context's GPU device is still usable for new work. The context must
    * already be locked by the caller. Backends without a native device-health query return true
    * for a non-null context; D3D12 checks the registered native device for removal.

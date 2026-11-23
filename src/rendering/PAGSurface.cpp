@@ -430,11 +430,9 @@ bool PAGSurface::waitUntilCompleted() {
   if (context == nullptr) {
     return false;
   }
-  context->flushAndSubmit();
   // On D3D12 the queue wait may mark the context as lost. Reacquire the lock afterward so that
   // loss is rejected; other backends only recheck the state supported by their device locks.
-  auto healthy = Devices::IsDeviceHealthy(context);
-  context->gpu()->queue()->waitUntilCompleted();
+  auto healthy = Devices::WaitForQueue(context);
   unlockContext();
   if (!healthy) {
     return false;

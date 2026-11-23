@@ -441,6 +441,44 @@ jobs:
             !web/emsdk
             !web/node_modules
 
+  win-tests-compile:
+    runs-on: windows-latest
+    steps:
+      - name: Check Out Repo
+        uses: actions/checkout@v4
+
+      - name: Run depsync
+        run: |
+          npm install depsync@1.4.6 -g
+          depsync
+        shell: bash
+
+      - name: Set up MSVC
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Build OpenGL tests
+        run: |
+          cmake -G Ninja -B build-win-gl -DPAG_BUILD_TESTS=ON -DPAG_USE_OPENGL=ON -DCMAKE_BUILD_TYPE=Debug
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cmake --build build-win-gl --target PAGFullTest_OpenGL --parallel
+        shell: pwsh
+
+      - name: Build D3D12 WARP tests
+        run: |
+          cmake -G Ninja -B build-win-d3d12 -DPAG_BUILD_TESTS=ON -DPAG_USE_D3D12=ON -DPAG_D3D12_USE_WARP=ON -DPAG_USE_OPENGL=OFF -DCMAKE_BUILD_TYPE=Debug
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cmake --build build-win-d3d12 --target PAGFullTest_D3D12 --parallel
+        shell: pwsh
+
+      - name: Build clang-cl tests
+        run: |
+          where.exe clang-cl
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cmake -G Ninja -B build-win-clang -DPAG_BUILD_TESTS=ON -DPAG_USE_D3D12=ON -DPAG_D3D12_USE_WARP=ON -DPAG_USE_OPENGL=OFF -DCMAKE_C_COMPILER=clang-cl -DCMAKE_CXX_COMPILER=clang-cl "-DCMAKE_C_COMPILER_LAUNCHER=python;win/tools/filter_clang.py" "-DCMAKE_CXX_COMPILER_LAUNCHER=python;win/tools/filter_clang.py" -DCMAKE_BUILD_TYPE=Debug
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cmake --build build-win-clang --target PAGFullTest_D3D12 --parallel
+        shell: pwsh
+
   win:
     runs-on: windows-latest
     steps:
