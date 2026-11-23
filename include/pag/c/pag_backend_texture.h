@@ -39,8 +39,11 @@ PAG_EXPORT pag_backend_texture* pag_backend_texture_create_from_mtl_texture_info
 
 /**
  * Creates a new pag_backend_texture from an external ID3D12Resource. Release it by pag_release.
- * The resource pointer is stored as an opaque handle; libpag will not release it. Typeless,
- * array, multisampled and multi-plane resources are rejected when the texture is used.
+ * The resource pointer is stored as an opaque handle; libpag will not release it. The resource
+ * must be a single-sample, single-plane typed 2D texture in D3D12_RESOURCE_STATE_COMMON. Sampling
+ * requires DENY_SHADER_RESOURCE to be unset; rendering requires ALLOW_RENDER_TARGET. Supported
+ * formats are R8_UNORM and RGBA8/BGRA8 UNORM or SRGB. The native device must match the surface
+ * that samples the texture. Typeless, array, multisampled and multi-plane resources are rejected.
  */
 PAG_EXPORT pag_backend_texture* pag_backend_texture_create_from_d3d12_texture_info(
     pag_d3d12_texture_info textureInfo, int width, int height);

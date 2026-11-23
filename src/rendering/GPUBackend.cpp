@@ -74,7 +74,7 @@ BackendTexture& BackendTexture::operator=(const BackendTexture& that) {
 }
 
 bool BackendTexture::getGLTextureInfo(GLTextureInfo* glTextureInfo) const {
-  if (!isValid() || _backend != Backend::OPENGL) {
+  if (!isValid() || _backend != Backend::OPENGL || glTextureInfo == nullptr) {
     return false;
   }
   *glTextureInfo = glInfo;
@@ -82,7 +82,7 @@ bool BackendTexture::getGLTextureInfo(GLTextureInfo* glTextureInfo) const {
 }
 
 bool BackendTexture::getMtlTextureInfo(MtlTextureInfo* mtlTextureInfo) const {
-  if (!isValid() || _backend != Backend::METAL) {
+  if (!isValid() || _backend != Backend::METAL || mtlTextureInfo == nullptr) {
     return false;
   }
   *mtlTextureInfo = mtlInfo;
@@ -98,7 +98,7 @@ bool BackendTexture::getD3D12TextureInfo(D3D12TextureInfo* d3d12TextureInfo) con
 }
 
 bool BackendTexture::getVkImageInfo(VkImageInfo* vkImageInfo) const {
-  if (!isValid() || _backend != Backend::VULKAN) {
+  if (!isValid() || _backend != Backend::VULKAN || vkImageInfo == nullptr) {
     return false;
   }
   *vkImageInfo = vkInfo;
@@ -106,7 +106,7 @@ bool BackendTexture::getVkImageInfo(VkImageInfo* vkImageInfo) const {
 }
 
 bool BackendTexture::getWebGPUTextureInfo(WebGPUTextureInfo* webGPUTextureInfo) const {
-  if (!isValid() || _backend != Backend::WEBGPU) {
+  if (!isValid() || _backend != Backend::WEBGPU || webGPUTextureInfo == nullptr) {
     return false;
   }
   *webGPUTextureInfo = webGPUInfo;
@@ -161,7 +161,7 @@ BackendRenderTarget& BackendRenderTarget::operator=(const BackendRenderTarget& t
 }
 
 bool BackendRenderTarget::getGLFramebufferInfo(GLFrameBufferInfo* glFrameBufferInfo) const {
-  if (!isValid() || _backend != Backend::OPENGL) {
+  if (!isValid() || _backend != Backend::OPENGL || glFrameBufferInfo == nullptr) {
     return false;
   }
   *glFrameBufferInfo = glInfo;
@@ -169,7 +169,7 @@ bool BackendRenderTarget::getGLFramebufferInfo(GLFrameBufferInfo* glFrameBufferI
 }
 
 bool BackendRenderTarget::getMtlTextureInfo(MtlTextureInfo* mtlTextureInfo) const {
-  if (!isValid() || _backend != Backend::METAL) {
+  if (!isValid() || _backend != Backend::METAL || mtlTextureInfo == nullptr) {
     return false;
   }
   *mtlTextureInfo = mtlInfo;
@@ -185,7 +185,7 @@ bool BackendRenderTarget::getD3D12TextureInfo(D3D12TextureInfo* d3d12TextureInfo
 }
 
 bool BackendRenderTarget::getVkImageInfo(VkImageInfo* vkImageInfo) const {
-  if (!isValid() || _backend != Backend::VULKAN) {
+  if (!isValid() || _backend != Backend::VULKAN || vkImageInfo == nullptr) {
     return false;
   }
   *vkImageInfo = vkInfo;

@@ -13,7 +13,7 @@ relative to it.
 Install the dependency sync tool once and fetch the prebuilt dependencies:
 
 ```powershell
-npm install -g depsync
+npm install -g depsync@1.4.6
 depsync
 ```
 

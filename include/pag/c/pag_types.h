@@ -96,13 +96,20 @@ typedef enum {
 } pag_image_origin;
 
 /**
- * Describes an external OpenGL texture. Callers initialize the fields explicitly; the usual
- * defaults are target GL_TEXTURE_2D (0x0DE1) and format GL_RGBA8 (0x8058).
+ * Describes an external OpenGL texture. C callers initialize all fields explicitly; C++ callers
+ * keep the historical value-initialized defaults target GL_TEXTURE_2D (0x0DE1) and format
+ * GL_RGBA8 (0x8058).
  */
 typedef struct pag_gl_texture_info {
+#ifdef __cplusplus
+  unsigned id = 0;
+  unsigned target = 0x0DE1;
+  unsigned format = 0x8058;
+#else
   unsigned id;
   unsigned target;
   unsigned format;
+#endif
 } pag_gl_texture_info;
 
 typedef struct pag_vk_image_info {
@@ -121,6 +128,10 @@ typedef struct pag_mtl_texture_info {
 typedef struct pag_d3d12_texture_info {
   void* resource;
 } pag_d3d12_texture_info;
+/* The resource must be a single-sample, single-plane typed 2D ID3D12Resource in
+ * D3D12_RESOURCE_STATE_COMMON. Sampling requires that DENY_SHADER_RESOURCE is not set; rendering
+ * requires ALLOW_RENDER_TARGET. Supported formats are R8_UNORM and RGBA8/BGRA8 UNORM or SRGB.
+ * The resource's native device must match the surface that samples it. */
 
 typedef struct pag_point {
   float x;

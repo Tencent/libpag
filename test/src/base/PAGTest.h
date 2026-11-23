@@ -126,17 +126,17 @@ class CLITest : public PAGTest {};
 #define PAG_PRIVATE_ACCESS(...) __VA_ARGS__
 #else
 #define PAG_TEST_PRIVATE(test_case_name, test_name) \
-  static void Disabled_##test_case_name##_##test_name()
+  static void DisabledPag_##test_case_name##_##test_name()
 #define PAG_PIXEL_TEST_PRIVATE(test_case_name, test_name) \
-  static void DisabledPixel_##test_case_name##_##test_name()
+  static void DisabledPagPixel_##test_case_name##_##test_name()
 #define PAGX_TEST_PRIVATE(test_case_name, test_name) \
-  static void Disabled_##test_case_name##_##test_name()
+  static void DisabledPagX_##test_case_name##_##test_name()
 #define PAGX_PIXEL_TEST_PRIVATE(test_case_name, test_name) \
-  static void DisabledPixel_##test_case_name##_##test_name()
+  static void DisabledPagXPixel_##test_case_name##_##test_name()
 #define CLI_TEST_PRIVATE(test_case_name, test_name) \
-  static void Disabled_##test_case_name##_##test_name()
+  static void DisabledCli_##test_case_name##_##test_name()
 #define CLI_PIXEL_TEST_PRIVATE(test_case_name, test_name) \
-  static void DisabledPixel_##test_case_name##_##test_name()
+  static void DisabledCliPixel_##test_case_name##_##test_name()
 #define PAG_PRIVATE_ACCESS(...)
 #endif
 

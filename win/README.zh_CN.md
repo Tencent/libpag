@@ -11,7 +11,7 @@ Windows 示例工程链接的是静态库 `libpag.lib`，因此 GPU 后端由 li
 首次使用需安装依赖同步工具并拉取预编译依赖：
 
 ```powershell
-npm install -g depsync
+npm install -g depsync@1.4.6
 depsync
 ```
 

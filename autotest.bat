@@ -109,7 +109,7 @@ if errorlevel 1 (
 where depsync >nul 2>nul
 if not errorlevel 1 goto :depsync_ready
 echo Installing depsync...
-call npm install -g depsync
+call npm install -g depsync@1.4.6
 if errorlevel 1 (
   echo Error: installing depsync failed.
   exit /b 1
@@ -167,7 +167,3 @@ echo.
 echo Run update_baseline.bat as a separate step first; this script never checks out another commit.
 echo Results are written to result\ (JSON report and failing screenshots).
 exit /b 0
-
-:usage_error
-echo Usage: autotest.bat [USE_OPENGL^|USE_OPENGL_SWIFTSHADER^|USE_D3D12^|USE_D3D12_WARP^|USE_VULKAN] [--clang-cl] [--filter ^<gtest filter^>]
-exit /b 1

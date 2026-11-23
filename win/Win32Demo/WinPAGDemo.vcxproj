@@ -113,7 +113,7 @@
     </PostBuildEvent>
     <PreBuildEvent>
       <Command>cd "$(SolutionDir).."
-call npm install -g depsync --silent
+call npm install -g depsync@1.4.6 --silent
 call depsync
 set CMAKE_MSVC_PATH=$(VCInstallDir)
 node .\build_pag -a x86 -DPAG_BUILD_SHARED=OFF $(PagBackendArguments)</Command>
@@ -148,7 +148,7 @@ node .\build_pag -a x86 -DPAG_BUILD_SHARED=OFF $(PagBackendArguments)</Command>
     </PostBuildEvent>
     <PreBuildEvent>
       <Command>cd "$(SolutionDir).."
-call npm install -g depsync --silent
+call npm install -g depsync@1.4.6 --silent
 call depsync
 set CMAKE_MSVC_PATH=$(VCInstallDir)
 node .\build_pag -a x86 -DPAG_BUILD_SHARED=OFF $(PagBackendArguments)</Command>
@@ -173,7 +173,7 @@ node .\build_pag -a x86 -DPAG_BUILD_SHARED=OFF $(PagBackendArguments)</Command>
     </Link>
     <PreBuildEvent>
       <Command>cd "$(SolutionDir).."
-call npm install -g depsync --silent
+call npm install -g depsync@1.4.6 --silent
 call depsync
 set CMAKE_MSVC_PATH=$(VCInstallDir)
 node .\build_pag -a x64 -DPAG_BUILD_SHARED=OFF $(PagBackendArguments)</Command>
@@ -215,7 +215,7 @@ node .\build_pag -a x64 -DPAG_BUILD_SHARED=OFF $(PagBackendArguments)</Command>
     </PostBuildEvent>
     <PreBuildEvent>
       <Command>cd "$(SolutionDir).."
-call npm install -g depsync --silent
+call npm install -g depsync@1.4.6 --silent
 call depsync
 set CMAKE_MSVC_PATH=$(VCInstallDir)
 node .\build_pag -a x64 -DPAG_BUILD_SHARED=OFF $(PagBackendArguments)</Command>

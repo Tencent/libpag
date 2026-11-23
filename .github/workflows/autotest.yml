@@ -35,7 +35,7 @@ jobs:
 
       - name: Run depsync
         run: |
-          npm install depsync -g
+          npm install depsync@1.4.6 -g
           depsync
         shell: bash
 
@@ -151,7 +151,7 @@ jobs:
 
       - name: Run depsync
         run: |
-          npm install depsync -g
+          npm install depsync@1.4.6 -g
           depsync
         shell: bash
 

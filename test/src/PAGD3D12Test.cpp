@@ -40,8 +40,10 @@
 namespace pag {
 
 /**
- * A native device that is intentionally not the registry's default entry. Tests use it to exercise
- * first-time registration and non-default device ownership instead of hitting the warm cache.
+ * A native device that is intentionally not the registry's default entry. The default device is
+ * covered by the other D3D12 tests (including WARP builds); this secondary device only exercises
+ * non-default registration and ownership. Prefer a different adapter so the two devices cannot
+ * collapse into the same registry entry.
  */
 struct SecondaryDeviceTexture {
   Microsoft::WRL::ComPtr<ID3D12Device> device = nullptr;
@@ -222,7 +224,8 @@ PAG_TEST(D3D12Test, TypelessResourceRejected) {
   auto resource = GetNativeResource(source->getBackendTexture());
   ASSERT_TRUE(resource != nullptr);
   ID3D12Device* device = nullptr;
-  ASSERT_TRUE(SUCCEEDED(resource->GetDevice(IID_PPV_ARGS(&device))));
+  auto deviceResult = resource->GetDevice(IID_PPV_ARGS(&device));
+  ASSERT_TRUE(SUCCEEDED(deviceResult)) << "GetDevice HRESULT=" << static_cast<long>(deviceResult);
   D3D12_HEAP_PROPERTIES heap = {};
   heap.Type = D3D12_HEAP_TYPE_DEFAULT;
   D3D12_RESOURCE_DESC desc = {};
@@ -237,7 +240,7 @@ PAG_TEST(D3D12Test, TypelessResourceRejected) {
   auto hr = device->CreateCommittedResource(&heap, D3D12_HEAP_FLAG_NONE, &desc,
                                             D3D12_RESOURCE_STATE_COMMON, nullptr,
                                             IID_PPV_ARGS(&typeless));
-  ASSERT_TRUE(SUCCEEDED(hr));
+  ASSERT_TRUE(SUCCEEDED(hr)) << "HRESULT=" << static_cast<long>(hr);
   D3D12TextureInfo info = {};
   info.resource = typeless;
   BackendTexture texture(info, 8, 8);
@@ -565,7 +568,8 @@ PAG_TEST(D3D12Test, IndependentQueueCompletion) {
   auto resource = static_cast<ID3D12Resource*>(const_cast<void*>(textureInfo.resource));
   ASSERT_TRUE(resource != nullptr);
   Microsoft::WRL::ComPtr<ID3D12Device> nativeDevice = nullptr;
-  ASSERT_TRUE(SUCCEEDED(resource->GetDevice(IID_PPV_ARGS(nativeDevice.ReleaseAndGetAddressOf()))));
+  auto nativeResult = resource->GetDevice(IID_PPV_ARGS(nativeDevice.ReleaseAndGetAddressOf()));
+  ASSERT_TRUE(SUCCEEDED(nativeResult)) << "GetDevice HRESULT=" << static_cast<long>(nativeResult);
   auto format = static_cast<DXGI_FORMAT>(textureInfo.format);
 
   HostQueue host = {};
@@ -578,7 +582,8 @@ PAG_TEST(D3D12Test, IndependentQueueCompletion) {
   ASSERT_TRUE(readback.Get() != nullptr);
 
   uint8_t* uploadPixels = nullptr;
-  ASSERT_TRUE(SUCCEEDED(upload->Map(0, nullptr, reinterpret_cast<void**>(&uploadPixels))));
+  auto uploadResult = upload->Map(0, nullptr, reinterpret_cast<void**>(&uploadPixels));
+  ASSERT_TRUE(SUCCEEDED(uploadResult)) << "Map HRESULT=" << static_cast<long>(uploadResult);
   for (int y = 0; y < size; y++) {
     for (int x = 0; x < size; x++) {
       auto pixel = uploadPixels + y * rowPitch + x * 4;
@@ -620,7 +625,8 @@ PAG_TEST(D3D12Test, IndependentQueueCompletion) {
 
   D3D12_RANGE readRange = {0, static_cast<SIZE_T>(rowPitch) * size};
   uint8_t* readbackPixels = nullptr;
-  ASSERT_TRUE(SUCCEEDED(readback->Map(0, &readRange, reinterpret_cast<void**>(&readbackPixels))));
+  auto readbackResult = readback->Map(0, &readRange, reinterpret_cast<void**>(&readbackPixels));
+  ASSERT_TRUE(SUCCEEDED(readbackResult)) << "Map HRESULT=" << static_cast<long>(readbackResult);
   for (int y = 0; y < size; y++) {
     for (int x = 0; x < size; x++) {
       auto pixel = readbackPixels + y * rowPitch + x * 4;
@@ -642,7 +648,8 @@ PAG_TEST(D3D12Test, IndependentQueueCompletion) {
                      D3D12_RESOURCE_STATE_COMMON);
   ASSERT_TRUE(host.execute());
 
-  ASSERT_TRUE(SUCCEEDED(readback->Map(0, &readRange, reinterpret_cast<void**>(&readbackPixels))));
+  auto secondReadbackResult = readback->Map(0, &readRange, reinterpret_cast<void**>(&readbackPixels));
+  ASSERT_TRUE(SUCCEEDED(secondReadbackResult)) << "Map HRESULT=" << static_cast<long>(readbackResult);
   auto corner = readbackPixels;
   EXPECT_EQ(corner[0], 0);
   EXPECT_EQ(corner[3], 0);

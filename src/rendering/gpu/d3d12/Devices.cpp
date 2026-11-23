@@ -21,6 +21,7 @@
 #include <dxgiformat.h>
 #include <memory>
 #include <mutex>
+#include <unordered_map>
 #include <vector>
 #include "base/utils/Log.h"
 #include "tgfx/gpu/Context.h"
@@ -57,7 +58,48 @@ struct Registry {
   std::mutex locker = {};
   std::vector<std::weak_ptr<DeviceEntry>> entries = {};
   std::weak_ptr<DeviceEntry> defaultEntry = {};
+  std::unordered_map<uint32_t, IUnknown*> contextIdentities = {};
+
+  ~Registry() {
+    for (auto& item : contextIdentities) {
+      item.second->Release();
+    }
+  }
 };
+
+std::mutex& GetCreationLocker() {
+  static std::mutex locker = {};
+  return locker;
+}
+
+bool IsEntryHealthy(const std::shared_ptr<DeviceEntry>& entry) {
+  if (entry == nullptr || entry->identity == nullptr) {
+    return false;
+  }
+  ID3D12Device* nativeDevice = nullptr;
+  entry->identity->QueryInterface(IID_PPV_ARGS(&nativeDevice));
+  if (nativeDevice == nullptr) {
+    return false;
+  }
+  auto reason = nativeDevice->GetDeviceRemovedReason();
+  nativeDevice->Release();
+  return SUCCEEDED(reason);
+}
+
+void EraseEntryLocked(Registry& registry, DeviceEntry* target) {
+  auto defaultEntry = registry.defaultEntry.lock();
+  if (defaultEntry.get() == target) {
+    registry.defaultEntry.reset();
+  }
+  for (auto iterator = registry.entries.begin(); iterator != registry.entries.end();) {
+    auto entry = iterator->lock();
+    if (entry == nullptr || entry.get() == target) {
+      iterator = registry.entries.erase(iterator);
+    } else {
+      ++iterator;
+    }
+  }
+}
 
 Registry& GetRegistry() {
   static Registry registry = {};
@@ -128,8 +170,18 @@ IUnknown* CaptureIdentityFromResource(ID3D12Resource* resource) {
 }
 
 IUnknown* CaptureIdentityFromContext(tgfx::Context* context) {
-  if (context == nullptr) {
+  if (context == nullptr || context->device() == nullptr) {
     return nullptr;
+  }
+  auto deviceID = context->device()->uniqueID();
+  {
+    auto& registry = GetRegistry();
+    std::lock_guard<std::mutex> autoLock(registry.locker);
+    auto iterator = registry.contextIdentities.find(deviceID);
+    if (iterator != registry.contextIdentities.end()) {
+      iterator->second->AddRef();
+      return iterator->second;
+    }
   }
   IUnknown* identity = nullptr;
   {
@@ -142,6 +194,19 @@ IUnknown* CaptureIdentityFromContext(tgfx::Context* context) {
       if (backendTexture.getD3D12TextureInfo(&info)) {
         identity = CaptureIdentityFromResource(GetResource(info));
       }
+    }
+  }
+  if (identity != nullptr) {
+    auto& registry = GetRegistry();
+    std::lock_guard<std::mutex> autoLock(registry.locker);
+    auto iterator = registry.contextIdentities.find(deviceID);
+    if (iterator != registry.contextIdentities.end()) {
+      identity->Release();
+      identity = iterator->second;
+      identity->AddRef();
+    } else {
+      registry.contextIdentities[deviceID] = identity;
+      identity->AddRef();
     }
   }
   return identity;
@@ -182,6 +247,18 @@ std::shared_ptr<DeviceEntry> RegisterNewDevice(std::shared_ptr<tgfx::D3D12Device
   return PublishEntry(identity, std::move(device));
 }
 
+std::shared_ptr<DeviceEntry> FindHealthyEntryLocked(Registry& registry, IUnknown* identity) {
+  auto existing = FindEntryLocked(registry, identity);
+  if (existing == nullptr) {
+    return nullptr;
+  }
+  if (IsEntryHealthy(existing)) {
+    return existing;
+  }
+  EraseEntryLocked(registry, existing.get());
+  return nullptr;
+}
+
 std::shared_ptr<DeviceEntry> GetOrCreateEntry(ID3D12Resource* resource) {
   auto identity = CaptureIdentityFromResource(resource);
   if (identity == nullptr) {
@@ -190,7 +267,17 @@ std::shared_ptr<DeviceEntry> GetOrCreateEntry(ID3D12Resource* resource) {
   {
     auto& registry = GetRegistry();
     std::lock_guard<std::mutex> autoLock(registry.locker);
-    auto existing = FindEntryLocked(registry, identity);
+    auto existing = FindHealthyEntryLocked(registry, identity);
+    if (existing != nullptr) {
+      identity->Release();
+      return existing;
+    }
+  }
+  std::lock_guard<std::mutex> creationLock(GetCreationLocker());
+  {
+    auto& registry = GetRegistry();
+    std::lock_guard<std::mutex> autoLock(registry.locker);
+    auto existing = FindHealthyEntryLocked(registry, identity);
     if (existing != nullptr) {
       identity->Release();
       return existing;
@@ -277,6 +364,22 @@ class D3D12ExternalDeviceRef : public ExternalDeviceRef {
 }  // namespace
 
 std::shared_ptr<tgfx::Device> Devices::MakeDefault() {
+  {
+    auto& registry = GetRegistry();
+    std::shared_ptr<DeviceEntry> entry = nullptr;
+    {
+      std::lock_guard<std::mutex> autoLock(registry.locker);
+      entry = registry.defaultEntry.lock();
+    }
+    if (entry != nullptr) {
+      if (IsEntryHealthy(entry)) {
+        return MakeAliasedDevice(entry);
+      }
+      std::lock_guard<std::mutex> autoLock(registry.locker);
+      EraseEntryLocked(registry, entry.get());
+    }
+  }
+  std::lock_guard<std::mutex> creationLock(GetCreationLocker());
   {
     auto& registry = GetRegistry();
     std::lock_guard<std::mutex> autoLock(registry.locker);

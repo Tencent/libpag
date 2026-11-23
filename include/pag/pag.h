@@ -1001,7 +1001,7 @@ class PAG_API PAGComposition : public PAGLayer {
                          std::shared_ptr<PAGLayer> pagLayer);
   static void MeasureChildLayer(tgfx::Rect* bounds, PAGLayer* childLayer);
   static void DrawChildLayer(Recorder* recorder, PAGLayer* childLayer,
-                              std::shared_ptr<FilterModifier> filterModifier);
+                             std::shared_ptr<FilterModifier> filterModifier);
   static bool GetTrackMatteLayerAtPoint(PAGLayer* childLayer, float x, float y,
                                         std::vector<std::shared_ptr<PAGLayer>>* results);
   static bool GetChildLayerAtPoint(PAGLayer* childLayer, float x, float y,
@@ -1191,7 +1191,8 @@ class PAGPlayer;
 /**
  * A GPU-backed render target that manages its device's context lock internally. Callers must not
  * hold the same GPU device's context lock while calling methods that access its GPU resources,
- * including readPixels(), clearAll(), freeCache(), updateSize(), and getHardwareBuffer().
+ * including readPixels(), clearAll(), freeCache(), updateSize(), getHardwareBuffer(), and
+ * waitUntilCompleted().
  *
  * A PAGSurface must always be created through the MakeFrom()/MakeOffscreen() factories and held
  * by std::shared_ptr.

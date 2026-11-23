@@ -21,6 +21,7 @@
 #include "base/PAGTest.h"
 #include "base/utils/TGFXCast.h"
 #include "base/utils/cast/MetalTexture.h"
+#include "pag/c/pag_types.h"
 #include "pag/pag.h"
 #include "tgfx/gpu/Context.h"
 
@@ -223,6 +224,31 @@ PAG_TEST(TGFXCastTest, WebGPUTextureRoundTrip) {
   WebGPUTextureInfo noFormat = webGPUInfo;
   noFormat.format = 0;
   EXPECT_FALSE(ToTGFX(BackendTexture(noFormat, 640, 360)).isValid());
+}
+
+/**
+ * C++ value-initialization must keep the historical GL defaults, and every backend getter must
+ * reject a null output pointer instead of dereferencing it.
+ */
+PAG_TEST(TGFXCastTest, BackendInfoDefaultsAndNullOutput) {
+  pag_gl_texture_info defaults = {};
+  EXPECT_EQ(defaults.id, 0u);
+  EXPECT_EQ(defaults.target, 0x0DE1u);
+  EXPECT_EQ(defaults.format, 0x8058u);
+  pag_gl_texture_info partial = {7};
+  EXPECT_EQ(partial.id, 7u);
+  EXPECT_EQ(partial.target, 0x0DE1u);
+  EXPECT_EQ(partial.format, 0x8058u);
+
+  BackendTexture glTexture(GLTextureInfo{}, 4, 4);
+  EXPECT_FALSE(glTexture.getGLTextureInfo(nullptr));
+  BackendRenderTarget glTarget(GLFrameBufferInfo{}, 4, 4);
+  EXPECT_FALSE(glTarget.getGLFramebufferInfo(nullptr));
+  EXPECT_FALSE(glTexture.getMtlTextureInfo(nullptr));
+  EXPECT_FALSE(glTexture.getVkImageInfo(nullptr));
+  EXPECT_FALSE(glTexture.getWebGPUTextureInfo(nullptr));
+  EXPECT_FALSE(glTarget.getMtlTextureInfo(nullptr));
+  EXPECT_FALSE(glTarget.getVkImageInfo(nullptr));
 }
 
 }  // namespace pag

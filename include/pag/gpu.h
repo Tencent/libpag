@@ -219,7 +219,8 @@ class PAG_API BackendTexture {
   BackendTexture& operator=(const BackendTexture& that);
 
   /**
-   * Returns true if the backend texture has been initialized.
+   * Returns true if the backend texture was created with positive dimensions. A null native
+   * resource is rejected when the texture is sampled or rendered into, not by this check.
    */
   bool isValid() const {
     return _width > 0 && _height > 0;

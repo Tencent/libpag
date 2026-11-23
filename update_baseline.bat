@@ -116,6 +116,7 @@ if errorlevel 1 (
 )
 git show %MAIN_COMMIT%:test/baseline/version.json > "%TEMP%\pag_main_version.json" 2>nul
 if errorlevel 1 (
+  del "%TEMP%\pag_main_version.json" >nul 2>nul
   call :Fail "Cannot read test\baseline\version.json from origin/main."
   goto :cleanup
 )
@@ -146,6 +147,7 @@ set "STASH_AFTER="
 for /f "delims=" %%i in ('git rev-parse --verify -q refs/stash 2^>nul') do set "STASH_AFTER=%%i"
 if not "%STASH_BEFORE%"=="%STASH_AFTER%" set "STASH_CREATED=1"
 set "RESTORE_NEEDED=1"
+echo Stashed local changes. Recovery: git switch "%CURRENT_BRANCH%" ^&^& git stash pop --index
 git switch --detach %MAIN_COMMIT% --quiet
 if errorlevel 1 (
   call :Fail "git switch --detach failed."
@@ -156,7 +158,7 @@ if errorlevel 1 (
 where depsync >nul 2>nul
 if not errorlevel 1 goto :depsync_ready
 echo Installing depsync...
-call npm install -g depsync
+call npm install -g depsync@1.4.6
 if errorlevel 1 (
   call :Fail "Installing depsync failed."
   goto :cleanup
@@ -194,7 +196,7 @@ if not exist "%BUILD_DIR%\CMakeFiles\%BASELINE_TARGET%.dir" (
   goto :cleanup
 )
 
-cmake --build "%BUILD_DIR%" --target %BASELINE_TARGET% --parallel 12
+cmake --build "%BUILD_DIR%" --target %BASELINE_TARGET% --parallel
 if errorlevel 1 (
   call :Fail "Building %BASELINE_TARGET% failed."
   goto :cleanup
