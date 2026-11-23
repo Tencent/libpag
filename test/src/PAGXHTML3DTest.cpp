@@ -36,6 +36,8 @@
 #include "base/PAGXTestCommon.h"
 #include "pagx/HTMLImporter.h"
 #include "pagx/PAGXDocument.h"
+#include "pagx/PAGXExporter.h"
+#include "pagx/PAGXImporter.h"
 #include "pagx/html/importer/HTMLDiagnosticSink.h"
 #include "pagx/html/importer/HTMLTransform3D.h"
 #include "pagx/html/importer/HTMLValueParser.h"
@@ -62,6 +64,19 @@ std::shared_ptr<pagx::PAGXDocument> ParseHtml(const std::string& html) {
   pagx::HTMLImporter::Options options = {};
   options.autoNormalize = false;
   return pagx::HTMLImporter::ParseString(html, options);
+}
+
+// Round-trips a document through the serialized form before rendering it. The runtime resolves an
+// `Animation` target through the document's id index, which only `PAGXImporter::FromXML` fills: a
+// document built in memory by the HTML importer has no entries there, so its animations would be
+// skipped and every frame would show the pre-animation state. Rendered content and keyframe values
+// are identical either way, and the CLI / eval harness renders through the same round-trip.
+std::shared_ptr<pagx::PAGXDocument> RoundTripForRender(
+    const std::shared_ptr<pagx::PAGXDocument>& doc) {
+  if (doc == nullptr) {
+    return nullptr;
+  }
+  return pagx::PAGXImporter::FromXML(pagx::PAGXExporter::ToXML(*doc));
 }
 
 pagx::Layer* FindLayerById(pagx::Layer* layer, const std::string& id) {
@@ -224,6 +239,18 @@ pagx::TypedChannel<pagx::Matrix3D>* FindMatrix3DChannel(pagx::Animation* animati
     return nullptr;
   }
   return static_cast<pagx::TypedChannel<pagx::Matrix3D>*>(channel);
+}
+
+// Counts the pixels a frame actually paints: any non-zero alpha means the layer covered part of
+// that pixel. A sub-pixel pose can still touch its corner pixel, so assertions allow a few.
+size_t CountVisiblePixels(const std::vector<uint8_t>& pixels) {
+  size_t visible = 0;
+  for (size_t i = 3; i < pixels.size(); i += 4) {
+    if (pixels[i] != 0) {
+      ++visible;
+    }
+  }
+  return visible;
 }
 
 // Composes two layer poses, so a test can assert what a child's pose becomes once an ancestor
@@ -2109,6 +2136,83 @@ PAG_TEST(PAGXHTML3DTest, SingularStaticPoseHoldsStaySubPixel) {
   EXPECT_TRUE(NearlyEqual(card->matrix.a, 0.0f, 1e-6f))
       << "the element's own static matrix keeps the authored zero";
   EXPECT_TRUE(NearlyEqual(card->matrix.d, 0.0f, 1e-6f));
+}
+
+/**
+ * Test case: the zero-scale substitute is a *ratio*, so a fixed `1e-3` only bounds the rendered size
+ * for boxes up to 500px — a 20000px box would paint a 20px patch. Sizing it from the reference box
+ * (`0.5 / 20000`) keeps the fill-mode hold inside half a pixel, so a large element is still
+ * invisible while the animation waits out its delay.
+ */
+PAG_TEST(PAGXHTML3DTest, SingularZeroScaleHoldStaysSubPixelOnALargeBox) {
+  auto doc = ParseHtml(R"HTML(
+    <html><head><style>
+      @keyframes k { 0% { transform: rotateY(0deg); } 100% { transform: rotateY(60deg); } }
+    </style></head>
+    <body style="width:200px;height:120px">
+      <div id="card" style="position:absolute;left:0;top:0;width:20000px;height:20000px;
+           background-color:#38BDF8;transform:scale(0);transform-origin:0px 0px;
+           animation:k 1s linear 0.5s 1"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* animation = FirstAnimation(doc);
+  ASSERT_NE(animation, nullptr);
+  auto* channel = FindMatrix3DChannel(animation);
+  ASSERT_NE(channel, nullptr);
+  ASSERT_GE(channel->keyframes.size(), 4u) << "delay + once needs a hold on both sides";
+  pagx::DecomposedMatrix3D decomposed = {};
+  ASSERT_TRUE(pagx::DecomposeMatrix3D(channel->keyframes.front().value, &decomposed));
+  // 0.5 / 20000 = 2.5e-5, which is below the `1e-3` upper bound the small-box cases keep.
+  EXPECT_NEAR(decomposed.scale[0], 0.000025, 1e-9);
+  EXPECT_NEAR(decomposed.scale[1], 0.000025, 1e-9);
+  // 0.1s sits inside the 0.5s delay, so the frame is the leading fill-mode hold.
+  const auto pixels = RenderFrame(RoundTripForRender(doc), 100000);
+  ASSERT_FALSE(pixels.empty());
+  EXPECT_LE(CountVisiblePixels(pixels), 8u)
+      << "a 20000px box held at 1e-3 would paint a 20px patch";
+}
+
+/**
+ * Test case: a singular static pose that came from a `matrix` factor cannot be recovered by the
+ * zero-scale clamp, but holding the identity would show the element at full size outside the
+ * active window. The hold is `diag(epsilon, epsilon, 1)` — invertible, sub-pixel — and keeps the
+ * authored translation, so the element stays invisible at its own position.
+ */
+PAG_TEST(PAGXHTML3DTest, MatrixSourceSingularFillHoldStaysSubPixel) {
+  auto doc = ParseHtml(R"HTML(
+    <html><head><style>
+      @keyframes k { 0% { transform: rotateY(0deg); } 100% { transform: rotateY(60deg); } }
+    </style></head>
+    <body style="width:200px;height:120px">
+      <div id="card" style="position:absolute;left:20px;top:20px;width:80px;height:60px;
+           background-color:#38BDF8;transform:matrix(0,0,0,0,30,20);
+           animation:k 1s linear 0.5s 1"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* animation = FirstAnimation(doc);
+  ASSERT_NE(animation, nullptr);
+  auto* channel = FindMatrix3DChannel(animation);
+  ASSERT_NE(channel, nullptr);
+  ASSERT_GE(channel->keyframes.size(), 4u) << "delay + once needs a hold on both sides";
+  const auto& hold = channel->keyframes.front().value;
+  ASSERT_TRUE(pagx::IsInvertibleMatrix3D(hold)) << "the hold has to be persistable";
+  // 0.5 / 80 is above the `1e-3` upper bound, so a 80px box keeps the small-box factor.
+  EXPECT_NEAR(hold.getRowColumn(0, 0), 1e-3f, 1e-6f)
+      << "the linear block is the sub-pixel substitute, not the identity";
+  EXPECT_NEAR(hold.getRowColumn(1, 1), 1e-3f, 1e-6f);
+  EXPECT_NEAR(hold.getRowColumn(2, 2), 1.0f, 1e-6f)
+      << "z stays 1, which is what keeps it invertible";
+  EXPECT_NEAR(hold.getRowColumn(0, 3), 30.0f, 1e-6f) << "the authored translation is preserved";
+  EXPECT_NEAR(hold.getRowColumn(1, 3), 20.0f, 1e-6f);
+  EXPECT_TRUE(HasDiagnosticContaining(doc, "animation-fill-mode"))
+      << "a matrix-source singular pose cannot be restored exactly, so it has to be reported";
+  // 0.1s sits inside the 0.5s delay, so the frame is the leading fill-mode hold.
+  const auto pixels = RenderFrame(RoundTripForRender(doc), 100000);
+  ASSERT_FALSE(pixels.empty());
+  EXPECT_LE(CountVisiblePixels(pixels), 8u)
+      << "an identity hold would paint the whole 80x60 box during the delay";
 }
 
 /**

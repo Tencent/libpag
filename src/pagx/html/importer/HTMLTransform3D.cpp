@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "pagx/html/importer/HTMLTransform3D.h"
+#include <algorithm>
 #include <cctype>
 #include <cmath>
 #include <cstdlib>
@@ -42,16 +43,21 @@ constexpr float POSE_EPSILON = 1e-6f;
 // *before* the multiply keeps the direction (`epsilon * R(-90deg)`), which is what makes the pose
 // invertible and therefore representable as a `matrix3D` keyframe.
 //
-// 1e-3 is picked from the rendering budget: on a 60px box the clamped edge is 60 * 1e-3 = 0.06px,
-// i.e. 0.0036 square px, which no viewer can see. Float32 rotation / scale decomposition stays well
-// conditioned down to about 1e-5, so 1e-3 is still far outside that noise band and there is no
-// reason to go smaller — a smaller factor buys nothing visually and only moves closer to the range
-// where the decomposition itself becomes unreliable.
-constexpr float SINGULAR_SCALE_CLAMP = 1e-3f;
+// The substitute has two bounds, and both are needed:
+//  - `1e-3` is the upper bound, picked from the rendering budget and the float32 conditioning range:
+//    on a small box it already keeps the pose invisible, and a smaller factor buys nothing visually
+//    while moving closer to the scale range (about 1e-5) where rotation / scale decomposition starts
+//    to wobble.
+//  - `0.5 / max(width, height)` is the size-aware bound: the factor is a *ratio*, so `1e-3` alone
+//    still renders a 100000px box as 100 visible pixels. Dividing the half-pixel budget by the box
+//    size makes "invisible" hold for any size, and it only binds for boxes larger than 500px.
+constexpr float SINGULAR_SCALE_UPPER_BOUND = 1e-3f;
+constexpr float SINGULAR_SCALE_PIXEL_BUDGET = 0.5f;
 
-// Zero carries no direction, so the substitute is the positive epsilon.
-float ClampSingularScale(float value) {
-  return value == 0.0f ? SINGULAR_SCALE_CLAMP : value;
+// Derived from the reference box, which is the same size the percentages in the list resolve
+// against. Zero carries no direction, so the substitute is the positive epsilon.
+float ClampSingularScale(float value, float epsilon) {
+  return value == 0.0f ? epsilon : value;
 }
 
 bool NearlyZero(float value) {
@@ -280,6 +286,8 @@ struct TransformArgs {
   // through `clampedZeroScale`.
   ZeroScale zeroScale = ZeroScale::Keep;
   bool* clampedZeroScale = nullptr;
+  // The substitute for a zero factor, sized by the reference box (see `SingularScaleEpsilon`).
+  float singularScaleEpsilon = SINGULAR_SCALE_UPPER_BOUND;
 
   // The Z axis has no percentage basis, so a percentage there is reported as unsupported.
   bool LengthAt(size_t index, float& value, TransformAxis axis) const {
@@ -431,9 +439,10 @@ bool ParseScale(const TransformCall& call) {
     }
   }
   if (call.args.zeroScale == ZeroScale::ClampToEpsilon && (x == 0.0f || y == 0.0f || z == 0.0f)) {
-    x = ClampSingularScale(x);
-    y = ClampSingularScale(y);
-    z = ClampSingularScale(z);
+    const float epsilon = call.args.singularScaleEpsilon;
+    x = ClampSingularScale(x, epsilon);
+    y = ClampSingularScale(y, epsilon);
+    z = ClampSingularScale(z, epsilon);
     if (call.args.clampedZeroScale != nullptr) {
       *call.args.clampedZeroScale = true;
     }
@@ -646,8 +655,13 @@ bool ParseFunction(const std::string& token, HTMLValueParser& valueParser,
   // exactly the token the author wrote.
   const std::string label = Trim(token.substr(0, token.find('(')));
   const auto parts = SplitTopLevelCommas(args);
-  const TransformArgs transformArgs = {
-      parts, valueParser, referenceWidthPx, referenceHeightPx, zeroScale, clampedZeroScale};
+  const TransformArgs transformArgs = {parts,
+                                       valueParser,
+                                       referenceWidthPx,
+                                       referenceHeightPx,
+                                       zeroScale,
+                                       clampedZeroScale,
+                                       SingularScaleEpsilon(referenceWidthPx, referenceHeightPx)};
   const TransformCall call = {token, name, label, transformArgs, diagnostics, out};
   return handler(call);
 }
@@ -672,6 +686,34 @@ bool IsOriginKeyword(const std::string& token) {
 }
 
 }  // namespace
+
+float SingularScaleEpsilon(float referenceWidthPx, float referenceHeightPx) {
+  const float reference = std::max(referenceWidthPx, referenceHeightPx);
+  if (!std::isfinite(reference) || reference <= 0.0f) {
+    // The box size is unknown, so the half-pixel budget has nothing to divide by. Fall back to the
+    // upper bound, which is the least wrong guess available: it stays inside the decomposition's
+    // conditioning range and keeps the pose invisible for every box up to 500px.
+    return SINGULAR_SCALE_UPPER_BOUND;
+  }
+  return std::min(SINGULAR_SCALE_UPPER_BOUND, SINGULAR_SCALE_PIXEL_BUDGET / reference);
+}
+
+Matrix3D SubPixelHoldPose(const Matrix3D& singularPose, float referenceWidthPx,
+                          float referenceHeightPx) {
+  const float epsilon = SingularScaleEpsilon(referenceWidthPx, referenceHeightPx);
+  // No direction survives a `matrix` / `matrix3d` source, so there is nothing to recover: the only
+  // requirement is that the element stay invisible. `diag(epsilon, epsilon, 1)` keeps the z axis at
+  // 1, which is what makes the pose invertible, while the two in-plane axes shrink the box to a
+  // sub-pixel speck at the authored position. Falling back to the identity would show the element at
+  // full size outside the active window.
+  Matrix3D hold = {};
+  hold.setRowColumn(0, 0, epsilon);
+  hold.setRowColumn(1, 1, epsilon);
+  hold.setRowColumn(0, 3, singularPose.getRowColumn(0, 3));
+  hold.setRowColumn(1, 3, singularPose.getRowColumn(1, 3));
+  hold.setRowColumn(2, 3, singularPose.getRowColumn(2, 3));
+  return hold;
+}
 
 bool IsSupportedTransformFunction(const std::string& name) {
   return FindTransformHandler(name) != nullptr;

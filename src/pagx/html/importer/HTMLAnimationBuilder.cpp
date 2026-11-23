@@ -1591,11 +1591,13 @@ bool HTMLAnimationBuilder::buildForElement(
       ResolveFillModeRange(spec.fillMode, matrix3DKeys.front().time, loopOnce).writesBaseline) {
     // PAGX persists `matrix3D` keyframes only when they are invertible, so a singular static pose
     // cannot be held verbatim. Re-parse the authored static transform with the same zero-scale clamp
-    // the keyframe stops use: `scale(0)` becomes `SINGULAR_SCALE_CLAMP`, so the hold keeps the
+    // the keyframe stops use: `scale(0)` becomes `SingularScaleEpsilon`, so the hold keeps the
     // element sub-pixel (which is what CSS shows) instead of showing it at full size. The element's
     // own static `matrix` is untouched — only the hold frame differs. A singular pose that came from
-    // a `matrix` / `matrix3d` factor has no direction to recover, so that case keeps the identity
-    // fallback and reports it.
+    // a `matrix` / `matrix3d` factor has no direction to recover, so the clamp cannot apply; the
+    // hold then only has to keep the element invisible at its authored position, which
+    // `SubPixelHoldPose` expresses as `diag(epsilon, epsilon, 1)` plus that translation. Holding the
+    // identity instead would show the element at full size outside the active window.
     Matrix3D clampedBaseline = {};
     bool clampedZeroScale = false;
     HTMLDiagnosticSink silentDiagnostics(false);
@@ -1608,9 +1610,9 @@ bool HTMLAnimationBuilder::buildForElement(
     } else {
       _diagnostics.warn(
           "html: the static transform has no invertible pose, so animation-fill-mode cannot hold "
-          "it; "
-          "the hold uses the identity [subset:animation-unsupported-property]");
-      matrix3DChannelBaseline = {};
+          "it exactly; the hold keeps it sub-pixel [subset:animation-unsupported-property]");
+      matrix3DChannelBaseline =
+          SubPixelHoldPose(matrix3DChannelBaseline, reference.widthPx, reference.heightPx);
     }
   }
 

@@ -143,7 +143,7 @@ HTMLElementAnchor ResolveElementAnchor(const std::string& originValue,
  *  - `Keep` is the CSS-exact result: the factor makes the composed matrix rank-deficient. Static
  *    poses and purely 2D keyframe tracks use it — the 2D `matrix` channel can carry a singular pose,
  *    so "invisible" stays exactly invisible.
- *  - `ClampToEpsilon` substitutes `SINGULAR_SCALE_CLAMP` for the zero factor *before* the functions
+ *  - `ClampToEpsilon` substitutes `SingularScaleEpsilon` for the zero factor *before* the functions
  *    multiply, which only matters when the same list also rotates: `rotateY(-90deg) scale(0)`
  *    collapses to the zero matrix under `Keep`, losing the -90 degrees and leaving nothing a
  *    `matrix3D` pose could carry, while `epsilon * R(-90deg)` keeps the direction and stays
@@ -155,6 +155,27 @@ enum class ZeroScale {
 };
 
 /**
+ * Returns the factor `ZeroScale::ClampToEpsilon` substitutes for an authored zero. It is sized from
+ * the element's reference box, because the substitute is a ratio: `min(1e-3, 0.5 / max(width,
+ * height))` keeps the scaled box within half a pixel on either axis for any size, while the `1e-3`
+ * upper bound keeps small boxes invisible without reaching the float32 range where rotation / scale
+ * decomposition starts to wobble. Both sizes are NaN or non-positive when the box size is unknown;
+ * the factor then falls back to that upper bound.
+ */
+float SingularScaleEpsilon(float referenceWidthPx, float referenceHeightPx);
+
+/**
+ * Returns the pose an `animation-fill-mode` hold uses when the element's static pose is singular and
+ * the zero-scale clamp cannot recover it, i.e. it came from an authored `matrix` / `matrix3d`
+ * factor. Such a pose carries no direction to restore, so the result only guarantees invisibility:
+ * `diag(epsilon, epsilon, 1)` — z stays 1 to keep the pose invertible — with the singular pose's
+ * translation column, so the element stays at its authored position as a sub-pixel speck instead of
+ * showing at full size. `epsilon` comes from `SingularScaleEpsilon` for the same reference size.
+ */
+Matrix3D SubPixelHoldPose(const Matrix3D& singularPose, float referenceWidthPx,
+                          float referenceHeightPx);
+
+/**
  * Parses a CSS `transform` value (a whitespace-separated function list) into a 4x4 pose, composed
  * in CSS order. `none` is a valid declaration of "no transform", so it resolves to the identity and
  * reports success. Three failures return false with a diagnostic: an unknown function, an invalid
@@ -163,9 +184,10 @@ enum class ZeroScale {
  * A `perspective` distance may be zero — it clamps to 1px — and only a negative distance is invalid.
  *
  * `zeroScale` only reaches the `scale` family; a `matrix` / `matrix3d` factor is never clamped
- * because it carries no direction to preserve, so a singular one still fails here. `clampedZeroScale`,
- * when non-null, reports whether the clamp actually replaced a factor, which lets a caller keep a
- * track that never leaves the z = 0 plane at its authored zero.
+ * because it carries no direction to preserve, so a singular one still fails here. The substitute
+ * factor is sized by `referenceWidthPx` / `referenceHeightPx` (see `SingularScaleEpsilon`).
+ * `clampedZeroScale`, when non-null, reports whether the clamp actually replaced a factor, which
+ * lets a caller keep a track that never leaves the z = 0 plane at its authored zero.
  */
 bool ParseCssTransformList(const std::string& value, HTMLValueParser& valueParser,
                            HTMLDiagnosticSink& diagnostics, Matrix3D* out,
