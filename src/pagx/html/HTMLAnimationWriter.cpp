@@ -1886,6 +1886,32 @@ static void AddBoundedSample(std::set<Frame>& times, Frame t, Frame limit) {
   times.insert(t);
 }
 
+// True when a channel of the animation keeps keys beyond the animation's own duration. Such a
+// timeline cannot share a rule with a longer one: the merged window would evaluate those keys
+// instead of freezing at the timeline's end, which is what the runtime does (R14).
+bool AnimationHasKeysPastEnd(const Animation* anim) {
+  for (auto* obj : anim->objects) {
+    if (obj == nullptr) {
+      continue;
+    }
+    for (auto* ch : obj->channels) {
+      if (ch == nullptr) {
+        continue;
+      }
+      std::set<Frame> times = {};
+      std::unordered_map<Frame, SegmentEasing> easings = {};
+      std::set<Frame> mixed = {};
+      std::set<Frame> pins = {};
+      std::unordered_map<Frame, std::set<Frame>> holdEnds = {};
+      ExtractChannelTimesAndEasing(ch, times, easings, mixed, pins, holdEnds);
+      if (!times.empty() && *times.rbegin() > anim->duration) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
 BundleChannelSet CollectBundleChannels(
     PAGXDocument& doc, const DomTargetBundle& bundle,
     const std::unordered_map<const SolidColor*, const Node*>& solidToPainter,
@@ -5104,15 +5130,24 @@ std::string HTMLAnimationSession::emitKeyframesAndWeave(std::string& bodyHtml) {
   std::vector<MountGroup> groups = {};
   std::map<std::tuple<int64_t, float, int, size_t, int64_t, bool>, size_t> groupIndex = {};
   size_t mountIndex = 0;
+  int64_t unmergeableSerial = 0;
   for (const auto& mount : mounts) {
     size_t thisMountIndex = mountIndex++;
     const auto* anim = mount.animation;
     if (anim->duration <= 0 || anim->frameRate <= 0.0f || anim->objects.empty()) {
       continue;
     }
-    auto key =
-        std::make_tuple(static_cast<int64_t>(anim->duration), anim->frameRate,
-                        static_cast<int>(anim->loop), mount.scope, mount.offset, mount.playing);
+    // The duration stays out of the key: a timeline that only differs by length shares one rule
+    // whose window is the longest one, and the shorter timeline's channels freeze on their last
+    // key. That is what the runtime does once a Once timeline ends, and it is the only way to keep
+    // a translation from one timeline and a rotation from another in one `transform`.
+    int64_t mergeKey = 0;
+    if (AnimationHasKeysPastEnd(anim)) {
+      // Such a timeline has to keep its own window, so it never joins another one.
+      mergeKey = ++unmergeableSerial;
+    }
+    auto key = std::make_tuple(mergeKey, anim->frameRate, static_cast<int>(anim->loop), mount.scope,
+                               mount.offset, mount.playing);
     auto it = groupIndex.find(key);
     if (it == groupIndex.end()) {
       it = groupIndex.emplace(key, groups.size()).first;
@@ -5125,6 +5160,10 @@ std::string HTMLAnimationSession::emitKeyframesAndWeave(std::string& bodyHtml) {
     }
     auto& group = groups[it->second];
     group.lastMountIndex = thisMountIndex;
+    // The rule's window is the longest timeline in the group; every shorter one holds its end value.
+    if (anim->duration > group.animation->duration) {
+      group.animation = anim;
+    }
     for (auto* obj : anim->objects) {
       if (obj != nullptr && group.seen.insert(obj).second) {
         group.objects.push_back(obj);
