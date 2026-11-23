@@ -517,9 +517,11 @@ scale(0)`) therefore has that factor clamped to `epsilon = min(1e-3, 0.5 / max(w
 *before* the multiply, so the stop keeps its rotation instead of losing it. The substitute has an
 upper bound and a size-aware bound: `1e-3` keeps the pose invisible on a small box and stays far from
 the float32 noise floor where the runtime's rotation / scale decomposition would start to wobble,
-while the half-pixel budget divided by the reference box keeps the rendered extent under half a
-pixel **at any size** — a 60px box still uses `1e-3` (a 0.06px edge), a 20000px box uses `2.5e-5`
-and is equally invisible. Clamping after the multiply cannot work — zero times anything is still
+while the half-pixel budget divided by the reference box keeps the extent under half a pixel **in
+the box's own coordinates** — a 60px box still uses `1e-3` (a 0.06px edge), a 20000px box uses
+`2.5e-5`. That is a bound in local space, not a screen-space promise: an ancestor transform, a camera
+or an `overflow` clip can still enlarge the remainder into visible pixels.
+Clamping after the multiply cannot work — zero times anything is still
 zero, and the direction is already gone. A singular stop that comes from an authored **matrix**
 (`matrix3d(0, …)`) carries no direction to recover, so it is still dropped and reported
 (`subset:animation-unsupported-property`). The same clamp fills the `matrix3D` channel's fill-mode

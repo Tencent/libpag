@@ -711,15 +711,15 @@ bool HTMLParserContext::resolveCanvasSize(const std::shared_ptr<DOMNode>& body, 
 //==================================================================================================
 
 void HTMLParserContext::assignElementId(Layer* layer, const std::shared_ptr<DOMNode>& element) {
-  // Known limitation, deliberately not fixed here: the allocator only writes `Layer::id`. It does not
-  // call `PAGXDocument::registerNode` (the index `PAGXDocument::findNode` reads), which is populated
-  // by `PAGXDocument::makeNode(id)` and by `PAGXImporter::FromXML`. The runtime resolves an
-  // `Animation` target through that index, so an animation on a document built purely in memory by
-  // this importer never binds - it is silently skipped and every frame shows the pre-animation state.
-  // The HTML CLI and the eval harness both render through the serialized form (`PAGXExporter::ToXML`
-  // + `PAGXImporter::FromXML`), which rebuilds the index, so the shipped paths are unaffected. A real
-  // fix means registering every id the importer assigns, which changes document ownership rules and
-  // is out of scope for this PR; the rendering tests below round-trip for the same reason.
+  // Known limitation, deliberately not fixed here: the allocator writes `Layer::id` and leaves the
+  // document's id index (`PAGXDocument::registerNode` / `findNode`) to their existing maintainers. An
+  // `Animation` target is resolved through that index, so a target the index never learned about is
+  // skipped: the runtime plays the animations it can resolve and leaves the rest at their
+  // pre-animation state.
+  // The CLI and the eval harness render through the serialized form, where
+  // `PAGXImporter::FromXML` builds the index, and the rendering tests below round-trip for the same
+  // reason. Completing the registration belongs to the index maintenance itself rather than to this
+  // camera work, so it stays out of this PR.
   _idAllocator->assign(layer, element);
   // Record elements that declare an animation so PAGX animations can be emitted once the whole
   // tree is built. Cheap lookup: the resolved style is cached by the cascade.
