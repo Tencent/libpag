@@ -514,13 +514,14 @@ stop is dropped), and a flat stop the placement already accepted — `scale(0)` 
 becomes singular when it is lifted onto `matrix3D`, which PAGX cannot persist because every
 `matrix3D` keyframe must be invertible. A zero scale written as a **factor** (`rotateY(-90deg)
 scale(0)`) therefore has that factor clamped to `epsilon = min(1e-3, 0.5 / max(width, height))`
-*before* the multiply, so the stop keeps its rotation instead of losing it. The substitute has an
-upper bound and a size-aware bound: `1e-3` keeps the pose invisible on a small box and stays far from
-the float32 noise floor where the runtime's rotation / scale decomposition would start to wobble,
-while the half-pixel budget divided by the reference box keeps the extent under half a pixel **in
-the box's own coordinates** — a 60px box still uses `1e-3` (a 0.06px edge), a 20000px box uses
-`2.5e-5`. That is a bound in local space, not a screen-space promise: an ancestor transform, a camera
-or an `overflow` clip can still enlarge the remainder into visible pixels.
+*before* the multiply, so the stop keeps its rotation instead of losing it. The substitute takes the smaller of a fixed upper
+bound and a budget derived from the reference box: `1e-3` keeps a box of up to 500px within half a
+pixel and stays far from the float32 noise floor where the runtime's rotation / scale decomposition
+would start to wobble, while `0.5 / max(width, height)` tightens it for larger boxes — a 60px box
+uses `1e-3` (a 0.06px edge), a 20000px box uses `2.5e-5`. That bound is **local to the box's own
+coordinates**, not a promise about the composed result: an ancestor transform or a camera can still
+enlarge the remainder into visible pixels, and with `overflow: visible` the painted content may
+exceed the reference box the budget was derived from.
 Clamping after the multiply cannot work — zero times anything is still
 zero, and the direction is already gone. A singular stop that comes from an authored **matrix**
 (`matrix3d(0, …)`) carries no direction to recover, so it is still dropped and reported
