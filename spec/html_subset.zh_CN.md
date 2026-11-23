@@ -178,7 +178,7 @@
 | `backdrop-filter: blur(X)` | `<BackgroundBlurStyle>` |
 | `transform: <fn-list>` | 按 CSS 顺序合成为一个 4x4 姿态。所有函数都支持：`translate[X\|Y\|Z\|3d]`、`scale[X\|Y\|Z\|3d]`、`rotate[X\|Y\|Z\|3d]`、`skewX`/`skewY`/`skew`、`matrix`、`matrix3d`、`perspective`。函数之间不需要分隔（`rotate(45deg)scale(2)` 合法），长度参数可以是 `px`、相对元素盒的百分比（X 取宽度、Y 取高度）。`calc()` 暂不支持：它需要 CSS 量纲校验，而快照链路给的是已计算值。角度参数接受 `deg` / `grad` / `rad` / `turn`（大小写不敏感）；无单位角度只有 `0` 合法，其它单位会让整条声明失效。仍停留在 z = 0 平面的姿态写入 `Layer.matrix`；带深度或透视的姿态写入 `Layer.matrix3D`（3D 姿态必须可逆）。`transform-style: preserve-3d` 映射到 `Layer.preserve3D` |
 | `perspective` / `perspective-origin` | 声明元素作为相机作用于**直接子级**：距离必须是非负长度；小于 1px 在渲染时按 1px 处理，只有 `none` 表示无相机；相机由一层 wrapper 承载并摆在 `perspective-origin` 处，投影中心因此与 CSS 一致。无法包装的子元素（flow / flex 布局，或用 `right` / `bottom` 定位）不做投影，并提示一次。详见 §13.7 |
-| `transform-origin` | 按元素盒子解析（`px`、`%`、`left`/`center`/`right`/`top`/`bottom`，以及可选的 px 深度），写入 `Layer.anchor` / `anchorZ`，姿态本身不带支点。只有无法解析的原点（百分比 / 关键字但盒子没有绝对尺寸）才告警并退回左上角支点 |
+| `transform-origin` | 按元素盒子解析（`px`、`%`、`left`/`center`/`right`/`top`/`bottom`，以及可选的 px 深度），写入 `Layer.anchor` / `anchorZ`，姿态本身不带支点。token 非法（坏单位、坏百分比或四个分量）会被拒绝并告警，支点回退到**盒中心**；合法的值若缺少可用的盒子尺寸，则告警并退到左上角支点 |
 | Layer 上的 `overflow: hidden` | `Layer.clipToBounds = true` |
 | Layer 上的 `overflow: <x> <y>`（两值简写） | 任一轴不是 `visible`（`hidden` / `clip` / `scroll` / `auto` / `overlay`）时 `Layer.clipToBounds = true`，与 CSS「任一轴非 `visible` 即成为裁剪容器」的规则一致；`visible visible` 则不裁剪。`scroll` / `auto` / `overlay` 另外告警，因为 PAGX 无法表达它们隐含的滚动能力 |
 
@@ -645,6 +645,6 @@ PAGX 把投影留在 `anchor` 之外（`M = P · T(anchor) · L · T(-anchor)`�
   并提示一次。把相机折进它的姿态会以父级原点作为消失点，那是另一种投影，而不是对作者写法的近似。
 * 作者写的 `perspective()` 同时带深度支点时，导入期会报告：投影中心无法复现（见 §13.2 的插值限制），
   姿态保留 PAGX 能承载的表达式。
-* `perspective-origin` 无法相对声明盒解析（没有绝对尺寸）时告警一次，并退化为图层原点而非盒中心。
+* `perspective-origin` 无法相对声明盒解析（没有绝对尺寸）时告警一次，且**不施加投影**：消失点无法复现，因此子层不做投影，而不是退化为绕图层原点投影。
 * inline-SVG 形状的动画不带父级相机。这不是信息丢失：形状的位姿被限制在 z = 0 平面上
   （3D 形状位姿会被告警拒绝），而平面位姿投影后仍是自身（`w = 1`），把相机折进去不会改变任何像素。

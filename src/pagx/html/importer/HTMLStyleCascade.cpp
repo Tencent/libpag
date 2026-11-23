@@ -829,10 +829,10 @@ void HTMLStyleCascade::parseBoxTransform(HTMLBoxAttributes& box, const PropertyM
   }
   // `valid` means "this element has a pose of its own", not "the `transform` property was
   // declared": an exact identity (`none`, a computed `matrix(1,0,0,1,0,0)`, `rotate(0deg)`,
-  // `scale(1)`) leaves nothing to apply, so the box keeps `valid = false` and `applyBoxTransform`
-  // can materialise a bare `preserve-3d` parent camera on this layer. The pivot is skipped with it:
-  // an origin cannot change a transform that is not there. A flat but non-identity pose
-  // (`scale(0)`) stays `valid`, or the `scale(0)` fix would fall back to the bare camera path.
+  // `scale(1)`) leaves nothing to apply, so the box keeps `valid = false` and no pose reaches the
+  // layer; a parent camera still reaches it as the wrapper layer above it. The pivot is skipped with
+  // it: an origin cannot change a transform that is not there. A flat but non-identity pose
+  // (`scale(0)`) stays `valid`, or the `scale(0)` fix would lose the pose it exists to keep.
   if (pose.isIdentity()) {
     return;
   }

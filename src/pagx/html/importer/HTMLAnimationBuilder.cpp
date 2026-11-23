@@ -402,8 +402,8 @@ void ApplyAnimationLonghands(const std::unordered_map<std::string, std::string>&
 constexpr float kPi = 3.14159265358979323846f;
 
 // Parses a CSS `transform` value into the 4x4 pose a keyframe carries. How that pose is routed
-// (x/y, 2D `matrix` or `matrix3D`) is decided by `PlacePose`, once the parent camera has been folded
-// in, so classification does not happen here as well. `transform-origin` is NOT folded in: the pivot
+// (x/y, 2D `matrix` or `matrix3D`) is decided by `RouteTransformStops`; the parent camera is carried
+// by a wrapper layer and never folded into this pose, so classification does not happen here. `transform-origin` is NOT folded in: the pivot
 // stays on the layer as `anchor`, so keyframes never carry a per-frame pivot translation that the
 // runtime would interpolate independently. `zeroScale` is the caller's policy for a zero `scale`
 // factor, which is why the keyframe loop decides it after the whole track is classified.
@@ -1309,9 +1309,9 @@ bool HTMLAnimationBuilder::buildForElement(
         bool clampedZeroScale = false;
         if (ParseTransformPose(val, _valueParser, _diagnostics, pose, reference,
                                ZeroScale::ClampToEpsilon, &clampedZeroScale)) {
-          // The parent camera is folded in after parsing, so a pose that parsed as flat can gain
-          // depth here; `PlacePose` re-classifies it, and an invalid pose only drops this stop. A
-          // pose that stays flat keeps itself instead, so `scale(0)` survives as a pop-in start.
+          // The parent camera is not part of this pose (it lives on the wrapper layer), so a pose
+          // that parsed as flat stays flat; `RouteTransformStops` classifies it directly and an
+          // invalid pose only drops this stop, so `scale(0)` survives as a pop-in start.
           const PosePlacement placement = PlacePose(pose);
           if (!placement.valid) {
             if (!warnedTransform) {

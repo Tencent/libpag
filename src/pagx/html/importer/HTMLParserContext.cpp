@@ -133,10 +133,10 @@ bool SubtreePosesOffThePlane(const std::shared_ptr<DOMNode>& element, HTMLStyleC
   return SubtreePosesOffThePlane(element, cascade, valueParser, silentDiagnostics, 0);
 }
 
-// Folds a CSS `perspective` declared on the parent into `box`: stores the camera distance and
-// re-expresses the parent's `perspective-origin` in this element's local coordinates. Only an
-// absolutely positioned child knows its offset from the parent's box; a flow / flex child is placed
-// by layout, so its local origin is unknown here and the parent coordinates are used as-is.
+// Carries a CSS `perspective` declared on the parent into `childInherited`: the camera distance plus
+// the parent's `perspective-origin`, both still in the parent's coordinates. The child re-expresses
+// them later, in `attachParentCamera`, which wraps an absolutely positioned child in a camera layer
+// or reports that a flow / flex child cannot be wrapped. Nothing is folded into a pose any more.
 // Single mapping point between `HTMLImporter::Options` and `HTMLSubsetTransformer::Options`.
 // All importer-controlled transformer behaviour funnels through here so adding a new shared
 // option only edits one location instead of being mirrored at every parseDOM() call site.

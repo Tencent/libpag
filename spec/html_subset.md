@@ -191,7 +191,7 @@ also a no-op (the offsets are ignored alongside the dropped position).
 | `backdrop-filter: blur(X)` | `<BackgroundBlurStyle>` |
 | `transform: <fn-list>` | composed in CSS order into a 4x4 pose. Every function is supported: `translate[X\|Y\|Z\|3d]`, `scale[X\|Y\|Z\|3d]`, `rotate[X\|Y\|Z\|3d]`, `skewX`/`skewY`/`skew`, `matrix`, `matrix3d`, `perspective`. Functions need no separator (`rotate(45deg)scale(2)` is legal), and a length argument may be `px`, or a percentage of the element box (width on X, height on Y). `calc()` is not supported: it needs CSS type checking, and the snapshot path already hands over computed values. Angle arguments accept `deg` / `grad` / `rad` / `turn` case insensitively; a unitless angle is only valid as `0`, and any other unit invalidates the declaration. A pose that stays on the z = 0 plane is written onto `Layer.matrix`; a pose with depth or perspective onto `Layer.matrix3D` (3D poses must be invertible). `transform-style: preserve-3d` maps onto `Layer.preserve3D` |
 | `perspective` / `perspective-origin` | the declaring element acts as a camera for its **direct children**: the distance must be a non-negative length; values below 1px are clamped to 1px for rendering, and only `none` disables the camera; the camera is carried by a wrapper layer placed at `perspective-origin`, so the projection centre follows CSS. A child that cannot be wrapped (flow / flex placement, or positioned by `right` / `bottom`) is left unprojected and reported once. See §13.7 |
-| `transform-origin` | resolved against the element box (`px`, `%`, `left`/`center`/`right`/`top`/`bottom`, plus the optional px depth) and written onto `Layer.anchor` / `anchorZ`; the pose itself stays un-pivoted. Only an unresolvable origin (a percentage / keyword with no absolute box size) warns and falls back to the top-left pivot |
+| `transform-origin` | resolved against the element box (`px`, `%`, `left`/`center`/`right`/`top`/`bottom`, plus the optional px depth) and written onto `Layer.anchor` / `anchorZ`; the pose itself stays un-pivoted. An invalid token (bad unit, bad percentage, a fourth component) is rejected with a warning and the pivot falls back to the **box centre**; a legal value that needs a box size which is not available warns and pivots at the top-left corner |
 | `overflow: hidden` on a Layer | `Layer.clipToBounds = true` |
 | `overflow: <x> <y>` (two-value shorthand) on a Layer | `Layer.clipToBounds = true` when either axis is not `visible` (`hidden` / `clip` / `scroll` / `auto` / `overlay`), matching CSS's rule that a non-`visible` axis makes the box a clipping container; `visible visible` leaves the box unclipped. `scroll` / `auto` / `overlay` additionally warn, since PAGX cannot model the scroll affordance they imply |
 
@@ -732,7 +732,8 @@ Limits of that rewrite, in order of how often they are hit:
   the projection centre cannot be reproduced (see the interpolation limits in §13.2), and the pose
   keeps the expression PAGX can hold.
 * A `perspective-origin` that cannot be resolved against the declaring box (no absolute size)
-  warns once and falls back to the layer origin instead of the box centre.
+  warns once and is **not applied**: the vanishing point cannot be reproduced, so the children are
+  left unprojected instead of being projected about the layer origin.
 * An inline-SVG shape animation ignores the parent camera. That is not a loss: shape transforms are
   restricted to the z = 0 plane (a 3D shape pose is rejected with a diagnostic), and a flat pose
   projects to itself (`w = 1`), so folding the camera in would not change a pixel.
