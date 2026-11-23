@@ -2087,9 +2087,12 @@ BundleChannelSet CollectBundleChannels(
       }
     }
   }
-  if (result.starOuterRoundnessCh != nullptr || result.starInnerRoundnessCh != nullptr) {
+  if ((result.starOuterRoundnessCh != nullptr || result.starInnerRoundnessCh != nullptr) &&
+      !result.keyTimes.empty()) {
     // Roundness bends the outline through bezier handles, so the path coordinates are not linear in
     // it; sampling every few frames keeps each segment straight enough to interpolate.
+    // The emptiness check matters: a roundness channel with no keys is a legal document, and the
+    // grid would otherwise be dereferenced while empty.
     constexpr Frame kRoundnessStep = 4;
     Frame first = *result.keyTimes.begin();
     Frame last = std::min(*result.keyTimes.rbegin(), samplingLimit);
