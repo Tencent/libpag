@@ -4827,8 +4827,12 @@ function animationNamesFor(computed) {
 // Distance of the camera this element needs, either because its own transform carries a
 // `perspective()` (already split out by `renderElementBox`) or because its animation does.
 function cameraDistanceForElement(computed) {
+  // Most elements have no animation at all; touching the registry for them is pure overhead and makes
+  // the payload reach into `globalThis` on every element.
+  const names = animationNamesFor(computed);
+  if (names.length === 0) return 0;
   const cameras = pagxAnimCameras();
-  for (const name of animationNamesFor(computed)) {
+  for (const name of names) {
     const distance = cameras[name];
     if (distance) return distance;
   }
@@ -4867,7 +4871,17 @@ function perspectiveOriginXY(computed) {
 // the element keeps the affine remainder only, i.e. silently loses its perspective.
 function restoreProjectedTransform(html, camera) {
   if (!camera || !camera.original || !camera.affine) return html;
-  return html.replace('transform: ' + camera.affine, 'transform: ' + camera.original);
+  const affineDecl = 'transform: ' + camera.affine;
+  if (html.includes(affineDecl)) {
+    return html.replace(affineDecl, 'transform: ' + camera.original);
+  }
+  // A pure text run or a flex item never carried the affine string, so the replace above would miss
+  // and the element would silently stay unprojected. Put the original transform back on the element
+  // instead; without a style attribute there was no transform to restore in the first place.
+  if (html.includes('style="')) {
+    return html.replace('style="', 'style="transform: ' + camera.original + '; ');
+  }
+  return html;
 }
 
 // Points an element whose camera was declined at the un-stripped copy of its keyframes, so the
