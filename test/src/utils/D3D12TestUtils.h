@@ -79,6 +79,7 @@ struct SecondaryDeviceTexture {
   Microsoft::WRL::ComPtr<ID3D12Device> device = nullptr;
   Microsoft::WRL::ComPtr<ID3D12Resource> resource = nullptr;
   tgfx::BackendTexture texture = {};
+  HRESULT lastError = S_OK;
 
   bool init(int width, int height) {
     auto result = D3D12CreateDevice(nullptr, D3D_FEATURE_LEVEL_11_0,
@@ -94,6 +95,7 @@ struct SecondaryDeviceTexture {
                                  IID_PPV_ARGS(device.ReleaseAndGetAddressOf()));
     }
     if (FAILED(result)) {
+      lastError = result;
       return false;
     }
     D3D12_HEAP_PROPERTIES heap = {};
@@ -107,9 +109,11 @@ struct SecondaryDeviceTexture {
     desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
     desc.SampleDesc.Count = 1;
     desc.Flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
-    if (FAILED(device->CreateCommittedResource(&heap, D3D12_HEAP_FLAG_NONE, &desc,
-                                               D3D12_RESOURCE_STATE_COMMON, nullptr,
-                                               IID_PPV_ARGS(resource.ReleaseAndGetAddressOf())))) {
+    auto resourceResult = device->CreateCommittedResource(
+        &heap, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_COMMON, nullptr,
+        IID_PPV_ARGS(resource.ReleaseAndGetAddressOf()));
+    if (FAILED(resourceResult)) {
+      lastError = resourceResult;
       return false;
     }
     tgfx::D3D12TextureInfo info = {};

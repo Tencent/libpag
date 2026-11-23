@@ -207,7 +207,7 @@ PAG_TEST(D3D12Test, SurfaceFromTextureAndCompletion) {
 PAG_TEST(D3D12Test, PAGXImageKeepsDeviceAlive) {
   SecondaryDeviceTexture secondary = {};
   if (!secondary.init(16, 16)) {
-    GTEST_SKIP() << "Failed to create a secondary D3D12 device.";
+    GTEST_SKIP() << "Failed to create a secondary D3D12 device, HRESULT=" << static_cast<long>(secondary.lastError);
   }
   auto device = Devices::MakeForTexture(secondary.texture);
   ASSERT_TRUE(device != nullptr);
@@ -238,7 +238,7 @@ PAG_TEST(D3D12Test, AsyncSurfaceRendersOnWorkerThread) {
   const int size = 32;
   SecondaryDeviceTexture secondary = {};
   if (!secondary.init(size, size)) {
-    GTEST_SKIP() << "Failed to create a secondary D3D12 device.";
+    GTEST_SKIP() << "Failed to create a secondary D3D12 device, HRESULT=" << static_cast<long>(secondary.lastError);
   }
   auto expected = Devices::MakeForTexture(secondary.texture);
   ASSERT_TRUE(expected != nullptr);

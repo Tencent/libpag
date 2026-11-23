@@ -10,5 +10,4 @@ import sys
 DROP_FLAGS = {"-pedantic", "-Weffc++", "-Wconversion", "-Werror"}
 
 arguments = [argument for argument in sys.argv[1:] if argument not in DROP_FLAGS]
-arguments.insert(1, "-w")
 sys.exit(subprocess.call(arguments))

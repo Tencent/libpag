@@ -33,6 +33,7 @@ namespace pag {
 
 namespace {
 
+// TODO: Fold this registry into tgfx Device::RegisterNative once DeviceKey supports D3D12.
 /**
  * One live tgfx device, keyed by the canonical IUnknown identity of its native ID3D12Device.
  * The identity is strongly held so pointer comparison stays valid after the caller releases its

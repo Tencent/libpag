@@ -210,7 +210,7 @@ PAG_TEST(D3D12Test, TypelessResourceRejected) {
 PAG_TEST(D3D12Test, DeviceRegistryIsThreadSafe) {
   SecondaryDeviceTexture secondary = {};
   if (!secondary.init(8, 8)) {
-    GTEST_SKIP() << "Failed to create a secondary D3D12 device.";
+    GTEST_SKIP() << "Failed to create a secondary D3D12 device, HRESULT=" << static_cast<long>(secondary.lastError);
   }
   constexpr int ThreadCount = 8;
   std::vector<std::shared_ptr<tgfx::Device>> results(ThreadCount);
