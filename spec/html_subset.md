@@ -513,16 +513,22 @@ and must not be conflated: a stop whose pose cannot be placed is rejected while 
 stop is dropped), and a flat stop the placement already accepted — `scale(0)` is the canonical case —
 becomes singular when it is lifted onto `matrix3D`, which PAGX cannot persist because every
 `matrix3D` keyframe must be invertible. A zero scale written as a **factor** (`rotateY(-90deg)
-scale(0)`) therefore has that factor clamped to `1e-3` *before* the multiply, so the stop keeps its
-rotation instead of losing it: at a 60px box the rendered edge is 0.06px and the area 0.0036 square
-pixels, i.e. invisible, while `1e-3` stays far from the float32 noise floor where the runtime's
-rotation / scale decomposition would start to wobble. Clamping after the multiply cannot work — zero
-times anything is still zero, and the direction is already gone. A singular stop that comes from an
-authored **matrix** (`matrix3d(0, …)`) carries no direction to recover, so it is still dropped and
-reported (`subset:animation-unsupported-property`). The same clamp fills the `matrix3D` channel's
-fill-mode hold, so an element whose static pose is `scale(0)` stays sub-pixel outside the active
-window instead of showing at full size. Static poses and 2D tracks keep the authored `0`: the 2D
-`matrix` channel accepts a singular matrix, which is also what CSS interpolates discretely.
+scale(0)`) therefore has that factor clamped to `epsilon = min(1e-3, 0.5 / max(width, height))`
+*before* the multiply, so the stop keeps its rotation instead of losing it. The substitute has an
+upper bound and a size-aware bound: `1e-3` keeps the pose invisible on a small box and stays far from
+the float32 noise floor where the runtime's rotation / scale decomposition would start to wobble,
+while the half-pixel budget divided by the reference box keeps the rendered extent under half a
+pixel **at any size** — a 60px box still uses `1e-3` (a 0.06px edge), a 20000px box uses `2.5e-5`
+and is equally invisible. Clamping after the multiply cannot work — zero times anything is still
+zero, and the direction is already gone. A singular stop that comes from an authored **matrix**
+(`matrix3d(0, …)`) carries no direction to recover, so it is still dropped and reported
+(`subset:animation-unsupported-property`). The same clamp fills the `matrix3D` channel's fill-mode
+hold, so an element whose static pose is `scale(0)` stays sub-pixel outside the active window instead
+of showing at full size. When that hold's singular static pose comes from a **matrix**, no direction
+can be restored, so the hold is `diag(epsilon, epsilon, 1)` with the authored translation: still
+invertible, and invisible at the element's own position under the same half-pixel bound. Static poses
+and 2D tracks keep the authored `0`: the 2D `matrix` channel accepts a singular matrix, which is also
+what CSS interpolates discretely.
 
 Two CSS behaviours are deliberately not reproduced, and cannot be without changing the PAGX
 keyframe format:
