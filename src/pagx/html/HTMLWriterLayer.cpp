@@ -1939,7 +1939,10 @@ void HTMLWriter::writeLayerContents(HTMLBuilder& out, const Layer* layer, float 
   // The paints of an alpha-animated distributing layer read the animated variable, so they fade on
   // their own instead of through one container opacity.
   bool savedFadePaints = _ctx->fadePaints;
-  _ctx->fadePaints = !layer->groupOpacity && _ctx->animation.alphaAnimatedNodes.count(layer) > 0;
+  // A filter composites the layer offscreen first, so the alpha belongs to that single surface and
+  // the container keeps it instead of the paints.
+  _ctx->fadePaints = !layer->groupOpacity && layer->filters.empty() &&
+                     _ctx->animation.alphaAnimatedNodes.count(layer) > 0;
   writeElements(out, layer->contents, alpha, distribute, fadesChildren, targetPlacement,
                 layerPadding);
   _ctx->fadePaints = savedFadePaints;

@@ -5432,6 +5432,12 @@ std::string HTMLAnimationSession::emitKeyframesAndWeave(std::string& bodyHtml) {
           addRule(restSet);
         }
       }
+      // A paused mount shows its first frame and never advances. Encoding that as a paused CSS
+      // animation only holds in a browser: a capture that drives every animation's currentTime
+      // advances it anyway, so the rule is left out and the authored state shows through.
+      if (!mount.playing) {
+        continue;
+      }
       std::unordered_map<std::string, std::string> keyframesNameByTag = {};
       for (const auto& element : elements) {
         for (size_t ruleIndex = 0; ruleIndex < ruleSets.size(); ++ruleIndex) {
@@ -5454,8 +5460,11 @@ std::string HTMLAnimationSession::emitKeyframesAndWeave(std::string& bodyHtml) {
           // which keeps one rule for the layer and needs no selector to find them.
           // A layer authored fully transparent has nothing to divide by and keeps the container path.
           BundleChannelSet stopSet = ruleSet;
+          // A filter makes the runtime composite the layer offscreen first, so its alpha lands on
+          // that single surface instead of on each paint (composite/28).
           const bool fadeOnPaints = ruleSet.alphaCh != nullptr && alphaHost != nullptr &&
-                                    !alphaHost->groupOpacity && alphaHost->alpha > 0.0f;
+                                    !alphaHost->groupOpacity && alphaHost->filters.empty() &&
+                                    alphaHost->alpha > 0.0f;
           if (fadeOnPaints) {
             stopSet.fadeViaVariable = true;
             stopSet.fadeBase = alphaHost->alpha;
@@ -5488,7 +5497,6 @@ std::string HTMLAnimationSession::emitKeyframesAndWeave(std::string& bodyHtml) {
             edits.idOrder.push_back(element.id);
           }
           edits.animDecls[element.id].push_back(shorthand);
-          edits.playStates[element.id].push_back(mount.playing);
           if (!IsSvgShapeTag(element.tagName)) {
             unsigned drivers = 0;
             if (chSet.strokeWidthCh != nullptr) {
@@ -5668,18 +5676,6 @@ void HTMLAnimationSession::ApplyElementEdits(
         combined += ", ";
       }
       combined += decls[i];
-    }
-    std::vector<bool> noPlayStates = {};
-    auto playIt = edits.playStates.find(elementId);
-    const auto& playStates = playIt != edits.playStates.end() ? playIt->second : noPlayStates;
-    if (std::find(playStates.begin(), playStates.end(), false) != playStates.end()) {
-      combined += ";animation-play-state:";
-      for (size_t i = 0; i < playStates.size(); ++i) {
-        if (i > 0) {
-          combined += ", ";
-        }
-        combined += playStates[i] ? "running" : "paused";
-      }
     }
     auto zeroIt = edits.needsZeroOrigin.find(elementId);
     bool needsZeroOrigin = zeroIt != edits.needsZeroOrigin.end() && zeroIt->second;
