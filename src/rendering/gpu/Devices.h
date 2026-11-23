@@ -262,6 +262,12 @@ class Devices {
   static bool WaitForQueue(tgfx::Context* context);
 
   /**
+   * Returns the number of live devices currently published in the D3D12 registry. Intended for
+   * tests that verify concurrent imports converge on a single device.
+   */
+  static size_t GetRegisteredDeviceCount();
+
+  /**
    * Returns true when the context's GPU device is still usable for new work. The context must
    * already be locked by the caller. Backends without a native device-health query return true
    * for a non-null context; D3D12 checks the registered native device for removal.

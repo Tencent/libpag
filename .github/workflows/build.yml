@@ -472,8 +472,12 @@ jobs:
 
       - name: Build clang-cl tests
         run: |
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          $clang = & $vswhere -latest -find "VC\Tools\Llvm\x64\bin\clang-cl.exe"
+          if (-not $clang) { $clang = "C:\Program Files\LLVM\bin\clang-cl.exe" }
+          if (-not (Test-Path $clang)) { throw "clang-cl was not found" }
+          $env:PATH = (Split-Path $clang) + ";" + $env:PATH
           where.exe clang-cl
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           cmake -G Ninja -B build-win-clang -DPAG_BUILD_TESTS=ON -DPAG_USE_D3D12=ON -DPAG_D3D12_USE_WARP=ON -DPAG_USE_OPENGL=OFF -DCMAKE_C_COMPILER=clang-cl -DCMAKE_CXX_COMPILER=clang-cl "-DCMAKE_C_COMPILER_LAUNCHER=python;win/tools/filter_clang.py" "-DCMAKE_CXX_COMPILER_LAUNCHER=python;win/tools/filter_clang.py" -DCMAKE_BUILD_TYPE=Debug
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           cmake --build build-win-clang --target PAGFullTest_D3D12 --parallel

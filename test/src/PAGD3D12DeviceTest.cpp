@@ -213,6 +213,7 @@ PAG_TEST(D3D12Test, DeviceRegistryIsThreadSafe) {
     GTEST_SKIP() << "Failed to create a secondary D3D12 device, HRESULT=" << static_cast<long>(secondary.lastError);
   }
   constexpr int ThreadCount = 8;
+  auto deviceCountBefore = Devices::GetRegisteredDeviceCount();
   std::vector<std::shared_ptr<tgfx::Device>> results(ThreadCount);
   std::vector<std::thread> threads = {};
   for (int i = 0; i < ThreadCount; i++) {
@@ -228,6 +229,7 @@ PAG_TEST(D3D12Test, DeviceRegistryIsThreadSafe) {
     EXPECT_EQ(result.get(), canonical.get());
   }
   EXPECT_EQ(Devices::MakeForTexture(secondary.texture).get(), canonical.get());
+  EXPECT_EQ(Devices::GetRegisteredDeviceCount(), deviceCountBefore + 1);
   EXPECT_NE(canonical.get(), Devices::MakeDefault().get());
 }
 
