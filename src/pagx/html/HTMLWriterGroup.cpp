@@ -50,8 +50,9 @@ void HTMLWriter::writeGroup(HTMLBuilder& out, const Group* group, float alpha, b
     style += ";transform-origin:0 0";
   }
   if (group->alpha < 1.0f) {
-    float ea = distribute ? (group->alpha * alpha) : group->alpha;
-    style += ";opacity:" + CssFloatToString(ea);
+    // A distributing layer hands its alpha to the paints themselves, so the wrapper keeps only the
+    // group's own alpha instead of multiplying it twice.
+    style += ";opacity:" + CssFloatToString(group->alpha);
   }
   out.openTag("div");
   auto animId = _ctx->claimAnimatedDomId({group});
@@ -72,13 +73,16 @@ void HTMLWriter::writeGroup(HTMLBuilder& out, const Group* group, float alpha, b
                            propagatedPainters->end());
     elements = &paintedElements;
   }
-  writeElements(out, *elements, 1.0f, false, false, LayerPlacement::Background, groupPadding);
+  // The layer's alpha has to reach the paints inside a retained group: with `groupOpacity=false`
+  // each paint fades on its own, so an overlap keeps the extra opacity the second paint adds.
+  writeElements(out, *elements, alpha, distribute, false, LayerPlacement::Background, groupPadding);
   // Recurse through nested Group / TextBox containers so a foreground painter inside a child
   // Group still triggers the second pass — the shallow flat-list scan would otherwise leave it
   // suppressed by both passes' filters.
   bool hasForegroundPainter = HasForegroundPainter(*elements);
   if (hasForegroundPainter) {
-    writeElements(out, *elements, 1.0f, false, false, LayerPlacement::Foreground, groupPadding);
+    writeElements(out, *elements, alpha, distribute, false, LayerPlacement::Foreground,
+                  groupPadding);
   }
   out.closeTag();
 }
