@@ -1,25 +1,31 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Tests: TextBox element spans and accumulated rich-text spans both animate their real Stroke without an unrelated Fill or Text channel.
-     Target: Composite  Channel: width  Type: float
-     Ref: R24 -->
+<!-- Tests: A TextBox's own Stroke and the Strokes of the rich-text runs inside it animate their
+     width independently, without an unrelated Fill or Text channel.
+     Target: Composite  Channel: width  Type: float  Ref: R24
+     Two authoring details matter here. A TextBox takes `left`/`top`: its `position` attribute is
+     ignored by the renderer, so a box placed with `position` draws at the origin. And the runs a
+     TextBox lays out are its own children; Groups listed as siblings of an empty TextBox all land
+     at the layer origin in the reference, which turns the frame into a pile of overlapping words
+     and measures layout instead of the stroke. -->
 <pagx width="380" height="240">
   <Layer width="380" height="240"><Rectangle position="190,120" size="380,240"/><Fill color="#F8FAFC"/></Layer>
   <Layer width="380" height="240">
-    <TextBox position="25,30" width="330" height="75" textAlign="start" paragraphAlign="near" lineHeight="40">
+    <TextBox left="25" top="24" width="330" height="50" textAlign="start" paragraphAlign="near" lineHeight="40">
       <Text text="OWN STROKE" fontFamily="Arial" fontStyle="Regular" fontSize="30"/>
       <Fill color="#1D4ED8"/><Stroke id="boxOwnOutline" color="#BE123C" width="2"/>
     </TextBox>
   </Layer>
   <Layer width="380" height="240">
-    <Group>
-      <Text text="RICH " fontFamily="Arial" fontStyle="Regular" fontSize="28"/>
-      <Fill color="#1D4ED8"/><Stroke id="richOutlineA" color="#BE123C" width="2"/>
-    </Group>
-    <Group>
-      <Text text="SPANS" fontFamily="Arial" fontStyle="Regular" fontSize="28"/>
-      <Fill color="#0F766E"/><Stroke id="richOutlineB" color="#7C3AED" width="2"/>
-    </Group>
-    <TextBox position="25,140" width="330" height="70" textAlign="center" paragraphAlign="middle"/>
+    <TextBox left="25" top="130" width="330" height="70" textAlign="start" paragraphAlign="near" lineHeight="34">
+      <Group>
+        <Text text="RICH " fontFamily="Arial" fontStyle="Regular" fontSize="28"/>
+        <Fill color="#1D4ED8"/><Stroke id="richOutlineA" color="#BE123C" width="2"/>
+      </Group>
+      <Group>
+        <Text text="SPANS" fontFamily="Arial" fontStyle="Regular" fontSize="28"/>
+        <Fill color="#0F766E"/><Stroke id="richOutlineB" color="#7C3AED" width="2"/>
+      </Group>
+    </TextBox>
   </Layer>
   <Animations><Animation id="boxStrokeWidths" duration="60" frameRate="60" loop="once">
     <Object target="boxOwnOutline"><Channel name="width" type="float"><Key time="0" value="2" interpolation="linear"/><Key time="60" value="8"/></Channel></Object>
