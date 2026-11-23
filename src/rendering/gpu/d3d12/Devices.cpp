@@ -19,6 +19,7 @@
 #include "rendering/gpu/Devices.h"
 #include <d3d12.h>
 #include <dxgiformat.h>
+#include <atomic>
 #include <memory>
 #include <mutex>
 #include <unordered_map>
@@ -152,6 +153,10 @@ std::shared_ptr<tgfx::Device> Devices::MakeDefault() {
     }
   }
   return MakeAliasedDevice(selected);
+}
+
+void Devices::SetDeviceHealthProbeForTesting(void* probe) {
+  deviceHealthProbe.store(reinterpret_cast<DeviceHealthProbe>(probe));
 }
 
 size_t Devices::GetRegisteredDeviceCount() {

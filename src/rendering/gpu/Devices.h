@@ -268,6 +268,12 @@ class Devices {
   static size_t GetRegisteredDeviceCount();
 
   /**
+   * Overrides the native device health query for tests. Pass nullptr to restore the real
+   * ID3D12Device::GetDeviceRemovedReason() probe.
+   */
+  static void SetDeviceHealthProbeForTesting(void* probe);
+
+  /**
    * Returns true when the context's GPU device is still usable for new work. The context must
    * already be locked by the caller. Backends without a native device-health query return true
    * for a non-null context; D3D12 checks the registered native device for removal.

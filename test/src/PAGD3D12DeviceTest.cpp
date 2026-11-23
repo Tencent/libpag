@@ -122,6 +122,26 @@ PAG_TEST(D3D12Test, SameNativeDeviceReturnsSameDevice) {
   EXPECT_EQ(defaultDevice.get(), firstDevice.get());
 }
 
+static HRESULT ForceRemovedDevice(void*) {
+  return DXGI_ERROR_DEVICE_REMOVED;
+}
+
+/**
+ * A removed default device must be evicted and replaced instead of being returned forever.
+ */
+PAG_TEST(D3D12Test, RemovedDefaultDeviceIsRebuilt) {
+  auto before = Devices::MakeDefault();
+  ASSERT_TRUE(before != nullptr);
+  Devices::SetDeviceHealthProbeForTesting(reinterpret_cast<void*>(ForceRemovedDevice));
+  auto after = Devices::MakeDefault();
+  Devices::SetDeviceHealthProbeForTesting(nullptr);
+  ASSERT_TRUE(after != nullptr);
+  EXPECT_NE(before.get(), after.get());
+  auto stable = Devices::MakeDefault();
+  ASSERT_TRUE(stable != nullptr);
+  EXPECT_EQ(stable.get(), after.get());
+}
+
 PAG_TEST(D3D12Test, HealthyDeviceReportsHealthy) {
   DeviceLockScope scope;
   ASSERT_TRUE(static_cast<bool>(scope));
@@ -210,7 +230,8 @@ PAG_TEST(D3D12Test, TypelessResourceRejected) {
 PAG_TEST(D3D12Test, DeviceRegistryIsThreadSafe) {
   SecondaryDeviceTexture secondary = {};
   if (!secondary.init(8, 8)) {
-    GTEST_SKIP() << "Failed to create a secondary D3D12 device, HRESULT=" << static_cast<long>(secondary.lastError);
+    GTEST_SKIP() << "Failed to create a secondary D3D12 device, HRESULT="
+                 << static_cast<long>(secondary.lastError);
   }
   constexpr int ThreadCount = 8;
   auto deviceCountBefore = Devices::GetRegisteredDeviceCount();

@@ -5,6 +5,14 @@
 // device import code separate from validation and rendering entry points.
 // TODO: Fold this registry into tgfx Device::RegisterNative once DeviceKey supports D3D12.
 
+using DeviceHealthProbe = HRESULT (*)(void* device);
+std::atomic<DeviceHealthProbe> deviceHealthProbe = nullptr;
+
+HRESULT QueryDeviceRemovedReason(ID3D12Device* device) {
+  auto probe = deviceHealthProbe.load();
+  return probe != nullptr ? probe(device) : device->GetDeviceRemovedReason();
+}
+
 /**
  * One live tgfx device, keyed by the canonical IUnknown identity of its native ID3D12Device.
  * The identity is strongly held so pointer comparison stays valid after the caller releases its
@@ -53,7 +61,7 @@ bool IsEntryHealthy(const std::shared_ptr<DeviceEntry>& entry) {
   if (nativeDevice == nullptr) {
     return false;
   }
-  auto reason = nativeDevice->GetDeviceRemovedReason();
+  auto reason = QueryDeviceRemovedReason(nativeDevice);
   nativeDevice->Release();
   return SUCCEEDED(reason);
 }
@@ -271,7 +279,6 @@ std::shared_ptr<DeviceEntry> GetOrCreateEntry(ID3D12Resource* resource) {
   }
   return PublishEntry(identity, std::move(device));
 }
-
 
 size_t CountRegisteredDevices() {
   auto& registry = GetRegistry();
