@@ -711,6 +711,15 @@ bool HTMLParserContext::resolveCanvasSize(const std::shared_ptr<DOMNode>& body, 
 //==================================================================================================
 
 void HTMLParserContext::assignElementId(Layer* layer, const std::shared_ptr<DOMNode>& element) {
+  // Known limitation, deliberately not fixed here: the allocator only writes `Layer::id`. It does not
+  // call `PAGXDocument::registerNode` (the index `PAGXDocument::findNode` reads), which is populated
+  // by `PAGXDocument::makeNode(id)` and by `PAGXImporter::FromXML`. The runtime resolves an
+  // `Animation` target through that index, so an animation on a document built purely in memory by
+  // this importer never binds - it is silently skipped and every frame shows the pre-animation state.
+  // The HTML CLI and the eval harness both render through the serialized form (`PAGXExporter::ToXML`
+  // + `PAGXImporter::FromXML`), which rebuilds the index, so the shipped paths are unaffected. A real
+  // fix means registering every id the importer assigns, which changes document ownership rules and
+  // is out of scope for this PR; the rendering tests below round-trip for the same reason.
   _idAllocator->assign(layer, element);
   // Record elements that declare an animation so PAGX animations can be emitted once the whole
   // tree is built. Cheap lookup: the resolved style is cached by the cascade.

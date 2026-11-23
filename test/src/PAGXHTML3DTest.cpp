@@ -66,11 +66,15 @@ std::shared_ptr<pagx::PAGXDocument> ParseHtml(const std::string& html) {
   return pagx::HTMLImporter::ParseString(html, options);
 }
 
-// Round-trips a document through the serialized form before rendering it. The runtime resolves an
-// `Animation` target through the document's id index, which only `PAGXImporter::FromXML` fills: a
-// document built in memory by the HTML importer has no entries there, so its animations would be
-// skipped and every frame would show the pre-animation state. Rendered content and keyframe values
-// are identical either way, and the CLI / eval harness renders through the same round-trip.
+// Round-trips a document through the serialized form before rendering it, because animation targets
+// only resolve in the file form. The runtime looks an `Animation` target up through the document's
+// id index; `PAGXImporter::FromXML` fills that index, while the HTML importer only writes
+// `Layer::id` (see the note in `HTMLParserContext::assignElementId`). An in-memory document therefore
+// keeps its layers and keyframes but cannot bind its animations, and every frame would show the
+// pre-animation state. This is a pre-existing importer limitation, not something these tests create,
+// and the CLI / eval harness renders through the same file form. Pinning the active-window frame as
+// well as the hold keeps the test honest: a document whose target failed to bind passes the hold
+// assertion anyway, so the visible frame is what proves the animation actually ran.
 std::shared_ptr<pagx::PAGXDocument> RoundTripForRender(
     const std::shared_ptr<pagx::PAGXDocument>& doc) {
   if (doc == nullptr) {
@@ -2166,11 +2170,22 @@ PAG_TEST(PAGXHTML3DTest, SingularZeroScaleHoldStaysSubPixelOnALargeBox) {
   // 0.5 / 20000 = 2.5e-5, which is below the `1e-3` upper bound the small-box cases keep.
   EXPECT_NEAR(decomposed.scale[0], 0.000025, 1e-9);
   EXPECT_NEAR(decomposed.scale[1], 0.000025, 1e-9);
+  auto rendered = RoundTripForRender(doc);
+  ASSERT_NE(rendered, nullptr);
+  ASSERT_NE(rendered->findNode("card"), nullptr)
+      << "the round-trip has to bind the animation target";
   // 0.1s sits inside the 0.5s delay, so the frame is the leading fill-mode hold.
-  const auto pixels = RenderFrame(RoundTripForRender(doc), 100000);
-  ASSERT_FALSE(pixels.empty());
-  EXPECT_LE(CountVisiblePixels(pixels), 8u)
+  const auto holdPixels = RenderFrame(rendered, 100000);
+  ASSERT_FALSE(holdPixels.empty());
+  EXPECT_LE(CountVisiblePixels(holdPixels), 8u)
       << "a 20000px box held at 1e-3 would paint a 20px patch";
+  // 1.0s is half-way through the 1s active window: the animation ran, so the element is clearly
+  // visible. Without this frame the hold assertion would also pass on a document whose animation was
+  // never bound at all.
+  const auto activePixels = RenderFrame(rendered, 1000000);
+  ASSERT_FALSE(activePixels.empty());
+  EXPECT_GT(CountVisiblePixels(activePixels), 1000u)
+      << "the active window has to render the animated element";
 }
 
 /**
@@ -2209,10 +2224,20 @@ PAG_TEST(PAGXHTML3DTest, MatrixSourceSingularFillHoldStaysSubPixel) {
   EXPECT_TRUE(HasDiagnosticContaining(doc, "animation-fill-mode"))
       << "a matrix-source singular pose cannot be restored exactly, so it has to be reported";
   // 0.1s sits inside the 0.5s delay, so the frame is the leading fill-mode hold.
-  const auto pixels = RenderFrame(RoundTripForRender(doc), 100000);
-  ASSERT_FALSE(pixels.empty());
-  EXPECT_LE(CountVisiblePixels(pixels), 8u)
+  auto rendered = RoundTripForRender(doc);
+  ASSERT_NE(rendered, nullptr);
+  ASSERT_NE(rendered->findNode("card"), nullptr)
+      << "the round-trip has to bind the animation target";
+  const auto holdPixels = RenderFrame(rendered, 100000);
+  ASSERT_FALSE(holdPixels.empty());
+  EXPECT_LE(CountVisiblePixels(holdPixels), 8u)
       << "an identity hold would paint the whole 80x60 box during the delay";
+  // Same reasoning as the large-box case: the visible frame inside the active window proves the
+  // animation actually played, which the hold assertion alone cannot.
+  const auto activePixels = RenderFrame(rendered, 1000000);
+  ASSERT_FALSE(activePixels.empty());
+  EXPECT_GT(CountVisiblePixels(activePixels), 1000u)
+      << "the active window has to render the animated element";
 }
 
 /**
