@@ -1214,6 +1214,9 @@ struct DomTargetBundle {
   // The host layer is placed by a parent's flex layout, so its slot must not be folded into the
   // animated transform as well.
   bool primaryHostPlacedByFlex = false;
+  // The host's static left/top were zeroed because a pose or matrix channel owns the position, so
+  // the frame has to carry the authored layout origin inside the transform.
+  bool primaryHostPositionZeroed = false;
   std::vector<const AnimationObject*> objects = {};
   // Set for a Repeater copy bundle: which copy this tag paints.
   int repeaterIndex = -1;
@@ -2470,8 +2473,16 @@ void EmitTransformCssAtFrame(const DomTargetBundle& bundle, const BundleChannelS
       baseSkewAxis = grp->skewAxis;
       baseAnchor = grp->anchor;
     } else if (isLayerHost) {
-      // A Layer keeps its authored components; left/top already carry the translation.
       auto* layer = static_cast<const Layer*>(bundle.primaryHost);
+      if (bundle.primaryHostPositionZeroed) {
+        // A pose channel zeroed the tag's left/top so the frame owns the position, and the runtime
+        // composes the layout slot outside the local pose - so the constraint slot has to come back
+        // through the translate (composite/34 sat at the origin without it).
+        // Only the slot: an authored x/y already rides in `LayerTransformCSS` below, and adding it
+        // here as well shifted every layer/scale or layer/skew case by its own position.
+        basePosX = std::isnan(layer->left) ? 0.0f : layer->left;
+        basePosY = std::isnan(layer->top) ? 0.0f : layer->top;
+      }
       baseRot = layer->rotationZ;
       baseSX = layer->scaleX;
       baseSY = layer->scaleY;
@@ -5231,9 +5242,13 @@ std::string HTMLAnimationSession::emitKeyframesAndWeave(std::string& bodyHtml) {
                                               _maskPathToLayer, &mount.objects);
     MergeBundlesByDomId(bundles);
     for (auto& bundle : bundles) {
-      bundle.primaryHostPlacedByFlex =
-          bundle.primaryHost != nullptr && bundle.primaryHost->nodeType() == NodeType::Layer &&
-          _ctx.animation.flexItems.count(static_cast<const Layer*>(bundle.primaryHost)) > 0;
+      if (bundle.primaryHost == nullptr || bundle.primaryHost->nodeType() != NodeType::Layer) {
+        continue;
+      }
+      const auto* hostLayerNode = static_cast<const Layer*>(bundle.primaryHost);
+      bundle.primaryHostPlacedByFlex = _ctx.animation.flexItems.count(hostLayerNode) > 0;
+      bundle.primaryHostPositionZeroed = _ctx.animation.poseDrivenLayers.count(hostLayerNode) > 0 ||
+                                         _ctx.animation.matrixDrivenLayers.count(hostLayerNode) > 0;
     }
     // Identical stops share one rule, even across bundles: a per-glyph fan-out where every glyph
     // ends up with the same keyframes (a uniform modifier colour, say) must not emit N copies.
