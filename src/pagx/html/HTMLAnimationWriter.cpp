@@ -4241,12 +4241,19 @@ std::string ModifierGlyphDecls(const RangeSelectorGlyph& glyph, const BundleChan
     // to reach the span, and one that only animates the colour keeps the glyph's own width.
     if ((chSet.modStrokeColorCh != nullptr || chSet.modStrokeWidthCh != nullptr) &&
         glyph.hasBaseStrokeWidth) {
-      Color strokeColor =
-          chSet.modStrokeColorCh != nullptr
-              ? EvalColorChannel(chSet.modStrokeColorCh, t,
-                                 modifier->strokeColor.value_or(glyph.baseStrokeColor))
-              : glyph.baseStrokeColor;
+      // Mirror the SVG outlet: the modifier is mixed in by the selector factor, so a glyph the
+      // selector no longer reaches keeps its own outline instead of inheriting the modifier's
+      // colour or a zero width (R33).
+      Color strokeColor = glyph.baseStrokeColor;
+      if (chSet.modStrokeColorCh != nullptr) {
+        Color tint = EvalColorChannel(chSet.modStrokeColorCh, t,
+                                      modifier->strokeColor.value_or(glyph.baseStrokeColor));
+        strokeColor = (glyph.hasBaseStrokeColor && glyph.factor > 0.0f)
+                          ? LerpColor(glyph.baseStrokeColor, tint, glyph.factor)
+                          : tint;
+      }
       float width = EvalFloatChannel(chSet.modStrokeWidthCh, t, glyph.baseStrokeWidth);
+      width = glyph.baseStrokeWidth + (width - glyph.baseStrokeWidth) * absF;
       if (width > 0.0f) {
         AppendCssDecl(decls, "-webkit-text-stroke",
                       CssFloatToString(width) + "px " + ColorToRGBA(strokeColor));

@@ -2163,7 +2163,15 @@ void HTMLWriter::emitSVGContent(HTMLBuilder& out, const std::vector<GeoInfo>& ge
     if (isContinuousTrim && !isContinuousTrimVisible(trim, pathLengths, totalPathLength, geoIdx)) {
       continue;
     }
-    std::string geoAnimId = _ctx->claimAnimatedDomId({stroke, fill, trim, g.element});
+    // A RoundCorner paints through this shape too: its radius animation resolves by node and scope,
+    // so the modifier needs a record on the same tag (R27).
+    std::vector<const Node*> geoIdCandidates = {stroke, fill, trim, g.element};
+    for (const auto& entry : _ctx->animation.roundCornerShapes) {
+      if (entry.second == g.element) {
+        geoIdCandidates.push_back(entry.first);
+      }
+    }
+    std::string geoAnimId = _ctx->claimAnimatedDomId(geoIdCandidates);
     if (!g.modifiedPathData.empty()) {
       out.openTag("path");
       if (!geoAnimId.empty()) {
