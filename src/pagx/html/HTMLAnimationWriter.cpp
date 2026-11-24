@@ -1477,6 +1477,9 @@ struct BundleChannelSet {
   // The residual filter stage has no wrapper to live in (the host is not an absolutely positioned
   // div), so the frame has to carry it inside its own `filter` list.
   bool residualInline = false;
+  // How many channels this bundle actually drives. A bundle whose animation only declares channels
+  // the exporter does not support drives nothing and must not produce a rule at all.
+  int boundChannels = 0;
   // Set for a paused mount: every stop evaluates this frame, so the rule holds the pose the runtime
   // shows at frame 0 instead of advancing or falling back to the authored value (R47).
   Frame pausedFrame = -1;
@@ -2138,6 +2141,7 @@ BundleChannelSet CollectBundleChannels(
       // An unbound channel has no CSS property to drive, so its keys must not split the bound
       // channels' keyframes or override their easing.
       if (BindChannelToBundleSet(objTarget, ch, solidToPainter, result)) {
+        ++result.boundChannels;
         // Throwaway sinks for the extractions that do not feed a pinned hold.
         std::set<Frame> unusedPins = {};
         std::unordered_map<Frame, std::set<Frame>> unusedHoldEnds = {};
@@ -2302,7 +2306,7 @@ BundleChannelSet CollectBundleChannels(
   for (auto it = result.keyTimes.upper_bound(samplingLimit); it != result.keyTimes.end();) {
     it = result.keyTimes.erase(it);
   }
-  if (result.keyTimes.empty() && samplingLimit >= 0) {
+  if (result.keyTimes.empty() && samplingLimit >= 0 && result.boundChannels > 0) {
     // Every key sits past the window, and the channel still holds its first key's value there: the
     // runtime does not fall back to the authored value (measured on a probe whose only key is at
     // frame 100 of a 60-frame timeline - the reference shows that key's 0.3 from frame 0). One stop
