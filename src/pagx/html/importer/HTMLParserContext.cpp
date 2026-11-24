@@ -742,9 +742,15 @@ Layer* HTMLParserContext::wrapInCameraLayer(Layer* parent, Layer* child,
   if (child == nullptr || !camera.HasOrigin()) {
     return child;
   }
-  const bool positioned = !child->includeInLayout &&
-                          (std::isfinite(child->left) || std::isfinite(child->centerX)) &&
-                          (std::isfinite(child->top) || std::isfinite(child->centerY));
+  // A child is positioned when it has any anchor on each axis, not only a leading one: `right` /
+  // `bottom` are authored just as often (corner badges, `right: 0` decorations) and
+  // `TranslateParentAnchors` already shifts them the other way, so excluding them dropped a
+  // projection that used to work.
+  const bool hasHorizontalAnchor =
+      std::isfinite(child->left) || std::isfinite(child->centerX) || std::isfinite(child->right);
+  const bool hasVerticalAnchor =
+      std::isfinite(child->top) || std::isfinite(child->centerY) || std::isfinite(child->bottom);
+  const bool positioned = !child->includeInLayout && hasHorizontalAnchor && hasVerticalAnchor;
   const bool flowAtPaddingOrigin =
       parent->layout == LayoutMode::None && child->includeInLayout && std::isnan(child->left) &&
       std::isnan(child->right) && std::isnan(child->top) && std::isnan(child->bottom) &&
@@ -779,6 +785,14 @@ Layer* HTMLParserContext::wrapInCameraLayer(Layer* parent, Layer* child,
     wrapper->matrix3D = projection;
     wrapper->children.push_back(child);
     return wrapper;
+  }
+  if (!std::isfinite(referenceWidthPx) || !std::isfinite(referenceHeightPx)) {
+    // The wrapper doubles as the child's containing block, so it needs the declaring box's size.
+    // `perspective-origin: 0 0` can resolve while the box size does not (`width: auto`), and a NaN
+    // sized wrapper collapses every percentage / `right` / `bottom` inside it. Skip the wrapper and
+    // report instead of silently mis-sizing the subtree.
+    warnUnprojectedParentCamera(element);
+    return child;
   }
   auto* wrapper = _document->makeNode<Layer>();
   // Same size as the box that declared the camera: children keep resolving percentages, centres and

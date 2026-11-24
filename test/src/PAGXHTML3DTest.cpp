@@ -2017,23 +2017,31 @@ PAG_TEST(PAGXHTML3DTest, AnimatedFlowChildUnderPerspectiveWarns) {
  * the parent camera cannot be expressed in its local coordinates; that has to be reported instead of
  * silently pinning the vanishing point to the parent origin.
  */
-PAG_TEST(PAGXHTML3DTest, RightPositionedChildUnderPerspectiveWarns) {
+/**
+ * Test case: a child positioned by `right` alone is positioned, so the parent camera can wrap it. It
+ * used to be judged un-wrappable and its projection was silently dropped (one document-level note at
+ * most), which moved corner-anchored elements.
+ */
+PAG_TEST(PAGXHTML3DTest, RightPositionedChildUnderPerspectiveKeepsTheProjection) {
   auto doc = ParseHtml(R"HTML(
     <html><body style="width:200px;height:120px">
       <div style="position:absolute;left:0;top:0;width:200px;height:120px;perspective:600px">
-        <div style="position:absolute;right:10px;top:10px;width:80px;height:60px;
+        <div id="card" style="position:absolute;right:10px;top:10px;width:80px;height:60px;
              background-color:#38BDF8;transform:rotateY(30deg)"></div>
       </div>
     </body></html>
   )HTML");
   ASSERT_NE(doc, nullptr);
-  int warnings = 0;
-  for (const auto& message : doc->errors) {
-    if (message.find("vanishing point") != std::string::npos) {
-      warnings++;
-    }
-  }
-  EXPECT_EQ(warnings, 1);
+  auto* card = FindLayerById(doc, "card");
+  ASSERT_NE(card, nullptr);
+  auto* wrapper = CameraWrapperOf(doc, card);
+  ASSERT_NE(wrapper, nullptr) << "a far-edge anchor is an anchor";
+  EXPECT_TRUE(NearlyEqual(wrapper->perspective, 600.0f, 0.01f));
+  // Default `perspective-origin` is the box centre; the far anchor grows by the wrapper offset.
+  EXPECT_TRUE(NearlyEqual(card->right, 110.0f, 1e-3f));
+  EXPECT_FALSE(HasProjectionRow(card));
+  EXPECT_FALSE(HasDiagnosticContaining(doc, "cannot be projected"))
+      << "the camera is applied, so nothing has to be reported";
 }
 
 /**
@@ -3366,6 +3374,90 @@ PAG_TEST(PAGXHTML3DTest, EmOriginWarnsOnce) {
   auto* box = FindLayerById(doc, "box");
   ASSERT_NE(box, nullptr);
   EXPECT_TRUE(NearlyEqual(box->anchor.x, 16.0f, 0.001f));
+}
+/**
+ * Test case: a `preserve-3d` element with a background and padding gets an inner host, and the
+ * children hang from that host. The outer layer keeps `preserve-3d`, but if the host drops it the
+ * subtree is flattened there and the parent camera silently stops at the host.
+ */
+PAG_TEST(PAGXHTML3DTest, Preserve3DSurvivesTheInnerHost) {
+  auto doc = ParseHtml(R"HTML(
+    <html><body style="width:200px;height:120px">
+      <div style="position:absolute;left:0;top:0;width:200px;height:120px;perspective:600px">
+        <div id="stage" style="position:absolute;left:0;top:0;width:200px;height:120px;
+             transform-style:preserve-3d;background-color:#ffffff;padding:8px">
+          <div id="card" style="position:absolute;left:10px;top:10px;width:60px;height:40px;
+               background-color:#38BDF8;transform:rotateY(30deg)"></div>
+        </div>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* stage = FindLayerById(doc, "stage");
+  ASSERT_NE(stage, nullptr);
+  EXPECT_TRUE(stage->preserve3D) << "the outer layer keeps the 3D context";
+  pagx::Layer* host = nullptr;
+  for (auto* candidate : stage->children) {
+    if (NearlyEqual(candidate->percentWidth, 100.0f, 1e-4f) &&
+        NearlyEqual(candidate->percentHeight, 100.0f, 1e-4f)) {
+      host = candidate;
+    }
+  }
+  ASSERT_NE(host, nullptr)
+      << "a background + padding element hangs its children from an inner host";
+  EXPECT_TRUE(host->preserve3D)
+      << "the host is the layer the children hang from, so it has to keep the 3D context too";
+  EXPECT_NE(CameraWrapperOf(doc, stage), nullptr) << "the parent camera still reaches the element";
+}
+
+/**
+ * Test case: `perspective-origin: 0 0` resolves while the declaring box has no absolute size, so the
+ * wrapper would be sized NaN and collapse every percentage inside it. The camera is dropped and
+ * reported instead.
+ */
+PAG_TEST(PAGXHTML3DTest, CameraWrapperRequiresAFiniteReferenceSize) {
+  auto doc = ParseHtml(R"HTML(
+    <html><body style="width:200px;height:120px">
+      <div style="position:absolute;left:0;top:0;perspective:600px;perspective-origin:0px 0px">
+        <div id="card" style="position:absolute;left:10px;top:10px;width:60px;height:40px;
+             background-color:#38BDF8;transform:rotateY(30deg)"></div>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* card = FindLayerById(doc, "card");
+  ASSERT_NE(card, nullptr);
+  EXPECT_EQ(CameraWrapperOf(doc, card), nullptr)
+      << "a NaN sized wrapper would be the child's containing block";
+  EXPECT_TRUE(HasDiagnosticContaining(doc, "cannot be projected"))
+      << "dropping the projection has to be reported";
+}
+
+/**
+ * Test case: a child positioned only by `right` / `bottom` is still positioned. It used to be judged
+ * un-wrappable, which silently dropped the parent projection for corner badges and similar elements.
+ */
+PAG_TEST(PAGXHTML3DTest, RightBottomPositionedChildKeepsTheProjection) {
+  auto doc = ParseHtml(R"HTML(
+    <html><body style="width:200px;height:100px">
+      <div style="position:absolute;left:0;top:0;width:200px;height:100px;perspective:600px">
+        <div id="card" style="position:absolute;right:10px;bottom:10px;width:50px;height:30px;
+             background-color:#38BDF8;transform:rotateY(30deg)"></div>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* card = FindLayerById(doc, "card");
+  ASSERT_NE(card, nullptr);
+  auto* wrapper = CameraWrapperOf(doc, card);
+  ASSERT_NE(wrapper, nullptr) << "right / bottom is an anchor like left / top";
+  EXPECT_TRUE(NearlyEqual(wrapper->perspective, 600.0f, 0.01f));
+  // The default `perspective-origin` is the box centre, so the far anchors shift the other way.
+  EXPECT_TRUE(NearlyEqual(wrapper->left, 100.0f, 1e-3f));
+  EXPECT_TRUE(NearlyEqual(wrapper->top, 50.0f, 1e-3f));
+  EXPECT_TRUE(NearlyEqual(card->right, 110.0f, 1e-3f)) << "right grows by the wrapper offset";
+  EXPECT_TRUE(NearlyEqual(card->bottom, 60.0f, 1e-3f));
+  EXPECT_FALSE(HasProjectionRow(card)) << "the camera stays on the wrapper";
 }
 
 }  // namespace pag
