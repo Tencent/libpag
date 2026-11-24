@@ -1431,6 +1431,9 @@ struct BundleChannelSet {
   // This rule drives a distributing layer's alpha. The stops write the registered `--pagx-fade`
   // ratio instead of `opacity`, because the paints consume it themselves.
   bool fadeViaVariable = false;
+  // The residual filter stage has no wrapper to live in (the host is not an absolutely positioned
+  // div), so the frame has to carry it inside its own `filter` list.
+  bool residualInline = false;
   // The layer's authored alpha: the ratio in the stops is relative to it, since the paints' static
   // `calc(var(--pagx-fade,1) * <product>)` already contains it.
   float fadeBase = 1.0f;
@@ -2973,11 +2976,12 @@ void EmitFilterCssAtFrame(const DomTargetBundle& bundle, const BundleChannelSet&
   // reference therefore rides on a wrapper div around this element instead (see
   // residualFilterWrappers and ApplyElementEdits), which keeps the authored chain order because the
   // wrapper's own filter runs on the already-filtered subtree.
-  if (!filterVal.empty() && !bundle.residualFilterId.empty() && tagName != "div") {
+  if (!filterVal.empty() && !bundle.residualFilterId.empty() &&
+      (tagName != "div" || chSet.residualInline)) {
     // Only an absolutely positioned div host can take the wrapper that carries the residual stage
-    // (see ApplyElementEdits). An SVG shape cannot, and silently dropping the stage there removed a
-    // filter the reference still draws, so it goes back inside the list: the interpolation degrades
-    // to steps for this host, which is better than losing the effect.
+    // (see ApplyElementEdits). An SVG shape, and an in-flow / flex div, cannot: both would gain a
+    // new parent box or lose the stage entirely, so it goes back inside the frame's own list and the
+    // interpolation degrades to steps for this host, which is better than losing the effect (R17(b)).
     filterVal += " " + bundle.residualFilterId;
   }
   if (!filterVal.empty()) {
@@ -5640,6 +5644,20 @@ std::string HTMLAnimationSession::emitKeyframesAndWeave(std::string& bodyHtml) {
           // which keeps one rule for the layer and needs no selector to find them.
           // A layer authored fully transparent has nothing to divide by and keeps the container path.
           BundleChannelSet stopSet = ruleSet;
+          if (!bundle.residualFilterId.empty()) {
+            // Mirror the wrapper decision in ApplyElementEdits: only `position:absolute` divs can
+            // hold a residual wrapper without changing their layout role.
+            stopSet.residualInline = true;
+            if (element.tagName == "div") {
+              auto rangeIt = tagIndex.rangeById.find(element.id);
+              if (rangeIt != tagIndex.rangeById.end()) {
+                auto positionAt = bodyHtml.find("position:absolute", rangeIt->second.first);
+                if (positionAt != std::string::npos && positionAt < rangeIt->second.second) {
+                  stopSet.residualInline = false;
+                }
+              }
+            }
+          }
           // A filter makes the runtime composite the layer offscreen first, so its alpha lands on
           // that single surface instead of on each paint (composite/28).
           const bool fadeOnPaints = ruleSet.alphaCh != nullptr && alphaHost != nullptr &&
