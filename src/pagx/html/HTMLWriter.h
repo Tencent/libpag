@@ -560,6 +560,12 @@ class HTMLWriterContext {
    * those records, which keeps the animations of the other candidates instead of dropping them.
    */
   std::string claimAnimatedDomId(std::initializer_list<const Node*> candidates) {
+    return claimAnimatedDomId(std::vector<const Node*>(candidates));
+  }
+
+  // Same contract as the initializer-list form, for callers whose candidate list is built at run
+  // time (a shape plus the RoundCorners that round it, for instance).
+  std::string claimAnimatedDomId(const std::vector<const Node*>& candidates) {
     if (animation.elementIds.empty()) {
       return {};
     }

@@ -2910,7 +2910,7 @@ void EmitGeometryCssAtFrame(const DomTargetBundle& bundle, const BundleChannelSe
     return;
   }
   if (chSet.roundCornerCh != nullptr && chSet.roundCornerTarget != nullptr &&
-      chSet.roundCornerShape != nullptr) {
+      chSet.roundCornerShape != nullptr && !chSet.roundCornerAsCss) {
     // The radius reshapes the outline, so every stop rewrites the path with that frame's radius.
     // Geometry channels on the same shape feed the same rewrite: dropping them here would leave the
     // outline at its authored size while the reference grows.
@@ -2993,11 +2993,12 @@ void EmitGeometryCssAtFrame(const DomTargetBundle& bundle, const BundleChannelSe
     }
     return;
   }
-  if (type != NodeType::Rectangle && type != NodeType::Ellipse) {
-    return;
-  }
-  if (chSet.roundCornerAsCss && type == NodeType::Rectangle && chSet.roundCornerTarget != nullptr) {
-    auto* rect = static_cast<const Rectangle*>(bundle.primaryHost);
+  // A RoundCorner targets the modifier, so the bundle's host is the RoundCorner rather than the box
+  // it rounds; the CSS route has to read the box from the recorded shape (R27).
+  if (chSet.roundCornerAsCss && chSet.roundCornerTarget != nullptr &&
+      chSet.roundCornerShape != nullptr &&
+      chSet.roundCornerShape->nodeType() == NodeType::Rectangle) {
+    auto* rect = static_cast<const Rectangle*>(chSet.roundCornerShape);
     auto size = rect->renderSize();
     float width = EvalFloatChannel(chSet.geometryWidthCh, t, size.width);
     // size.height has no channel binding yet; the clamp only needs the value used for layout.
@@ -3017,6 +3018,11 @@ void EmitGeometryCssAtFrame(const DomTargetBundle& bundle, const BundleChannelSe
                     CssFloatToString(rect->renderPosition().x - width * 0.5f) + "px");
       AppendCssDecl(decls, "width", CssFloatToString(width) + "px");
     }
+    return;
+  }
+  // Everything below rebuilds a box shape; a modifier host (the RoundCorner above) or any other node
+  // type has nothing to emit here.
+  if (type != NodeType::Rectangle && type != NodeType::Ellipse) {
     return;
   }
   Point center = {};
@@ -4710,6 +4716,12 @@ std::vector<BundleElement> FindBundleElementsForNode(
     }
     return {};
   }
+  if (bundle.repeaterIndex >= 0) {
+    // A copy bundle names exactly one copy, and copy ids are unique in the document (they carry the
+    // mount scope). Matching by node and scope would return every copy of the repeater at once, and
+    // inside a Composition the copies are not registered under that key at all (R27).
+    return FindBundleElements(tagIndex, bundle.domId);
+  }
   auto it = tagIndexByNode.find(bundle.primaryHost);
   if (it != tagIndexByNode.end()) {
     for (const auto& entry : it->second) {
@@ -5321,12 +5333,13 @@ std::string HTMLAnimationSession::emitKeyframesAndWeave(std::string& bodyHtml) {
       if (chSet.roundCornerTarget != nullptr) {
         auto shapeIt = _ctx.animation.roundCornerShapes.find(chSet.roundCornerTarget);
         if (shapeIt != _ctx.animation.roundCornerShapes.end()) {
+          // Record the rounded box either way: the CSS route needs its size, the `d` route needs
+          // its geometry.
+          chSet.roundCornerShape = shapeIt->second;
           if (shapeIt->second->nodeType() == NodeType::Rectangle) {
             // border-radius runs on the same div as left/width, so a geometry channel can animate
             // next to it; the path rewrite below cannot interpolate when the command list changes.
             chSet.roundCornerAsCss = true;
-          } else {
-            chSet.roundCornerShape = shapeIt->second;
           }
         }
       }

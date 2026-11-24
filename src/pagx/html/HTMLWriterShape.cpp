@@ -33,6 +33,7 @@
 #include "pagx/nodes/Polystar.h"
 #include "pagx/nodes/RadialGradient.h"
 #include "pagx/nodes/Rectangle.h"
+#include "pagx/nodes/RoundCorner.h"
 #include "pagx/nodes/SolidColor.h"
 #include "pagx/nodes/TrimPath.h"
 #include "pagx/svg/SVGPathParser.h"
@@ -1710,7 +1711,16 @@ void HTMLWriter::renderCSSDiv(HTMLBuilder& out, const GeoInfo& geo, const Fill* 
   }
 
   out.openTag("div");
-  auto animId = _ctx->claimAnimatedDomId({fill, geo.element});
+  // A RoundCorner paints through the shape it rounds, and in a Composition mount the weaving pass
+  // resolves targets by node and scope: without a record for the modifier itself its radius
+  // animation has no host (R27).
+  std::vector<const Node*> idCandidates = {fill, geo.element};
+  for (const auto& entry : _ctx->animation.roundCornerShapes) {
+    if (entry.second == geo.element) {
+      idCandidates.push_back(entry.first);
+    }
+  }
+  auto animId = _ctx->claimAnimatedDomId(idCandidates);
   if (!animId.empty()) {
     out.addAttr("id", animId);
   }

@@ -152,6 +152,11 @@ void HTMLWriter::writeRepeater(HTMLBuilder& out, const Repeater* rep,
     std::string copyId = {};
     if (animated) {
       copyId = rep->id + "_copy" + std::to_string(i);
+      // The same Composition can be mounted several times, and each mount paints its own copies:
+      // the ids have to stay unique or every instance would target the first one's tag.
+      if (_ctx->animation.scope != 0) {
+        copyId += "__" + std::to_string(_ctx->animation.scope);
+      }
     }
     if (animated || !m.isIdentity() || ea < 1.0f) {
       out.openTag("div");
