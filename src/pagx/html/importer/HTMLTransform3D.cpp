@@ -886,8 +886,7 @@ bool ParseCssTransformList(const std::string& value, HTMLValueParser& valueParse
     return false;
   }
   if (ToLower(trimmed) == "none") {
-    // `none` is a valid declaration of "no transform", so it resolves to the identity and reports
-    // success: `false` only ever means "there is a diagnostic".
+    // Unlike an empty value, `none` is a valid identity declaration.
     *out = {};
     return true;
   }
