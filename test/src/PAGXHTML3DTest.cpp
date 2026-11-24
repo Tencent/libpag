@@ -257,6 +257,73 @@ size_t CountVisiblePixels(const std::vector<uint8_t>& pixels) {
   return visible;
 }
 
+// Bounding box of the pixels a frame actually paints. Rendered geometry is what these camera tests
+// are about: a wrapper that exists but is sized wrong, or a flattened subtree, still has the right
+// node structure and would pass a field-only assertion.
+struct VisibleBounds {
+  int x = 0;
+  int y = 0;
+  int width = 0;
+  int height = 0;
+};
+
+VisibleBounds BoundsOf(const std::vector<uint8_t>& pixels) {
+  VisibleBounds bounds = {};
+  int minX = PAGX_TEST_DOC_SIZE;
+  int minY = PAGX_TEST_DOC_SIZE;
+  int maxX = -1;
+  int maxY = -1;
+  for (int y = 0; y < PAGX_TEST_DOC_SIZE; ++y) {
+    for (int x = 0; x < PAGX_TEST_DOC_SIZE; ++x) {
+      if (pixels[(static_cast<size_t>(y) * PAGX_TEST_DOC_SIZE + x) * 4 + 3] == 0) {
+        continue;
+      }
+      minX = std::min(minX, x);
+      minY = std::min(minY, y);
+      maxX = std::max(maxX, x);
+      maxY = std::max(maxY, y);
+    }
+  }
+  if (maxX < 0) {
+    return bounds;
+  }
+  bounds.x = minX;
+  bounds.y = minY;
+  bounds.width = maxX - minX + 1;
+  bounds.height = maxY - minY + 1;
+  return bounds;
+}
+
+VisibleBounds RedBoundsOf(const std::vector<uint8_t>& pixels) {
+  VisibleBounds bounds = {};
+  int minX = PAGX_TEST_DOC_SIZE;
+  int minY = PAGX_TEST_DOC_SIZE;
+  int maxX = -1;
+  int maxY = -1;
+  for (int y = 0; y < PAGX_TEST_DOC_SIZE; ++y) {
+    for (int x = 0; x < PAGX_TEST_DOC_SIZE; ++x) {
+      const auto offset = (static_cast<size_t>(y) * PAGX_TEST_DOC_SIZE + x) * 4;
+      const bool red = pixels[offset] > 200 && pixels[offset + 1] < 80 && pixels[offset + 2] < 80 &&
+                       pixels[offset + 3] != 0;
+      if (!red) {
+        continue;
+      }
+      minX = std::min(minX, x);
+      minY = std::min(minY, y);
+      maxX = std::max(maxX, x);
+      maxY = std::max(maxY, y);
+    }
+  }
+  if (maxX < 0) {
+    return bounds;
+  }
+  bounds.x = minX;
+  bounds.y = minY;
+  bounds.width = maxX - minX + 1;
+  bounds.height = maxY - minY + 1;
+  return bounds;
+}
+
 // Composes two layer poses, so a test can assert what a child's pose becomes once an ancestor
 // layer's transform is applied to it.
 pagx::Matrix3D MultiplyPose(const pagx::Matrix3D& left, const pagx::Matrix3D& right) {
@@ -2013,11 +2080,6 @@ PAG_TEST(PAGXHTML3DTest, AnimatedFlowChildUnderPerspectiveWarns) {
 }
 
 /**
- * Test case: an absolutely positioned child placed by `right` / `bottom` has no `left` / `top`, so
- * the parent camera cannot be expressed in its local coordinates; that has to be reported instead of
- * silently pinning the vanishing point to the parent origin.
- */
-/**
  * Test case: a child positioned by `right` alone is positioned, so the parent camera can wrap it. It
  * used to be judged un-wrappable and its projection was silently dropped (one document-level note at
  * most), which moved corner-anchored elements.
@@ -3383,11 +3445,12 @@ PAG_TEST(PAGXHTML3DTest, EmOriginWarnsOnce) {
 PAG_TEST(PAGXHTML3DTest, Preserve3DSurvivesTheInnerHost) {
   auto doc = ParseHtml(R"HTML(
     <html><body style="width:200px;height:120px">
-      <div style="position:absolute;left:0;top:0;width:200px;height:120px;perspective:600px">
+      <div style="position:absolute;left:0;top:0;width:200px;height:120px;perspective:100px;
+           perspective-origin:0px 0px">
         <div id="stage" style="position:absolute;left:0;top:0;width:200px;height:120px;
-             transform-style:preserve-3d;background-color:#ffffff;padding:8px">
-          <div id="card" style="position:absolute;left:10px;top:10px;width:60px;height:40px;
-               background-color:#38BDF8;transform:rotateY(30deg)"></div>
+             transform-style:preserve-3d;background-color:#ffffff;padding:4px">
+          <div id="card" style="position:absolute;left:0;top:0;width:20px;height:10px;
+               background-color:#FF0000;transform:translateZ(50px)"></div>
         </div>
       </div>
     </body></html>
@@ -3395,7 +3458,6 @@ PAG_TEST(PAGXHTML3DTest, Preserve3DSurvivesTheInnerHost) {
   ASSERT_NE(doc, nullptr);
   auto* stage = FindLayerById(doc, "stage");
   ASSERT_NE(stage, nullptr);
-  EXPECT_TRUE(stage->preserve3D) << "the outer layer keeps the 3D context";
   pagx::Layer* host = nullptr;
   for (auto* candidate : stage->children) {
     if (NearlyEqual(candidate->percentWidth, 100.0f, 1e-4f) &&
@@ -3407,7 +3469,11 @@ PAG_TEST(PAGXHTML3DTest, Preserve3DSurvivesTheInnerHost) {
       << "a background + padding element hangs its children from an inner host";
   EXPECT_TRUE(host->preserve3D)
       << "the host is the layer the children hang from, so it has to keep the 3D context too";
-  EXPECT_NE(CameraWrapperOf(doc, stage), nullptr) << "the parent camera still reaches the element";
+  // Rendering is what the flag is for: at `perspective: 100` and `translateZ(50)` the 20x10 block
+  // has to be painted twice its size. A flattened host would paint it at 20x10.
+  const auto bounds = RedBoundsOf(RenderFrame(RoundTripForRender(doc)));
+  EXPECT_NEAR(bounds.width, 40, 1) << "the parent camera has to reach through the inner host";
+  EXPECT_NEAR(bounds.height, 20, 1);
 }
 
 /**
@@ -3416,21 +3482,39 @@ PAG_TEST(PAGXHTML3DTest, Preserve3DSurvivesTheInnerHost) {
  * reported instead.
  */
 PAG_TEST(PAGXHTML3DTest, CameraWrapperRequiresAFiniteReferenceSize) {
-  auto doc = ParseHtml(R"HTML(
+  auto cameraDoc = ParseHtml(R"HTML(
     <html><body style="width:200px;height:120px">
       <div style="position:absolute;left:0;top:0;perspective:600px;perspective-origin:0px 0px">
-        <div id="card" style="position:absolute;left:10px;top:10px;width:60px;height:40px;
-             background-color:#38BDF8;transform:rotateY(30deg)"></div>
+        <div id="card" style="width:50%;height:50%;background-color:#FF0000;
+             transform:rotateY(20deg)"></div>
       </div>
     </body></html>
   )HTML");
-  ASSERT_NE(doc, nullptr);
-  auto* card = FindLayerById(doc, "card");
+  auto plainDoc = ParseHtml(R"HTML(
+    <html><body style="width:200px;height:120px">
+      <div style="position:absolute;left:0;top:0">
+        <div id="card" style="width:50%;height:50%;background-color:#FF0000;
+             transform:rotateY(20deg)"></div>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(cameraDoc, nullptr);
+  ASSERT_NE(plainDoc, nullptr);
+  auto* card = FindLayerById(cameraDoc, "card");
   ASSERT_NE(card, nullptr);
-  EXPECT_EQ(CameraWrapperOf(doc, card), nullptr)
+  EXPECT_EQ(CameraWrapperOf(cameraDoc, card), nullptr)
       << "a NaN sized wrapper would be the child's containing block";
-  EXPECT_TRUE(HasDiagnosticContaining(doc, "cannot be projected"))
+  EXPECT_TRUE(HasDiagnosticContaining(cameraDoc, "cannot be projected"))
       << "dropping the projection has to be reported";
+  // The percentage child is the point of the test: a NaN sized wrapper collapsed it, so compare the
+  // painted frame against the same page without a camera instead of only reading the fields.
+  const auto withCamera = RenderFrame(RoundTripForRender(cameraDoc));
+  const auto without = RenderFrame(RoundTripForRender(plainDoc));
+  ASSERT_FALSE(withCamera.empty());
+  ASSERT_FALSE(without.empty());
+  EXPECT_EQ(withCamera, without) << "an unusable camera must leave the layout untouched";
+  // 50% of the 200x120 box, so a wrapper that collapsed the percentage would paint nothing here.
+  EXPECT_TRUE(NearlyEqual(card->percentWidth, 50.0f, 1e-4f));
 }
 
 /**
@@ -3438,26 +3522,45 @@ PAG_TEST(PAGXHTML3DTest, CameraWrapperRequiresAFiniteReferenceSize) {
  * un-wrappable, which silently dropped the parent projection for corner badges and similar elements.
  */
 PAG_TEST(PAGXHTML3DTest, RightBottomPositionedChildKeepsTheProjection) {
-  auto doc = ParseHtml(R"HTML(
-    <html><body style="width:200px;height:100px">
-      <div style="position:absolute;left:0;top:0;width:200px;height:100px;perspective:600px">
-        <div id="card" style="position:absolute;right:10px;bottom:10px;width:50px;height:30px;
-             background-color:#38BDF8;transform:rotateY(30deg)"></div>
+  auto cameraDoc = ParseHtml(R"HTML(
+    <html><body style="width:200px;height:120px">
+      <div style="position:absolute;left:0;top:0;width:200px;height:120px;perspective:600px;
+           perspective-origin:40px 30px">
+        <div id="card" style="position:absolute;right:10px;bottom:10px;width:50%;height:50%;
+             background-color:#FF0000"></div>
       </div>
     </body></html>
   )HTML");
-  ASSERT_NE(doc, nullptr);
-  auto* card = FindLayerById(doc, "card");
+  auto plainDoc = ParseHtml(R"HTML(
+    <html><body style="width:200px;height:120px">
+      <div style="position:absolute;left:0;top:0;width:200px;height:120px">
+        <div id="card" style="position:absolute;right:10px;bottom:10px;width:50%;height:50%;
+             background-color:#FF0000"></div>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(cameraDoc, nullptr);
+  ASSERT_NE(plainDoc, nullptr);
+  auto* card = FindLayerById(cameraDoc, "card");
   ASSERT_NE(card, nullptr);
-  auto* wrapper = CameraWrapperOf(doc, card);
+  auto* wrapper = CameraWrapperOf(cameraDoc, card);
   ASSERT_NE(wrapper, nullptr) << "right / bottom is an anchor like left / top";
   EXPECT_TRUE(NearlyEqual(wrapper->perspective, 600.0f, 0.01f));
-  // The default `perspective-origin` is the box centre, so the far anchors shift the other way.
-  EXPECT_TRUE(NearlyEqual(wrapper->left, 100.0f, 1e-3f));
-  EXPECT_TRUE(NearlyEqual(wrapper->top, 50.0f, 1e-3f));
-  EXPECT_TRUE(NearlyEqual(card->right, 110.0f, 1e-3f)) << "right grows by the wrapper offset";
-  EXPECT_TRUE(NearlyEqual(card->bottom, 60.0f, 1e-3f));
+  EXPECT_TRUE(NearlyEqual(wrapper->left, 40.0f, 1e-3f));
+  EXPECT_TRUE(NearlyEqual(wrapper->top, 30.0f, 1e-3f));
+  EXPECT_TRUE(NearlyEqual(card->right, 50.0f, 1e-3f)) << "right grows by the wrapper offset";
+  EXPECT_TRUE(NearlyEqual(card->bottom, 40.0f, 1e-3f));
   EXPECT_FALSE(HasProjectionRow(card)) << "the camera stays on the wrapper";
+  // A flat pose is the identity under the camera, so the painted frame must match the page without
+  // one: 50% of 200x100 is 100x60, pinned to the bottom-right corner.
+  const auto withCamera = RenderFrame(RoundTripForRender(cameraDoc));
+  const auto without = RenderFrame(RoundTripForRender(plainDoc));
+  ASSERT_FALSE(withCamera.empty());
+  ASSERT_FALSE(without.empty());
+  EXPECT_EQ(withCamera, without) << "a flat child must be placed exactly like CSS places it";
+  const auto bounds = BoundsOf(withCamera);
+  EXPECT_NEAR(bounds.width, 100, 1);
+  EXPECT_NEAR(bounds.height, 60, 1);
 }
 
 }  // namespace pag
