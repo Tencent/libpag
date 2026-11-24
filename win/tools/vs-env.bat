@@ -17,6 +17,7 @@ if defined WindowsSdkDir set "SDK_ROOT=%WindowsSdkDir%"
 set "SDK_VERSION="
 if defined WindowsSDKVersion call :SelectSDK "%WindowsSDKVersion:\=%"
 if not defined SDK_VERSION if exist "%SDK_ROOT%\Include" for /f "delims=" %%i in ('dir /b /ad /o:n "%SDK_ROOT%\Include" 2^>nul') do call :SelectSDK "%%i"
+if not defined SDK_VERSION call :TryDefaultSDKRoot
 if not defined SDK_VERSION (
   echo Error: no complete x64 Windows SDK was found in "%SDK_ROOT%". 1>&2
   exit /b 1
@@ -41,6 +42,14 @@ where cmake >nul 2>nul
 if errorlevel 1 exit /b 1
 where ninja >nul 2>nul
 if errorlevel 1 exit /b 1
+exit /b 0
+
+:TryDefaultSDKRoot
+rem WindowsSdkDir may point at a partial install while a complete SDK exists in the default root.
+if /i "%SDK_ROOT%"=="%PF86%\Windows Kits\10" exit /b 0
+set "SDK_ROOT=%PF86%\Windows Kits\10"
+if not exist "%SDK_ROOT%\Include" exit /b 0
+for /f "delims=" %%i in ('dir /b /ad /o:n "%SDK_ROOT%\Include" 2^>nul') do call :SelectSDK "%%i"
 exit /b 0
 
 :SelectSDK

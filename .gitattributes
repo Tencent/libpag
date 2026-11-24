@@ -24,3 +24,4 @@
 update_baseline.bat text eol=crlf
 autotest.bat text eol=crlf
 win/tools/*.bat text eol=crlf
+*.vcxproj text eol=crlf

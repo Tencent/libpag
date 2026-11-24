@@ -44,6 +44,7 @@
 #include "renderer/LayerBuilder.h"
 #include "renderer/TextHolder.h"
 #include "renderer/ToTGFX.h"
+#include "rendering/gpu/Devices.h"
 #include "tgfx/layers/DisplayList.h"
 #include "tgfx/layers/Layer.h"
 
@@ -670,7 +671,7 @@ bool PAGScene::draw(const std::shared_ptr<PAGSurface>& surface, bool autoClear) 
   if (device == nullptr) {
     return false;
   }
-  auto* context = device->lockContext();
+  auto* context = pag::Devices::LockContext(device);
   if (context == nullptr) {
     return false;
   }

@@ -71,7 +71,7 @@ std::shared_ptr<PAGImage> PAGImage::MakeFromTexture(const pag::BackendTexture& t
   if (device == nullptr) {
     return nullptr;
   }
-  auto* context = device->lockContext();
+  auto* context = pag::Devices::LockContext(device);
   if (context == nullptr) {
     return nullptr;
   }

@@ -82,7 +82,7 @@ bool PAGSurface::readPixels(void* dstPixels, size_t dstRowBytes) {
   if (device == nullptr) {
     return false;
   }
-  auto* context = device->lockContext();
+  auto* context = pag::Devices::LockContext(device);
   if (context == nullptr) {
     return false;
   }
@@ -107,7 +107,7 @@ bool PAGSurface::waitUntilCompleted() {
   if (device == nullptr) {
     return false;
   }
-  auto context = device->lockContext();
+  auto context = pag::Devices::LockContext(device);
   if (context == nullptr) {
     return false;
   }
@@ -118,7 +118,7 @@ bool PAGSurface::waitUntilCompleted() {
   if (!healthy) {
     return false;
   }
-  context = device->lockContext();
+  context = pag::Devices::LockContext(device);
   if (context == nullptr) {
     return false;
   }

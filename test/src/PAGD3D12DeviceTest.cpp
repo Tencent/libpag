@@ -133,11 +133,13 @@ static HRESULT ForceRemovedDevice(void*) {
 PAG_TEST(D3D12Test, RemovedDefaultDeviceIsRebuilt) {
   auto before = Devices::MakeDefault();
   ASSERT_TRUE(before != nullptr);
-  Devices::SetDeviceHealthProbeForTesting(reinterpret_cast<void*>(ForceRemovedDevice));
+  Devices::SetDeviceHealthProbeForTesting(ForceRemovedDevice);
   auto after = Devices::MakeDefault();
   Devices::SetDeviceHealthProbeForTesting(nullptr);
   ASSERT_TRUE(after != nullptr);
   EXPECT_NE(before.get(), after.get());
+  DeviceLockScope afterScope(after);
+  EXPECT_TRUE(static_cast<bool>(afterScope));
   auto stable = Devices::MakeDefault();
   ASSERT_TRUE(stable != nullptr);
   EXPECT_EQ(stable.get(), after.get());

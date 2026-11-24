@@ -267,6 +267,13 @@ class Devices {
    */
   static void TrackContextDevice(const std::shared_ptr<tgfx::Device>& device);
 
+  /**
+   * Locks the device and records a permanent wrapper failure when locking returns null. Main-thread
+   * callers of tgfx::Device::lockContext() should use this entry point so later health checks can
+   * avoid handing the same unusable device back to the caller.
+   */
+  static tgfx::Context* LockContext(const std::shared_ptr<tgfx::Device>& device);
+
 #if defined(TGFX_USE_D3D12)
   /**
    * Returns the number of context identity records whose tracked owner is still alive.
@@ -294,7 +301,7 @@ class Devices {
    * Overrides the native device health query for tests. Pass nullptr to restore the real
    * ID3D12Device::GetDeviceRemovedReason() probe.
    */
-  static void SetDeviceHealthProbeForTesting(void* probe);
+  static void SetDeviceHealthProbeForTesting(long (*probe)(void* device));
 
   /**
    * Returns true when the context's GPU device is still usable for new work. The context must

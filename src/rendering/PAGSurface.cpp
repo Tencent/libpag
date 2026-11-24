@@ -450,7 +450,7 @@ tgfx::Context* PAGSurface::lockContext() {
   if (device == nullptr) {
     return nullptr;
   }
-  auto context = device->lockContext();
+  auto context = pag::Devices::LockContext(device);
   if (context != nullptr && stateGuard != nullptr) {
     static_cast<ExternalStateGuard*>(stateGuard)->save(context);
   }

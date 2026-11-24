@@ -23,6 +23,7 @@
 #include <memory>
 #include <mutex>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 #include "base/utils/Log.h"
 #include "tgfx/gpu/Context.h"
@@ -155,7 +156,7 @@ std::shared_ptr<tgfx::Device> Devices::MakeDefault() {
   return MakeAliasedDevice(selected);
 }
 
-void Devices::SetDeviceHealthProbeForTesting(void* probe) {
+void Devices::SetDeviceHealthProbeForTesting(long (*probe)(void* device)) {
   deviceHealthProbe.store(reinterpret_cast<DeviceHealthProbe>(probe));
 }
 
@@ -172,6 +173,17 @@ void Devices::TrackContextDevice(const std::shared_ptr<tgfx::Device>& device) {
   PurgeContextIdentitiesLocked(registry);
   auto& record = registry.contextIdentities[device->uniqueID()];
   record.owner = device;
+}
+
+tgfx::Context* Devices::LockContext(const std::shared_ptr<tgfx::Device>& device) {
+  if (device == nullptr) {
+    return nullptr;
+  }
+  auto context = device->lockContext();
+  if (context == nullptr) {
+    MarkWrapperLost(device);
+  }
+  return context;
 }
 
 size_t Devices::GetContextIdentityCacheCountForTesting() {
@@ -300,7 +312,10 @@ bool Devices::IsDeviceHealthy(tgfx::Context* context) {
   }
   auto reason = nativeDevice->GetDeviceRemovedReason();
   nativeDevice->Release();
-  return SUCCEEDED(reason);
+  if (FAILED(reason)) {
+    return false;
+  }
+  return !IsWrapperLost(context->device());
 }
 
 bool Devices::CanSampleFrom(tgfx::Context* context, const ExternalDeviceRef* deviceRef) {

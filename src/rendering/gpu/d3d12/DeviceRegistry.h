@@ -48,6 +48,7 @@ struct Registry {
   std::vector<std::weak_ptr<DeviceEntry>> entries = {};
   std::weak_ptr<DeviceEntry> defaultEntry = {};
   std::unordered_map<uint32_t, ContextIdentity> contextIdentities = {};
+  std::unordered_set<uint32_t> lostDevices = {};
   size_t identityCaptureCount = 0;
   size_t deviceCreationCount = 0;
 };
@@ -68,8 +69,33 @@ std::mutex& GetCreationLocker() {
   return locker;
 }
 
-bool IsEntryHealthy(const std::shared_ptr<DeviceEntry>& entry) {
-  if (entry == nullptr || entry->identity == nullptr) {
+Registry& GetRegistry();
+
+bool IsWrapperLost(tgfx::Device* device) {
+  if (device == nullptr) {
+    return true;
+  }
+  auto& registry = GetRegistry();
+  std::lock_guard<std::mutex> autoLock(registry.locker);
+  return registry.lostDevices.count(device->uniqueID()) != 0;
+}
+
+bool IsWrapperLost(const std::shared_ptr<tgfx::Device>& device) {
+  return IsWrapperLost(device.get());
+}
+
+void MarkWrapperLost(const std::shared_ptr<tgfx::Device>& device) {
+  if (device == nullptr) {
+    return;
+  }
+  auto& registry = GetRegistry();
+  std::lock_guard<std::mutex> autoLock(registry.locker);
+  registry.lostDevices.insert(device->uniqueID());
+}
+
+bool IsEntryHealthyLocked(Registry& registry, const std::shared_ptr<DeviceEntry>& entry) {
+  if (entry == nullptr || entry->identity == nullptr || entry->device == nullptr ||
+      registry.lostDevices.count(entry->device->uniqueID()) != 0) {
     return false;
   }
   ID3D12Device* nativeDevice = nullptr;
@@ -80,6 +106,12 @@ bool IsEntryHealthy(const std::shared_ptr<DeviceEntry>& entry) {
   auto reason = QueryDeviceRemovedReason(nativeDevice);
   nativeDevice->Release();
   return SUCCEEDED(reason);
+}
+
+bool IsEntryHealthy(const std::shared_ptr<DeviceEntry>& entry) {
+  auto& registry = GetRegistry();
+  std::lock_guard<std::mutex> autoLock(registry.locker);
+  return IsEntryHealthyLocked(registry, entry);
 }
 
 void EraseEntryLocked(Registry& registry, DeviceEntry* target) {
@@ -265,7 +297,7 @@ std::shared_ptr<DeviceEntry> FindHealthyEntryLocked(Registry& registry, IUnknown
   if (existing == nullptr) {
     return nullptr;
   }
-  if (IsEntryHealthy(existing)) {
+  if (IsEntryHealthyLocked(registry, existing)) {
     return existing;
   }
   EraseEntryLocked(registry, existing.get());

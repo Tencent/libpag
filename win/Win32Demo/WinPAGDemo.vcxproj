@@ -75,8 +75,7 @@
     <PagBackendArguments Condition="'$(PagBackend)'=='D3D12'">-DPAG_USE_D3D12=ON -DPAG_USE_OPENGL=OFF</PagBackendArguments>
     <PagBackendArguments Condition="'$(PagBackend)'=='D3D12WARP'">-DPAG_USE_D3D12=ON -DPAG_D3D12_USE_WARP=ON -DPAG_USE_OPENGL=OFF</PagBackendArguments>
     <PagSystemLibs>libpag.lib</PagSystemLibs>
-    <PagSystemLibs Condition="'$(PagBackend)'=='D3D12'">libpag.lib;d3d12.lib;dxgi.lib;d3dcompiler.lib;dcomp.lib;d3d11.lib</PagSystemLibs>
-    <PagSystemLibs Condition="'$(PagBackend)'=='D3D12WARP'">libpag.lib;d3d12.lib;dxgi.lib;d3dcompiler.lib;dcomp.lib;d3d11.lib</PagSystemLibs>
+    <PagSystemLibs Condition="'$(PagBackend)'=='D3D12' or '$(PagBackend)'=='D3D12WARP'">libpag.lib;d3d12.lib;dxgi.lib;d3dcompiler.lib;dcomp.lib;d3d11.lib</PagSystemLibs>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <LinkIncremental>true</LinkIncremental>
