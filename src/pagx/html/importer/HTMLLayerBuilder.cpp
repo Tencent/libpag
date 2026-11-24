@@ -182,6 +182,10 @@ bool HTMLLayerBuilder::requiresInnerHost(const HTMLBoxAttributes& box) {
 
 Layer* HTMLLayerBuilder::createInnerHost(Layer* outer, const HTMLBoxAttributes& box) {
   auto inner = _document->makeNode<Layer>();
+  // The inner host is the layer the children actually hang from, so it has to carry the 3D context as
+  // well: with `preserve-3d` left on the outer layer only, a background / padding element would
+  // flatten its subtree and the parent camera would stop at this host.
+  inner->preserve3D = outer->preserve3D;
   inner->percentWidth = 100.0f;
   inner->percentHeight = 100.0f;
   applyLayoutAttributes(inner, box);
