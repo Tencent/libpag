@@ -849,9 +849,9 @@ Layer* HTMLParserContext::convertBody(const std::shared_ptr<DOMNode>& body, floa
         if (pending != _pendingChildCamera.end()) {
           _pendingChildCamera.erase(pending);
         }
-        contentHost->children.push_back(wrapInCameraLayer(
-            contentHost, childLayer, child, entry.camera, entry.referenceWidthPx,
-            entry.referenceHeightPx));
+        contentHost->children.push_back(wrapInCameraLayer(contentHost, childLayer, child,
+                                                          entry.camera, entry.referenceWidthPx,
+                                                          entry.referenceHeightPx));
       }
     } else if (child->type == DOMNodeType::Text) {
       // Stray text directly under <body> — match convertContainer's behaviour so authors
@@ -1105,9 +1105,9 @@ Layer* HTMLParserContext::convertContainer(const std::shared_ptr<DOMNode>& eleme
         if (pending != _pendingChildCamera.end()) {
           _pendingChildCamera.erase(pending);
         }
-        contentHost->children.push_back(wrapInCameraLayer(
-            contentHost, childLayer, child, entry.camera, entry.referenceWidthPx,
-            entry.referenceHeightPx));
+        contentHost->children.push_back(wrapInCameraLayer(contentHost, childLayer, child,
+                                                          entry.camera, entry.referenceWidthPx,
+                                                          entry.referenceHeightPx));
       }
     } else if (child->type == DOMNodeType::Text) {
       std::string trimmed = Trim(child->name);
