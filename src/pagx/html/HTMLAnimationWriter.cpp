@@ -2302,6 +2302,13 @@ BundleChannelSet CollectBundleChannels(
   for (auto it = result.keyTimes.upper_bound(samplingLimit); it != result.keyTimes.end();) {
     it = result.keyTimes.erase(it);
   }
+  if (result.keyTimes.empty() && samplingLimit >= 0) {
+    // Every key sits past the window, and the channel still holds its first key's value there: the
+    // runtime does not fall back to the authored value (measured on a probe whose only key is at
+    // frame 100 of a 60-frame timeline - the reference shows that key's 0.3 from frame 0). One stop
+    // inside the window makes the rule exist and evaluate that held value (R42).
+    result.keyTimes.insert(0);
+  }
   if (result.animatedMaskPath != nullptr) {
     auto maskIt = maskPathToLayer.find(result.animatedMaskPath);
     if (maskIt != maskPathToLayer.end() && maskIt->second != nullptr &&
