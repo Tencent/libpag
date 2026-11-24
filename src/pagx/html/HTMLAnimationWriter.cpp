@@ -2016,6 +2016,13 @@ std::vector<Frame> ValueCrossingFrames(double v0, double v1, Frame t0, Frame t1,
   return frames;
 }
 
+// The frame a paused mount shows: the start of its rule window. The evaluation offset is not folded
+// in - a paused instance holds currentTime at zero, so it shows its first frame even when the
+// timeline declares an offset (measured on a probe: offset 30 of a 0.2->1 ramp still shows 0.2).
+Frame PausedPoseFrame(const BundleTimingInfo& timing) {
+  return timing.bundleShiftFrames;
+}
+
 // True when a channel of the animation keeps keys beyond the animation's own duration. Such a
 // timeline cannot share a rule with a longer one: the merged window would evaluate those keys
 // instead of freezing at the timeline's end, which is what the runtime does (R14).
@@ -5515,6 +5522,10 @@ std::string HTMLAnimationSession::emitKeyframesAndWeave(std::string& bodyHtml) {
       if (elements.empty()) {
         continue;
       }
+      // A paused mount still has to publish the pose it holds: omitting the rule fell back to the
+      // authored static value, which differs from the paused frame whenever the first key does
+      // (R47). Every rule below collapses onto that frame.
+      const bool pausedMount = !mount.playing;
       BundleChannelSet chSet =
           CollectBundleChannels(_doc, bundle, _solidToPainter, _maskPathToLayer, anim->duration,
                                 _ctx.animation.objectOwner);
@@ -5577,7 +5588,7 @@ std::string HTMLAnimationSession::emitKeyframesAndWeave(std::string& bodyHtml) {
         // carries. Emitting the keyframes with `animation-play-state: paused` would look the same in
         // a browser but not under a capture that drives every animation's currentTime, which is how
         // the reference is sampled; leaving the mask static matches both.
-        if (idIt != _ctx.animation.maskPathIds.end() && mount.playing) {
+        if (idIt != _ctx.animation.maskPathIds.end()) {
           // The mask is an inline SVG subtree, so its geometry animates on its own: emit `d` stops
           // for the mask path and let the masked element keep its static style. A coverage mask
           // must never be rewritten as a clip polygon, which would drop its paint.
@@ -5596,6 +5607,12 @@ std::string HTMLAnimationSession::emitKeyframesAndWeave(std::string& bodyHtml) {
           }
           stopTimes.insert(windowStart);
           stopTimes.insert(windowEnd);
+          if (pausedMount) {
+            // A paused mount holds one pose, mask geometry included: both stops sit on that frame,
+            // so a capture that drives `currentTime` cannot morph the mask (R47).
+            const Frame held = PausedPoseFrame(timing);
+            stopTimes = {held, held + 1};
+          }
           std::string stops = {};
           for (Frame t : stopTimes) {
             std::string d = RebuildAnimatedPathSVGString(chSet.animatedMaskPath, chSet.maskPtX,
@@ -5718,9 +5735,6 @@ std::string HTMLAnimationSession::emitKeyframesAndWeave(std::string& bodyHtml) {
       // A paused mount shows its first frame and never advances. Encoding that as a paused CSS
       // animation only holds in a browser: a capture that drives every animation's currentTime
       // advances it anyway, so the rule is left out and the authored state shows through.
-      // A paused mount still has to publish its pose: omitting the rule fell back to the authored
-      // static value, which differs from frame 0 whenever the first key does (R47).
-      const bool pausedMount = !mount.playing;
       std::unordered_map<std::string, std::string> keyframesNameByTag = {};
       for (const auto& element : elements) {
         for (size_t ruleIndex = 0; ruleIndex < ruleSets.size(); ++ruleIndex) {
@@ -5744,7 +5758,7 @@ std::string HTMLAnimationSession::emitKeyframesAndWeave(std::string& bodyHtml) {
           // A layer authored fully transparent has nothing to divide by and keeps the container path.
           BundleChannelSet stopSet = ruleSet;
           if (pausedMount) {
-            stopSet.pausedFrame = ruleTiming.bundleShiftFrames;
+            stopSet.pausedFrame = PausedPoseFrame(ruleTiming);
           }
           if (ruleSet.fauxBoldCh != nullptr) {
             // The emulation and a real Stroke write the same width variable. When the span has a
