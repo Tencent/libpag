@@ -1925,6 +1925,40 @@ static void AddBoundedSample(std::set<Frame>& times, Frame t, Frame limit) {
   times.insert(t);
 }
 
+// Frames where a linear segment passes an integer value, clipped to the playable window.
+// The enumeration runs over value boundaries, and those crossings are NOT ordered in time when the
+// value descends: iterating 4,5,…,9 on a 10->3 segment yields 102,85,68,51,34,17, so treating the
+// first out-of-window crossing as "every later one is out too" dropped all the reachable switches
+// (R41). The band is clipped to the values the segment actually reaches inside the window, and a
+// probe budget keeps an absurd range from guessing.
+std::vector<Frame> ValueCrossingFrames(double v0, double v1, Frame t0, Frame t1, Frame limit) {
+  std::vector<Frame> frames = {};
+  if (v0 == v1) {
+    return frames;
+  }
+  const Frame span = t1 - t0;
+  double reachable = 1.0;
+  if (span > 0) {
+    reachable = static_cast<double>(limit - t0) / static_cast<double>(span);
+  }
+  reachable = std::clamp(reachable, 0.0, 1.0);
+  const double reachableValue = v0 + (v1 - v0) * reachable;
+  const double lo = std::min(v0, reachableValue);
+  const double hi = std::max(v0, reachableValue);
+  constexpr int kMaxCrossingProbes = 512;
+  int probes = 0;
+  for (double boundary = std::floor(lo) + 1.0; boundary < hi && probes < kMaxCrossingProbes;
+       boundary += 1.0, ++probes) {
+    const double ratio = (boundary - v0) / (v1 - v0);
+    const Frame crossing = t0 + static_cast<Frame>(ratio * span);
+    if (crossing < 0 || crossing > limit) {
+      continue;
+    }
+    frames.push_back(crossing);
+  }
+  return frames;
+}
+
 // True when a channel of the animation keeps keys beyond the animation's own duration. Such a
 // timeline cannot share a rule with a longer one: the merged window would evaluate those keys
 // instead of freezing at the timeline's end, which is what the runtime does (R14).
@@ -2136,16 +2170,8 @@ BundleChannelSet CollectBundleChannels(
       if (v1 == v0) {
         continue;
       }
-      double lo = std::min(v0, v1);
-      double hi = std::max(v0, v1);
-      for (double boundary = std::floor(lo) + 1.0; boundary < hi; boundary += 1.0) {
-        double ratio = (boundary - v0) / (v1 - v0);
-        Frame crossing =
-            keys[k].time + static_cast<Frame>(ratio * (keys[k + 1].time - keys[k].time));
-        if (crossing > samplingLimit) {
-          // Crossings grow with the boundary value, so every later one is out of the window too.
-          break;
-        }
+      for (Frame crossing :
+           ValueCrossingFrames(v0, v1, keys[k].time, keys[k + 1].time, samplingLimit)) {
         // Hold the old point count up to the crossing, then switch: CSS would otherwise morph the
         // two outlines into each other across the whole interval.
         AddBoundedSample(result.keyTimes, crossing - kCrossingEpsilon, samplingLimit);
@@ -2200,15 +2226,8 @@ BundleChannelSet CollectBundleChannels(
       // A key that lands exactly on an integer starts a new copy count immediately after it, so the
       // frame right after the key already shows the shifted layout.
       AddBoundedSample(result.keyTimes, keys[k].time + kCrossingEpsilon, samplingLimit);
-      double lo = std::min(v0, v1);
-      double hi = std::max(v0, v1);
-      for (double boundary = std::floor(lo) + 1.0; boundary < hi; boundary += 1.0) {
-        double ratio = (boundary - v0) / (v1 - v0);
-        Frame crossing =
-            keys[k].time + static_cast<Frame>(ratio * (keys[k + 1].time - keys[k].time));
-        if (crossing > samplingLimit) {
-          break;
-        }
+      for (Frame crossing :
+           ValueCrossingFrames(v0, v1, keys[k].time, keys[k + 1].time, samplingLimit)) {
         AddBoundedSample(result.keyTimes, crossing, samplingLimit);
         AddBoundedSample(result.keyTimes, crossing + kCrossingEpsilon, samplingLimit);
       }
