@@ -735,10 +735,68 @@ size_t FindEnclosingSvgStart(const std::string& html, size_t pos) {
   return std::string::npos;
 }
 
+// Authored width of the span's text stroke, read either from the bound form
+// (`var(--pagx-text-stroke-width, 2px)`) or from the plain `2px` the static writer emits before the
+// weaving pass binds it.
+float ReadTextStrokeFallbackWidth(const std::string& tag) {
+  static const std::string varMarker = "var(--pagx-text-stroke-width,";
+  size_t pos = tag.find(varMarker);
+  if (pos != std::string::npos) {
+    pos += varMarker.size();
+  } else {
+    static const std::string strokeProp = "-webkit-text-stroke:";
+    pos = tag.find(strokeProp);
+    if (pos == std::string::npos) {
+      return 0.0f;
+    }
+    pos += strokeProp.size();
+  }
+  while (pos < tag.size() && tag[pos] == ' ') {
+    ++pos;
+  }
+  size_t end = pos;
+  while (end < tag.size() &&
+         (std::isdigit(static_cast<unsigned char>(tag[end])) || tag[end] == '.')) {
+    ++end;
+  }
+  if (end == pos) {
+    return 0.0f;
+  }
+  return std::strtof(tag.substr(pos, end - pos).c_str(), nullptr);
+}
+
+// True when the span paints a real Stroke rather than the faux-bold emulation, whose stroke uses
+// `currentColor`. The two write the same CSS property, so the caller has to pick one owner (R20).
+// The declaration value can be a whole `var(...)` plus a colour, so the test is on the declaration's
+// tail rather than on the first space-delimited token.
+bool SpanHasRealTextStroke(const std::string& tag) {
+  static const std::string strokeProp = "-webkit-text-stroke:";
+  size_t pos = tag.find(strokeProp);
+  while (pos != std::string::npos) {
+    size_t valueStart = pos + strokeProp.size();
+    size_t valueEnd = tag.find(';', valueStart);
+    size_t quoteEnd = tag.find('"', valueStart);
+    if (valueEnd == std::string::npos || (quoteEnd != std::string::npos && quoteEnd < valueEnd)) {
+      valueEnd = quoteEnd == std::string::npos ? tag.size() : quoteEnd;
+    }
+    std::string value = tag.substr(valueStart, valueEnd - valueStart);
+    while (!value.empty() && value.back() == ' ') {
+      value.pop_back();
+    }
+    static const std::string currentColor = "currentColor";
+    if (value.size() < currentColor.size() ||
+        value.compare(value.size() - currentColor.size(), currentColor.size(), currentColor) != 0) {
+      return true;
+    }
+    pos = tag.find(strokeProp, valueEnd);
+  }
+  return false;
+}
+
 // Rewrites the width of a span's text stroke declarations so they read the animated variable, keeping
 // the authored width as its fallback. The width cannot ride on the `-webkit-text-stroke` shorthand's
 // own animation: Chromium treats `-webkit-text-stroke-width` as non-interpolable and steps it at the
-// midpoint. A separate longhand declaration would not work either — the style extractor hoists
+// midpoint. A separate longhand declaration would not work either: the style extractor hoists
 // declarations into class rules by value, and a class carrying the shorthand (which resets the width)
 // would win over the longhand. Every declaration is bound because a span can carry both the real
 // Stroke and the faux-bold emulation, and each writes the same property.
@@ -1434,6 +1492,14 @@ struct BundleChannelSet {
   // The residual filter stage has no wrapper to live in (the host is not an absolutely positioned
   // div), so the frame has to carry it inside its own `filter` list.
   bool residualInline = false;
+  // Set for a paused mount: every stop evaluates this frame, so the rule holds the pose the runtime
+  // shows at frame 0 instead of advancing or falling back to the authored value (R47).
+  Frame pausedFrame = -1;
+  // Authored width of a real Stroke on the same span. The faux-bold emulation writes the same width
+  // variable, so its stops add to this base instead of replacing it: writing `0px` while not bold
+  // erased the authored outline (R20).
+  float fauxBoldBaseWidth = 0.0f;
+  bool hasFauxBoldBaseWidth = false;
   // The layer's authored alpha: the ratio in the stops is relative to it, since the paints' static
   // `calc(var(--pagx-fade,1) * <product>)` already contains it.
   float fadeBase = 1.0f;
@@ -3186,6 +3252,11 @@ std::string EvaluateKeyframeCssDecls(const DomTargetBundle& bundle, const Bundle
                                      Frame t, bool& needsZeroOrigin,
                                      const float* alphaOverride = nullptr) {
   std::string decls;
+  if (chSet.pausedFrame >= 0) {
+    // A paused mount holds its first frame. Making every stop evaluate that frame keeps the pose the
+    // runtime shows, and a capture that drives `currentTime` cannot advance it either (R47).
+    t = chSet.pausedFrame;
+  }
   // `propertyGroups` says which halves of this rule are active. A bundle normally drives both; when
   // opacity and the transform/paint group need different timing functions it is emitted as two rules
   // with disjoint properties, because one stop's timing function covers every property in its rule.
@@ -3271,6 +3342,10 @@ std::string EvaluateKeyframeCssDecls(const DomTargetBundle& bundle, const Bundle
                      ? EvalFloatChannel(chSet.fontSizeCh, t, text->renderFontSize())
                      : text->renderFontSize();
     float width = bold ? FauxBoldStrokeWidth(size) : 0.0f;
+    if (chSet.hasFauxBoldBaseWidth) {
+      // The span also paints a real Stroke; the emulation thickens it instead of owning the width.
+      width += chSet.fauxBoldBaseWidth;
+    }
     // The emulated width rides the same registered variable as a real Stroke's width: both paint the
     // one CSS property, so the rule that comes later has to stay the winner.
     AppendCssDecl(decls, kTextStrokeWidthVar, CssFloatToString(width) + "px");
@@ -5360,9 +5435,14 @@ std::string HTMLAnimationSession::emitKeyframesAndWeave(std::string& bodyHtml) {
     // key. That is what the runtime does once a Once timeline ends, and it is the only way to keep
     // a translation from one timeline and a rotation from another in one `transform`.
     int64_t mergeKey = 0;
+    // Only a Once timeline can share a longer window: it freezes on its last key when its own
+    // duration ends. A Loop / PingPong timeline has a period, and stretching it to another
+    // timeline's window would change that period (R46), so its duration stays part of the key —
+    // identical loops still share one rule, different ones do not.
     if (AnimationHasKeysPastEnd(anim)) {
-      // Such a timeline has to keep its own window, so it never joins another one.
       mergeKey = ++unmergeableSerial;
+    } else if (anim->loop != LoopMode::Once) {
+      mergeKey = static_cast<int64_t>(anim->duration);
     }
     auto key = std::make_tuple(mergeKey, anim->frameRate, static_cast<int>(anim->loop), mount.scope,
                                mount.offset, mount.playing);
@@ -5619,9 +5699,9 @@ std::string HTMLAnimationSession::emitKeyframesAndWeave(std::string& bodyHtml) {
       // A paused mount shows its first frame and never advances. Encoding that as a paused CSS
       // animation only holds in a browser: a capture that drives every animation's currentTime
       // advances it anyway, so the rule is left out and the authored state shows through.
-      if (!mount.playing) {
-        continue;
-      }
+      // A paused mount still has to publish its pose: omitting the rule fell back to the authored
+      // static value, which differs from frame 0 whenever the first key does (R47).
+      const bool pausedMount = !mount.playing;
       std::unordered_map<std::string, std::string> keyframesNameByTag = {};
       for (const auto& element : elements) {
         for (size_t ruleIndex = 0; ruleIndex < ruleSets.size(); ++ruleIndex) {
@@ -5644,6 +5724,23 @@ std::string HTMLAnimationSession::emitKeyframesAndWeave(std::string& bodyHtml) {
           // which keeps one rule for the layer and needs no selector to find them.
           // A layer authored fully transparent has nothing to divide by and keeps the container path.
           BundleChannelSet stopSet = ruleSet;
+          if (pausedMount) {
+            stopSet.pausedFrame = ruleTiming.bundleShiftFrames;
+          }
+          if (ruleSet.fauxBoldCh != nullptr) {
+            // The emulation and a real Stroke write the same width variable. When the span has a
+            // real outline the emulation adds to its width instead of replacing it, so the authored
+            // stroke survives every stop (R20).
+            auto rangeIt = tagIndex.rangeById.find(element.id);
+            if (rangeIt != tagIndex.rangeById.end()) {
+              std::string tag = bodyHtml.substr(rangeIt->second.first,
+                                                rangeIt->second.second - rangeIt->second.first);
+              if (SpanHasRealTextStroke(tag)) {
+                stopSet.hasFauxBoldBaseWidth = true;
+                stopSet.fauxBoldBaseWidth = ReadTextStrokeFallbackWidth(tag);
+              }
+            }
+          }
           if (!bundle.residualFilterId.empty()) {
             // Mirror the wrapper decision in ApplyElementEdits: only `position:absolute` divs can
             // hold a residual wrapper without changing their layout role.
