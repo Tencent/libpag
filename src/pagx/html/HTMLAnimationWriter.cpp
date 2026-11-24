@@ -354,12 +354,11 @@ void CollectKeyframeTimesAndEasing(const std::vector<Keyframe<T>>& keys, std::se
       }
       if (seg.type == KeyframeInterpolationType::Bezier) {
         const auto& nextK = keys[i + 1];
+        // The segment's handles are the left key's `out` and the right key's `in`, exactly as the
+        // runtime reads them. Borrowing the left key's `in` (which belongs to the previous segment)
+        // replaced a legitimately zero handle and bent the second half of a split curve (R15).
         Point outPt = k.bezierOut;
         Point inPt = nextK.bezierIn;
-        if (FloatNearlyZero(inPt.x) && FloatNearlyZero(inPt.y) &&
-            (!FloatNearlyZero(k.bezierIn.x) || !FloatNearlyZero(k.bezierIn.y))) {
-          inPt = k.bezierIn;
-        }
         if (FloatNearlyZero(outPt.x) && FloatNearlyZero(outPt.y) && FloatNearlyZero(inPt.x) &&
             FloatNearlyZero(inPt.y)) {
           // All-zero handles mean "no curve was authored": tgfx shortcuts that to a straight line
