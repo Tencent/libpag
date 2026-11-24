@@ -3482,19 +3482,23 @@ PAG_TEST(PAGXHTML3DTest, Preserve3DSurvivesTheInnerHost) {
  * reported instead.
  */
 PAG_TEST(PAGXHTML3DTest, CameraWrapperRequiresAFiniteReferenceSize) {
+  // The parent's *px* width is unknown (`100%`), which is the combination the fix is about: the
+  // origin resolves in px while `box.widthPx` stays NaN. The child has to be absolutely positioned,
+  // otherwise it takes the flow branch and this test would never reach the wrapper decision.
   auto cameraDoc = ParseHtml(R"HTML(
     <html><body style="width:200px;height:120px">
-      <div style="position:absolute;left:0;top:0;perspective:600px;perspective-origin:0px 0px">
-        <div id="card" style="width:50%;height:50%;background-color:#FF0000;
-             transform:rotateY(20deg)"></div>
+      <div style="position:absolute;left:0;top:0;width:100%;height:100%;perspective:600px;
+           perspective-origin:0px 0px">
+        <div id="card" style="position:absolute;left:0;top:0;width:50%;height:50%;
+             background-color:#FF0000;transform:translateZ(0.01px)"></div>
       </div>
     </body></html>
   )HTML");
   auto plainDoc = ParseHtml(R"HTML(
     <html><body style="width:200px;height:120px">
-      <div style="position:absolute;left:0;top:0">
-        <div id="card" style="width:50%;height:50%;background-color:#FF0000;
-             transform:rotateY(20deg)"></div>
+      <div style="position:absolute;left:0;top:0;width:100%;height:100%">
+        <div id="card" style="position:absolute;left:0;top:0;width:50%;height:50%;
+             background-color:#FF0000;transform:translateZ(0.01px)"></div>
       </div>
     </body></html>
   )HTML");
@@ -3513,8 +3517,12 @@ PAG_TEST(PAGXHTML3DTest, CameraWrapperRequiresAFiniteReferenceSize) {
   ASSERT_FALSE(withCamera.empty());
   ASSERT_FALSE(without.empty());
   EXPECT_EQ(withCamera, without) << "an unusable camera must leave the layout untouched";
-  // 50% of the 200x120 box, so a wrapper that collapsed the percentage would paint nothing here.
+  // 50% of the 200x120 box. A NaN sized wrapper collapsed exactly this percentage, so the painted
+  // geometry — not the pixel buffer being non-empty — is what has to be checked.
   EXPECT_TRUE(NearlyEqual(card->percentWidth, 50.0f, 1e-4f));
+  const auto bounds = RedBoundsOf(withCamera);
+  EXPECT_NEAR(bounds.width, 100, 1) << "the percentage child must keep its painted size";
+  EXPECT_NEAR(bounds.height, 60, 1);
 }
 
 /**
@@ -3561,6 +3569,28 @@ PAG_TEST(PAGXHTML3DTest, RightBottomPositionedChildKeepsTheProjection) {
   const auto bounds = BoundsOf(withCamera);
   EXPECT_NEAR(bounds.width, 100, 1);
   EXPECT_NEAR(bounds.height, 60, 1);
+  // The comparison above only proves the layout survived. A child on the z = 0 plane renders the same
+  // with or without a camera, so project one too: 25% x 15% of a 200x200 box, pinned to the far
+  // edges, lifted 50px under `perspective: 100` about the box centre has to come out twice as large.
+  auto projectedDoc = ParseHtml(R"HTML(
+    <html><body style="width:200px;height:200px">
+      <div style="position:absolute;left:0;top:0;width:200px;height:200px;perspective:100px;
+           perspective-origin:100px 100px">
+        <div id="card" style="position:absolute;right:80px;bottom:80px;width:25%;height:15%;
+             background-color:#FF0000;transform:translateZ(50px)"></div>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(projectedDoc, nullptr);
+  auto* projected = FindLayerById(projectedDoc, "card");
+  ASSERT_NE(projected, nullptr);
+  ASSERT_NE(CameraWrapperOf(projectedDoc, projected), nullptr)
+      << "the far-edge child still has to be wrapped";
+  const auto projectedBounds = RedBoundsOf(RenderFrame(RoundTripForRender(projectedDoc)));
+  EXPECT_NEAR(projectedBounds.width, 100, 2) << "50x30 at 2x under the parent camera";
+  EXPECT_NEAR(projectedBounds.height, 60, 2);
+  EXPECT_NEAR(projectedBounds.x, 40, 2) << "the projection is centred on perspective-origin";
+  EXPECT_NEAR(projectedBounds.y, 80, 2);
 }
 
 }  // namespace pag
