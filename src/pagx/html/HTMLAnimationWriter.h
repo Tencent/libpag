@@ -19,6 +19,7 @@
 #pragma once
 
 #include <cstdint>
+#include <set>
 #include <string>
 #include <unordered_map>
 #include <utility>
@@ -96,6 +97,8 @@ class HTMLAnimationSession {
     // Set once any distributing layer publishes its alpha through the registered `--pagx-fade`
     // property, so the rule is emitted only when something reads it.
     bool fadeVariable = false;
+    // One custom property per fading layer, so a nested fade multiplies with its parent (R16).
+    std::set<std::string> fadeVariableNames = {};
     // Elements whose animated `filter` would otherwise carry a residual SVG reference (a blend, an
     // inner shadow). Value is the ready-made `url(#id)` reference that goes on the wrapper. Chromium
     // treats a filter list containing a `url()` as non-interpolable and steps the whole list, so the

@@ -79,11 +79,6 @@ using pag::RadiansToDegrees;
 // serves the whole document: custom properties are per element, so spans that share a keyframes rule
 // still animate their own copy. Chromium does not interpolate `-webkit-text-stroke-width` itself.
 constexpr const char* kTextStrokeWidthVar = "--pagx-text-stroke-width";
-// Registered custom property that carries a distributing layer's alpha. Each paint reads it in
-// its own `opacity`, so every paint fades on its own and an overlap keeps the opacity the second
-// paint adds, without the animation having to target the paint elements.
-constexpr const char* kFadeVariable = "--pagx-fade";
-
 // tgfx fakes italic by shearing the chosen face with Matrix::postSkew(ITALIC_SKEW = -0.2, 0) about
 // the baseline, so the CSS equivalent is a skew of atan(0.2) pivoting on that same baseline.
 float FauxItalicSkewDegrees() {
@@ -1475,9 +1470,10 @@ struct BundleChannelSet {
   std::unordered_map<Frame, Frame> steppedGroupEasingEnds = {};
   std::unordered_map<Frame, Frame> opacityGroupEasingEnds = {};
   std::unordered_map<Frame, Frame> transformGroupEasingEnds = {};
-  // This rule drives a distributing layer's alpha. The stops write the registered `--pagx-fade`
-  // ratio instead of `opacity`, because the paints consume it themselves.
-  bool fadeViaVariable = false;
+  // This rule drives a distributing layer's alpha. The stops write that layer's registered variable
+  // (a ratio) instead of `opacity`, because the paints consume it themselves. Each layer has its own
+  // name so nested fades multiply instead of overwriting each other (R16).
+  std::string fadeVarName = {};
   // The residual filter stage has no wrapper to live in (the host is not an absolutely positioned
   // div), so the frame has to carry it inside its own `filter` list.
   bool residualInline = false;
@@ -3265,11 +3261,11 @@ std::string EvaluateKeyframeCssDecls(const DomTargetBundle& bundle, const Bundle
   const bool wantsStepped = (chSet.propertyGroups & 4) != 0;
   if (wantsOpacity && chSet.alphaCh != nullptr) {
     float a = alphaOverride != nullptr ? *alphaOverride : EvalFloatChannel(chSet.alphaCh, t, 1.0f);
-    if (chSet.fadeViaVariable) {
+    if (!chSet.fadeVarName.empty()) {
       // The paints already carry the authored alpha in `calc(var(...) * <product>)`, so the stop
       // publishes the ratio that brings them to this frame's value.
       float ratio = chSet.fadeBase > 0.0f ? a / chSet.fadeBase : 0.0f;
-      AppendCssDecl(decls, kFadeVariable, CssFloatToString(ratio));
+      AppendCssDecl(decls, chSet.fadeVarName, CssFloatToString(ratio));
     } else {
       AppendCssDecl(decls, "opacity", CssFloatToString(a));
     }
@@ -5797,9 +5793,13 @@ std::string HTMLAnimationSession::emitKeyframesAndWeave(std::string& bodyHtml) {
                                     !alphaHost->groupOpacity && alphaHost->filters.empty() &&
                                     alphaHost->alpha > 0.0f;
           if (fadeOnPaints) {
-            stopSet.fadeViaVariable = true;
-            stopSet.fadeBase = alphaHost->alpha;
-            edits.fadeVariable = true;
+            auto fadeNameIt = _ctx.fadeVarNames.find(alphaHost);
+            if (fadeNameIt != _ctx.fadeVarNames.end()) {
+              stopSet.fadeVarName = fadeNameIt->second;
+              stopSet.fadeBase = alphaHost->alpha;
+              edits.fadeVariable = true;
+              edits.fadeVariableNames.insert(fadeNameIt->second);
+            }
           }
           auto nameIt = keyframesNameByTag.find(ruleKey);
           if (nameIt == keyframesNameByTag.end()) {
@@ -5866,8 +5866,8 @@ std::string HTMLAnimationSession::emitKeyframesAndWeave(std::string& bodyHtml) {
 
   ApplyElementEdits(bodyHtml, tagIndex.rangeById, edits);
 
-  if (edits.fadeVariable) {
-    keyframesCss = std::string("@property ") + kFadeVariable +
+  for (const auto& name : edits.fadeVariableNames) {
+    keyframesCss = std::string("@property ") + name +
                    " {\n  syntax: '<number>';\n  inherits: true;\n  initial-value: 1;\n}\n" +
                    keyframesCss;
   }

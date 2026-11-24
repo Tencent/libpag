@@ -244,13 +244,20 @@ inline constexpr const char* kFadeVariableName = "--pagx-fade";
 
 // `groupOpacity=false` layer alpha reaches the paints, not a container: the emitted value has to
 // read the animated variable instead of a literal.
-std::string PaintOpacityCss(bool viaVariable, float value);
+// Opacity of one paint. Every fading ancestor contributes a variable, and the paint multiplies all
+// of them: a single shared name made an inner layer's rule replace the outer layer's value instead
+// of compounding with it (R16).
+std::string PaintOpacityCss(const std::vector<std::string>& fadeVars, float value);
 
 class HTMLWriterContext {
  public:
-  // Set while writing the contents of a layer whose alpha is animated and distributed to the
-  // paints, so each paint declares the animated variable instead of a literal opacity.
-  bool fadePaints = false;
+  // Fade variables of the layers that currently distribute their alpha to their paints, outermost
+  // first. A paint multiplies all of them, so nested fading layers compound (R16).
+  std::vector<std::string> fadeVars = {};
+  // Name a layer publishes its animated alpha under. Stable per layer, and distinct per layer, so
+  // two fading layers never overwrite each other's value.
+  std::unordered_map<const Layer*, std::string> fadeVarNames = {};
+  unsigned fadeVarCounter = 0;
   float docWidth = 0;
   float docHeight = 0;
   // True when the document carries keyframe animations and the caller asked for them. The body is

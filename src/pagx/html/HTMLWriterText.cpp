@@ -1148,8 +1148,8 @@ void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
       style += ";-webkit-text-fill-color:transparent";
     }
   }
-  if (_ctx->fadePaints || (alpha < 1.0f)) {
-    style += PaintOpacityCss(_ctx->fadePaints, alpha);
+  if (!_ctx->fadeVars.empty() || (alpha < 1.0f)) {
+    style += PaintOpacityCss(_ctx->fadeVars, alpha);
   }
   // Honour U+0009 TAB inside the span (see HTMLWriterLayer tbSpans branch for rationale).
   if (text && text->text.find('\t') != std::string::npos) {
@@ -1407,8 +1407,8 @@ void HTMLWriter::writeTextModifier(HTMLBuilder& out, const std::vector<GeoInfo>&
           if (modifier->alpha < 1.0f) {
             glyphAlpha = std::max(0.0f, 1.0f + (modifier->alpha - 1.0f) * absF);
           }
-          if (_ctx->fadePaints || (glyphAlpha < 1.0f)) {
-            charStyle += PaintOpacityCss(_ctx->fadePaints, glyphAlpha);
+          if (!_ctx->fadeVars.empty() || (glyphAlpha < 1.0f)) {
+            charStyle += PaintOpacityCss(_ctx->fadeVars, glyphAlpha);
           }
 
           std::string puaChar;
@@ -1480,8 +1480,8 @@ void HTMLWriter::writeTextModifier(HTMLBuilder& out, const std::vector<GeoInfo>&
           // content, and stroked glyphs measured worse with it.
           svgStyle += ";text-rendering:geometricPrecision";
         }
-        if (_ctx->fadePaints || (alpha < 1.0f)) {
-          svgStyle += PaintOpacityCss(_ctx->fadePaints, alpha);
+        if (!_ctx->fadeVars.empty() || (alpha < 1.0f)) {
+          svgStyle += PaintOpacityCss(_ctx->fadeVars, alpha);
         }
         out.openTag("svg");
         out.addAttr("style", svgStyle);
@@ -1819,9 +1819,9 @@ void HTMLWriter::writeTextModifier(HTMLBuilder& out, const std::vector<GeoInfo>&
             // box-center and tgfx's baseline-center is a tgfx alignment item, not something
             // the HTML exporter should compensate with a hardcoded font-metric approximation.
           }
-          if (_ctx->fadePaints || (modifier->alpha < 1.0f)) {
+          if (!_ctx->fadeVars.empty() || (modifier->alpha < 1.0f)) {
             float charAlpha = std::max(0.0f, 1.0f + (modifier->alpha - 1.0f) * absF);
-            charStyle += PaintOpacityCss(_ctx->fadePaints, charAlpha);
+            charStyle += PaintOpacityCss(_ctx->fadeVars, charAlpha);
           }
           if (fill && fill->color && fill->color->nodeType() == NodeType::SolidColor) {
             auto sc = static_cast<const SolidColor*>(fill->color);
@@ -2681,8 +2681,8 @@ void HTMLWriter::writeEmbeddedShapeGlyphsAsFont(HTMLBuilder& out, const Text* te
       if (!runIsBitmapFont) {
         style += colorCss + strokeCss;
       }
-      if (_ctx->fadePaints || (effectiveAlpha < 1.0f)) {
-        style += PaintOpacityCss(_ctx->fadePaints, effectiveAlpha);
+      if (!_ctx->fadeVars.empty() || (effectiveAlpha < 1.0f)) {
+        style += PaintOpacityCss(_ctx->fadeVars, effectiveAlpha);
       }
       out.openTag("span");
       out.addAttr("style", style);

@@ -1917,12 +1917,15 @@ static ShadowShape FindLayerShadowShape(const Layer* layer) {
   return s;
 }
 
-std::string PaintOpacityCss(bool viaVariable, float value) {
-  if (!viaVariable) {
+std::string PaintOpacityCss(const std::vector<std::string>& fadeVars, float value) {
+  if (fadeVars.empty()) {
     return ";opacity:" + CssFloatToString(value);
   }
-  return ";opacity:calc(var(" + std::string(kFadeVariableName) + ", 1) * " +
-         CssFloatToString(value) + ")";
+  std::string product = {};
+  for (const auto& name : fadeVars) {
+    product += "var(" + name + ", 1) * ";
+  }
+  return ";opacity:calc(" + product + CssFloatToString(value) + ")";
 }
 
 void HTMLWriter::writeLayerContents(HTMLBuilder& out, const Layer* layer, float alpha,
@@ -1936,16 +1939,11 @@ void HTMLWriter::writeLayerContents(HTMLBuilder& out, const Layer* layer, float 
   // does the same through the `> *` rule while the authored value is still 1.
   bool fadesChildren =
       distribute || (!layer->groupOpacity && _ctx->animation.alphaAnimatedNodes.count(layer) > 0);
-  // The paints of an alpha-animated distributing layer read the animated variable, so they fade on
-  // their own instead of through one container opacity.
-  bool savedFadePaints = _ctx->fadePaints;
-  // A filter composites the layer offscreen first, so the alpha belongs to that single surface and
-  // the container keeps it instead of the paints.
-  _ctx->fadePaints = !layer->groupOpacity && layer->filters.empty() &&
-                     _ctx->animation.alphaAnimatedNodes.count(layer) > 0;
+  // The paints of an alpha-animated distributing layer read that layer's animated variable (pushed
+  // by writeLayer, which also covers child layers) and fade on their own instead of through one
+  // container opacity.
   writeElements(out, layer->contents, alpha, distribute, fadesChildren, targetPlacement,
                 layerPadding);
-  _ctx->fadePaints = savedFadePaints;
 }
 
 //==============================================================================
@@ -2277,6 +2275,33 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
   // (hasContent == false, after the ctx writes) exits without clearing them, which would leak
   // a stale offset to the next sibling layer's writeLayer invocation. The guard restores the
   // caller's offsets at destruction regardless of how writeLayer returns.
+  // A layer that hands its animated alpha to its paints publishes it under its own variable, and
+  // everything it renders - elements and child layers alike - multiplies that variable into its
+  // opacity. The scope covers the child loop too, so a nested fading layer compounds with this one
+  // instead of replacing it (R16).
+  struct FadeScope {
+    HTMLWriterContext* ctx;
+    bool active = false;
+    explicit FadeScope(HTMLWriterContext* c) : ctx(c) {
+    }
+    ~FadeScope() {
+      if (active) {
+        ctx->fadeVars.pop_back();
+      }
+    }
+  } fadeScope(_ctx);
+  if (!layer->groupOpacity && layer->filters.empty() &&
+      _ctx->animation.alphaAnimatedNodes.count(layer) > 0) {
+    auto nameIt = _ctx->fadeVarNames.find(layer);
+    if (nameIt == _ctx->fadeVarNames.end()) {
+      nameIt = _ctx->fadeVarNames
+                   .emplace(layer,
+                            std::string(kFadeVariableName) + std::to_string(++_ctx->fadeVarCounter))
+                   .first;
+    }
+    _ctx->fadeVars.push_back(nameIt->second);
+    fadeScope.active = true;
+  }
   RepeaterOffsetGuard offsetGuard(_ctx);
   if (!layer->visible && _ctx->animation.visibleLayers.count(layer) == 0) {
     out.openTag("div");

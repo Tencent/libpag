@@ -1706,8 +1706,8 @@ void HTMLWriter::renderCSSDiv(HTMLBuilder& out, const GeoInfo& geo, const Fill* 
       style += blendStr;
     }
   }
-  if (_ctx->fadePaints || (alpha < 1.0f)) {
-    style += PaintOpacityCss(_ctx->fadePaints, alpha);
+  if (!_ctx->fadeVars.empty() || (alpha < 1.0f)) {
+    style += PaintOpacityCss(_ctx->fadeVars, alpha);
   }
 
   out.openTag("div");
@@ -1779,8 +1779,8 @@ void HTMLWriter::renderSVGConicStroke(HTMLBuilder& out, const std::vector<GeoInf
       svgStyle += blendStr;
     }
   }
-  if (_ctx->fadePaints || (alpha < 1.0f)) {
-    svgStyle += PaintOpacityCss(_ctx->fadePaints, alpha);
+  if (!_ctx->fadeVars.empty() || (alpha < 1.0f)) {
+    svgStyle += PaintOpacityCss(_ctx->fadeVars, alpha);
   }
   out.openTag("svg");
   out.addAttr("width", CssFloatToString(bw));
@@ -2046,8 +2046,8 @@ void HTMLWriter::renderSVG(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
       svgStyle += blendStr;
     }
   }
-  if (_ctx->fadePaints || (alpha < 1.0f)) {
-    svgStyle += PaintOpacityCss(_ctx->fadePaints, alpha);
+  if (!_ctx->fadeVars.empty() || (alpha < 1.0f)) {
+    svgStyle += PaintOpacityCss(_ctx->fadeVars, alpha);
   }
   if (stroke != nullptr) {
     // The viewport is the geometry bbox padded by half the stroke width, but a miter join reaches
@@ -2384,8 +2384,8 @@ void HTMLWriter::renderGeo(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
           svgStyle += blendStr;
         }
       }
-      if (_ctx->fadePaints || (alpha < 1.0f)) {
-        svgStyle += PaintOpacityCss(_ctx->fadePaints, alpha);
+      if (!_ctx->fadeVars.empty() || (alpha < 1.0f)) {
+        svgStyle += PaintOpacityCss(_ctx->fadeVars, alpha);
       }
       out.openTag("svg");
       out.addAttr("width", CssFloatToString(sw));
@@ -2498,8 +2498,8 @@ void HTMLWriter::renderGeo(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
         svgStyle += blendStr;
       }
     }
-    if (_ctx->fadePaints || (alpha < 1.0f)) {
-      svgStyle += PaintOpacityCss(_ctx->fadePaints, alpha);
+    if (!_ctx->fadeVars.empty() || (alpha < 1.0f)) {
+      svgStyle += PaintOpacityCss(_ctx->fadeVars, alpha);
     }
     out.openTag("svg");
     out.addAttr("width", CssFloatToString(sw));
@@ -2622,8 +2622,8 @@ void HTMLWriter::renderDiamondCanvas(HTMLBuilder& out, const GeoInfo& geo, const
   std::string style = "position:absolute;left:" + CssFloatToString(left) +
                       "px;top:" + CssFloatToString(top) + "px;width:" + CssFloatToString(w) +
                       "px;height:" + CssFloatToString(h) + "px";
-  if (_ctx->fadePaints || (alpha < 1.0f)) {
-    style += PaintOpacityCss(_ctx->fadePaints, alpha);
+  if (!_ctx->fadeVars.empty() || (alpha < 1.0f)) {
+    style += PaintOpacityCss(_ctx->fadeVars, alpha);
   }
   if (painterBlend != BlendMode::Normal) {
     auto blendStr = BlendModeToMixBlendMode(painterBlend);
@@ -2700,8 +2700,8 @@ void HTMLWriter::renderConicCanvas(HTMLBuilder& out, const std::vector<GeoInfo>&
       svgStyle += blendStr;
     }
   }
-  if (_ctx->fadePaints || (alpha < 1.0f)) {
-    svgStyle += PaintOpacityCss(_ctx->fadePaints, alpha);
+  if (!_ctx->fadeVars.empty() || (alpha < 1.0f)) {
+    svgStyle += PaintOpacityCss(_ctx->fadeVars, alpha);
   }
   out.openTag("svg");
   out.addAttr("width", CssFloatToString(sw));
@@ -2776,8 +2776,8 @@ void HTMLWriter::renderImagePatternCanvas(HTMLBuilder& out, const GeoInfo& geo, 
   std::string style = "position:absolute;left:" + CssFloatToString(left) +
                       "px;top:" + CssFloatToString(top) + "px;width:" + CssFloatToString(w) +
                       "px;height:" + CssFloatToString(h) + "px";
-  if (_ctx->fadePaints || (alpha < 1.0f)) {
-    style += PaintOpacityCss(_ctx->fadePaints, alpha);
+  if (!_ctx->fadeVars.empty() || (alpha < 1.0f)) {
+    style += PaintOpacityCss(_ctx->fadeVars, alpha);
   }
   if (painterBlend != BlendMode::Normal) {
     auto blendStr = BlendModeToMixBlendMode(painterBlend);
