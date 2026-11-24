@@ -40,21 +40,23 @@ def channels(text):
 
 def remove(text, target, index):
     """Returns the document with the `index`-th channel of `target` removed."""
+    seen = -1
     for obj in OBJECT_RE.finditer(text):
         if obj.group("target") != target:
             continue
         body = obj.group("body")
-        seen = -1
         for ch in CHANNEL_RE.finditer(body):
+            # The index counts across every Object that targets this node: its channels can be split
+            # over several Objects, and a per-Object counter restarted at each one (R36).
             seen += 1
             if seen != index:
                 continue
             new_body = body[: ch.start()] + body[ch.end():]
-            new_obj = obj.group(0)
-            if new_body.strip():
-                new_obj = new_obj.replace(body, new_body, 1)
-            # An Object with no channel left is dropped together with its whitespace.
-            return text[: obj.start()] + new_obj + text[obj.end():]
+            if not new_body.strip():
+                # Nothing else lives in this Object: drop the whole element. Keeping an empty Object
+                # made the caller re-evaluate an unchanged document (R36).
+                return text[: obj.start()] + text[obj.end():]
+            return text[: obj.start()] + obj.group(0).replace(body, new_body, 1) + text[obj.end():]
     raise SystemExit("channel not found: %s #%d" % (target, index))
 
 

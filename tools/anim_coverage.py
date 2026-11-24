@@ -19,7 +19,9 @@ import argparse
 import glob
 import os
 import re
+import shutil
 import subprocess
+import tempfile
 import sys
 import xml.etree.ElementTree as ET
 
@@ -644,21 +646,32 @@ def check(anim, exported, index, cases, audit):
             else:
                 failures.append("exported channel without a case: %s.%s" % (node, channel))
 
-    for case in cases:
-        if os.path.exists(PAGX_BIN):
-            out = os.path.join("/tmp/anim_coverage", case["short"].replace("/", "_") + ".html")
-            os.makedirs("/tmp/anim_coverage", exist_ok=True)
-            subprocess.run(
+    # A private directory per run: a fixed one kept the HTML of an earlier successful export, so a
+    # failed export could still be read back and the case passed on stale output (R35).
+    out_dir = tempfile.mkdtemp(prefix="anim_coverage_")
+    try:
+        for case in cases:
+            if not os.path.exists(PAGX_BIN):
+                continue
+            out = os.path.join(out_dir, case["short"].replace("/", "_") + ".html")
+            result = subprocess.run(
                 [PAGX_BIN, "export", "--input", os.path.join(CORPUS, case["file"]), "--format", "html",
                  "--output", out],
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
             )
+            if result.returncode != 0:
+                # The exporter can return early before it opens the output file; reading a leftover
+                # HTML would hide that (R35).
+                failures.append("export failed (exit %d): %s" % (result.returncode, case["file"]))
+                continue
             html = open(out, encoding="utf-8", errors="ignore").read() if os.path.exists(out) else ""
             # A case only exists for a channel the exporter claims, so it must produce keyframes;
             # a static export means the mapping silently stopped working.
             if "@keyframes" not in html:
                 failures.append("case does not export keyframes: " + case["file"])
+    finally:
+        shutil.rmtree(out_dir, ignore_errors=True)
 
     # A real duplicate is the same document modulo ids: two cases that only differ by channel would
     # still be different tests, so the signature is the normalised XML, not the channel list.
