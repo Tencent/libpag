@@ -70,33 +70,42 @@ inline BackendRenderTarget MakeD3D12RenderTarget(const std::shared_ptr<tgfx::Tex
 }
 
 /**
- * A native device that is intentionally not the registry's default entry. The default device is
- * covered by the other D3D12 tests (including WARP builds); this secondary device only exercises
- * non-default registration and ownership. Prefer a different adapter so the two devices cannot
- * collapse into the same registry entry.
+ * A caller-created native texture used to exercise external device registration and ownership.
+ * D3D12 may reuse the same native device as the default device on the selected adapter.
  */
-struct SecondaryDeviceTexture {
+struct ExternalDeviceTexture {
   Microsoft::WRL::ComPtr<ID3D12Device> device = nullptr;
   Microsoft::WRL::ComPtr<ID3D12Resource> resource = nullptr;
   tgfx::BackendTexture texture = {};
   HRESULT lastError = S_OK;
+  const char* lastStage = "";
 
+  /**
+   * Creates an external renderable texture in COMMON state, honoring the configured WARP policy.
+   */
   bool init(int width, int height) {
-    auto result = D3D12CreateDevice(nullptr, D3D_FEATURE_LEVEL_11_0,
-                                    IID_PPV_ARGS(device.ReleaseAndGetAddressOf()));
-    if (FAILED(result)) {
+    bool useWarp = true;
+#ifndef PAG_D3D12_USE_WARP
+    useWarp = !checkResult(D3D12CreateDevice(nullptr, D3D_FEATURE_LEVEL_11_0,
+                                             IID_PPV_ARGS(device.ReleaseAndGetAddressOf())),
+                           "D3D12CreateDevice(hardware)");
+#endif
+    if (useWarp) {
       Microsoft::WRL::ComPtr<IDXGIFactory4> factory = nullptr;
       Microsoft::WRL::ComPtr<IDXGIAdapter> warpAdapter = nullptr;
-      if (FAILED(CreateDXGIFactory1(IID_PPV_ARGS(factory.ReleaseAndGetAddressOf()))) ||
-          FAILED(factory->EnumWarpAdapter(IID_PPV_ARGS(warpAdapter.ReleaseAndGetAddressOf())))) {
+      if (!checkResult(CreateDXGIFactory1(IID_PPV_ARGS(factory.ReleaseAndGetAddressOf())),
+                       "CreateDXGIFactory1")) {
         return false;
       }
-      result = D3D12CreateDevice(warpAdapter.Get(), D3D_FEATURE_LEVEL_11_0,
-                                 IID_PPV_ARGS(device.ReleaseAndGetAddressOf()));
-    }
-    if (FAILED(result)) {
-      lastError = result;
-      return false;
+      if (!checkResult(factory->EnumWarpAdapter(IID_PPV_ARGS(warpAdapter.ReleaseAndGetAddressOf())),
+                       "EnumWarpAdapter")) {
+        return false;
+      }
+      if (!checkResult(D3D12CreateDevice(warpAdapter.Get(), D3D_FEATURE_LEVEL_11_0,
+                                         IID_PPV_ARGS(device.ReleaseAndGetAddressOf())),
+                       "D3D12CreateDevice(WARP)")) {
+        return false;
+      }
     }
     D3D12_HEAP_PROPERTIES heap = {};
     heap.Type = D3D12_HEAP_TYPE_DEFAULT;
@@ -109,11 +118,10 @@ struct SecondaryDeviceTexture {
     desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
     desc.SampleDesc.Count = 1;
     desc.Flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
-    auto resourceResult = device->CreateCommittedResource(
-        &heap, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_COMMON, nullptr,
-        IID_PPV_ARGS(resource.ReleaseAndGetAddressOf()));
-    if (FAILED(resourceResult)) {
-      lastError = resourceResult;
+    if (!checkResult(device->CreateCommittedResource(
+                         &heap, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_COMMON, nullptr,
+                         IID_PPV_ARGS(resource.ReleaseAndGetAddressOf())),
+                     "CreateCommittedResource(texture)")) {
       return false;
     }
     tgfx::D3D12TextureInfo info = {};
@@ -121,6 +129,13 @@ struct SecondaryDeviceTexture {
     info.format = DXGI_FORMAT_R8G8B8A8_UNORM;
     texture = tgfx::BackendTexture(info, width, height);
     return true;
+  }
+
+ private:
+  bool checkResult(HRESULT result, const char* stage) {
+    lastError = result;
+    lastStage = stage;
+    return SUCCEEDED(result);
   }
 };
 

@@ -1195,7 +1195,9 @@ class PAGPlayer;
  * waitUntilCompleted().
  *
  * A PAGSurface must always be created through the MakeFrom()/MakeOffscreen() factories and held
- * by std::shared_ptr.
+ * by std::shared_ptr. A surface cannot survive loss of its GPU device, including D3D12 TDR. Release
+ * the affected surfaces and external resources before requesting a new device; retained native
+ * resources can prevent the same adapter's D3D12 device from being recreated.
  */
 class PAG_API PAGSurface {
  public:

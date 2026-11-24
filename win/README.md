@@ -61,9 +61,11 @@ working directory, so it can be started from any directory:
 .\win\x64\Release\WinPAGDemo.exe
 ```
 
-The demo is a GUI application, so it writes its log to `win\x64\Release\WinPAGDemo.log` next to the
-executable instead of printing to the console. The log contains the backend line, the resolved asset
-path, and an explicit error when a resource is missing. A missing `assets/test2.pag` leaves the
+The demo is a GUI application, so it writes stdout and stderr to `win\x64\Release\WinPAGDemo.log`
+next to the executable instead of printing to the console. If that path cannot be opened, it uses
+`%TEMP%\WinPAGDemo-<pid>.log` and reports the actual path to the debugger. If neither path can be
+opened, it shows a warning and continues without file logging. The log contains the backend line,
+the resolved asset path, and an explicit error when a resource is missing. A missing `assets/test2.pag` leaves the
 window black because the demo has nothing to draw.
 
 ## Runtime

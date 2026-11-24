@@ -2263,7 +2263,8 @@ PAGX_TEST(PAGXTest, EmbeddingDoesNotMutateMountedDomain) {
 PAGX_TEST(PAGXTest, DetachedImageDomainDoesNotLeavePathIndex) {
   auto doc = pagx::PAGXDocument::Make(100, 100);
   auto* host = doc->makeNode<pagx::Layer>("host");
-  host->importDirective.content = R"(<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20">
+  host->importDirective.content =
+      R"(<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20">
   <image href="inline.png" width="20" height="20"/>
 </svg>)";
   doc->layers.push_back(host);

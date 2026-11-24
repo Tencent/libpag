@@ -233,11 +233,16 @@ PAG_TEST(PAGImageLayerTest, mask) {
  * 用例描述: 测试TrackMatteImageLayer的getVisibleRange是否正确。
  */
 PAG_TEST_PRIVATE(PAGImageLayerTest, trackmatteImageLayer) {
-  PAG_PRIVATE_ACCESS(auto pagFile = LoadPAGFile("resources/apitest/TrackmatteImageLayer.pag");
-                     ASSERT_NE(pagFile, nullptr);
-                     auto imageLayer = std::static_pointer_cast<PAGImageLayer>(
-                         pagFile->getLayersByEditableIndex(0, LayerType::Image).front());
-                     auto timeRange = imageLayer->getVisibleRangeInFile();
-                     EXPECT_EQ(timeRange.start, -13); EXPECT_EQ(timeRange.end, 66);)
+  // clang-format off
+  PAG_PRIVATE_ACCESS(
+    auto pagFile = LoadPAGFile("resources/apitest/TrackmatteImageLayer.pag");
+    ASSERT_NE(pagFile, nullptr);
+    auto imageLayer = std::static_pointer_cast<PAGImageLayer>(
+        pagFile->getLayersByEditableIndex(0, LayerType::Image).front());
+    auto timeRange = imageLayer->getVisibleRangeInFile();
+    EXPECT_EQ(timeRange.start, -13);
+    EXPECT_EQ(timeRange.end, 66);
+  )
+  // clang-format on
 }
 }  // namespace pag

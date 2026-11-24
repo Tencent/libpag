@@ -289,7 +289,6 @@ class Devices {
    * Returns the number of successful tgfx device creations performed by the D3D12 registry.
    */
   static size_t GetDeviceCreationCountForTesting();
-#endif
 
   /**
    * Returns the number of live devices currently published in the D3D12 registry. Intended for
@@ -297,16 +296,20 @@ class Devices {
    */
   static size_t GetRegisteredDeviceCount();
 
-  /**
-   * Overrides the native device health query for tests. Pass nullptr to restore the real
-   * ID3D12Device::GetDeviceRemovedReason() probe.
-   */
-  static void SetDeviceHealthProbeForTesting(long (*probe)(void* device));
+  using DeviceHealthProbe = long (*)(void* nativeDevice);
 
   /**
-   * Returns true when the context's GPU device is still usable for new work. The context must
-   * already be locked by the caller. Backends without a native device-health query return true
-   * for a non-null context; D3D12 checks the registered native device for removal.
+   * Overrides the native device health query for tests and returns the previous probe. Pass nullptr
+   * to restore ID3D12Device::GetDeviceRemovedReason(). The callback must not acquire device locks.
+   */
+  static DeviceHealthProbe SetDeviceHealthProbeForTesting(DeviceHealthProbe probe);
+#endif
+
+  /**
+   * Checks backend device health while the caller holds the context lock. D3D12 checks native
+   * removal and permanent lock failures already observed by LockContext(); it cannot inspect
+   * unobserved internal tgfx failures. Backends without a native health query return true for a
+   * non-null context.
    */
   static bool IsDeviceHealthy(tgfx::Context* context);
 

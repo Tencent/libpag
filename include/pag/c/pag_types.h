@@ -124,14 +124,14 @@ typedef struct pag_mtl_texture_info {
  * Non-owning description of an external typed 2D D3D12 texture. The pointer is an
  * ID3D12Resource; PAG never releases it and the caller must keep it valid for the lifetime of
  * every object created from this description and until its submitted GPU work completes.
+ * The resource must be a single-sample, single-plane typed 2D texture in D3D12_RESOURCE_STATE_COMMON.
+ * Sampling requires DENY_SHADER_RESOURCE to be unset; rendering requires ALLOW_RENDER_TARGET.
+ * Supported formats are R8_UNORM and RGBA8/BGRA8 UNORM or SRGB; A8_UNORM and R8G8_UNORM are rejected.
+ * The resource's native device must match the surface that samples it.
  */
 typedef struct pag_d3d12_texture_info {
   void* resource;
 } pag_d3d12_texture_info;
-/* The resource must be a single-sample, single-plane typed 2D ID3D12Resource in
- * D3D12_RESOURCE_STATE_COMMON. Sampling requires that DENY_SHADER_RESOURCE is not set; rendering
- * requires ALLOW_RENDER_TARGET. Supported formats are R8_UNORM and RGBA8/BGRA8 UNORM or SRGB.
- * The resource's native device must match the surface that samples it. */
 
 typedef struct pag_point {
   float x;

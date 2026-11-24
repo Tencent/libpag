@@ -1254,12 +1254,18 @@ PAGX_TEST(PAGXVideoExporterTest, OutputDimensionsAreAllOrNothing) {
 }
 
 PAGX_TEST_PRIVATE(PAGXVideoExporterTest, NextFrameReportsDrawingFailure) {
-  PAG_PRIVATE_ACCESS(auto exporter = pagx::VideoExporter::Make(MakeStaticDocument());
-                     ASSERT_TRUE(exporter != nullptr); exporter->impl->surface = nullptr;
-                     std::string errorMsg = {}; EXPECT_FALSE(exporter->nextFrame(&errorMsg));
-                     EXPECT_EQ(exporter->currentFrame(), 0);
-                     EXPECT_EQ(exporter->errorCode(), pagx::VideoExportError::RenderFailed);
-                     EXPECT_NE(errorMsg.find("failed to draw frame 0"), std::string::npos);)
+  // clang-format off
+  PAG_PRIVATE_ACCESS(
+    auto exporter = pagx::VideoExporter::Make(MakeStaticDocument());
+    ASSERT_TRUE(exporter != nullptr);
+    exporter->impl->surface = nullptr;
+    std::string errorMsg = {};
+    EXPECT_FALSE(exporter->nextFrame(&errorMsg));
+    EXPECT_EQ(exporter->currentFrame(), 0);
+    EXPECT_EQ(exporter->errorCode(), pagx::VideoExportError::RenderFailed);
+    EXPECT_NE(errorMsg.find("failed to draw frame 0"), std::string::npos);
+  )
+  // clang-format on
 }
 
 PAGX_TEST(PAGXVideoExporterTest, NextFrameAdvancesSequentiallyAndStopsAtEnd) {

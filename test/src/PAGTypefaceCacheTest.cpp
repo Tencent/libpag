@@ -84,9 +84,14 @@ static pagx::PAGFont FindSystemFamilyWithUnavailableStyle() {
 
 // Returns the cached tgfx typeface on a Font node, or nullptr if no cache has been built yet.
 static std::shared_ptr<Typeface> CachedTypeface(const pagx::Font* fontNode) {
-  PAG_PRIVATE_ACCESS(if (fontNode == nullptr || fontNode->renderCache == nullptr) {
-    return nullptr;
-  } return fontNode->renderCache->typeface;)
+  // clang-format off
+  PAG_PRIVATE_ACCESS(
+    if (fontNode == nullptr || fontNode->renderCache == nullptr) {
+      return nullptr;
+    }
+    return fontNode->renderCache->typeface;
+  )
+  // clang-format on
   return nullptr;
 }
 

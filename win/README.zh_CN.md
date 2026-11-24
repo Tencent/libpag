@@ -55,7 +55,8 @@ node third_party/vendor_tools/ms-build -a x64 win/Win32Demo.sln /p:Configuration
 .\win\x64\Release\WinPAGDemo.exe
 ```
 
-示例是 GUI 程序，日志写到可执行文件旁边的 `win\x64\Release\WinPAGDemo.log`，不会输出到控制台。
+示例是 GUI 程序，stdout 和 stderr 都写到可执行文件旁边的 `win\x64\Release\WinPAGDemo.log`，不会输出到控制台。
+该路径无法打开时会回退到 `%TEMP%\WinPAGDemo-<pid>.log`，并向调试器报告实际路径；两个路径均无法打开时会提示警告，但不会阻止启动。
 日志里包含当前后端、实际解析到的资源路径，以及资源缺失时的明确报错；`assets/test2.pag` 缺失时示例没有内容可画，窗口会保持黑屏。
 
 ## 运行时

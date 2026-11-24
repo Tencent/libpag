@@ -140,7 +140,8 @@ struct MtlTextureInfo {
  */
 struct D3D12TextureInfo {
   /**
-   * Pointer to a live ID3D12Resource. Null resources are invalid. PAG never releases it.
+   * Pointer to a live ID3D12Resource. A null resource cannot be imported for sampling or rendering.
+   * BackendTexture::isValid() only checks the description's dimensions. PAG never releases it.
    */
   void* resource = nullptr;
 };
@@ -248,14 +249,18 @@ class PAG_API BackendTexture {
   }
 
   /**
-   * If the backend API is GL, copies a snapshot of the GLTextureInfo struct into the passed in
-   * pointer and returns true. Otherwise returns false if the backend API is not GL.
+   * Copies the OpenGL texture description into the output pointer.
+   * @param glTextureInfo the destination description, or nullptr to return false.
+   * @return true for an initialized OpenGL backend object with a non-null output pointer;
+   *         false otherwise.
    */
   bool getGLTextureInfo(GLTextureInfo* glTextureInfo) const;
 
   /**
-   * If the backend API is Metal, copies a snapshot of the GrMtlTextureInfo struct into the passed
-   * in pointer and returns true. Otherwise returns false if the backend API is not Metal.
+   * Copies the Metal texture description into the output pointer.
+   * @param mtlTextureInfo the destination description, or nullptr to return false.
+   * @return true for an initialized Metal backend object with a non-null output pointer;
+   *         false otherwise.
    */
   bool getMtlTextureInfo(MtlTextureInfo* mtlTextureInfo) const;
 
@@ -268,15 +273,18 @@ class PAG_API BackendTexture {
   bool getD3D12TextureInfo(D3D12TextureInfo* d3d12TextureInfo) const;
 
   /**
-   * If the backend API is Vulkan, copies a snapshot of the VkImageInfo struct into the passed
-   * in pointer and returns true. Otherwise, returns false if the backend API is not Vulkan.
+   * Copies the Vulkan image description into the output pointer.
+   * @param vkImageInfo the destination description, or nullptr to return false.
+   * @return true for an initialized Vulkan backend object with a non-null output pointer;
+   *         false otherwise.
    */
   bool getVkImageInfo(VkImageInfo* vkImageInfo) const;
 
   /**
-   * If the backend API is WebGPU, copies a snapshot of the WebGPUTextureInfo struct into the
-   * passed in pointer and returns true. Otherwise, returns false if the backend API is not
-   * WebGPU.
+   * Copies the WebGPU texture description into the output pointer.
+   * @param webGPUTextureInfo the destination description, or nullptr to return false.
+   * @return true for an initialized WebGPU backend object with a non-null output pointer;
+   *         false otherwise.
    */
   bool getWebGPUTextureInfo(WebGPUTextureInfo* webGPUTextureInfo) const;
 
@@ -331,7 +339,8 @@ class PAG_API BackendRenderTarget {
   BackendRenderTarget& operator=(const BackendRenderTarget&);
 
   /**
-   * Returns true if the backend texture has been initialized.
+   * Returns true if the render target description has positive dimensions. Native handles are
+   * validated when imported for rendering, not by this check.
    */
   bool isValid() const {
     return _width > 0 && _height > 0;
@@ -359,14 +368,18 @@ class PAG_API BackendRenderTarget {
   }
 
   /**
-   * If the backend API is GL, copies a snapshot of the GLFramebufferInfo struct into the passed
-   * in pointer and returns true. Otherwise returns false if the backend API is not GL.
+   * Copies the OpenGL framebuffer description into the output pointer.
+   * @param glFrameBufferInfo the destination description, or nullptr to return false.
+   * @return true for an initialized OpenGL backend object with a non-null output pointer;
+   *         false otherwise.
    */
   bool getGLFramebufferInfo(GLFrameBufferInfo* glFrameBufferInfo) const;
 
   /**
-   * If the backend API is Metal, copies a snapshot of the MtlTextureInfo struct into the passed
-   * in pointer and returns true. Otherwise returns false if the backend API is not Metal.
+   * Copies the Metal texture description into the output pointer.
+   * @param mtlTextureInfo the destination description, or nullptr to return false.
+   * @return true for an initialized Metal backend object with a non-null output pointer;
+   *         false otherwise.
    */
   bool getMtlTextureInfo(MtlTextureInfo* mtlTextureInfo) const;
 
@@ -379,8 +392,10 @@ class PAG_API BackendRenderTarget {
   bool getD3D12TextureInfo(D3D12TextureInfo* d3d12TextureInfo) const;
 
   /**
-   * If the backend API is Vulkan, copies a snapshot of the VkImageInfo struct into the passed
-   * in pointer and returns true. Otherwise, returns false if the backend API is not Vulkan.
+   * Copies the Vulkan image description into the output pointer.
+   * @param vkImageInfo the destination description, or nullptr to return false.
+   * @return true for an initialized Vulkan backend object with a non-null output pointer;
+   *         false otherwise.
    */
   bool getVkImageInfo(VkImageInfo* vkImageInfo) const;
 

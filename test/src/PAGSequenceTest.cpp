@@ -75,46 +75,56 @@ PAG_PIXEL_TEST(PAGSequenceTest, VideoSequenceAsMask) {
  * 用例描述: 带mp4头的视频序列帧导出为mp4
  */
 PAG_TEST_PRIVATE(PAGSequenceTest, VideoSequenceToMp4WithHeader) {
+  // clang-format off
   PAG_PRIVATE_ACCESS(
-      auto pagFile = LoadPAGFile("resources/apitest/video_sequence_with_mp4header.pag");
-      ASSERT_NE(pagFile, nullptr); ASSERT_EQ(pagFile->layerType(), LayerType::PreCompose);
+    auto pagFile = LoadPAGFile("resources/apitest/video_sequence_with_mp4header.pag");
+    ASSERT_NE(pagFile, nullptr);
+    ASSERT_EQ(pagFile->layerType(), LayerType::PreCompose);
 
-      const PreComposeLayer* preComposeLayer =
-          static_cast<const PreComposeLayer*>(pagFile->getLayer());
-      ASSERT_NE(preComposeLayer->composition, nullptr);
-      ASSERT_EQ(preComposeLayer->composition->type(), CompositionType::Video);
+    const PreComposeLayer* preComposeLayer =
+        static_cast<const PreComposeLayer*>(pagFile->getLayer());
+    ASSERT_NE(preComposeLayer->composition, nullptr);
+    ASSERT_EQ(preComposeLayer->composition->type(), CompositionType::Video);
 
-      VideoComposition* videoComposition =
-          static_cast<VideoComposition*>(preComposeLayer->composition);
-      ASSERT_FALSE(videoComposition->sequences.empty());
-      const auto* videoSequence = videoComposition->sequences.at(0);
-      auto MP4Data = MP4BoxHelper::CovertToMP4(videoSequence); ASSERT_NE(MP4Data, nullptr);
+    VideoComposition* videoComposition =
+        static_cast<VideoComposition*>(preComposeLayer->composition);
+    ASSERT_FALSE(videoComposition->sequences.empty());
+    const auto* videoSequence = videoComposition->sequences.at(0);
+    auto MP4Data = MP4BoxHelper::CovertToMP4(videoSequence);
+    ASSERT_NE(MP4Data, nullptr);
 
-      EXPECT_TRUE(
-          Baseline::Compare(std::move(MP4Data), "PAGSequenceTest/VideoSequenceToMP4WithHeader"));)
+    EXPECT_TRUE(
+        Baseline::Compare(std::move(MP4Data), "PAGSequenceTest/VideoSequenceToMP4WithHeader"));
+  )
+  // clang-format on
 }
 
 /**
  * 用例描述: 不带mp4头的视频序列帧导出为mp4
  */
 PAG_TEST_PRIVATE(PAGSequenceTest, VideoSequenceToMP4WithoutHeader) {
+  // clang-format off
   PAG_PRIVATE_ACCESS(
-      auto pagFile = LoadPAGFile("resources/apitest/video_sequence_without_mp4header.pag");
-      ASSERT_NE(pagFile, nullptr); ASSERT_EQ(pagFile->layerType(), LayerType::PreCompose);
+    auto pagFile = LoadPAGFile("resources/apitest/video_sequence_without_mp4header.pag");
+    ASSERT_NE(pagFile, nullptr);
+    ASSERT_EQ(pagFile->layerType(), LayerType::PreCompose);
 
-      const PreComposeLayer* preComposeLayer =
-          static_cast<const PreComposeLayer*>(pagFile->getLayer());
-      ASSERT_NE(preComposeLayer->composition, nullptr);
-      ASSERT_EQ(preComposeLayer->composition->type(), CompositionType::Video);
+    const PreComposeLayer* preComposeLayer =
+        static_cast<const PreComposeLayer*>(pagFile->getLayer());
+    ASSERT_NE(preComposeLayer->composition, nullptr);
+    ASSERT_EQ(preComposeLayer->composition->type(), CompositionType::Video);
 
-      VideoComposition* videoComposition =
-          static_cast<VideoComposition*>(preComposeLayer->composition);
-      ASSERT_FALSE(videoComposition->sequences.empty());
-      const auto* videoSequence = videoComposition->sequences.at(0);
-      auto MP4Data = MP4BoxHelper::CovertToMP4(videoSequence); ASSERT_NE(MP4Data, nullptr);
+    VideoComposition* videoComposition =
+        static_cast<VideoComposition*>(preComposeLayer->composition);
+    ASSERT_FALSE(videoComposition->sequences.empty());
+    const auto* videoSequence = videoComposition->sequences.at(0);
+    auto MP4Data = MP4BoxHelper::CovertToMP4(videoSequence);
+    ASSERT_NE(MP4Data, nullptr);
 
-      EXPECT_TRUE(Baseline::Compare(std::move(MP4Data),
-                                    "PAGSequenceTest/VideoSequenceToMP4WithoutHeader"));)
+    EXPECT_TRUE(Baseline::Compare(std::move(MP4Data),
+                                "PAGSequenceTest/VideoSequenceToMP4WithoutHeader"));
+  )
+  // clang-format on
 }
 /**
  * 用例描述: 同一个序列帧多图层引用且时间轴交错，测试解码器数量是否正确。
@@ -124,28 +134,41 @@ PAG_TEST_PRIVATE(PAGSequenceTest, VideoSequenceToMP4WithoutHeader) {
 // RenderCache::prepareLayers(), so the cache is already populated at the 5s checkpoint.
 #if !defined(__EMSCRIPTEN__)
 PAG_TEST_PRIVATE(PAGSequenceTest, Sequence_Multiple_References) {
+  // clang-format off
   PAG_PRIVATE_ACCESS(
-      auto pagFile = LoadPAGFile("resources/apitest/sequence_mul_ref.pag");
-      EXPECT_NE(pagFile, nullptr);
-      auto pagSurface = OffscreenSurface::Make(pagFile->width(), pagFile->height());
-      auto pagPlayer = std::make_shared<PAGPlayer>(); pagPlayer->setSurface(pagSurface);
-      pagPlayer->setComposition(pagFile); pagPlayer->setMatrix(Matrix::I());
-      auto& sequenceCaches = pagPlayer->renderCache->sequenceCaches; pagFile->setCurrentTime(0);
-      pagPlayer->flush(); ASSERT_EQ(static_cast<int>(sequenceCaches.size()), 1);
-      EXPECT_EQ(static_cast<int>(sequenceCaches.begin()->second.size()), 1);
-      pagFile->setCurrentTime(1000000); pagPlayer->flush();
-      ASSERT_EQ(static_cast<int>(sequenceCaches.size()), 1);
-      EXPECT_EQ(static_cast<int>(sequenceCaches.begin()->second.size()), 2);
-      pagFile->setCurrentTime(3000000); pagPlayer->flush();
-      ASSERT_EQ(static_cast<int>(sequenceCaches.size()), 1);
-      EXPECT_EQ(static_cast<int>(sequenceCaches.begin()->second.size()), 3);
-      pagFile->setCurrentTime(4500000); pagPlayer->flush();
-      ASSERT_EQ(static_cast<int>(sequenceCaches.size()), 1);
-      EXPECT_EQ(static_cast<int>(sequenceCaches.begin()->second.size()), 3);
-      pagFile->setCurrentTime(5000000); pagPlayer->flush();
-      ASSERT_EQ(static_cast<int>(sequenceCaches.size()), 0); pagFile->setCurrentTime(8000000);
-      pagPlayer->flush(); ASSERT_EQ(static_cast<int>(sequenceCaches.size()), 1);
-      EXPECT_EQ(static_cast<int>(sequenceCaches.begin()->second.size()), 1);)
+    auto pagFile = LoadPAGFile("resources/apitest/sequence_mul_ref.pag");
+    EXPECT_NE(pagFile, nullptr);
+    auto pagSurface = OffscreenSurface::Make(pagFile->width(), pagFile->height());
+    auto pagPlayer = std::make_shared<PAGPlayer>();
+    pagPlayer->setSurface(pagSurface);
+    pagPlayer->setComposition(pagFile);
+    pagPlayer->setMatrix(Matrix::I());
+    auto& sequenceCaches = pagPlayer->renderCache->sequenceCaches;
+    pagFile->setCurrentTime(0);
+    pagPlayer->flush();
+    ASSERT_EQ(static_cast<int>(sequenceCaches.size()), 1);
+    EXPECT_EQ(static_cast<int>(sequenceCaches.begin()->second.size()), 1);
+    pagFile->setCurrentTime(1000000);
+    pagPlayer->flush();
+    ASSERT_EQ(static_cast<int>(sequenceCaches.size()), 1);
+    EXPECT_EQ(static_cast<int>(sequenceCaches.begin()->second.size()), 2);
+    pagFile->setCurrentTime(3000000);
+    pagPlayer->flush();
+    ASSERT_EQ(static_cast<int>(sequenceCaches.size()), 1);
+    EXPECT_EQ(static_cast<int>(sequenceCaches.begin()->second.size()), 3);
+    pagFile->setCurrentTime(4500000);
+    pagPlayer->flush();
+    ASSERT_EQ(static_cast<int>(sequenceCaches.size()), 1);
+    EXPECT_EQ(static_cast<int>(sequenceCaches.begin()->second.size()), 3);
+    pagFile->setCurrentTime(5000000);
+    pagPlayer->flush();
+    ASSERT_EQ(static_cast<int>(sequenceCaches.size()), 0);
+    pagFile->setCurrentTime(8000000);
+    pagPlayer->flush();
+    ASSERT_EQ(static_cast<int>(sequenceCaches.size()), 1);
+    EXPECT_EQ(static_cast<int>(sequenceCaches.begin()->second.size()), 1);
+  )
+  // clang-format on
 }
 #endif
 

@@ -1,3 +1,21 @@
+/////////////////////////////////////////////////////////////////////////////////////////////////
+//
+//  Tencent is pleased to support the open source community by making libpag available.
+//
+//  Copyright (C) 2026 Tencent. All rights reserved.
+//
+//  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
+//  except in compliance with the License. You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+//  Unless required by applicable law or agreed to in writing, software distributed under the
+//  License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
+//  either express or implied. See the License for the specific language governing permissions
+//  and limitations under the License.
+//
+/////////////////////////////////////////////////////////////////////////////////////////////////
+
 #pragma once
 
 // Internal device registry implementation. This file is included inside the anonymous namespace
@@ -5,11 +23,10 @@
 // device import code separate from validation and rendering entry points.
 // TODO: Fold this registry into tgfx Device::RegisterNative once DeviceKey supports D3D12.
 
-using DeviceHealthProbe = HRESULT (*)(void* device);
-std::atomic<DeviceHealthProbe> deviceHealthProbe = nullptr;
+std::atomic<Devices::DeviceHealthProbe> DeviceHealthProbeOverride = nullptr;
 
 HRESULT QueryDeviceRemovedReason(ID3D12Device* device) {
-  auto probe = deviceHealthProbe.load();
+  auto probe = DeviceHealthProbeOverride.load();
   return probe != nullptr ? probe(device) : device->GetDeviceRemovedReason();
 }
 
@@ -57,6 +74,7 @@ void PurgeContextIdentitiesLocked(Registry& registry) {
   for (auto iterator = registry.contextIdentities.begin();
        iterator != registry.contextIdentities.end();) {
     if (iterator->second.owner.expired()) {
+      registry.lostDevices.erase(iterator->first);
       iterator = registry.contextIdentities.erase(iterator);
     } else {
       ++iterator;
@@ -90,6 +108,7 @@ void MarkWrapperLost(const std::shared_ptr<tgfx::Device>& device) {
   }
   auto& registry = GetRegistry();
   std::lock_guard<std::mutex> autoLock(registry.locker);
+  registry.contextIdentities[device->uniqueID()].owner = device;
   registry.lostDevices.insert(device->uniqueID());
 }
 

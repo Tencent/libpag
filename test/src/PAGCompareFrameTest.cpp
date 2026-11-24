@@ -110,9 +110,13 @@ static void CompareFileFrames(const std::string& pagPath) {
       Clock clock = {};
       currentSnapshot = MakeSnapshot(pagSurface);
       cost.readPixelsCost = clock.measure();
-      PAG_PRIVATE_ACCESS(auto cache = pagPlayer->renderCache;
-                         cost.totalTime = cache->totalTime + cost.readPixelsCost;
-                         cost.performance = cache->getPerformanceString();)
+      // clang-format off
+      PAG_PRIVATE_ACCESS(
+        auto cache = pagPlayer->renderCache;
+        cost.totalTime = cache->totalTime + cost.readPixelsCost;
+        cost.performance = cache->getPerformanceString();
+      )
+      // clang-format on
       performanceMap[currentFrame] = cost;
     }
     CompareFrame(currentFrame - 1);

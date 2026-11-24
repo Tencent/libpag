@@ -122,7 +122,10 @@ std::shared_ptr<tgfx::Device> Devices::MakeDefault() {
     std::lock_guard<std::mutex> autoLock(registry.locker);
     auto entry = registry.defaultEntry.lock();
     if (entry != nullptr) {
-      return MakeAliasedDevice(entry);
+      if (IsEntryHealthyLocked(registry, entry)) {
+        return MakeAliasedDevice(entry);
+      }
+      EraseEntryLocked(registry, entry.get());
     }
   }
   std::shared_ptr<tgfx::D3D12Device> candidate = nullptr;
@@ -156,8 +159,8 @@ std::shared_ptr<tgfx::Device> Devices::MakeDefault() {
   return MakeAliasedDevice(selected);
 }
 
-void Devices::SetDeviceHealthProbeForTesting(long (*probe)(void* device)) {
-  deviceHealthProbe.store(reinterpret_cast<DeviceHealthProbe>(probe));
+Devices::DeviceHealthProbe Devices::SetDeviceHealthProbeForTesting(DeviceHealthProbe probe) {
+  return DeviceHealthProbeOverride.exchange(probe);
 }
 
 size_t Devices::GetRegisteredDeviceCount() {
@@ -310,7 +313,7 @@ bool Devices::IsDeviceHealthy(tgfx::Context* context) {
   if (nativeDevice == nullptr) {
     return false;
   }
-  auto reason = nativeDevice->GetDeviceRemovedReason();
+  auto reason = QueryDeviceRemovedReason(nativeDevice);
   nativeDevice->Release();
   if (FAILED(reason)) {
     return false;

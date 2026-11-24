@@ -98,7 +98,7 @@ if "%USE_CLANG_CL%"=="1" (
     echo Error: clang-cl was not found. Install the C++ Clang tools for Windows component.
     exit /b 1
   )
-  set "CMAKE_COMPILER_ARGS=-DCMAKE_C_COMPILER=clang-cl -DCMAKE_CXX_COMPILER=clang-cl -DCMAKE_C_COMPILER_LAUNCHER=python;%WORKSPACE%\win\tools\filter_clang.py -DCMAKE_CXX_COMPILER_LAUNCHER=python;%WORKSPACE%\win\tools\filter_clang.py"
+  set "CMAKE_COMPILER_ARGS=-DCMAKE_C_COMPILER=clang-cl -DCMAKE_CXX_COMPILER=clang-cl -DCMAKE_C_COMPILER_LAUNCHER="python;%WORKSPACE%\win\tools\filter_clang.py" -DCMAKE_CXX_COMPILER_LAUNCHER="python;%WORKSPACE%\win\tools\filter_clang.py""
 )
 
 where node >nul 2>nul

@@ -244,11 +244,16 @@ PAG_TEST(TGFXCastTest, BackendInfoDefaultsAndNullOutput) {
   EXPECT_FALSE(glTexture.getGLTextureInfo(nullptr));
   BackendRenderTarget glTarget(GLFrameBufferInfo{}, 4, 4);
   EXPECT_FALSE(glTarget.getGLFramebufferInfo(nullptr));
-  EXPECT_FALSE(glTexture.getMtlTextureInfo(nullptr));
-  EXPECT_FALSE(glTexture.getVkImageInfo(nullptr));
-  EXPECT_FALSE(glTexture.getWebGPUTextureInfo(nullptr));
-  EXPECT_FALSE(glTarget.getMtlTextureInfo(nullptr));
-  EXPECT_FALSE(glTarget.getVkImageInfo(nullptr));
+  BackendTexture metalTexture(MtlTextureInfo{}, 4, 4);
+  BackendTexture vulkanTexture(VkImageInfo{}, 4, 4);
+  BackendTexture webGPUTexture(WebGPUTextureInfo{}, 4, 4);
+  BackendRenderTarget metalTarget(MtlTextureInfo{}, 4, 4);
+  BackendRenderTarget vulkanTarget(VkImageInfo{}, 4, 4);
+  EXPECT_FALSE(metalTexture.getMtlTextureInfo(nullptr));
+  EXPECT_FALSE(vulkanTexture.getVkImageInfo(nullptr));
+  EXPECT_FALSE(webGPUTexture.getWebGPUTextureInfo(nullptr));
+  EXPECT_FALSE(metalTarget.getMtlTextureInfo(nullptr));
+  EXPECT_FALSE(vulkanTarget.getVkImageInfo(nullptr));
 }
 
 }  // namespace pag

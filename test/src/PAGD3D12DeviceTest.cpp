@@ -22,7 +22,9 @@
 
 #include <d3d12.h>
 #include <dxgiformat.h>
+#include <atomic>
 #include <cstdint>
+#include <cstdlib>
 #include <thread>
 #include <vector>
 #include "base/utils/TGFXCast.h"
@@ -100,6 +102,10 @@ PAG_TEST(D3D12Test, BackendTextureRoundTrip) {
   EXPECT_FALSE(texture.getD3D12TextureInfo(nullptr));
   BackendRenderTarget renderTarget(info, 16, 16);
   EXPECT_FALSE(renderTarget.getD3D12TextureInfo(nullptr));
+  EXPECT_FALSE(Devices::ValidateExternalResource(ToTGFX(texture), ExternalResourceUsage::Sampled));
+  EXPECT_FALSE(Devices::ValidateExternalResource(ToTGFX(renderTarget)));
+  EXPECT_EQ(PAGImage::FromTexture(texture, ImageOrigin::TopLeft), nullptr);
+  EXPECT_EQ(PAGSurface::MakeFrom(texture, ImageOrigin::TopLeft), nullptr);
   MtlTextureInfo metalInfo = {};
   EXPECT_FALSE(texture.getMtlTextureInfo(&metalInfo));
 }
@@ -123,19 +129,45 @@ PAG_TEST(D3D12Test, SameNativeDeviceReturnsSameDevice) {
   EXPECT_EQ(defaultDevice.get(), firstDevice.get());
 }
 
-static HRESULT ForceRemovedDevice(void*) {
-  return DXGI_ERROR_DEVICE_REMOVED;
+static std::atomic<bool> SimulateNextRemoval = false;
+
+static HRESULT ForceRemovedDevice(void* nativeDevice) {
+  if (SimulateNextRemoval.exchange(false)) {
+    return DXGI_ERROR_DEVICE_REMOVED;
+  }
+  return static_cast<ID3D12Device*>(nativeDevice)->GetDeviceRemovedReason();
 }
 
 /**
- * A removed default device must be evicted and replaced instead of being returned forever.
+ * Restores the previous health probe even when a test exits early after an assertion failure.
+ */
+class ScopedDeviceHealthProbe {
+ public:
+  explicit ScopedDeviceHealthProbe(Devices::DeviceHealthProbe probe)
+      : previous(Devices::SetDeviceHealthProbeForTesting(probe)) {
+  }
+
+  ~ScopedDeviceHealthProbe() {
+    Devices::SetDeviceHealthProbeForTesting(previous);
+    SimulateNextRemoval.store(false);
+  }
+
+  ScopedDeviceHealthProbe(const ScopedDeviceHealthProbe&) = delete;
+  ScopedDeviceHealthProbe& operator=(const ScopedDeviceHealthProbe&) = delete;
+
+ private:
+  Devices::DeviceHealthProbe previous = nullptr;
+};
+
+/**
+ * A simulated removal query must evict the cached wrapper. This does not remove the native GPU.
  */
 PAG_TEST(D3D12Test, RemovedDefaultDeviceIsRebuilt) {
   auto before = Devices::MakeDefault();
   ASSERT_TRUE(before != nullptr);
-  Devices::SetDeviceHealthProbeForTesting(ForceRemovedDevice);
+  ScopedDeviceHealthProbe probe(ForceRemovedDevice);
+  SimulateNextRemoval.store(true);
   auto after = Devices::MakeDefault();
-  Devices::SetDeviceHealthProbeForTesting(nullptr);
   ASSERT_TRUE(after != nullptr);
   EXPECT_NE(before.get(), after.get());
   DeviceLockScope afterScope(after);
@@ -148,6 +180,18 @@ PAG_TEST(D3D12Test, RemovedDefaultDeviceIsRebuilt) {
 PAG_TEST(D3D12Test, HealthyDeviceReportsHealthy) {
   DeviceLockScope scope;
   ASSERT_TRUE(static_cast<bool>(scope));
+  EXPECT_TRUE(Devices::IsDeviceHealthy(scope.context()));
+}
+
+/**
+ * The native removal probe must also be observed by health checks on an already locked context.
+ */
+PAG_TEST(D3D12Test, RemovedDeviceReportsUnhealthy) {
+  DeviceLockScope scope;
+  ASSERT_TRUE(static_cast<bool>(scope));
+  ScopedDeviceHealthProbe probe(ForceRemovedDevice);
+  SimulateNextRemoval.store(true);
+  EXPECT_FALSE(Devices::IsDeviceHealthy(scope.context()));
   EXPECT_TRUE(Devices::IsDeviceHealthy(scope.context()));
 }
 
@@ -262,22 +306,20 @@ PAG_TEST(D3D12Test, TypelessResourceRejected) {
 }
 
 /**
- * Covers concurrent first-time resolution of an unregistered native device: the registry must
- * publish exactly one tgfx device even when every worker misses the cache.
+ * Concurrent external imports reuse an existing wrapper or create at most one on a cache miss.
+ * Per-adapter native singletons may already be registered by another test.
  */
 PAG_TEST(D3D12Test, DeviceRegistryIsThreadSafe) {
-  SecondaryDeviceTexture secondary = {};
-  if (!secondary.init(8, 8)) {
-    GTEST_SKIP() << "Failed to create a secondary D3D12 device, HRESULT="
-                 << static_cast<long>(secondary.lastError);
-  }
+  ExternalDeviceTexture external = {};
+  ASSERT_TRUE(external.init(8, 8))
+      << external.lastStage << " HRESULT=" << static_cast<long>(external.lastError);
   constexpr int ThreadCount = 8;
   auto deviceCountBefore = Devices::GetRegisteredDeviceCount();
   auto creationCountBefore = Devices::GetDeviceCreationCountForTesting();
   std::vector<std::shared_ptr<tgfx::Device>> results(ThreadCount);
   std::vector<std::thread> threads = {};
   for (int i = 0; i < ThreadCount; i++) {
-    RegistryLookupTask task = {&secondary.texture, &results[static_cast<size_t>(i)]};
+    RegistryLookupTask task = {&external.texture, &results[static_cast<size_t>(i)]};
     threads.emplace_back(task);
   }
   for (auto& thread : threads) {
@@ -288,11 +330,95 @@ PAG_TEST(D3D12Test, DeviceRegistryIsThreadSafe) {
   for (const auto& result : results) {
     EXPECT_EQ(result.get(), canonical.get());
   }
-  EXPECT_EQ(Devices::MakeForTexture(secondary.texture).get(), canonical.get());
-  EXPECT_EQ(Devices::GetRegisteredDeviceCount(), deviceCountBefore + 1);
-  EXPECT_EQ(Devices::GetDeviceCreationCountForTesting(), creationCountBefore + 1);
-  EXPECT_NE(canonical.get(), Devices::MakeDefault().get());
+  EXPECT_EQ(Devices::MakeForTexture(external.texture).get(), canonical.get());
+  EXPECT_LE(Devices::GetRegisteredDeviceCount(), deviceCountBefore + 1);
+  EXPECT_LE(Devices::GetDeviceCreationCountForTesting(), creationCountBefore + 1);
+#ifdef PAG_D3D12_USE_WARP
+  Microsoft::WRL::ComPtr<IDXGIFactory4> factory = nullptr;
+  Microsoft::WRL::ComPtr<IDXGIAdapter> warpAdapter = nullptr;
+  auto factoryResult = CreateDXGIFactory1(IID_PPV_ARGS(factory.ReleaseAndGetAddressOf()));
+  ASSERT_TRUE(SUCCEEDED(factoryResult)) << "CreateDXGIFactory1 HRESULT=" << factoryResult;
+  auto adapterResult = factory->EnumWarpAdapter(IID_PPV_ARGS(warpAdapter.ReleaseAndGetAddressOf()));
+  ASSERT_TRUE(SUCCEEDED(adapterResult)) << "EnumWarpAdapter HRESULT=" << adapterResult;
+  DXGI_ADAPTER_DESC adapterDescription = {};
+  auto descriptionResult = warpAdapter->GetDesc(&adapterDescription);
+  ASSERT_TRUE(SUCCEEDED(descriptionResult)) << "GetDesc HRESULT=" << descriptionResult;
+  auto actualAdapter = external.device->GetAdapterLuid();
+  EXPECT_EQ(actualAdapter.LowPart, adapterDescription.AdapterLuid.LowPart);
+  EXPECT_EQ(actualAdapter.HighPart, adapterDescription.AdapterLuid.HighPart);
+#endif
 }
+
+#if defined(PAG_TEST_ACCESS_PRIVATE) && GTEST_HAS_DEATH_TEST
+static int VerifyLostWrapperRecovery() {
+  auto before = Devices::MakeDefault();
+  if (before == nullptr) {
+    return 1;
+  }
+  std::shared_ptr<tgfx::Texture> texture = nullptr;
+  {
+    DeviceLockScope scope(before);
+    if (!scope) {
+      return 2;
+    }
+    texture = MakeD3D12Texture(
+        scope.context(), 8, 8,
+        tgfx::TextureUsage::TEXTURE_BINDING | tgfx::TextureUsage::RENDER_ATTACHMENT);
+  }
+  if (texture == nullptr) {
+    return 3;
+  }
+  auto backendTexture = texture->getBackendTexture();
+  before->_contextLost.store(true);
+  if (Devices::LockContext(before) != nullptr) {
+    before->unlock();
+    return 4;
+  }
+  auto creationCountBefore = Devices::GetDeviceCreationCountForTesting();
+  constexpr int ThreadCount = 8;
+  std::vector<std::shared_ptr<tgfx::Device>> results(ThreadCount);
+  std::vector<std::thread> threads = {};
+  for (int index = 0; index < ThreadCount; index++) {
+    RegistryLookupTask task = {&backendTexture, &results[static_cast<size_t>(index)]};
+    threads.emplace_back(task);
+  }
+  for (auto& thread : threads) {
+    thread.join();
+  }
+  auto canonical = results.front();
+  if (canonical == nullptr || canonical.get() == before.get()) {
+    return 5;
+  }
+  for (const auto& result : results) {
+    if (result.get() != canonical.get()) {
+      return 6;
+    }
+  }
+  if (Devices::GetDeviceCreationCountForTesting() != creationCountBefore + 1) {
+    return 7;
+  }
+  {
+    DeviceLockScope scope(canonical);
+    if (!scope || !Devices::IsDeviceHealthy(scope.context())) {
+      return 8;
+    }
+  }
+  auto surface = PAGSurface::MakeFrom(ToPAG(backendTexture), ImageOrigin::TopLeft);
+  if (surface == nullptr || !surface->clearAll() || !surface->waitUntilCompleted()) {
+    return 9;
+  }
+  return 0;
+}
+
+/**
+ * Exercises real wrapper lock failure and concurrent replacement in an isolated process so the
+ * permanently lost device cannot contaminate another test's cached device. This is not native TDR.
+ */
+PAG_TEST(D3D12Test, WrapperLockFailureIsEvictedAndRebuilt) {
+  GTEST_FLAG_SET(death_test_style, "threadsafe");
+  EXPECT_EXIT(std::exit(VerifyLostWrapperRecovery()), ::testing::ExitedWithCode(0), "");
+}
+#endif
 
 }  // namespace pag
 

@@ -451,13 +451,20 @@ PAGX_TEST(PAGXUtilsTest, BuildLayerMatrix_Identity) {
 }
 
 PAGX_TEST_PRIVATE(PAGXUtilsTest, BuildLayerMatrix_WithPosition) {
+  // clang-format off
   PAG_PRIVATE_ACCESS(
-      auto doc = pagx::PAGXDocument::Make(100, 100); auto layer = doc->makeNode<pagx::Layer>();
-      layer->x = 10.0f; layer->y = 20.0f;
-      // BuildLayerMatrix consumes the layout-resolved renderPosition(); run the layer's measure
-      // pass so the authored x/y propagate into preferredX/Y (and therefore layoutBounds()).
-      layer->updateSize(nullptr); auto m = pagx::BuildLayerMatrix(layer);
-      EXPECT_FLOAT_EQ(m.tx, 10.0f); EXPECT_FLOAT_EQ(m.ty, 20.0f);)
+    auto doc = pagx::PAGXDocument::Make(100, 100);
+    auto layer = doc->makeNode<pagx::Layer>();
+    layer->x = 10.0f;
+    layer->y = 20.0f;
+    // BuildLayerMatrix consumes the layout-resolved renderPosition(); run the layer's measure
+    // pass so the authored x/y propagate into preferredX/Y (and therefore layoutBounds()).
+    layer->updateSize(nullptr);
+    auto m = pagx::BuildLayerMatrix(layer);
+    EXPECT_FLOAT_EQ(m.tx, 10.0f);
+    EXPECT_FLOAT_EQ(m.ty, 20.0f);
+  )
+  // clang-format on
 }
 
 PAGX_TEST(PAGXUtilsTest, BuildLayerMatrix_AddsAuthoredPositionToGeneratedLayout) {
@@ -547,10 +554,17 @@ PAGX_TEST(PAGXUtilsTest, BuildLayerMatrix_IgnoresNonFiniteMatrix) {
 }
 
 PAGX_TEST_PRIVATE(PAGXUtilsTest, BuildLayerMatrix_OnlyXNonZero) {
-  PAG_PRIVATE_ACCESS(auto doc = pagx::PAGXDocument::Make(100, 100);
-                     auto layer = doc->makeNode<pagx::Layer>(); layer->x = 15.0f;
-                     layer->updateSize(nullptr); auto m = pagx::BuildLayerMatrix(layer);
-                     EXPECT_FLOAT_EQ(m.tx, 15.0f); EXPECT_FLOAT_EQ(m.ty, 0.0f);)
+  // clang-format off
+  PAG_PRIVATE_ACCESS(
+    auto doc = pagx::PAGXDocument::Make(100, 100);
+    auto layer = doc->makeNode<pagx::Layer>();
+    layer->x = 15.0f;
+    layer->updateSize(nullptr);
+    auto m = pagx::BuildLayerMatrix(layer);
+    EXPECT_FLOAT_EQ(m.tx, 15.0f);
+    EXPECT_FLOAT_EQ(m.ty, 0.0f);
+  )
+  // clang-format on
 }
 
 // ---------------------------------------------------------------------------
@@ -565,13 +579,19 @@ PAGX_TEST(PAGXUtilsTest, BuildGroupMatrix_Identity) {
 }
 
 PAGX_TEST_PRIVATE(PAGXUtilsTest, BuildGroupMatrix_PositionOnly) {
+  // clang-format off
   PAG_PRIVATE_ACCESS(
-      auto doc = pagx::PAGXDocument::Make(100, 100); auto group = doc->makeNode<pagx::Group>();
-      group->position = {50.0f, 30.0f};
-      // BuildGroupMatrix translates by renderPosition(); run the group's measure pass so the
-      // authored position propagates into preferredX/Y (and therefore layoutBounds()).
-      group->updateSize(nullptr); auto m = pagx::BuildGroupMatrix(group);
-      EXPECT_FLOAT_EQ(m.tx, 50.0f); EXPECT_FLOAT_EQ(m.ty, 30.0f);)
+    auto doc = pagx::PAGXDocument::Make(100, 100);
+    auto group = doc->makeNode<pagx::Group>();
+    group->position = {50.0f, 30.0f};
+    // BuildGroupMatrix translates by renderPosition(); run the group's measure pass so the
+    // authored position propagates into preferredX/Y (and therefore layoutBounds()).
+    group->updateSize(nullptr);
+    auto m = pagx::BuildGroupMatrix(group);
+    EXPECT_FLOAT_EQ(m.tx, 50.0f);
+    EXPECT_FLOAT_EQ(m.ty, 30.0f);
+  )
+  // clang-format on
 }
 
 PAGX_TEST(PAGXUtilsTest, BuildGroupMatrix_ScaleOnly) {
@@ -622,12 +642,21 @@ PAGX_TEST(PAGXUtilsTest, BuildGroupMatrix_SkewOnly) {
 }
 
 PAGX_TEST_PRIVATE(PAGXUtilsTest, BuildGroupMatrix_AnchorPositionScaleRotation) {
+  // clang-format off
   PAG_PRIVATE_ACCESS(
-      auto doc = pagx::PAGXDocument::Make(100, 100); auto group = doc->makeNode<pagx::Group>();
-      group->anchor = {10.0f, 10.0f}; group->position = {100.0f, 100.0f};
-      group->scale = {2.0f, 2.0f}; group->rotation = 45.0f; group->updateSize(nullptr);
-      auto m = pagx::BuildGroupMatrix(group); EXPECT_FLOAT_EQ(m.tx, 100.0f);
-      EXPECT_FLOAT_EQ(m.ty, 100.0f - 20.0f * std::sqrt(2.0f)); EXPECT_FALSE(m.isIdentity());)
+    auto doc = pagx::PAGXDocument::Make(100, 100);
+    auto group = doc->makeNode<pagx::Group>();
+    group->anchor = {10.0f, 10.0f};
+    group->position = {100.0f, 100.0f};
+    group->scale = {2.0f, 2.0f};
+    group->rotation = 45.0f;
+    group->updateSize(nullptr);
+    auto m = pagx::BuildGroupMatrix(group);
+    EXPECT_FLOAT_EQ(m.tx, 100.0f);
+    EXPECT_FLOAT_EQ(m.ty, 100.0f - 20.0f * std::sqrt(2.0f));
+    EXPECT_FALSE(m.isIdentity());
+  )
+  // clang-format on
 }
 
 // ---------------------------------------------------------------------------
@@ -2816,7 +2845,12 @@ PAGX_TEST(PAGXUtilsTest, SVGPathParser_ZAfterLineKeepsCurrent) {
 // ---------------------------------------------------------------------------
 
 PAGX_TEST_PRIVATE(PAGXUtilsTest, SVGPathParser_ToSVGStringEmpty) {
-  PAG_PRIVATE_ACCESS(pagx::PathData empty; EXPECT_EQ(pagx::PathDataToSVGString(empty), "");)
+  // clang-format off
+  PAG_PRIVATE_ACCESS(
+    pagx::PathData empty;
+    EXPECT_EQ(pagx::PathDataToSVGString(empty), "");
+  )
+  // clang-format on
 }
 
 PAGX_TEST(PAGXUtilsTest, SVGPathParser_ToSVGStringAllVerbs) {

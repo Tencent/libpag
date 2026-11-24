@@ -1284,7 +1284,7 @@ if (PAG_BUILD_TESTS)
     file(GLOB_RECURSE SRC_FILES test/src/*.*)
     list(FILTER SRC_FILES EXCLUDE REGEX "/MetalTestSupport\\.(cpp|h)$")
     if (NOT PAG_USE_D3D12)
-        list(FILTER SRC_FILES EXCLUDE REGEX "PAGD3D12Test\\.cpp$")
+        list(FILTER SRC_FILES EXCLUDE REGEX "PAGD3D12(Device|Surface)Test\\.cpp$")
     endif ()
     if (NOT APPLE OR NOT USE_NATIVE_PLATFORM)
         # VTDecodeContextPoolTest links the VideoToolbox decode-context pool, which only the native

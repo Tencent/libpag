@@ -23,6 +23,7 @@
 #include <d3d12.h>
 #include <dxgiformat.h>
 #include <cstdint>
+#include <iostream>
 #include <memory>
 #include <thread>
 #include <vector>
@@ -47,59 +48,94 @@ struct HostQueue {
   Microsoft::WRL::ComPtr<ID3D12Fence> fence = nullptr;
   HANDLE event = nullptr;
   UINT64 fenceValue = 0;
+  HRESULT lastError = S_OK;
+  const char* lastStage = "";
 
+  /**
+   * Releases the Win32 event used for queue completion.
+   */
   ~HostQueue() {
     if (event != nullptr) {
       CloseHandle(event);
     }
   }
 
+  /**
+   * Creates an independent host queue and records the result of each native initialization stage.
+   */
   bool init(ID3D12Device* device) {
     D3D12_COMMAND_QUEUE_DESC queueDesc = {};
     queueDesc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
-    if (FAILED(
-            device->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(queue.ReleaseAndGetAddressOf())))) {
+    if (!checkResult(
+            device->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(queue.ReleaseAndGetAddressOf())),
+            "CreateCommandQueue")) {
       return false;
     }
-    if (FAILED(device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT,
-                                              IID_PPV_ARGS(allocator.ReleaseAndGetAddressOf())))) {
+    if (!checkResult(
+            device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT,
+                                           IID_PPV_ARGS(allocator.ReleaseAndGetAddressOf())),
+            "CreateCommandAllocator")) {
       return false;
     }
-    if (FAILED(device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, allocator.Get(),
-                                         nullptr,
-                                         IID_PPV_ARGS(commandList.ReleaseAndGetAddressOf())))) {
+    if (!checkResult(
+            device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, allocator.Get(), nullptr,
+                                      IID_PPV_ARGS(commandList.ReleaseAndGetAddressOf())),
+            "CreateCommandList")) {
       return false;
     }
-    if (FAILED(device->CreateFence(0, D3D12_FENCE_FLAG_NONE,
-                                   IID_PPV_ARGS(fence.ReleaseAndGetAddressOf())))) {
+    if (!checkResult(device->CreateFence(0, D3D12_FENCE_FLAG_NONE,
+                                         IID_PPV_ARGS(fence.ReleaseAndGetAddressOf())),
+                     "CreateFence")) {
       return false;
     }
     event = CreateEvent(nullptr, FALSE, FALSE, nullptr);
-    return event != nullptr;
+    if (event == nullptr) {
+      return checkResult(HRESULT_FROM_WIN32(GetLastError()), "CreateEvent");
+    }
+    return checkResult(S_OK, "CreateEvent");
   }
 
+  /**
+   * Submits the host commands, waits up to 30 seconds, and records native errors before resetting.
+   */
   bool execute() {
-    if (FAILED(commandList->Close())) {
+    if (!checkResult(commandList->Close(), "CommandList::Close")) {
       return false;
     }
     ID3D12CommandList* lists[] = {commandList.Get()};
     queue->ExecuteCommandLists(1, lists);
     ++fenceValue;
-    if (FAILED(queue->Signal(fence.Get(), fenceValue))) {
+    if (!checkResult(queue->Signal(fence.Get(), fenceValue), "CommandQueue::Signal")) {
       return false;
     }
     if (fence->GetCompletedValue() < fenceValue) {
-      if (FAILED(fence->SetEventOnCompletion(fenceValue, event))) {
+      if (!checkResult(fence->SetEventOnCompletion(fenceValue, event),
+                       "Fence::SetEventOnCompletion")) {
         return false;
       }
-      if (WaitForSingleObject(event, 30000) != WAIT_OBJECT_0) {
-        return false;
+      auto waitResult = WaitForSingleObject(event, 30000);
+      if (waitResult != WAIT_OBJECT_0) {
+        DWORD error = ERROR_GEN_FAILURE;
+        if (waitResult == WAIT_TIMEOUT) {
+          error = ERROR_TIMEOUT;
+        } else if (waitResult == WAIT_FAILED) {
+          error = GetLastError();
+        }
+        return checkResult(HRESULT_FROM_WIN32(error), "WaitForSingleObject");
       }
+      checkResult(S_OK, "WaitForSingleObject");
     }
-    if (FAILED(allocator->Reset())) {
+    if (!checkResult(allocator->Reset(), "CommandAllocator::Reset")) {
       return false;
     }
-    return SUCCEEDED(commandList->Reset(allocator.Get(), nullptr));
+    return checkResult(commandList->Reset(allocator.Get(), nullptr), "CommandList::Reset");
+  }
+
+ private:
+  bool checkResult(HRESULT result, const char* stage) {
+    lastError = result;
+    lastStage = stage;
+    return SUCCEEDED(result);
   }
 };
 
@@ -130,9 +166,11 @@ Microsoft::WRL::ComPtr<ID3D12Resource> CreateBuffer(ID3D12Device* device, UINT64
   desc.SampleDesc.Count = 1;
   desc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
   Microsoft::WRL::ComPtr<ID3D12Resource> buffer = nullptr;
-  if (FAILED(device->CreateCommittedResource(&heap, D3D12_HEAP_FLAG_NONE, &desc, initialState,
-                                             nullptr,
-                                             IID_PPV_ARGS(buffer.ReleaseAndGetAddressOf())))) {
+  auto result =
+      device->CreateCommittedResource(&heap, D3D12_HEAP_FLAG_NONE, &desc, initialState, nullptr,
+                                      IID_PPV_ARGS(buffer.ReleaseAndGetAddressOf()));
+  if (FAILED(result)) {
+    std::cerr << "CreateCommittedResource(buffer) failed, HRESULT=" << result << "\n";
     return nullptr;
   }
   return buffer;
@@ -205,19 +243,19 @@ PAG_TEST(D3D12Test, SurfaceFromTextureAndCompletion) {
  * same native texture must still return the original device because the image holds it.
  */
 PAG_TEST(D3D12Test, PAGXImageKeepsDeviceAlive) {
-  SecondaryDeviceTexture secondary = {};
-  if (!secondary.init(16, 16)) {
-    GTEST_SKIP() << "Failed to create a secondary D3D12 device, HRESULT="
-                 << static_cast<long>(secondary.lastError);
+  ExternalDeviceTexture external = {};
+  if (!external.init(16, 16)) {
+    GTEST_SKIP() << "Failed to create an external D3D12 texture, stage=" << external.lastStage
+                 << ", HRESULT=" << external.lastError;
   }
-  auto device = Devices::MakeForTexture(secondary.texture);
+  auto device = Devices::MakeForTexture(external.texture);
   ASSERT_TRUE(device != nullptr);
   auto expected = device.get();
-  auto pagTexture = ToPAG(secondary.texture);
+  auto pagTexture = ToPAG(external.texture);
   auto image = pagx::PAGImage::MakeFromTexture(pagTexture, ImageOrigin::TopLeft);
   ASSERT_TRUE(image != nullptr);
   device.reset();
-  auto revived = Devices::MakeForTexture(secondary.texture);
+  auto revived = Devices::MakeForTexture(external.texture);
   ASSERT_TRUE(revived != nullptr);
   EXPECT_EQ(revived.get(), expected);
   auto target = pagx::PAGSurface::MakeFrom(pagTexture, ImageOrigin::TopLeft);
@@ -232,22 +270,21 @@ PAG_TEST(D3D12Test, OffscreenCompletion) {
 }
 
 /**
- * Covers the forAsyncThread path on a non-default native device: D3D12 reuses the texture's
- * registry device (there is no separate context), and the worker's frame is readable afterwards.
+ * Covers the forAsyncThread path on a caller-created native texture: D3D12 reuses the texture's
+ * registry device, which may also be the default device, and the worker's frame is readable.
  */
 PAG_TEST(D3D12Test, AsyncSurfaceRendersOnWorkerThread) {
   const int size = 32;
-  SecondaryDeviceTexture secondary = {};
-  if (!secondary.init(size, size)) {
-    GTEST_SKIP() << "Failed to create a secondary D3D12 device, HRESULT="
-                 << static_cast<long>(secondary.lastError);
+  ExternalDeviceTexture external = {};
+  if (!external.init(size, size)) {
+    GTEST_SKIP() << "Failed to create an external D3D12 texture, stage=" << external.lastStage
+                 << ", HRESULT=" << external.lastError;
   }
-  auto expected = Devices::MakeForTexture(secondary.texture);
+  auto expected = Devices::MakeForTexture(external.texture);
   ASSERT_TRUE(expected != nullptr);
-  auto surface = PAGSurface::MakeFrom(ToPAG(secondary.texture), ImageOrigin::TopLeft, true);
+  auto surface = PAGSurface::MakeFrom(ToPAG(external.texture), ImageOrigin::TopLeft, true);
   ASSERT_TRUE(surface != nullptr);
-  EXPECT_EQ(Devices::MakeForTexture(secondary.texture).get(), expected.get());
-  EXPECT_NE(expected.get(), Devices::MakeDefault().get());
+  EXPECT_EQ(Devices::MakeForTexture(external.texture).get(), expected.get());
 
   AsyncRenderTask task = {};
   task.surface = surface;
@@ -327,7 +364,8 @@ PAG_TEST(D3D12Test, IndependentQueueCompletion) {
   auto format = static_cast<DXGI_FORMAT>(textureInfo.format);
 
   HostQueue host = {};
-  ASSERT_TRUE(host.init(nativeDevice.Get()));
+  ASSERT_TRUE(host.init(nativeDevice.Get()))
+      << "stage=" << host.lastStage << ", HRESULT=" << host.lastError;
   auto upload = CreateBuffer(nativeDevice.Get(), static_cast<UINT64>(rowPitch) * size,
                              D3D12_HEAP_TYPE_UPLOAD, D3D12_RESOURCE_STATE_GENERIC_READ);
   ASSERT_TRUE(upload.Get() != nullptr);
@@ -368,14 +406,14 @@ PAG_TEST(D3D12Test, IndependentQueueCompletion) {
   host.commandList->CopyTextureRegion(&textureLocation, 0, 0, 0, &uploadLocation, nullptr);
   TransitionResource(host.commandList.Get(), resource, D3D12_RESOURCE_STATE_COPY_DEST,
                      D3D12_RESOURCE_STATE_COMMON);
-  ASSERT_TRUE(host.execute());
+  ASSERT_TRUE(host.execute()) << "stage=" << host.lastStage << ", HRESULT=" << host.lastError;
 
   TransitionResource(host.commandList.Get(), resource, D3D12_RESOURCE_STATE_COMMON,
                      D3D12_RESOURCE_STATE_COPY_SOURCE);
   host.commandList->CopyTextureRegion(&readbackLocation, 0, 0, 0, &textureLocation, nullptr);
   TransitionResource(host.commandList.Get(), resource, D3D12_RESOURCE_STATE_COPY_SOURCE,
                      D3D12_RESOURCE_STATE_COMMON);
-  ASSERT_TRUE(host.execute());
+  ASSERT_TRUE(host.execute()) << "stage=" << host.lastStage << ", HRESULT=" << host.lastError;
 
   D3D12_RANGE readRange = {0, static_cast<SIZE_T>(rowPitch) * size};
   uint8_t* readbackPixels = nullptr;
@@ -400,7 +438,7 @@ PAG_TEST(D3D12Test, IndependentQueueCompletion) {
   host.commandList->CopyTextureRegion(&readbackLocation, 0, 0, 0, &textureLocation, nullptr);
   TransitionResource(host.commandList.Get(), resource, D3D12_RESOURCE_STATE_COPY_SOURCE,
                      D3D12_RESOURCE_STATE_COMMON);
-  ASSERT_TRUE(host.execute());
+  ASSERT_TRUE(host.execute()) << "stage=" << host.lastStage << ", HRESULT=" << host.lastError;
 
   auto secondReadbackResult =
       readback->Map(0, &readRange, reinterpret_cast<void**>(&readbackPixels));

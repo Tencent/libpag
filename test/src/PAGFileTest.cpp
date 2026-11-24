@@ -596,50 +596,61 @@ PAG_PIXEL_TEST(PAGFileTest, ShapeType) {
  * 用例描述: ChildFrameToLocal接口测试，不改变时长
  */
 PAG_TEST_PRIVATE(PAGFileTest, ChildFrameToLocal) {
+  // clang-format off
   PAG_PRIVATE_ACCESS(
-      auto testFile = LoadPAGFile("resources/apitest/ShapeType.pag"); EXPECT_NE(testFile, nullptr);
+    auto testFile = LoadPAGFile("resources/apitest/ShapeType.pag");
+    EXPECT_NE(testFile, nullptr);
 
-      auto fileFrame = TimeToFrame(testFile->duration(), testFile->frameRate());
+    auto fileFrame = TimeToFrame(testFile->duration(), testFile->frameRate());
 
-      //超过fileDuration
-      auto result = testFile->childFrameToLocal(fileFrame + 10, testFile->frameRate());
-      EXPECT_EQ(result, fileFrame + 10);
+    //超过fileDuration
+    auto result = testFile->childFrameToLocal(fileFrame + 10, testFile->frameRate());
+    EXPECT_EQ(result, fileFrame + 10);
 
-      //少于0
-      result = testFile->childFrameToLocal(-10, testFile->frameRate());
-      EXPECT_EQ(result, -10);
+    //少于0
+    result = testFile->childFrameToLocal(-10, testFile->frameRate());
+    EXPECT_EQ(result, -10);
 
-      //处于0~fileDuration中
-      result = testFile->childFrameToLocal(fileFrame - 10, testFile->frameRate());
-      EXPECT_EQ(result, fileFrame - 10);)
+    //处于0~fileDuration中
+    result = testFile->childFrameToLocal(fileFrame - 10, testFile->frameRate());
+    EXPECT_EQ(result, fileFrame - 10);
+  )
+  // clang-format on
 }
 
 /**
  * 用例描述: ChildFrameToLocal进阶测试，改变时长
  */
 PAG_TEST_PRIVATE(PAGFileTest, ChildFrameToLocalAdvanced) {
+  // clang-format off
   PAG_PRIVATE_ACCESS(
-      auto testFile = LoadPAGFile("resources/apitest/ShapeType.pag"); EXPECT_NE(testFile, nullptr);
+    auto testFile = LoadPAGFile("resources/apitest/ShapeType.pag");
+    EXPECT_NE(testFile, nullptr);
 
-      auto fileFrame = TimeToFrame(testFile->duration(), testFile->frameRate());
-      EXPECT_EQ(fileFrame, 336); testFile->setDuration(FrameToTime(326, testFile->frameRate()));
+    auto fileFrame = TimeToFrame(testFile->duration(), testFile->frameRate());
+    EXPECT_EQ(fileFrame, 336);
+    testFile->setDuration(FrameToTime(326, testFile->frameRate()));
 
-      //超过fileDuration
-      auto result = testFile->childFrameToLocal(336, testFile->frameRate());
-      EXPECT_EQ(result, 326);
+    //超过fileDuration
+    auto result = testFile->childFrameToLocal(336, testFile->frameRate());
+    EXPECT_EQ(result, 326);
 
-      //少于0
-      result = testFile->childFrameToLocal(-10, testFile->frameRate());
-      EXPECT_EQ(result, -10);
+    //少于0
+    result = testFile->childFrameToLocal(-10, testFile->frameRate());
+    EXPECT_EQ(result, -10);
 
-      // scale情况
-      //处于0~fileDuration中
-      testFile->setTimeStretchMode(pag::PAGTimeStretchMode::Scale);
-      result = testFile->childFrameToLocal(316, testFile->frameRate()); EXPECT_EQ(result, 306);
+    // scale情况
+    //处于0~fileDuration中
+    testFile->setTimeStretchMode(pag::PAGTimeStretchMode::Scale);
+    result = testFile->childFrameToLocal(316, testFile->frameRate());
+    EXPECT_EQ(result, 306);
 
-      //非scale情况
-      testFile->setTimeStretchMode(pag::PAGTimeStretchMode::None);
-      result = testFile->childFrameToLocal(316, testFile->frameRate()); EXPECT_EQ(result, 316);)
+    //非scale情况
+    testFile->setTimeStretchMode(pag::PAGTimeStretchMode::None);
+    result = testFile->childFrameToLocal(316, testFile->frameRate());
+    EXPECT_EQ(result, 316);
+  )
+  // clang-format on
 }
 
 /**
