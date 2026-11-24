@@ -984,6 +984,7 @@ Layer* HTMLLayerBuilder::wrapForMargin(Layer* inner, const HTMLBoxAttributes& bo
   // need to write explicit `inner->left / inner->top` here — the default (NaN, NaN) origin
   // lands on the padded-box top-left automatically.
   auto* outer = _document->makeNode<Layer>();
+  outer->preserve3D = inner->preserve3D;
   outer->padding.top = box.marginTopPx;
   outer->padding.right = box.marginRightPx;
   outer->padding.bottom = box.marginBottomPx;

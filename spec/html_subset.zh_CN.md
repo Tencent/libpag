@@ -177,7 +177,7 @@
 | `filter: blur(X) drop-shadow(X Y [B] [C])`（不支持 spread 或 `inset`） | `<BlurFilter>` / `<DropShadowFilter>` 链；静态颜色调整使用 `<ColorMatrixFilter>` |
 | `backdrop-filter: blur(X)` | `<BackgroundBlurStyle>` |
 | `transform: <fn-list>` | 按 CSS 顺序合成为一个 4x4 姿态。所有函数都支持：`translate[X\|Y\|Z\|3d]`、`scale[X\|Y\|Z\|3d]`、`rotate[X\|Y\|Z\|3d]`、`skewX`/`skewY`/`skew`、`matrix`、`matrix3d`、`perspective`。函数之间不需要分隔（`rotate(45deg)scale(2)` 合法），长度参数可以是 `px`、相对元素盒的百分比（X 取宽度、Y 取高度）。`calc()` 暂不支持：它需要 CSS 量纲校验，而快照链路给的是已计算值。角度参数接受 `deg` / `grad` / `rad` / `turn`（大小写不敏感）；无单位角度只有 `0` 合法，其它单位会让整条声明失效。仍停留在 z = 0 平面的姿态写入 `Layer.matrix`；带深度或透视的姿态写入 `Layer.matrix3D`（3D 姿态必须可逆）。`transform-style: preserve-3d` 映射到 `Layer.preserve3D` |
-| `perspective` / `perspective-origin` | 声明元素作为相机作用于**直接子级**：距离必须是非负长度；小于 1px 在渲染时按 1px 处理，只有 `none` 表示无相机；相机由一层 wrapper 承载并摆在 `perspective-origin` 处，投影中心因此与 CSS 一致。无法包装的子元素（flow / flex 布局，或用 `right` / `bottom` 定位）不做投影，并提示一次。详见 §13.7 |
+| `perspective` / `perspective-origin` | 声明元素作为相机作用于**直接子级**：距离必须是非负长度；小于 1px 在渲染时按 1px 处理，只有 `none` 表示无相机。固定相机由wrapper承载，元素自身姿态保留；非flex布局宿主下无位置约束的流式子层保留父投影，不改变百分比或内容测量，其preserve-3d后代继续获得投影。位置或相机无法表示的子层（包括flex定位、未解析的远边定位）仍不投影并诊断。详见 §13.7 |
 | `transform-origin` | 按元素盒子解析（`px`、`%`、`left`/`center`/`right`/`top`/`bottom`，以及可选的 px 深度），写入 `Layer.anchor` / `anchorZ`，姿态本身不带支点。token 非法（坏单位、坏百分比或四个分量）会被拒绝并告警，支点回退到**盒中心**；合法的值若缺少可用的盒子尺寸，则告警并退到左上角支点 |
 | Layer 上的 `overflow: hidden` | `Layer.clipToBounds = true` |
 | Layer 上的 `overflow: <x> <y>`（两值简写） | 任一轴不是 `visible`（`hidden` / `clip` / `scroll` / `auto` / `overlay`）时 `Layer.clipToBounds = true`，与 CSS「任一轴非 `visible` 即成为裁剪容器」的规则一致；`visible visible` 则不裁剪。`scroll` / `auto` / `overlay` 另外告警，因为 PAGX 无法表达它们隐含的滚动能力 |
@@ -643,8 +643,10 @@ PAGX 把投影留在 `anchor` 之外（`M = P · T(anchor) · L · T(-anchor)`�
   分量；此时改写被跳过（`eval-animation` 记为 `camera-skips: depth-pivot`），元素保留函数写法：
   姿态里仍然带着投影，但 PAGX 按 `P · T(a) · L · T(-a)` 合成、CSS 按 `T(a) · P · L · T(-a)`，
   两者相差这个次序项（`d = 600px`、支点深度 30px 时约百分之几）。跳过改写绝不能把投影本身丢掉。
-* `perspective` 父级的 flow / flex 子元素在导入期没有已解析的偏移，因此无法包装、**不做投影**，
-  并提示一次。把相机折进它的姿态会以父级原点作为消失点，那是另一种投影，而不是对作者写法的近似。
+* 声明盒尺寸及消失点已解析时，非flex布局宿主下无位置约束的流式子层落在padding原点，可由逐分支
+  wrapper接管其尺寸slot并承载 `T(origin) * P * T(-origin)`，百分比、内容测量及自身pose仍独立。
+  原preserve-3d标志和生成的margin宿主保留后代深度，不打开真实flat／裁剪边界，也不合并兄弟3D分组。
+  flex定位或相机／位置无法表示的子层仍**不做投影并诊断**；不冻结首次布局坐标，不把相机折进对象关键帧。
 * 作者写的 `perspective()` 同时带深度支点时，导入期会报告：投影中心无法复现（见 §13.2 的插值限制），
   姿态保留 PAGX 能承载的表达式。
 * `perspective-origin` 无法相对声明盒解析（没有绝对尺寸）时告警一次，且**不施加投影**：消失点无法复现，因此子层不做投影，而不是退化为绕图层原点投影。

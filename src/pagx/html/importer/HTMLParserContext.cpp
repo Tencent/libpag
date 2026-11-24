@@ -34,6 +34,7 @@
 #include "pagx/nodes/StateMachine.h"
 #include "pagx/nodes/StateRegion.h"
 #include "pagx/nodes/Text.h"
+#include "pagx/runtime/Matrix3DDecompose.h"
 #include "pagx/utils/StringParser.h"
 #include "pagx/xml/XMLDOM.h"
 #include "tgfx/core/Typeface.h"
@@ -734,10 +735,50 @@ void HTMLParserContext::assignElementId(Layer* layer, const std::shared_ptr<DOMN
 // Places `child` inside a layer that carries the parent camera at the parent's `perspective-origin`.
 // The child keeps its own (un-projected) pose; only its layout anchors change, so the composition
 // stays `T(origin) * P * T(-origin) * T(child) * pose`, i.e. CSS's order.
-Layer* HTMLParserContext::wrapInCameraLayer(Layer* child, const HTMLParentCamera& camera,
-                                            float referenceWidthPx, float referenceHeightPx) {
+Layer* HTMLParserContext::wrapInCameraLayer(Layer* parent, Layer* child,
+                                            const std::shared_ptr<DOMNode>& element,
+                                            const HTMLParentCamera& camera, float referenceWidthPx,
+                                            float referenceHeightPx) {
   if (child == nullptr || !camera.HasOrigin()) {
     return child;
+  }
+  const bool positioned = !child->includeInLayout &&
+                          (std::isfinite(child->left) || std::isfinite(child->centerX)) &&
+                          (std::isfinite(child->top) || std::isfinite(child->centerY));
+  const bool flowAtPaddingOrigin =
+      parent->layout == LayoutMode::None && child->includeInLayout && std::isnan(child->left) &&
+      std::isnan(child->right) && std::isnan(child->top) && std::isnan(child->bottom) &&
+      std::isnan(child->centerX) && std::isnan(child->centerY) && std::isfinite(referenceWidthPx) &&
+      std::isfinite(referenceHeightPx);
+  if (!positioned && !flowAtPaddingOrigin) {
+    warnUnprojectedParentCamera(element);
+    return child;
+  }
+  if (flowAtPaddingOrigin) {
+    // Non-flex constraint layout puts an unpositioned child at the padding origin. The wrapper
+    // takes its sizing slot, so percentages are allocated once against the original parent rather
+    // than against an intermediate, rounded 100% reference. Each branch keeps its own 3D context.
+    const Point origin = {camera.localOrigin.x - std::round(parent->padding.left),
+                          camera.localOrigin.y - std::round(parent->padding.top)};
+    Matrix3D projection = {};
+    projection.setRowColumn(0, 2, -origin.x / camera.distancePx);
+    projection.setRowColumn(1, 2, -origin.y / camera.distancePx);
+    projection.setRowColumn(3, 2, -1.0f / camera.distancePx);
+    if (!IsInvertibleMatrix3D(projection)) {
+      warnUnprojectedParentCamera(element);
+      return child;
+    }
+    auto* wrapper = _document->makeNode<Layer>();
+    wrapper->width = child->width;
+    wrapper->height = child->height;
+    wrapper->percentWidth = child->percentWidth;
+    wrapper->percentHeight = child->percentHeight;
+    child->percentWidth = std::isnan(wrapper->percentWidth) ? NAN : 100.0f;
+    child->percentHeight = std::isnan(wrapper->percentHeight) ? NAN : 100.0f;
+    wrapper->preserve3D = true;
+    wrapper->matrix3D = projection;
+    wrapper->children.push_back(child);
+    return wrapper;
   }
   auto* wrapper = _document->makeNode<Layer>();
   // Same size as the box that declared the camera: children keep resolving percentages, centres and
@@ -809,7 +850,8 @@ Layer* HTMLParserContext::convertBody(const std::shared_ptr<DOMNode>& body, floa
           _pendingChildCamera.erase(pending);
         }
         contentHost->children.push_back(wrapInCameraLayer(
-            childLayer, entry.camera, entry.referenceWidthPx, entry.referenceHeightPx));
+            contentHost, childLayer, child, entry.camera, entry.referenceWidthPx,
+            entry.referenceHeightPx));
       }
     } else if (child->type == DOMNodeType::Text) {
       // Stray text directly under <body> — match convertContainer's behaviour so authors
@@ -831,8 +873,7 @@ Layer* HTMLParserContext::convertBody(const std::shared_ptr<DOMNode>& body, floa
   return wrapper;
 }
 
-void HTMLParserContext::attachParentCamera(HTMLBoxAttributes& box,
-                                           const std::shared_ptr<DOMNode>& element,
+void HTMLParserContext::attachParentCamera(const std::shared_ptr<DOMNode>& element,
                                            const HTMLInheritedStyle& inherited) {
   const HTMLParentCamera& camera = inherited.parentCamera;
   if (!camera.Has()) {
@@ -849,31 +890,30 @@ void HTMLParserContext::attachParentCamera(HTMLBoxAttributes& box,
   // Folding it per keyframe is what made `translateZ 0 -> 50` under `perspective: 100` settle at
   // 114px instead of the CSS 133px, and the wrapper is also the only way to carry a
   // `perspective-origin`, which PAGX projects about the layer origin.
-  if (box.absolute && std::isfinite(box.leftPx) && std::isfinite(box.topPx)) {
-    _pendingChildCamera[element.get()] = {camera, inherited.parentWidthPx,
-                                          inherited.parentHeightPx};
-    return;
-  }
+  _pendingChildCamera[element.get()] = {camera, inherited.parentWidthPx, inherited.parentHeightPx};
+}
+
+void HTMLParserContext::warnUnprojectedParentCamera(const std::shared_ptr<DOMNode>& element) {
   if (_flowChildPerspectiveWarned) {
     return;
   }
-  // A flow / flex child is placed by layout, so it has no offset to subtract and cannot be wrapped.
-  // Report it once per document rather than folding the projection into the wrong point. Only a pose
-  // that actually leaves the z = 0 plane is projected: `anchorZ` cancels in `T(a) * L * T(-a)` for a
-  // flat `L`, and the projection is the identity on that plane, so a non-zero pivot depth alone must
-  // not count as affected.
   HTMLDiagnosticSink silentDiagnostics(false);
   HTMLValueParser silentParser(silentDiagnostics, _canvasWidth, _canvasHeight);
   const auto& style = _styleCascade->getResolvedStyle(element);
   const HTMLTransformReference reference = _styleCascade->getTransformReferenceSize(element);
   const bool animatesTransform =
       Animates3DTransform(_styleCascade->keyframes(), style, silentParser, reference);
+  Matrix3D pose = {};
   const bool ownPoseOn3D =
-      (box.transform.valid && !IsFlatTransform(box.transform.pose)) || animatesTransform;
+      animatesTransform ||
+      (ParseCssTransformList(LookupProperty(style, "transform"), silentParser, silentDiagnostics,
+                             &pose, reference.widthPx, reference.heightPx) &&
+       !IsFlatTransform(pose));
   // A `preserve-3d` layer with no pose of its own still forwards the parent camera to the 3D poses
   // below it in CSS. The wrapper cannot be inserted here, so that camera is lost for the whole
   // subtree and the child check alone would stay silent about it.
-  const bool subtreeOn3D = !ownPoseOn3D && box.preserve3D &&
+  const bool subtreeOn3D = !ownPoseOn3D &&
+                           ToLower(LookupProperty(style, "transform-style")) == "preserve-3d" &&
                            SubtreePosesOffThePlane(element, _styleCascade.get(), silentParser);
   if (!ownPoseOn3D && !subtreeOn3D) {
     return;
@@ -881,14 +921,14 @@ void HTMLParserContext::attachParentCamera(HTMLBoxAttributes& box,
   if (subtreeOn3D) {
     _diagnostics->warn(
         "html: perspective on the parent of <" + element->name +
-        "> cannot be projected through this preserve-3d layer: it has no resolved offset (flow / "
-        "flex placement), so 3D poses in its subtree are not projected by the parent camera");
+        "> cannot be projected through this preserve-3d layer: its layout position or camera "
+        "matrix "
+        "cannot be represented, so 3D poses in its subtree are not projected by the parent camera");
   } else {
     _diagnostics->warn(
         "html: perspective on the parent of <" + element->name +
-        "> cannot be projected onto this child: it has no resolved offset (flow / flex "
-        "placement, or positioned by right / bottom), so its vanishing point is the "
-        "parent origin");
+        "> cannot be projected onto this child: its layout position or camera matrix cannot be "
+        "represented, so its vanishing point is not applied");
   }
   _flowChildPerspectiveWarned = true;
 }
@@ -928,7 +968,7 @@ Layer* HTMLParserContext::convertElement(const std::shared_ptr<DOMNode>& element
     // Per-glyph / TextModifier / TextPath container host: convert the whole container into a
     // single semantic Text layer instead of recursing into its PUA glyph spans.
     HTMLBoxAttributes box = _styleCascade->computeBoxAttributes(element);
-    attachParentCamera(box, element, inherited);
+    attachParentCamera(element, inherited);
     return _layerBuilder->wrapForMargin(
         _textFragmentBuilder->convertPAGXTextHost(element, inherited, box), box);
   }
@@ -948,19 +988,19 @@ Layer* HTMLParserContext::convertElement(const std::shared_ptr<DOMNode>& element
   }
   if (tag == "svg") {
     HTMLBoxAttributes box = _styleCascade->computeBoxAttributes(element);
-    attachParentCamera(box, element, inherited);
+    attachParentCamera(element, inherited);
     return _layerBuilder->wrapForMargin(convertInlineSvg(element, box, inherited), box);
   }
   if (tag == "img") {
     HTMLBoxAttributes box = _styleCascade->computeBoxAttributes(element);
-    attachParentCamera(box, element, inherited);
+    attachParentCamera(element, inherited);
     return _layerBuilder->wrapForMargin(convertImage(element, box), box);
   }
 
   HTMLInheritedStyle childInherited = _styleCascade->resolveInheritedStyle(
       element, inherited, /*recordFontFallbacks=*/!isPagxTextHost);
   HTMLBoxAttributes box = _styleCascade->computeBoxAttributes(element);
-  attachParentCamera(box, element, inherited);
+  attachParentCamera(element, inherited);
 
   if (IsContainerTag(tag)) {
     return _layerBuilder->wrapForMargin(convertContainer(element, box, childInherited, depth), box);
@@ -1066,7 +1106,8 @@ Layer* HTMLParserContext::convertContainer(const std::shared_ptr<DOMNode>& eleme
           _pendingChildCamera.erase(pending);
         }
         contentHost->children.push_back(wrapInCameraLayer(
-            childLayer, entry.camera, entry.referenceWidthPx, entry.referenceHeightPx));
+            contentHost, childLayer, child, entry.camera, entry.referenceWidthPx,
+            entry.referenceHeightPx));
       }
     } else if (child->type == DOMNodeType::Text) {
       std::string trimmed = Trim(child->name);

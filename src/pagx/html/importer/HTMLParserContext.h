@@ -83,8 +83,9 @@ class HTMLParserContext {
   Layer* convertElement(const std::shared_ptr<DOMNode>& element,
                         const HTMLInheritedStyle& inherited, int depth);
 
-  void attachParentCamera(HTMLBoxAttributes& box, const std::shared_ptr<DOMNode>& element,
+  void attachParentCamera(const std::shared_ptr<DOMNode>& element,
                           const HTMLInheritedStyle& inherited);
+  void warnUnprojectedParentCamera(const std::shared_ptr<DOMNode>& element);
 
   void forwardParentCamera(const HTMLBoxAttributes& box, HTMLInheritedStyle& childInherited);
 
@@ -307,26 +308,21 @@ class HTMLParserContext {
   // `_valueParser` and `_idAllocator`; document handle + keyframes registry bound in parseDOM.
   std::unique_ptr<HTMLAnimationBuilder> _animationBuilder = nullptr;
 
-  // A `perspective` parent whose child is placed by layout cannot be projected exactly; the first
-  // such child reports it, the rest stay quiet (see attachParentCamera).
+  // Camera attachments that cannot preserve the child's layout report once per document.
   bool _flowChildPerspectiveWarned = false;
 
-  // Elements carrying an `animation` declaration, paired with their finalised outer Layer.
-  // Set by `attachParentCamera` when the parent camera will be carried by a wrapper layer instead of
-  // being folded into this element's pose; the caller that attaches the converted layer consumes it
-  // immediately. A wrapper keeps the camera static (it must not be interpolated with the pose) and
-  // lets the projection be centred on `perspective-origin` instead of the layer origin.
-  // Camera to wrap onto a child's layer, keyed by that child node: converting a child recurses, so a
-  // single slot would be overwritten by the grandchild before the child is attached.
+  // Resolve attachment after conversion, when the parent's layout host and the child's sizing
+  // slot are known. Child keys prevent recursive conversion from overwriting a pending camera.
   struct PendingCamera {
     HTMLParentCamera camera = {};
-    // Size of the box that declared the camera; the wrapper keeps it as its layout reference.
+    // Declaring box reference, used by the positioned wrapper and the flow attachment admission.
     float referenceWidthPx = NAN;
     float referenceHeightPx = NAN;
   };
   std::unordered_map<const DOMNode*, PendingCamera> _pendingChildCamera = {};
 
-  Layer* wrapInCameraLayer(Layer* child, const HTMLParentCamera& camera, float referenceWidthPx,
+  Layer* wrapInCameraLayer(Layer* parent, Layer* child, const std::shared_ptr<DOMNode>& element,
+                           const HTMLParentCamera& camera, float referenceWidthPx,
                            float referenceHeightPx);
 
   // Recorded during `assignElementId` and processed after the whole tree is built (so background

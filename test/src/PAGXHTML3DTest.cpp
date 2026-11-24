@@ -679,9 +679,8 @@ PAG_TEST(PAGXHTML3DTest, ParentPerspectiveProjectsTheChildPose) {
   auto* card = FindLayerById(doc, "card");
   ASSERT_NE(card, nullptr);
   const auto& pose = card->matrix3D;
-  // A flow child has no offset to subtract, so it cannot be wrapped: the projection is dropped
-  // instead of folded into the wrong point, and the case is reported once.
-  EXPECT_TRUE(HasDiagnosticContaining(doc, "vanishing point"));
+  EXPECT_FALSE(HasDiagnosticContaining(doc, "vanishing point"));
+  EXPECT_EQ(LayersWithNonIdentityMatrix3D(doc).size(), 2u);
   EXPECT_TRUE(NearlyEqual(pose.getRowColumn(0, 0), 0.866025f, 0.001f));
   EXPECT_TRUE(NearlyEqual(pose.getRowColumn(0, 2), 0.5f, 0.001f));
   EXPECT_TRUE(NearlyEqual(pose.getRowColumn(3, 0), 0.0f, 1e-5f));
@@ -920,12 +919,250 @@ PAG_TEST(PAGXHTML3DTest, UnknownCameraBoxSizeDropsTheProjectionWithADiagnostic) 
   EXPECT_TRUE(NearlyEqual(card->matrix3D.getRowColumn(0, 0), 0.866025f, 0.001f));
 }
 
+PAG_TEST(PAGXHTML3DTest, FlowPreserve3DLayerKeepsParentCamera) {
+  auto doc = ParseHtml(R"HTML(
+    <html><body style="width:200px;height:200px">
+      <div style="position:absolute;left:0;top:0;width:200px;height:200px;
+           perspective:100px;perspective-origin:0px 0px">
+        <div id="stage" style="width:200px;height:200px;transform-style:preserve-3d">
+          <div id="card" style="position:absolute;left:0;top:0;width:50px;height:30px;
+               background-color:#ff0000;transform:translateZ(50px)"></div>
+        </div>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  EXPECT_FALSE(HasDiagnosticContaining(doc, "not projected"));
+  const auto pixels = RenderFrame(doc);
+  ASSERT_FALSE(pixels.empty());
+  EXPECT_EQ(CountVisiblePixels(pixels), 100u * 60u);
+}
+
+PAG_TEST(PAGXHTML3DTest, FlowCameraPreservesPaddingPercentagesAndNonzeroOrigin) {
+  auto doc = ParseHtml(R"HTML(
+    <html><body style="width:200px;height:200px">
+      <div style="position:absolute;left:10px;top:10px;width:180px;height:160px;
+           padding:10px 5px;perspective:100px;perspective-origin:50px 30px">
+        <div id="stage" style="width:100%;height:100%;transform-style:preserve-3d">
+          <div style="position:absolute;left:45px;top:20px;width:20px;height:10px;
+               background-color:#ff0000;transform:translateZ(50px)"></div>
+        </div>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* stage = FindLayerById(doc, "stage");
+  ASSERT_NE(stage, nullptr);
+  doc->applyLayout();
+  EXPECT_NEAR(stage->layoutBounds().width, 170.0f, 0.001f);
+  EXPECT_NEAR(stage->layoutBounds().height, 140.0f, 0.001f);
+  const auto pixels = RenderFrame(doc);
+  ASSERT_FALSE(pixels.empty());
+  EXPECT_EQ(CountVisiblePixels(pixels), 40u * 20u);
+  const size_t inside = (50u * PAGX_TEST_DOC_SIZE + 70u) * 4u;
+  const size_t outside = (35u * PAGX_TEST_DOC_SIZE + 70u) * 4u;
+  EXPECT_EQ(pixels[inside], 255);
+  EXPECT_EQ(pixels[inside + 3], 255);
+  EXPECT_EQ(pixels[outside + 3], 0);
+}
+
+PAG_TEST(PAGXHTML3DTest, FlowCameraDoesNotMergeSibling3DContexts) {
+  auto doc = ParseHtml(R"HTML(
+    <html><body style="width:200px;height:200px">
+      <div style="position:absolute;left:0;top:0;width:200px;height:200px;
+           perspective:100px;perspective-origin:0px 0px">
+        <div style="width:100px;height:0px;transform-style:preserve-3d">
+          <div style="position:absolute;left:0;top:0;width:30px;height:20px;
+               background-color:#ff0000;transform:translateZ(50px)"></div>
+        </div>
+        <div style="width:100px;height:0px;transform-style:preserve-3d">
+          <div style="position:absolute;left:15px;top:5px;width:30px;height:20px;
+               background-color:#0000ff"></div>
+        </div>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  const auto pixels = RenderFrame(doc);
+  ASSERT_FALSE(pixels.empty());
+  const size_t overlap = (10u * PAGX_TEST_DOC_SIZE + 20u) * 4u;
+  EXPECT_EQ(pixels[overlap], 0);
+  EXPECT_EQ(pixels[overlap + 2], 255);
+  EXPECT_EQ(pixels[overlap + 3], 255);
+}
+
+PAG_TEST(PAGXHTML3DTest, FlowCameraRespectsFlatIntermediateLayer) {
+  auto doc = ParseHtml(R"HTML(
+    <html><body style="width:200px;height:200px">
+      <div style="position:absolute;left:0;top:0;width:200px;height:200px;
+           perspective:100px;perspective-origin:0px 0px">
+        <div style="width:200px;height:200px">
+          <div style="position:absolute;left:0;top:0;width:50px;height:30px;
+               background-color:#ff0000;transform:translateZ(50px)"></div>
+        </div>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  const auto pixels = RenderFrame(doc);
+  ASSERT_FALSE(pixels.empty());
+  EXPECT_EQ(CountVisiblePixels(pixels), 50u * 30u);
+}
+
+PAG_TEST(PAGXHTML3DTest, FlowCameraKeepsFractionalPercentageSizingAfterRelayout) {
+  auto doc = ParseHtml(R"HTML(
+    <html><body style="width:200px;height:200px">
+      <div id="parent" style="position:absolute;left:0;top:0;width:101.1px;height:101.1px;
+           perspective:100px;perspective-origin:0px 0px">
+        <div id="stage" style="width:75%;height:75%;transform-style:preserve-3d">
+          <div style="position:absolute;left:0;top:0;width:20px;height:10px;
+               background-color:#ff0000;transform:translateZ(50px)"></div>
+        </div>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* parent = FindLayerById(doc, "parent");
+  auto* stage = FindLayerById(doc, "stage");
+  ASSERT_NE(parent, nullptr);
+  ASSERT_NE(stage, nullptr);
+  doc->applyLayout();
+  EXPECT_NEAR(stage->layoutBounds().width, 76.0f, 0.001f);
+  EXPECT_NEAR(stage->layoutBounds().height, 76.0f, 0.001f);
+  parent->width = 105.1f;
+  parent->height = 105.1f;
+  doc->applyLayout();
+  EXPECT_NEAR(stage->layoutBounds().width, 79.0f, 0.001f);
+  EXPECT_NEAR(stage->layoutBounds().height, 79.0f, 0.001f);
+  EXPECT_EQ(CountVisiblePixels(RenderFrame(doc)), 40u * 20u);
+}
+
+PAG_TEST(PAGXHTML3DTest, FlowCameraKeepsDepthThroughMarginLayoutWrapper) {
+  auto doc = ParseHtml(R"HTML(
+    <html><body style="width:200px;height:200px">
+      <div style="position:absolute;left:0;top:0;width:200px;height:200px;
+           perspective:100px;perspective-origin:0px 0px">
+        <div style="width:100px;height:60px;margin:1px;transform-style:preserve-3d">
+          <div style="position:absolute;left:0;top:0;width:50px;height:30px;
+               background-color:#ff0000;transform:translateZ(50px)"></div>
+        </div>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  EXPECT_FALSE(HasDiagnosticContaining(doc, "not projected"));
+  const auto pixels = RenderFrame(doc);
+  ASSERT_FALSE(pixels.empty());
+  EXPECT_EQ(CountVisiblePixels(pixels), 100u * 60u);
+  const size_t inside = (3u * PAGX_TEST_DOC_SIZE + 3u) * 4u;
+  EXPECT_EQ(pixels[inside], 255);
+  EXPECT_EQ(pixels[inside + 3], 255);
+  EXPECT_EQ(pixels[3], 0);
+}
+
+PAG_TEST(PAGXHTML3DTest, FlowCameraStaysFixedOutsideOffsetFlexAnimation) {
+  auto doc = ParseHtml(R"HTML(
+    <html><head><style>
+      @keyframes depth { from { transform:translateZ(0px); } to { transform:translateZ(50px); } }
+    </style></head><body style="width:200px;height:200px">
+      <div style="position:absolute;left:0;top:0;width:200px;height:100px;
+           perspective:100px;perspective-origin:50px 0px">
+        <div style="display:flex;gap:20px;width:200px;height:100px;transform-style:preserve-3d">
+          <div style="width:40px;height:10px"></div>
+          <div id="card" style="width:20px;height:10px;background-color:#ff0000;
+               animation:depth 1s linear 1"></div>
+        </div>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto rendered = RoundTripForRender(doc);
+  ASSERT_NE(rendered, nullptr);
+  ASSERT_NE(rendered->findNode("card"), nullptr);
+  const auto middle = RenderFrame(rendered, 500000);
+  ASSERT_FALSE(middle.empty());
+  const size_t projected = (5u * PAGX_TEST_DOC_SIZE + 88u) * 4u;
+  const size_t unprojected = (5u * PAGX_TEST_DOC_SIZE + 61u) * 4u;
+  EXPECT_EQ(middle[projected], 255);
+  EXPECT_EQ(middle[projected + 3], 255);
+  EXPECT_EQ(middle[unprojected + 3], 0);
+  const auto end = RenderFrame(rendered, 1000000);
+  ASSERT_FALSE(end.empty());
+  EXPECT_EQ(CountVisiblePixels(end), 40u * 20u);
+}
+
+PAG_TEST(PAGXHTML3DTest, FlowCameraKeepsIntrinsicSizeAfterContentChange) {
+  auto doc = ParseHtml(R"HTML(
+    <html><body style="width:200px;height:200px">
+      <div style="position:absolute;left:0;top:0;width:200px;height:200px;
+           perspective:100px;perspective-origin:0px 0px">
+        <div id="stage" style="display:flex;transform-style:preserve-3d">
+          <div id="card" style="width:20px;height:10px;background-color:#ff0000;
+               transform:translateZ(50px)"></div>
+        </div>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* stage = FindLayerById(doc, "stage");
+  auto* card = FindLayerById(doc, "card");
+  ASSERT_NE(stage, nullptr);
+  ASSERT_NE(card, nullptr);
+  doc->applyLayout();
+  EXPECT_NEAR(stage->layoutBounds().width, 20.0f, 0.001f);
+  EXPECT_NEAR(stage->layoutBounds().height, 10.0f, 0.001f);
+  card->width = 30.0f;
+  card->height = 15.0f;
+  doc->applyLayout();
+  EXPECT_NEAR(stage->layoutBounds().width, 30.0f, 0.001f);
+  EXPECT_NEAR(stage->layoutBounds().height, 15.0f, 0.001f);
+  const auto pixels = RenderFrame(doc);
+  ASSERT_FALSE(pixels.empty());
+  EXPECT_EQ(CountVisiblePixels(pixels), 60u * 30u);
+}
+
+PAG_TEST(PAGXHTML3DTest, FlowCameraDoesNotOpenAnOverflowFlatteningBoundary) {
+  auto doc = ParseHtml(R"HTML(
+    <html><body style="width:200px;height:200px">
+      <div style="position:absolute;left:0;top:0;width:200px;height:200px;
+           perspective:100px;perspective-origin:0px 0px">
+        <div style="width:80px;height:60px;transform-style:preserve-3d;overflow:hidden">
+          <div style="position:absolute;left:0;top:0;width:50px;height:30px;
+               background-color:#ff0000;transform:translateZ(50px)"></div>
+        </div>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  const auto pixels = RenderFrame(doc);
+  ASSERT_FALSE(pixels.empty());
+  EXPECT_EQ(CountVisiblePixels(pixels), 50u * 30u);
+}
+
+PAG_TEST(PAGXHTML3DTest, FlowCameraRejectsAnUnrepresentableProjectionMatrix) {
+  auto doc = ParseHtml(R"HTML(
+    <html><body style="width:200px;height:200px">
+      <div style="position:absolute;left:0;top:0;width:200px;height:200px;
+           perspective:100px;perspective-origin:1000000000000px 0px">
+        <div style="width:100px;height:60px;transform-style:preserve-3d">
+          <div style="position:absolute;left:0;top:0;width:20px;height:10px;
+               background-color:#ff0000;transform:translateZ(50px)"></div>
+        </div>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  EXPECT_TRUE(HasDiagnosticContaining(doc, "camera matrix"));
+  auto serialized = RoundTripForRender(doc);
+  ASSERT_NE(serialized, nullptr);
+  EXPECT_EQ(CountVisiblePixels(RenderFrame(serialized)), 20u * 10u);
+}
+
 /**
- * Test case: a `preserve-3d` layer placed by flex has no pose of its own, but in CSS the parent
- * camera still reaches the 3D poses below it. The wrapper cannot be inserted there, so the whole
- * subtree loses the projection and that has to be reported once per document.
+ * Test case: an intermediate flow layer retains its parent camera while its own flex layout
+ * continues to place the descendants independently of their transforms.
  */
-PAG_TEST(PAGXHTML3DTest, Preserve3DFlowLayerReportsTheLostParentCamera) {
+PAG_TEST(PAGXHTML3DTest, Preserve3DFlowLayerKeepsCameraForFlexDescendants) {
   auto doc = ParseHtml(R"HTML(
     <html><body style="width:300px;height:150px">
       <div style="position:absolute;left:10px;top:10px;width:200px;height:100px;
@@ -944,10 +1181,11 @@ PAG_TEST(PAGXHTML3DTest, Preserve3DFlowLayerReportsTheLostParentCamera) {
       warnings++;
     }
   }
-  EXPECT_EQ(warnings, 1) << "the lost camera is reported once per document";
+  EXPECT_EQ(warnings, 0);
+  EXPECT_EQ(LayersWithNonIdentityMatrix3D(doc).size(), 2u);
   auto* g = FindLayerById(doc, "g");
   ASSERT_NE(g, nullptr);
-  EXPECT_FALSE(HasProjectionRow(g)) << "the camera is dropped, not folded into the pose";
+  EXPECT_FALSE(HasProjectionRow(g)) << "the camera is separate from the animated element";
   EXPECT_TRUE(NearlyEqual(g->matrix3D.getRowColumn(0, 0), 0.766044f, 0.001f));
 
   // The same structure with only flat poses below the preserve-3d layer keeps the camera irrelevant.
