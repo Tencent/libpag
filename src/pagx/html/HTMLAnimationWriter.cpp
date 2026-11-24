@@ -735,42 +735,14 @@ size_t FindEnclosingSvgStart(const std::string& html, size_t pos) {
   return std::string::npos;
 }
 
-// Authored width of the span's text stroke, read either from the bound form
-// (`var(--pagx-text-stroke-width, 2px)`) or from the plain `2px` the static writer emits before the
-// weaving pass binds it.
-float ReadTextStrokeFallbackWidth(const std::string& tag) {
-  static const std::string varMarker = "var(--pagx-text-stroke-width,";
-  size_t pos = tag.find(varMarker);
-  if (pos != std::string::npos) {
-    pos += varMarker.size();
-  } else {
-    static const std::string strokeProp = "-webkit-text-stroke:";
-    pos = tag.find(strokeProp);
-    if (pos == std::string::npos) {
-      return 0.0f;
-    }
-    pos += strokeProp.size();
-  }
-  while (pos < tag.size() && tag[pos] == ' ') {
-    ++pos;
-  }
-  size_t end = pos;
-  while (end < tag.size() &&
-         (std::isdigit(static_cast<unsigned char>(tag[end])) || tag[end] == '.')) {
-    ++end;
-  }
-  if (end == pos) {
-    return 0.0f;
-  }
-  return std::strtof(tag.substr(pos, end - pos).c_str(), nullptr);
-}
-
-// True when the span paints a real Stroke rather than the faux-bold emulation, whose stroke uses
-// `currentColor`. The two write the same CSS property, so the caller has to pick one owner (R20).
-// The declaration value can be a whole `var(...)` plus a colour, so the test is on the declaration's
-// tail rather than on the first space-delimited token.
-bool SpanHasRealTextStroke(const std::string& tag) {
+// Authored width of the span's **real** text stroke. A span can carry two `-webkit-text-stroke`
+// declarations (the authored outline and the faux-bold emulation), so the first one is not
+// necessarily the outline: only the declaration whose colour is not `currentColor` counts (R20).
+// Returns -1 when the tag has no real declaration.
+float ReadRealTextStrokeWidth(const std::string& tag) {
   static const std::string strokeProp = "-webkit-text-stroke:";
+  static const std::string varMarker = "var(--pagx-text-stroke-width,";
+  static const std::string currentColor = "currentColor";
   size_t pos = tag.find(strokeProp);
   while (pos != std::string::npos) {
     size_t valueStart = pos + strokeProp.size();
@@ -783,14 +755,31 @@ bool SpanHasRealTextStroke(const std::string& tag) {
     while (!value.empty() && value.back() == ' ') {
       value.pop_back();
     }
-    static const std::string currentColor = "currentColor";
-    if (value.size() < currentColor.size() ||
-        value.compare(value.size() - currentColor.size(), currentColor.size(), currentColor) != 0) {
-      return true;
+    const bool real =
+        value.size() < currentColor.size() ||
+        value.compare(value.size() - currentColor.size(), currentColor.size(), currentColor) != 0;
+    if (real) {
+      size_t numberStart = valueStart;
+      size_t marker = value.find(varMarker);
+      if (marker != std::string::npos) {
+        numberStart = valueStart + marker + varMarker.size();
+      }
+      while (numberStart < valueEnd && tag[numberStart] == ' ') {
+        ++numberStart;
+      }
+      size_t numberEnd = numberStart;
+      while (numberEnd < valueEnd &&
+             (std::isdigit(static_cast<unsigned char>(tag[numberEnd])) || tag[numberEnd] == '.')) {
+        ++numberEnd;
+      }
+      if (numberEnd > numberStart) {
+        return std::strtof(tag.substr(numberStart, numberEnd - numberStart).c_str(), nullptr);
+      }
+      return 0.0f;
     }
     pos = tag.find(strokeProp, valueEnd);
   }
-  return false;
+  return -1.0f;
 }
 
 // Rewrites the width of a span's text stroke declarations so they read the animated variable, keeping
@@ -2058,8 +2047,17 @@ bool AnimationHasKeysPastEnd(const Animation* anim) {
 // override `x` / `y` and every transform component (PAGAnimation::FilterLayerChannels). Channels a
 // matrix covers must not reach the bundle, or the frame rebuilds the pose from them instead and the
 // matrix disappears (R9(b): `matrix` I->T(100,0) beside `rotation.z` 0->90 exported a pure spin).
+// The transform components the runtime treats as matrix-covered. `Matrix3DComponentFromChannel`
+// lists exactly these names; the role table is broader (it also carries Group poses and the anchor),
+// and filtering a channel the runtime still applies changes the pose (R45).
+bool IsMatrixCoveredComponentName(const std::string& name) {
+  return name == "rotation.x" || name == "rotation.y" || name == "rotation.z" ||
+         name == "scale.x" || name == "scale.y" || name == "scale.z" || name == "skew.x" ||
+         name == "skew.y" || name == "perspective";
+}
+
 void CollectMatrixCoveredChannels(
-    PAGXDocument& doc, const DomTargetBundle& bundle,
+    const DomTargetBundle& bundle,
     const std::unordered_map<const AnimationObject*, const Animation*>& objectOwner,
     std::unordered_set<const Channel*>& covered) {
   std::unordered_set<const Animation*> matrixOwners = {};
@@ -2093,19 +2091,14 @@ void CollectMatrixCoveredChannels(
     if (!ownerHasMatrix && !ownerHasMatrix3D) {
       continue;
     }
-    const Node* targetNode = ResolveTargetNode(doc, obj->target);
-    if (targetNode == nullptr) {
-      continue;
-    }
     for (const auto* ch : obj->channels) {
       if (ch == nullptr) {
         continue;
       }
-      const auto role = LookupChannelRole(targetNode->nodeType(), ch->name);
-      bool overridden = IsPoseComponentRole(role);
+      bool overridden =
+          ch->name == "x" || ch->name == "y" || IsMatrixCoveredComponentName(ch->name);
       if (ownerHasMatrix3D) {
-        overridden = overridden || role == TargetChannelRole::LayerZ ||
-                     role == TargetChannelRole::LayerMatrix;
+        overridden = overridden || ch->name == "z" || ch->name == "matrix";
       }
       if (overridden) {
         covered.insert(ch);
@@ -2122,7 +2115,7 @@ BundleChannelSet CollectBundleChannels(
   BundleChannelSet result = {};
   // Channels a matrix covers inside their own animation never reach the bundle (R9(b)).
   std::unordered_set<const Channel*> matrixCovered = {};
-  CollectMatrixCoveredChannels(doc, bundle, objectOwner, matrixCovered);
+  CollectMatrixCoveredChannels(bundle, objectOwner, matrixCovered);
   for (auto* obj : bundle.objects) {
     Node* objTarget = ResolveTargetNode(doc, obj->target);
     if (objTarget == nullptr) {
@@ -3343,7 +3336,9 @@ std::string EvaluateKeyframeCssDecls(const DomTargetBundle& bundle, const Bundle
                      : text->renderFontSize();
     float width = bold ? FauxBoldStrokeWidth(size) : 0.0f;
     if (chSet.hasFauxBoldBaseWidth) {
-      // The span also paints a real Stroke; the emulation thickens it instead of owning the width.
+      // The span also paints a real Stroke: the emulation thickens that outline instead of owning
+      // the width, so no stop can erase it. An animated stroke width still wins, because this
+      // stepped rule is emitted before the continuous one in the animation list (R20).
       width += chSet.fauxBoldBaseWidth;
     }
     // The emulated width rides the same registered variable as a real Stroke's width: both paint the
@@ -4508,6 +4503,11 @@ std::string EmitModifierGlyphStops(const BundleChannelSet& chSet, const BundleTi
   }
   times.insert(windowStart);
   times.insert(windowEnd);
+  if (chSet.pausedFrame >= 0) {
+    // A paused mount holds its first frame: the stops collapse onto that frame, so a capture that
+    // drives `currentTime` cannot advance the glyph (R47).
+    times = {chSet.pausedFrame, chSet.pausedFrame + 1};
+  }
   // A selector-driven factor is not linear in time: it bends where a range edge crosses a glyph
   // edge and is clamped to [0, 1] outside the range, so the keys alone would let the browser
   // interpolate straight across the bend. Cut the window at those crossings - the same edges the
@@ -4573,6 +4573,11 @@ std::string EmitRangeSelectorGlyphStops(const BundleChannelSet& chSet,
   const double windowStart = static_cast<double>(timing.bundleShiftFrames);
   const double windowEnd = windowStart + static_cast<double>(timing.effectiveDuration);
   std::set<double> cuts = {windowStart, windowEnd};
+  if (chSet.pausedFrame >= 0) {
+    // Same pause rule as the modifier exit: both stops sit on the held frame (R47).
+    const double held = static_cast<double>(chSet.pausedFrame);
+    cuts = {held, held + 1.0};
+  }
   for (Frame key : chSet.keyTimes) {
     double t = static_cast<double>(key);
     if (t > windowStart && t < windowEnd) {
@@ -5125,13 +5130,11 @@ void HTMLAnimationSession::ResolveAnimationTargets(
                 if (copiesKeys[k].interpolation != KeyframeInterpolationType::Bezier) {
                   continue;
                 }
+                // Same rule as the stop emitter: a segment reads its own two keys' handles. The
+                // borrowed-fallback this used to copy was removed as R15, and duplicating it here
+                // would bound the copies with a different curve than the one that plays.
                 Point out = copiesKeys[k].bezierOut;
                 Point in = copiesKeys[k + 1].bezierIn;
-                if (FloatNearlyZero(in.x) && FloatNearlyZero(in.y) &&
-                    (!FloatNearlyZero(copiesKeys[k].bezierIn.x) ||
-                     !FloatNearlyZero(copiesKeys[k].bezierIn.y))) {
-                  in = copiesKeys[k].bezierIn;
-                }
                 if (FloatNearlyZero(out.x) && FloatNearlyZero(out.y) && FloatNearlyZero(in.x) &&
                     FloatNearlyZero(in.y)) {
                   continue;
@@ -5352,11 +5355,6 @@ std::vector<HTMLAnimationSession::AnimationMount> HTMLAnimationSession::CollectA
       continue;
     }
     auto* anim = static_cast<const Animation*>(node);
-    for (auto* obj : anim->objects) {
-      if (obj != nullptr) {
-        _ctx.animation.objectOwner.emplace(obj, anim);
-      }
-    }
     int64_t offset = 0;
     auto it = _timelineOffsets.find(anim->id);
     if (it != _timelineOffsets.end()) {
@@ -5379,6 +5377,18 @@ std::vector<HTMLAnimationSession::AnimationMount> HTMLAnimationSession::CollectA
                             timeline->evaluationOffset, timeline->playing});
           break;
         }
+      }
+    }
+  }
+  // Every mounted animation owns its objects, including the ones declared inside a Composition: the
+  // transform precedence is per animation, and a bundle can mix objects from several of them (R45).
+  for (const auto& mount : mounts) {
+    if (mount.animation == nullptr) {
+      continue;
+    }
+    for (auto* obj : mount.animation->objects) {
+      if (obj != nullptr) {
+        _ctx.animation.objectOwner.emplace(obj, mount.animation);
       }
     }
   }
@@ -5440,9 +5450,11 @@ std::string HTMLAnimationSession::emitKeyframesAndWeave(std::string& bodyHtml) {
     // timeline's window would change that period (R46), so its duration stays part of the key —
     // identical loops still share one rule, different ones do not.
     if (AnimationHasKeysPastEnd(anim)) {
-      mergeKey = ++unmergeableSerial;
+      // The serial and the loop period below are different meanings and must not collide in the
+      // same integer: a serial of 60 would look like a 60-frame loop (R46). Serial stays negative.
+      mergeKey = -++unmergeableSerial;
     } else if (anim->loop != LoopMode::Once) {
-      mergeKey = static_cast<int64_t>(anim->duration);
+      mergeKey = std::max<int64_t>(static_cast<int64_t>(anim->duration), 1);
     }
     auto key = std::make_tuple(mergeKey, anim->frameRate, static_cast<int>(anim->loop), mount.scope,
                                mount.offset, mount.playing);
@@ -5729,15 +5741,16 @@ std::string HTMLAnimationSession::emitKeyframesAndWeave(std::string& bodyHtml) {
           }
           if (ruleSet.fauxBoldCh != nullptr) {
             // The emulation and a real Stroke write the same width variable. When the span has a
-            // real outline the emulation adds to its width instead of replacing it, so the authored
-            // stroke survives every stop (R20).
+            // real outline the emulation adds to its width instead of replacing it; when that width
+            // is animated the stroke owns the variable and the emulation stands down (R20).
             auto rangeIt = tagIndex.rangeById.find(element.id);
             if (rangeIt != tagIndex.rangeById.end()) {
               std::string tag = bodyHtml.substr(rangeIt->second.first,
                                                 rangeIt->second.second - rangeIt->second.first);
-              if (SpanHasRealTextStroke(tag)) {
+              float realWidth = ReadRealTextStrokeWidth(tag);
+              if (realWidth >= 0.0f) {
                 stopSet.hasFauxBoldBaseWidth = true;
-                stopSet.fauxBoldBaseWidth = ReadTextStrokeFallbackWidth(tag);
+                stopSet.fauxBoldBaseWidth = realWidth;
               }
             }
           }
