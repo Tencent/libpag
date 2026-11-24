@@ -52,6 +52,8 @@
 
 namespace pagx {
 
+class Animation;
+class AnimationObject;
 class Group;
 class MemZipWriter;
 class HTMLWriterContext;
@@ -387,6 +389,10 @@ class HTMLWriterContext {
     // Animated Paths inside a mask, and the SVG element ids handed to them. A coverage mask (Alpha /
     // Luminance) cannot be expressed as a clip polygon, so such a mask is emitted as an inline SVG
     // <mask> whose geometry is animated by CSS inside the mask.
+    // Which Animation owns each AnimationObject. A bundle can merge objects from several animations,
+    // and the runtime applies its transform precedence once per animation, so the precedence needs
+    // that grouping (R9(b)).
+    std::unordered_map<const AnimationObject*, const Animation*> objectOwner = {};
     // Nodes with an animated `alpha` channel. A layer with `groupOpacity=false` distributes its
     // alpha to the children it renders, so such a layer must not merge several draws into one <svg>
     // whose single opacity then applies once for the whole paint.

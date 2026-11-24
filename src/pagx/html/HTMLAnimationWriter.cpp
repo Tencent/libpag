@@ -1952,11 +1952,75 @@ bool AnimationHasKeysPastEnd(const Animation* anim) {
   return false;
 }
 
+// The runtime filters a target's channels once per animation: `matrix3D` overrides `matrix`, both
+// override `x` / `y` and every transform component (PAGAnimation::FilterLayerChannels). Channels a
+// matrix covers must not reach the bundle, or the frame rebuilds the pose from them instead and the
+// matrix disappears (R9(b): `matrix` I->T(100,0) beside `rotation.z` 0->90 exported a pure spin).
+void CollectMatrixCoveredChannels(
+    PAGXDocument& doc, const DomTargetBundle& bundle,
+    const std::unordered_map<const AnimationObject*, const Animation*>& objectOwner,
+    std::unordered_set<const Channel*>& covered) {
+  std::unordered_set<const Animation*> matrixOwners = {};
+  std::unordered_set<const Animation*> matrix3DOwners = {};
+  for (const auto* obj : bundle.objects) {
+    auto ownerIt = objectOwner.find(obj);
+    if (obj == nullptr || ownerIt == objectOwner.end()) {
+      continue;
+    }
+    for (const auto* ch : obj->channels) {
+      if (ch == nullptr) {
+        continue;
+      }
+      if (ch->name == "matrix") {
+        matrixOwners.insert(ownerIt->second);
+      } else if (ch->name == "matrix3D") {
+        matrix3DOwners.insert(ownerIt->second);
+      }
+    }
+  }
+  if (matrixOwners.empty() && matrix3DOwners.empty()) {
+    return;
+  }
+  for (const auto* obj : bundle.objects) {
+    auto ownerIt = objectOwner.find(obj);
+    if (obj == nullptr || ownerIt == objectOwner.end()) {
+      continue;
+    }
+    const bool ownerHasMatrix = matrixOwners.count(ownerIt->second) > 0;
+    const bool ownerHasMatrix3D = matrix3DOwners.count(ownerIt->second) > 0;
+    if (!ownerHasMatrix && !ownerHasMatrix3D) {
+      continue;
+    }
+    const Node* targetNode = ResolveTargetNode(doc, obj->target);
+    if (targetNode == nullptr) {
+      continue;
+    }
+    for (const auto* ch : obj->channels) {
+      if (ch == nullptr) {
+        continue;
+      }
+      const auto role = LookupChannelRole(targetNode->nodeType(), ch->name);
+      bool overridden = IsPoseComponentRole(role);
+      if (ownerHasMatrix3D) {
+        overridden = overridden || role == TargetChannelRole::LayerZ ||
+                     role == TargetChannelRole::LayerMatrix;
+      }
+      if (overridden) {
+        covered.insert(ch);
+      }
+    }
+  }
+}
+
 BundleChannelSet CollectBundleChannels(
     PAGXDocument& doc, const DomTargetBundle& bundle,
     const std::unordered_map<const SolidColor*, const Node*>& solidToPainter,
-    const std::unordered_map<const Path*, Layer*>& maskPathToLayer, Frame samplingLimit) {
+    const std::unordered_map<const Path*, Layer*>& maskPathToLayer, Frame samplingLimit,
+    const std::unordered_map<const AnimationObject*, const Animation*>& objectOwner) {
   BundleChannelSet result = {};
+  // Channels a matrix covers inside their own animation never reach the bundle (R9(b)).
+  std::unordered_set<const Channel*> matrixCovered = {};
+  CollectMatrixCoveredChannels(doc, bundle, objectOwner, matrixCovered);
   for (auto* obj : bundle.objects) {
     Node* objTarget = ResolveTargetNode(doc, obj->target);
     if (objTarget == nullptr) {
@@ -1970,7 +2034,7 @@ BundleChannelSet CollectBundleChannels(
         result.matrixCh != nullptr || result.layerMatrix3DCh != nullptr;
     bool matrixInObject = false;
     for (auto* ch : obj->channels) {
-      if (ch == nullptr) {
+      if (ch == nullptr || matrixCovered.count(ch) > 0) {
         continue;
       }
       // An unbound channel has no CSS property to drive, so its keys must not split the bound
@@ -5191,6 +5255,11 @@ std::vector<HTMLAnimationSession::AnimationMount> HTMLAnimationSession::CollectA
       continue;
     }
     auto* anim = static_cast<const Animation*>(node);
+    for (auto* obj : anim->objects) {
+      if (obj != nullptr) {
+        _ctx.animation.objectOwner.emplace(obj, anim);
+      }
+    }
     int64_t offset = 0;
     auto it = _timelineOffsets.find(anim->id);
     if (it != _timelineOffsets.end()) {
@@ -5326,7 +5395,8 @@ std::string HTMLAnimationSession::emitKeyframesAndWeave(std::string& bodyHtml) {
         continue;
       }
       BundleChannelSet chSet =
-          CollectBundleChannels(_doc, bundle, _solidToPainter, _maskPathToLayer, anim->duration);
+          CollectBundleChannels(_doc, bundle, _solidToPainter, _maskPathToLayer, anim->duration,
+                                _ctx.animation.objectOwner);
       if (bundle.rangeGlyphIndex >= 0) {
         chSet.rangeGlyph = &_ctx.animation.rangeSelectorGlyphs[bundle.rangeGlyphIndex];
       }
