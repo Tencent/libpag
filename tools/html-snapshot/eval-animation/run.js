@@ -696,7 +696,11 @@ function parsePagxCaseHeader(xml) {
   return {
     target: pick(/Target:\s*(\S+)/),
     channel: pick(/Channel:\s*(\S+)/),
-    expect: pick(/Expect:\s*(\w+)/) || 'unknown',
+    // The corpus convention is "present in the tree means we promise to support it": only an
+    // explicit `Expect: gap` marks a fixture the exporter is not expected to match. Defaulting to
+    // `unknown` put every ordinary case outside the aggregate and left the report with NaN means
+    // over zero cases (R38).
+    expect: pick(/Expect:\s*(\w+)/) || 'supported',
     // Names a channel the reference renderer does not draw at all: the fixture still measures the
     // export against that renderer, but a mismatch it causes is a renderer gap, not our defect.
     renderer: pick(/Renderer:\s*([^\n]+)/),
