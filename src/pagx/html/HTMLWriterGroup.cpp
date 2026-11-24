@@ -121,6 +121,11 @@ void HTMLWriter::writeRepeater(HTMLBuilder& out, const Repeater* rep,
   if (animated) {
     // Emit every copy the channel can reach, so a copy that appears mid-playback already has a tag.
     n = std::max(n, reachableCopies);
+    if (applyCopyAlphaDecay) {
+      // The per-frame emitter recomposes the copies from the channels, so it needs the same
+      // "painter before the Repeater" decision this static pass just made.
+      _ctx->animation.repeaterDecays.insert(rep);
+    }
   }
   for (int i = 0; i < n; i++) {
     int idx = (rep->order == RepeaterOrder::AboveOriginal) ? i : (n - 1 - i);

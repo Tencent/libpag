@@ -1217,6 +1217,8 @@ struct DomTargetBundle {
   // The host's static left/top were zeroed because a pose or matrix channel owns the position, so
   // the frame has to carry the authored layout origin inside the transform.
   bool primaryHostPositionZeroed = false;
+  // The copy's alpha decay is only real when a painter existed before the Repeater.
+  bool repeaterApplyDecay = false;
   std::vector<const AnimationObject*> objects = {};
   // Set for a Repeater copy bundle: which copy this tag paints.
   int repeaterIndex = -1;
@@ -2248,9 +2250,11 @@ void EmitTransformCssAtFrame(const DomTargetBundle& bundle, const BundleChannelS
     float alpha = 0.0f;
     if (i < n) {
       alpha = 1.0f;
-      float denom = std::max(static_cast<float>(n), 1.0f);
-      float np = std::clamp((static_cast<float>(idx) + values.offset) / denom, 0.0f, 1.0f);
-      alpha *= values.startAlpha + (values.endAlpha - values.startAlpha) * np;
+      if (bundle.repeaterApplyDecay) {
+        float denom = std::max(static_cast<float>(n), 1.0f);
+        float np = std::clamp((static_cast<float>(idx) + values.offset) / denom, 0.0f, 1.0f);
+        alpha *= values.startAlpha + (values.endAlpha - values.startAlpha) * np;
+      }
       if (idx == n - 1 && frac > 0.0f && frac < 1.0f) {
         // The trailing copy is only partially there.
         alpha *= frac;
@@ -3482,6 +3486,8 @@ std::vector<DomTargetBundle> GroupObjectsIntoDomBundles(
         copyBundle.primaryHost = targetNode;
         copyBundle.objects.push_back(obj);
         copyBundle.repeaterIndex = copy.index;
+        copyBundle.repeaterApplyDecay =
+            ctx.animation.repeaterDecays.count(static_cast<const Repeater*>(targetNode)) > 0;
         bundles.push_back(std::move(copyBundle));
       }
       continue;
@@ -4934,8 +4940,36 @@ void HTMLAnimationSession::ResolveAnimationTargets(
             if (repeaterRole == TargetChannelRole::RepeaterCopies &&
                 ch->valueType() == ChannelValueType::Float) {
               float maxCopies = repeater->copies;
-              for (const auto& key : static_cast<const TypedChannel<float>*>(ch)->keyframes) {
+              const auto& copiesKeys = static_cast<const TypedChannel<float>*>(ch)->keyframes;
+              for (const auto& key : copiesKeys) {
                 maxCopies = std::max(maxCopies, key.value);
+              }
+              // A Bezier easing may overshoot past both endpoints, so the peak copy count can sit
+              // inside a segment: sample the curve instead of trusting only the keys, or the DOM
+              // runs out of copies mid-playback (R29).
+              constexpr int kCopiesSamples = 32;
+              for (size_t k = 0; k + 1 < copiesKeys.size(); ++k) {
+                if (copiesKeys[k].interpolation != KeyframeInterpolationType::Bezier) {
+                  continue;
+                }
+                Point out = copiesKeys[k].bezierOut;
+                Point in = copiesKeys[k + 1].bezierIn;
+                if (FloatNearlyZero(in.x) && FloatNearlyZero(in.y) &&
+                    (!FloatNearlyZero(copiesKeys[k].bezierIn.x) ||
+                     !FloatNearlyZero(copiesKeys[k].bezierIn.y))) {
+                  in = copiesKeys[k].bezierIn;
+                }
+                if (FloatNearlyZero(out.x) && FloatNearlyZero(out.y) && FloatNearlyZero(in.x) &&
+                    FloatNearlyZero(in.y)) {
+                  continue;
+                }
+                float v0 = copiesKeys[k].value;
+                float v1 = copiesKeys[k + 1].value;
+                for (int sample = 1; sample < kCopiesSamples; ++sample) {
+                  double u = static_cast<double>(sample) / kCopiesSamples;
+                  double eased = CubicBezierEase(out.x, out.y, in.x, in.y, u);
+                  maxCopies = std::max(maxCopies, static_cast<float>(v0 + (v1 - v0) * eased));
+                }
               }
               int emitted = static_cast<int>(std::ceil(std::max(maxCopies, 0.0f)));
               auto& slot = _ctx.animation.repeaterMaxCopies[repeater];

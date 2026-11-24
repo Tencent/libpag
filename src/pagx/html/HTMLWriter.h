@@ -422,6 +422,10 @@ class HTMLWriterContext {
     // Copies to emit for an animated `copies` channel: the largest count the channel reaches, so
     // every copy that appears during playback already exists in the DOM.
     std::unordered_map<const Repeater*, int> repeaterMaxCopies = {};
+    // Repeaters whose copies carry the authored alpha decay. The static writer only decays when a
+    // painter already exists before the Repeater, and the frame has to reuse that decision instead
+    // of decaying unconditionally.
+    std::unordered_set<const Repeater*> repeaterDecays = {};
     std::vector<RepeaterCopy> repeaterCopies = {};
 
     // A RangeSelector channel moves which glyphs its TextModifier reaches, so it is fanned out to
