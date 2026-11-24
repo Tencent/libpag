@@ -46,19 +46,21 @@ static ID3D12Resource* GetNativeResource(const tgfx::BackendTexture& texture) {
   return const_cast<ID3D12Resource*>(static_cast<const ID3D12Resource*>(info.resource));
 }
 
-static ID3D12Device* GetNativeDevice(ID3D12Resource* resource) {
+static Microsoft::WRL::ComPtr<ID3D12Device> GetNativeDevice(ID3D12Resource* resource) {
   if (resource == nullptr) {
     return nullptr;
   }
-  ID3D12Device* device = nullptr;
-  if (FAILED(resource->GetDevice(IID_PPV_ARGS(&device)))) {
+  Microsoft::WRL::ComPtr<ID3D12Device> device = nullptr;
+  if (FAILED(resource->GetDevice(IID_PPV_ARGS(device.ReleaseAndGetAddressOf())))) {
     return nullptr;
   }
   return device;
 }
 
-static ID3D12Resource* CreateNativeResource(ID3D12Device* device, DXGI_FORMAT format,
-                                            D3D12_RESOURCE_FLAGS flags, int width, int height) {
+static Microsoft::WRL::ComPtr<ID3D12Resource> CreateNativeResource(ID3D12Device* device,
+                                                                   DXGI_FORMAT format,
+                                                                   D3D12_RESOURCE_FLAGS flags,
+                                                                   int width, int height) {
   if (device == nullptr) {
     return nullptr;
   }
@@ -73,10 +75,10 @@ static ID3D12Resource* CreateNativeResource(ID3D12Device* device, DXGI_FORMAT fo
   desc.Format = format;
   desc.SampleDesc.Count = 1;
   desc.Flags = flags;
-  ID3D12Resource* resource = nullptr;
+  Microsoft::WRL::ComPtr<ID3D12Resource> resource = nullptr;
   if (FAILED(device->CreateCommittedResource(&heap, D3D12_HEAP_FLAG_NONE, &desc,
                                              D3D12_RESOURCE_STATE_COMMON, nullptr,
-                                             IID_PPV_ARGS(&resource)))) {
+                                             IID_PPV_ARGS(resource.ReleaseAndGetAddressOf())))) {
     return nullptr;
   }
   return resource;
@@ -106,6 +108,7 @@ PAG_TEST(D3D12Test, BackendTextureRoundTrip) {
   EXPECT_FALSE(Devices::ValidateExternalResource(ToTGFX(renderTarget)));
   EXPECT_EQ(PAGImage::FromTexture(texture, ImageOrigin::TopLeft), nullptr);
   EXPECT_EQ(PAGSurface::MakeFrom(texture, ImageOrigin::TopLeft), nullptr);
+  EXPECT_FALSE(MakeD3D12RenderTarget(nullptr, 16, 16).isValid());
   MtlTextureInfo metalInfo = {};
   EXPECT_FALSE(texture.getMtlTextureInfo(&metalInfo));
 }
@@ -241,20 +244,19 @@ PAG_TEST(D3D12Test, ResourceUsageValidation) {
   // tgfx enables ALLOW_RENDER_TARGET for every renderable colour texture, so a PAG texture
   // created for sampling is still a valid render target from the native flags' point of view.
 
-  auto nativeDevice = GetNativeDevice(GetNativeResource(sampledTexture));
+  Microsoft::WRL::ComPtr<ID3D12Device> nativeDevice =
+      GetNativeDevice(GetNativeResource(sampledTexture));
   ASSERT_TRUE(nativeDevice != nullptr);
-  auto sampledOnly = CreateNativeResource(nativeDevice, DXGI_FORMAT_R8G8B8A8_UNORM,
-                                          D3D12_RESOURCE_FLAG_NONE, 8, 8);
+  Microsoft::WRL::ComPtr<ID3D12Resource> sampledOnly = CreateNativeResource(
+      nativeDevice.Get(), DXGI_FORMAT_R8G8B8A8_UNORM, D3D12_RESOURCE_FLAG_NONE, 8, 8);
   ASSERT_TRUE(sampledOnly != nullptr);
   D3D12TextureInfo sampledOnlyInfo = {};
-  sampledOnlyInfo.resource = sampledOnly;
+  sampledOnlyInfo.resource = sampledOnly.Get();
   BackendTexture sampledOnlyTexture(sampledOnlyInfo, 8, 8);
   EXPECT_TRUE(Devices::ValidateExternalResource(ToTGFX(sampledOnlyTexture),
                                                 ExternalResourceUsage::Sampled));
   EXPECT_FALSE(Devices::ValidateExternalResource(ToTGFX(sampledOnlyTexture),
                                                  ExternalResourceUsage::RenderTarget));
-  sampledOnly->Release();
-  nativeDevice->Release();
 
   auto renderTarget = MakeD3D12Texture(
       context, 8, 8, tgfx::TextureUsage::TEXTURE_BINDING | tgfx::TextureUsage::RENDER_ATTACHMENT);
@@ -279,8 +281,8 @@ PAG_TEST(D3D12Test, TypelessResourceRejected) {
   ASSERT_TRUE(source != nullptr);
   auto resource = GetNativeResource(source->getBackendTexture());
   ASSERT_TRUE(resource != nullptr);
-  ID3D12Device* device = nullptr;
-  auto deviceResult = resource->GetDevice(IID_PPV_ARGS(&device));
+  Microsoft::WRL::ComPtr<ID3D12Device> device = nullptr;
+  auto deviceResult = resource->GetDevice(IID_PPV_ARGS(device.ReleaseAndGetAddressOf()));
   ASSERT_TRUE(SUCCEEDED(deviceResult)) << "GetDevice HRESULT=" << static_cast<long>(deviceResult);
   D3D12_HEAP_PROPERTIES heap = {};
   heap.Type = D3D12_HEAP_TYPE_DEFAULT;
@@ -292,17 +294,15 @@ PAG_TEST(D3D12Test, TypelessResourceRejected) {
   desc.MipLevels = 1;
   desc.Format = DXGI_FORMAT_R8G8B8A8_TYPELESS;
   desc.SampleDesc.Count = 1;
-  ID3D12Resource* typeless = nullptr;
+  Microsoft::WRL::ComPtr<ID3D12Resource> typeless = nullptr;
   auto hr = device->CreateCommittedResource(&heap, D3D12_HEAP_FLAG_NONE, &desc,
                                             D3D12_RESOURCE_STATE_COMMON, nullptr,
-                                            IID_PPV_ARGS(&typeless));
+                                            IID_PPV_ARGS(typeless.ReleaseAndGetAddressOf()));
   ASSERT_TRUE(SUCCEEDED(hr)) << "HRESULT=" << static_cast<long>(hr);
   D3D12TextureInfo info = {};
-  info.resource = typeless;
+  info.resource = typeless.Get();
   BackendTexture texture(info, 8, 8);
   EXPECT_FALSE(Devices::ValidateExternalResource(ToTGFX(texture), ExternalResourceUsage::Sampled));
-  typeless->Release();
-  device->Release();
 }
 
 /**

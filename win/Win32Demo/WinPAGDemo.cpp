@@ -87,7 +87,10 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
     MessageBoxW(nullptr, L"Cannot open a log file. The demo will continue without file logging.",
                 L"PAG Viewer", MB_OK | MB_ICONWARNING);
   } else {
-    std::cout << "[PAGDemo] starting, log file: " << logPath.string() << std::endl;
+    auto utf8Path = logPath.u8string();
+    std::cout << "[PAGDemo] starting, log file: "
+              << std::string(utf8Path.begin(), utf8Path.end())
+              << std::endl;
   }
 
   int width = 600;

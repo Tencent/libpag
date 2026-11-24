@@ -648,7 +648,7 @@ CLI_TEST(PAGXCliTest, VideoEncoder_ExecutesTheValidatedRelativePath) {
 #endif
 }
 
-CLI_TEST(PAGXCliTest, VideoEncoder_EncodesPaddedFramesWhenFFmpegIsAvailable) {
+CLI_TEST_PRIVATE(PAGXCliTest, VideoEncoder_EncodesPaddedFramesWhenFFmpegIsAvailable) {
   auto location = pagx::cli::FindFFmpeg("");
   if (location.path.empty()) {
     GTEST_SKIP() << "ffmpeg is not available";

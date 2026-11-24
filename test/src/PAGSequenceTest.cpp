@@ -24,21 +24,46 @@
 
 namespace pag {
 
-/**
- * 用例描述: 测试直接上屏
- */
-PAG_PIXEL_TEST(PAGSequenceTest, RenderOnScreen) {
+static std::shared_ptr<PAGPlayer> MakeSequencePlayer() {
   auto pagFile = LoadPAGFile("resources/apitest/wz_mvp.pag");
-  EXPECT_NE(pagFile, nullptr);
+  if (pagFile == nullptr) {
+    return nullptr;
+  }
   auto pagSurface = OffscreenSurface::Make(750, 1334);
+  if (pagSurface == nullptr) {
+    return nullptr;
+  }
   auto pagPlayer = std::make_shared<PAGPlayer>();
   pagPlayer->setSurface(pagSurface);
   pagPlayer->setComposition(pagFile);
   pagPlayer->setMatrix(Matrix::I());
   pagPlayer->setProgress(0.5);
-  pagPlayer->flush();
-  PAG_PRIVATE_ACCESS(EXPECT_EQ(static_cast<int>(pagPlayer->renderCache->sequenceCaches.size()), 1);)
-  EXPECT_TRUE(Baseline::Compare(pagSurface, "PAGSequenceTest/pagSequenceTest"));
+  if (!pagPlayer->flush()) {
+    return nullptr;
+  }
+  return pagPlayer;
+}
+
+/**
+ * 用例描述: 测试直接上屏
+ */
+PAG_PIXEL_TEST(PAGSequenceTest, RenderOnScreen) {
+  auto pagPlayer = MakeSequencePlayer();
+  ASSERT_NE(pagPlayer, nullptr);
+  EXPECT_TRUE(Baseline::Compare(pagPlayer->getSurface(), "PAGSequenceTest/pagSequenceTest"));
+}
+
+/**
+ * Verifies sequence-cache creation without disabling the pixel baseline test on MSVC.
+ */
+PAG_TEST_PRIVATE(PAGSequenceTest, RenderOnScreenCreatesSequenceCache) {
+  // clang-format off
+  PAG_PRIVATE_ACCESS(
+    auto pagPlayer = MakeSequencePlayer();
+    ASSERT_NE(pagPlayer, nullptr);
+    EXPECT_EQ(pagPlayer->renderCache->sequenceCaches.size(), 1u);
+  )
+  // clang-format on
 }
 
 /**

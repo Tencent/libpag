@@ -264,9 +264,19 @@ PAG_TEST(D3D12Test, PAGXImageKeepsDeviceAlive) {
 }
 
 PAG_TEST(D3D12Test, OffscreenCompletion) {
-  auto surface = PAGSurface::MakeOffscreen(16, 16);
+  const int size = 16;
+  auto surface = PAGSurface::MakeOffscreen(size, size);
   ASSERT_TRUE(surface != nullptr);
-  EXPECT_TRUE(surface->waitUntilCompleted());
+  ASSERT_TRUE(DrawBottomRightQuadrant(surface, size));
+  ASSERT_TRUE(surface->waitUntilCompleted());
+  std::vector<uint8_t> pixels(size * size * 4);
+  ASSERT_TRUE(
+      surface->readPixels(ColorType::RGBA_8888, AlphaType::Premultiplied, pixels.data(), size * 4));
+  auto lastPixel = (size * size - 1) * 4;
+  EXPECT_EQ(pixels[lastPixel], 255);
+  EXPECT_EQ(pixels[lastPixel + 1], 0);
+  EXPECT_EQ(pixels[lastPixel + 2], 0);
+  EXPECT_EQ(pixels[lastPixel + 3], 255);
 }
 
 /**

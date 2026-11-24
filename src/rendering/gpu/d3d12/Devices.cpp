@@ -221,8 +221,20 @@ bool Devices::ValidateExternalResource(const tgfx::BackendTexture& texture,
   if (!texture.getD3D12TextureInfo(&info)) {
     return false;
   }
-  auto sampled = usage != ExternalResourceUsage::RenderTarget;
-  auto renderTarget = usage != ExternalResourceUsage::Sampled;
+  bool sampled = false;
+  bool renderTarget = false;
+  switch (usage) {
+    case ExternalResourceUsage::Sampled:
+      sampled = true;
+      break;
+    case ExternalResourceUsage::RenderTarget:
+      renderTarget = true;
+      break;
+    case ExternalResourceUsage::SampledRenderTarget:
+      sampled = true;
+      renderTarget = true;
+      break;
+  }
   return ValidateResource(GetResource(info), texture.width(), texture.height(), sampled,
                           renderTarget);
 }

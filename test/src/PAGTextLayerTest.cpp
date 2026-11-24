@@ -156,7 +156,7 @@ PAG_TEST(PAGTextLayerTest, multiThreadModify) {
 /**
  * 用例描述: PAGTextLayer Make 功能测试
  */
-PAG_TEST(PAGTextLayerTest, Make) {
+PAG_TEST_PRIVATE(PAGTextLayerTest, Make) {
   auto textLayer = PAGTextLayer::Make(0, "");
   EXPECT_TRUE(textLayer == nullptr);
   textLayer = PAGTextLayer::Make(10, std::shared_ptr<TextDocument>{});

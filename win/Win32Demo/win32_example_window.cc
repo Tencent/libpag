@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "win32_example_window.h"
-
 #include <filesystem>
 #include <iostream>
 #include <vector>
@@ -30,6 +29,11 @@ std::filesystem::path ExecutableDirectory() {
     return {};
   }
   return std::filesystem::path(buffer).parent_path();
+}
+
+std::string PathToUtf8(const std::filesystem::path& path) {
+  auto value = path.u8string();
+  return std::string(value.begin(), value.end());
 }
 
 std::string StripLeadingParents(const std::string& path) {
@@ -46,11 +50,10 @@ std::string ResolveResourcePath(const std::string& relativePath) {
     // WinPAGDemo.exe lives in win/<arch>/<configuration>, three levels below the repository root.
     // The callers pass paths relative to win/Win32Demo, so the leading "../" segments are already
     // consumed by walking up to the repository root.
-    auto candidate =
-        exeDirectory / ".." / ".." / ".." / StripLeadingParents(relativePath);
+    auto candidate = exeDirectory / ".." / ".." / ".." / StripLeadingParents(relativePath);
     std::error_code error = {};
     if (std::filesystem::exists(candidate, error) && !error) {
-      return candidate.lexically_normal().string();
+      return PathToUtf8(candidate.lexically_normal());
     }
   }
   std::error_code error = {};
@@ -61,9 +64,11 @@ std::string ResolveResourcePath(const std::string& relativePath) {
 }
 }  // namespace
 
-Win32ExampleWindow::Win32ExampleWindow() {}
+Win32ExampleWindow::Win32ExampleWindow() {
+}
 
-Win32ExampleWindow::~Win32ExampleWindow() {}
+Win32ExampleWindow::~Win32ExampleWindow() {
+}
 
 void Win32ExampleWindow::SetTimer(int timer_id, int elapse) {
   ::SetTimer(window_handle_, timer_id, elapse, nullptr);
@@ -116,7 +121,9 @@ void Win32ExampleWindow::OnCreate() {
   SetTimer(kRenderTimerId, 20);
 }
 
-void Win32ExampleWindow::OnDestroy() { PostQuitMessage(0); }
+void Win32ExampleWindow::OnDestroy() {
+  PostQuitMessage(0);
+}
 
 void Win32ExampleWindow::DoPaint(HDC hdc) {
   bool ret = pag_engine_->Flush(true);
@@ -134,4 +141,5 @@ void Win32ExampleWindow::OnSize(int w, int h) {
   pag_engine_->Resize(w, h);
 }
 
-void Win32ExampleWindow::OnPagPlayEnd() {}
+void Win32ExampleWindow::OnPagPlayEnd() {
+}

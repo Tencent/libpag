@@ -332,7 +332,7 @@ PAGX_TEST(PAGXVideoExporterTest, MakeRejectsInvalidFrameRateRatios) {
   }
 }
 
-PAGX_TEST(PAGXVideoExporterTest, MakeSupportsFractionalFrameRate) {
+PAGX_TEST_PRIVATE(PAGXVideoExporterTest, MakeSupportsFractionalFrameRate) {
 #ifdef TGFX_USE_WEBGPU
   GTEST_SKIP() << "VideoExporter currently requires synchronous pixel readback";
 #endif

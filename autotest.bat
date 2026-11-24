@@ -98,7 +98,17 @@ if "%USE_CLANG_CL%"=="1" (
     echo Error: clang-cl was not found. Install the C++ Clang tools for Windows component.
     exit /b 1
   )
-  set "CMAKE_COMPILER_ARGS=-DCMAKE_C_COMPILER=clang-cl -DCMAKE_CXX_COMPILER=clang-cl -DCMAKE_C_COMPILER_LAUNCHER="python;%WORKSPACE%\win\tools\filter_clang.py" -DCMAKE_CXX_COMPILER_LAUNCHER="python;%WORKSPACE%\win\tools\filter_clang.py""
+  python -c "import sys; sys.exit(0 if sys.version_info[0] == 3 else 1)" >nul 2>nul
+  if not errorlevel 1 (
+    set "CMAKE_COMPILER_ARGS=-DCMAKE_C_COMPILER=clang-cl -DCMAKE_CXX_COMPILER=clang-cl -DCMAKE_C_COMPILER_LAUNCHER="python;%WORKSPACE%\win\tools\filter_clang.py" -DCMAKE_CXX_COMPILER_LAUNCHER="python;%WORKSPACE%\win\tools\filter_clang.py""
+  ) else (
+    py -3 -c "import sys; sys.exit(0 if sys.version_info[0] == 3 else 1)" >nul 2>nul
+    if errorlevel 1 (
+      echo Error: Python 3 through python or py -3 is required by the clang-cl compiler launcher. 1>&2
+      exit /b 1
+    )
+    set "CMAKE_COMPILER_ARGS=-DCMAKE_C_COMPILER=clang-cl -DCMAKE_CXX_COMPILER=clang-cl -DCMAKE_C_COMPILER_LAUNCHER="py;-3;%WORKSPACE%\win\tools\filter_clang.py" -DCMAKE_CXX_COMPILER_LAUNCHER="py;-3;%WORKSPACE%\win\tools\filter_clang.py""
+  )
 )
 
 where node >nul 2>nul

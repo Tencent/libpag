@@ -116,9 +116,19 @@ if not defined MAIN_COMMIT (
   call :Fail "origin/main was not found."
   goto :cleanup
 )
-git cat-file -e %MAIN_COMMIT%:update_baseline.bat >nul 2>nul
+git diff --quiet -- update_baseline.bat
 if errorlevel 1 (
-  call :Fail "origin/main does not contain update_baseline.bat yet, so switching to it would remove this script mid-run. Re-run with --no-checkout to build the current working tree."
+  call :Fail "update_baseline.bat has uncommitted changes, so stashing it would corrupt this run. Commit the script or use --no-checkout."
+  goto :cleanup
+)
+git diff --cached --quiet -- update_baseline.bat
+if errorlevel 1 (
+  call :Fail "update_baseline.bat has staged changes, so stashing it would corrupt this run. Commit the script or use --no-checkout."
+  goto :cleanup
+)
+git diff --quiet HEAD %MAIN_COMMIT% -- update_baseline.bat
+if errorlevel 1 (
+  call :Fail "origin/main has a different update_baseline.bat, so switching would corrupt this run. Use --no-checkout."
   goto :cleanup
 )
 git show %MAIN_COMMIT%:test/baseline/version.json > "%TEMP%\pag_main_version.json" 2>nul

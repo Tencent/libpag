@@ -367,7 +367,8 @@ bool PAGSurface::draw(RenderCache* cache, std::shared_ptr<Graphic> graphic,
         break;
       case tgfx::Backend::Vulkan:
       case tgfx::Backend::D3D12:
-        LOGE("PAGSurface::draw() cannot forward a semaphore of this backend yet.");
+        // These backends have no BackendSemaphore ABI; the caller should use
+        // waitUntilCompleted() instead. Leaving the semaphore uninitialized is expected.
         break;
     }
   }

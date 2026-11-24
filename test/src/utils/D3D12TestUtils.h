@@ -60,6 +60,9 @@ inline std::shared_ptr<tgfx::Texture> MakeD3D12RenderableTexture(int width, int 
 
 inline BackendRenderTarget MakeD3D12RenderTarget(const std::shared_ptr<tgfx::Texture>& texture,
                                                  int width, int height) {
+  if (texture == nullptr) {
+    return BackendRenderTarget();
+  }
   tgfx::D3D12TextureInfo textureInfo = {};
   if (!texture->getBackendTexture().getD3D12TextureInfo(&textureInfo)) {
     return BackendRenderTarget();
