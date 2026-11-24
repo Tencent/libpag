@@ -162,7 +162,7 @@ void HTMLWriter::writeRepeater(HTMLBuilder& out, const Repeater* rep,
       out.openTag("div");
       if (!copyId.empty()) {
         out.addAttr("id", copyId);
-        _ctx->animation.repeaterCopies.push_back({rep, i, copyId});
+        _ctx->animation.repeaterCopies.push_back({rep, i, copyId, _ctx->animation.scope});
       }
       std::string s = "position:absolute";
       if (!m.isIdentity()) {

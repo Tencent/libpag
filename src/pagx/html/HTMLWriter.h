@@ -423,6 +423,9 @@ class HTMLWriterContext {
       const Repeater* repeater = nullptr;
       int index = 0;
       std::string id = {};
+      // Composition mount that rendered this copy. The same source Repeater paints one set of
+      // copies per mount, and a bundle may only drive the copies of its own mount.
+      size_t scope = 0;
     };
     std::unordered_set<const Repeater*> animatedRepeaters = {};
     // Copies to emit for an animated `copies` channel: the largest count the channel reaches, so

@@ -3509,7 +3509,7 @@ std::vector<DomTargetBundle> GroupObjectsIntoDomBundles(
     PAGXDocument& doc, const Animation* anim, HTMLWriterContext& ctx,
     const std::unordered_map<const SolidColor*, const Node*>& solidToPainter,
     const std::unordered_map<const LayerFilter*, const Layer*>& filterToLayer,
-    const std::unordered_map<const Path*, Layer*>& maskPathToLayer,
+    const std::unordered_map<const Path*, Layer*>& maskPathToLayer, size_t mountScope,
     const std::vector<AnimationObject*>* objectsOverride = nullptr) {
   std::vector<DomTargetBundle> bundles = {};
   std::unordered_map<std::string, size_t> bundleIndex = {};
@@ -3647,7 +3647,9 @@ std::vector<DomTargetBundle> GroupObjectsIntoDomBundles(
     }
     if (nType == NodeType::Repeater) {
       for (const auto& copy : ctx.animation.repeaterCopies) {
-        if (copy.repeater != targetNode) {
+        // Only the copies this mount rendered: the same source Repeater paints one set per mount,
+        // and a copy id is unique per mount, so a foreign one would drive another instance (R27).
+        if (copy.repeater != targetNode || copy.scope != mountScope) {
           continue;
         }
         DomTargetBundle copyBundle;
@@ -5501,7 +5503,7 @@ std::string HTMLAnimationSession::emitKeyframesAndWeave(std::string& bodyHtml) {
   for (const auto& mount : groups) {
     const auto* anim = mount.animation;
     auto bundles = GroupObjectsIntoDomBundles(_doc, anim, _ctx, _solidToPainter, _filterToLayer,
-                                              _maskPathToLayer, &mount.objects);
+                                              _maskPathToLayer, mount.scope, &mount.objects);
     MergeBundlesByDomId(bundles);
     for (auto& bundle : bundles) {
       if (bundle.primaryHost == nullptr || bundle.primaryHost->nodeType() != NodeType::Layer) {
