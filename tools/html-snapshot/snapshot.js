@@ -35,6 +35,7 @@ require('./ensure-built').ensureBuilt();
 
 const { parseArgs } = require('./dist/lib/cli');
 const { LOG_PREFIX } = require('./dist/lib/common');
+const { PAGX_CAMERA_SKIP_BLOCK_LEVEL_REASONS } = require('./dist/lib/browser-snapshot');
 const { launchBrowser, formatLaunchHint } = require('./dist/lib/browser-engine');
 const { runSnapshot } = require('./dist/lib/snapshot-runner');
 
@@ -94,6 +95,25 @@ async function main() {
     } else {
       fs.writeFileSync(opts.output, result.html, 'utf8');
       console.log(`${LOG_PREFIX}wrote ${opts.output} (${result.width}x${result.height})`);
+    }
+
+    // Report how many `perspective()` elements kept their function form instead of the exact camera
+    // wrapper, so a page that silently fell back is visible in the eval report.
+    //
+    // `cameraSkips` mixes two units: per-element entries and per-`@keyframes`-block causes (the
+    // block kept its own projection, which is *why* some elements fell back). Only the element
+    // entries are affected elements, so the reported total excludes the block-level reasons while
+    // the detail breakdown still lists them.
+    const cameraSkips = result.cameraSkips || {};
+    const skipReasons = Object.keys(cameraSkips);
+    const skipTotal = skipReasons
+      .filter((reason) => !PAGX_CAMERA_SKIP_BLOCK_LEVEL_REASONS.has(reason))
+      .reduce((sum, reason) => sum + cameraSkips[reason], 0);
+    if (skipReasons.length > 0) {
+      const detail = Object.entries(cameraSkips)
+        .map(([reason, count]) => `${reason}:${count}`)
+        .join(' ');
+      console.error(`${LOG_PREFIX}camera-skips: ${skipTotal} (${detail})`);
     }
 
     // Emit the per-page font manifest so a caller with a shared --font-dir can

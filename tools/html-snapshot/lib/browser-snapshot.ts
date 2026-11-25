@@ -622,6 +622,21 @@ function px(n) {
   return `${roundPx(n)}px`;
 }
 
+// Box size the style under construction pins on `axis` (`width` / `height`), read back from the
+// declarations already written: that value is the box the reopened subset will have. Returns null
+// when the axis is not pinned (a content-sized flex item / glyph-sized text leaf), where the output
+// box is unknown and must not be guessed from the measurement.
+function pinnedAxisSize(parts, axis) {
+  const prefix = axis + ': ';
+  for (const part of parts) {
+    if (part.indexOf(prefix) === 0) {
+      const value = parseFloat(part.slice(prefix.length));
+      return isFinite(value) ? value : null;
+    }
+  }
+  return null;
+}
+
 // Format a numeric `flex-grow` for the subset HTML's `flex: <N>` shorthand.
 // Integers stay integer-shaped (`flex: 1`) so the imported PAGX renders the
 // canonical form; non-integers keep up to three decimals to round-trip the
@@ -1206,6 +1221,39 @@ function classify(el, computed) {
 
 // ===== Style emission =====
 
+// Reports whether `value` (a computed `perspective-origin`) resolves to the centre of the box, i.e.
+// to what an omitted declaration — the CSS initial `50% 50%` — would produce. Chromium reports the
+// property in px (`100px 50px` for the centre of a 200×100 box), so the schema's string compare
+// against `50% 50%` never fires and every emitted box would carry the declaration. `boxWidth` /
+// `boxHeight` must be the size of the box the subset will have — the `width` / `height` the style
+// writes (the canvas for `<body>`), *not* the measured border box, because the emitted px value is
+// read back against the output box. `px()` rounds the measurement to one decimal, so a measured
+// 100.0625 box is emitted as `100.1px`: judging the centre against the measurement would delete an
+// origin that is 0.0188px off the output box's centre.
+function perspectiveOriginAtBoxCentre(value, boxWidth, boxHeight) {
+  // Only a value that resolves to the centre *exactly* is the CSS initial `50% 50%`, and the
+  // reference box above is already the output box, so `epsilon` only absorbs float noise (the
+  // computed px and the emitted one-decimal size both come from the same layout). A real sub-pixel
+  // offset such as `100.25px` is a vanishing point: dropping it magnifies the error near the
+  // projection plane.
+  const epsilon = 1e-3;
+  if (!(boxWidth > 0) || !(boxHeight > 0)) return false;
+  const tokens = String(value || '').trim().split(/\s+/);
+  if (tokens.length !== 2) return false;
+  const axisPx = (token, axis) => {
+    if (token === 'center') return axis / 2;
+    if (token === 'left' || token === 'top') return 0;
+    if (token === 'right' || token === 'bottom') return axis;
+    const amount = parseFloat(token);
+    if (!isFinite(amount)) return NaN;
+    return token.endsWith('%') ? (amount / 100) * axis : amount;
+  };
+  const x = axisPx(tokens[0], boxWidth);
+  const y = axisPx(tokens[1], boxHeight);
+  if (!isFinite(x) || !isFinite(y)) return false;
+  return Math.abs(x - boxWidth / 2) <= epsilon && Math.abs(y - boxHeight / 2) <= epsilon;
+}
+
 // Append a single schema-driven CSS declaration to `parts` if its computed
 // value isn't a default and survives normalisation. `ctx.textColor` (when
 // provided) is consulted by entries flagged `skipIfEqualsTextColor`.
@@ -1221,6 +1269,10 @@ function appendStyleProp(parts, computed, entry, ctx) {
   const v = entry.normalize ? entry.normalize(raw) : raw;
   if (!v) return;
   if (entry.defaults && entry.defaults.includes(v)) return;
+  // Score a centre-pointed camera as the default: Chromium resolves `perspective-origin` to px, so
+  // the `50% 50%` entry above never matches its computed value (see perspectiveOriginAtBoxCentre).
+  if (entry.defaultsToBoxCentre && ctx &&
+      perspectiveOriginAtBoxCentre(v, ctx.boxWidth, ctx.boxHeight)) return;
   if (entry.skipIfEqualsTextColor && ctx && v === ctx.textColor) return;
   const outProp = entry.outProp || entry.prop;
   // Rewrite embedded double quotes as single quotes so the value embeds safely
@@ -1554,8 +1606,17 @@ function buildStyle(left, top, width, height, computed, opts) {
   }
 
   if (opts.box) {
+    // The camera's reference box is the box the subset will have, i.e. the `width` / `height` just
+    // written above, not the measured border box: the emitted px origin is resolved against the
+    // output box. A box whose size this style does not pin (content-sized flex item, glyph-sized text
+    // leaf) has no known output box, so the judgement is skipped and the authored origin is kept
+    // rather than guessed from the measurement.
+    const boxCtx = {
+      boxWidth: pinnedAxisSize(parts, 'width'),
+      boxHeight: pinnedAxisSize(parts, 'height'),
+    };
     for (const entry of STYLE_SCHEMA_BOX) {
-      appendStyleProp(parts, computed, entry);
+      appendStyleProp(parts, computed, entry, boxCtx);
     }
     // Geometric clip-path (inset/circle/ellipse/polygon/path) is not a plain
     // property copy — it needs the element's box size to resolve %/calc, so it
@@ -1615,10 +1676,13 @@ function buildStyle(left, top, width, height, computed, opts) {
   }
 
   // Forward a canonical `pagxAnim*` animation (set by animation-capture.ts) so
-  // the importer can map it onto a PAGX animation. Emitted for every element
-  // kind so animated containers, text leaves and replaced elements all carry
-  // their declaration.
-  appendAnimation(parts, computed);
+  // the importer can map it onto a PAGX animation. `suppressAnimation` is set by
+  // the synthesized per-line `<span>`s: their wrapper already carries the same
+  // declaration, and emitting it twice makes the importer animate both the host
+  // Layer and the text Layer, doubling every rotation / translation.
+  if (!opts.suppressAnimation) {
+    appendAnimation(parts, computed);
+  }
 
   return parts.join('; ');
 }
@@ -1883,6 +1947,302 @@ function readBoxTransform(computed) {
   if (t === 'matrix(1, 0, 0, 1, 0, 0)') return null;
   const o = (computed.transformOrigin || '').trim();
   return { transform: t, transformOrigin: o };
+}
+
+// ===== Perspective cameras =====
+//
+// CSS `transform: perspective(d) ...` puts the camera *inside* the function list, so
+// `transform-origin` conjugates the projection and PAGX (which keeps the projection outside
+// `anchor`, like AE / Lottie) cannot reproduce it. The subset therefore rewrites that form into the
+// equivalent `perspective` *property* on a wrapper element: CSS then projects the child's result
+// instead of conjugating it with the child's origin, and PAGX models it exactly (origin and distance
+// are kept together and the independent camera wrapper layer expresses the parent projection).
+//
+// The rewrite is exact because
+//   T(o) * P * T(-o) * [T(o) * L * T(-o)]  ==  T(o) * P * L * T(-o)
+// when the wrapper's `perspective-origin` is the child's `transform-origin` (o).
+
+function parseMatrix3DValues(transform) {
+  const m = /^matrix3d\(([^)]*)\)$/i.exec((transform || '').trim());
+  if (!m) return null;
+  const parts = m[1].split(',').map((x) => parseFloat(x.trim()));
+  if (parts.length !== 16 || parts.some((v) => !isFinite(v))) return null;
+  return parts;
+}
+
+function invert3x3(matrix) {
+  const [a, b, c] = matrix[0];
+  const [d0, e, f] = matrix[1];
+  const [g, h, i] = matrix[2];
+  const det = a * (e * i - f * h) - b * (d0 * i - f * g) + c * (d0 * h - e * g);
+  if (!isFinite(det) || Math.abs(det) < 1e-12) return null;
+  const s = 1 / det;
+  return [
+    [(e * i - f * h) * s, (c * h - b * i) * s, (b * f - c * e) * s],
+    [(f * g - d0 * i) * s, (a * i - c * g) * s, (c * d0 - a * f) * s],
+    [(d0 * h - e * g) * s, (b * g - a * h) * s, (a * e - b * d0) * s],
+  ];
+}
+
+// Whether the matrix carries a camera at all, i.e. a non-zero projection row. Lets a caller tell "no
+// projection, nothing to split" (leave the value alone, no diagnostic) from "a projection the wrapper
+// cannot reproduce" (keep it and report the decline).
+function hasProjectionRow(transform) {
+  const values = parseMatrix3DValues(transform);
+  if (!values) return false;
+  return Math.abs(values[3]) > 1e-9 || Math.abs(values[7]) > 1e-9 || Math.abs(values[11]) > 1e-9;
+}
+
+// Splits `matrix3d` into the projection distance and the affine remainder. Returns null when there is
+// nothing to split or when the pair cannot reproduce the pose: a `perspective` wrapper supplies only
+// a `perspective(d)` camera, so a projection row shifted in `qx`/`qy` (above the serialisation noise
+// floor documented at the gate below) or a `w`-scaling `m44` has no wrapper form and the authored
+// matrix has to stay on the element.
+function splitProjectiveTransform(transform) {
+  const values = parseMatrix3DValues(transform);
+  if (!values) return null;
+  const row3 = [values[3], values[7], values[11]];
+  if (row3.every((v) => Math.abs(v) < 1e-9)) return null;
+  const linear = [
+    [values[0], values[4], values[8]],
+    [values[1], values[5], values[9]],
+    [values[2], values[6], values[10]],
+  ];
+  const inverse = invert3x3(linear);
+  if (!inverse) return null;
+  // `pose = P * L` with `P` differing from the identity only in row 3, so the projection
+  // coefficients are row3(pose) premultiplied by L^-1.
+  const projection = [0, 1, 2].map(
+    (column) =>
+      row3[0] * inverse[0][column] + row3[1] * inverse[1][column] + row3[2] * inverse[2][column],
+  );
+  // `qx` / `qy` shift the vanishing point inside the projected plane. `perspective` cannot express
+  // that, so splitting would strip the term and only put `qz` back on the wrapper. The gate is a
+  // noise floor, not an exact-zero test: a `matrix3d` arrives serialised with six decimals and
+  // `row3·L^-1` propagates that rounding into `qx`/`qy`, so a plain `perspective(600px) rotateY(30deg)`
+  // pose already measures ~2.5e-8; requiring exact zeros would decline every real camera. Below 1e-6
+  // the term is indistinguishable from that serialisation error and dropping it moves the projected
+  // scale by `|qx·x| < 1e-3` over a 1000px extent (under a tenth of a percent); above it the shift
+  // is authored, so the matrix stays as written.
+  if (Math.abs(projection[0]) > 1e-6 || Math.abs(projection[1]) > 1e-6) return null;
+  const distance = projection[2] < -1e-9 ? -1 / projection[2] : 0;
+  if (!(distance > 0)) return null;
+  // The distance is recovered from a float matrix, so keep it to sub-pixel precision (600 not
+  // 600.0008485) to keep the emitted subset readable and stable across runs.
+  const roundedDistance = Math.round(distance * 1000) / 1000;
+  const affine = values.slice();
+  for (let column = 0; column < 4; column++) {
+    affine[column * 4 + 3] =
+      values[column * 4 + 3] -
+      (projection[0] * values[column * 4] +
+        projection[1] * values[column * 4 + 1] +
+        projection[2] * values[column * 4 + 2]);
+  }
+  // The remainder has to be a plain affine: `m44 != 1` scales the homogeneous `w`, which the wrapper
+  // does not restore, and neither the `matrix(...)` collapse nor the importer can carry it. Keep the
+  // authored matrix instead of silently dropping the scale.
+  if (Math.abs(affine[15] - 1) > 1e-6) return null;
+  const flat =
+    Math.abs(affine[2]) < 1e-6 && Math.abs(affine[6]) < 1e-6 && Math.abs(affine[10] - 1) < 1e-6 &&
+    Math.abs(affine[14]) < 1e-6 && Math.abs(affine[8]) < 1e-6 && Math.abs(affine[9]) < 1e-6 &&
+    Math.abs(affine[3]) < 1e-6 && Math.abs(affine[7]) < 1e-6 && Math.abs(affine[11]) < 1e-6;
+  const text = flat
+    ? 'matrix(' +
+      [affine[0], affine[1], affine[4], affine[5], affine[12], affine[13]]
+        .map((v) => String(Math.round(v * 1e6) / 1e6))
+        .join(', ') +
+      ')'
+    : 'matrix3d(' +
+      affine.map((v) => String(Math.round(v * 1e6) / 1e6)).join(', ') +
+      ')';
+  return { distance: roundedDistance, affine: text };
+}
+
+// Moves the element's box onto a wrapper that declares the camera and shrinks the element itself to
+// fill it. Returns null when the emitted html is not a plain absolutely-positioned <div>, so the
+// caller can fall back to the old behaviour instead of corrupting the layout.
+function liftBoxOntoCameraWrapper(html, distance, origin) {
+  // Any attribute the element already carries (the author `name`, see applyLayerName) stays on the
+  // element's own box; only the box geometry moves out onto the camera layer.
+  const match = /^<div((?:\s+[A-Za-z_:][-\w:.]*="[^"]*")*)\s+style="([^"]*)"/.exec(html);
+  if (!match) return null;
+  const leadingAttributes = match[1];
+  const style = match[2];
+  const box = {};
+  for (const key of ['left', 'top', 'width', 'height']) {
+    const found = new RegExp('(?:^|;\\s*)' + key + ':\\s*([^;]+)').exec(style);
+    if (!found) return null;
+    const value = found[1].trim();
+    // A percentage / auto size has no absolute reference box, so the camera layer could not be sized
+    // and the element's own percentage-derived properties (`border-radius: 50%`, `background-size`)
+    // would lose their reference anyway. Keep the function form instead.
+    if ((key === 'width' || key === 'height') && !/^-?\d+(\.\d+)?px$/.test(value)) return null;
+    box[key] = value;
+  }
+  // Only the offset moves onto the camera layer: the element box keeps its own absolute width and
+  // height. Rewriting them to `100%` would turn `box.widthPx` into NaN downstream and make
+  // percentage-derived properties resolve against the canvas or drop out.
+  let inner = style;
+  for (const key of ['left', 'top']) {
+    inner = inner.replace(new RegExp('(^|;\\s*)' + key + ':\\s*[^;]+'), '$1' + key + ': 0px');
+  }
+  const wrapperStyle = [
+    'position: absolute',
+    'left: ' + box.left,
+    'top: ' + box.top,
+    'width: ' + box.width,
+    'height: ' + box.height,
+    'perspective: ' + distance + 'px',
+    'perspective-origin: ' + origin,
+  ].join('; ');
+  // `html.slice(...)` starts at the original opening tag's closing quote and already ends with the
+  // element's own `</div>`, so only the wrapper's closing tag is appended.
+  return '<div style="' + wrapperStyle + '"><div' + leadingAttributes + ' style="' + inner + '"' +
+         html.slice(match[0].length) + '</div>';
+}
+
+// Lazy global registry shared by the perspective bookkeeping below. These helpers are stringified
+// into the page payload, where module state does not exist, so each registry lives on `globalThis`
+// and is created on first use; `key` is its `globalThis` property name.
+function cameraRegistry(key) {
+  const scope = typeof globalThis === 'undefined' ? null : globalThis;
+  if (!scope) return {};
+  if (!scope[key]) scope[key] = {};
+  return scope[key];
+}
+
+// Why the snapshot kept the function form of a `perspective()` transform instead of rewriting it
+// into a camera wrapper. Counted per reason and surfaced in the eval report, so "this page has 12
+// perspective elements, 5 of them fell back" is visible instead of silent.
+function recordCameraSkip(reason) {
+  const skips = cameraRegistry('__pagxCameraSkips');
+  skips[reason] = (skips[reason] || 0) + 1;
+}
+
+// Reasons `rewritePerspectiveKeyframes` records once per `@keyframes` block, not once per element.
+// The skip registry mixes both units, so the eval report keeps these out of the affected-element
+// total and lists them only in the detail breakdown; every key recorded per element stays counted.
+const PAGX_CAMERA_SKIP_BLOCK_LEVEL_REASONS = new Set([
+  'keyframes-mixed',
+  'keyframes-not-separable',
+]);
+
+function pagxCameraSkips() {
+  return cameraRegistry('__pagxCameraSkips');
+}
+
+// Distance of the camera a captured animation carries, keyed by animation name.
+function pagxAnimCameras() {
+  return cameraRegistry('__pagxAnimCameras');
+}
+
+// Animation names whose keyframes still carry their own `perspective()` because the stops disagreed
+// on the distance. An element playing one of them must not also get a camera wrapper: the pose would
+// be projected twice.
+function pagxAnimProjectedNames() {
+  return cameraRegistry('__pagxAnimProjected');
+}
+
+// Animation names whose keyframes were also emitted un-stripped (suffix `__pagxCam`), for elements
+// whose camera wrapper is declined at render time.
+function pagxAnimCameraClones() {
+  return cameraRegistry('__pagxAnimCameraClones');
+}
+
+// Rewrites every `matrix3d` keyframe that carries its own projection into its affine part and
+// records the camera distance per animation name, so the elements using it can emit a camera
+// wrapper. A block whose stops disagree on the distance keeps the old (projected) form.
+function rewritePerspectiveKeyframes(cssText) {
+  const cameras = pagxAnimCameras();
+  for (const name of Object.keys(cameras)) {
+    delete cameras[name];
+  }
+  const clones = pagxAnimCameraClones();
+  for (const name of Object.keys(clones)) {
+    delete clones[name];
+  }
+  const projected = pagxAnimProjectedNames();
+  for (const name of Object.keys(projected)) {
+    delete projected[name];
+  }
+  if (!cssText) return cssText;
+  let out = '';
+  let index = 0;
+  for (;;) {
+    const at = cssText.indexOf('@keyframes', index);
+    if (at < 0) {
+      out += cssText.slice(index);
+      break;
+    }
+    const open = cssText.indexOf('{', at);
+    if (open < 0) {
+      out += cssText.slice(index);
+      break;
+    }
+    let depth = 0;
+    let close = open;
+    for (; close < cssText.length; close++) {
+      if (cssText[close] === '{') depth++;
+      else if (cssText[close] === '}' && --depth === 0) break;
+    }
+    const nameMatch = /@keyframes\s+([^\s{]+)/.exec(cssText.slice(at, open));
+    const name = nameMatch ? nameMatch[1] : '';
+    const block = cssText.slice(open + 1, close);
+    // Every stop must carry the same camera, otherwise a single wrapper would retime the ones that
+    // do not; counting the transform declarations catches stops that carry no projection at all.
+    const transformCount = (block.match(/transform\s*:/g) || []).length;
+    let projectedCount = 0;
+    let unsplittable = false;
+    let distance = 0;
+    let consistent = true;
+    const rewritten = block.replace(/matrix3d\([^)]*\)/g, (value) => {
+      const split = splitProjectiveTransform(value);
+      // A stop that carries no projection at all is caught by the `projectedCount !== transformCount`
+      // check below, which does not depend on locating the declaration text. A stop that does carry a
+      // camera but cannot be factored exactly (skewed projection row, `m44 != 1`, singular linear part)
+      // must not be partially stripped: the whole block stays as authored.
+      if (!split) {
+        if (hasProjectionRow(value)) unsplittable = true;
+        return value;
+      }
+      projectedCount++;
+      if (distance === 0) {
+        distance = split.distance;
+      } else if (Math.abs(distance - split.distance) > 1e-2) {
+        consistent = false;
+      }
+      return split.affine;
+    });
+    if (projectedCount !== transformCount) {
+      consistent = false;
+    }
+    if (distance > 0 && consistent && !unsplittable) {
+      out += cssText.slice(index, open + 1) + rewritten + '}';
+      if (name) {
+        cameras[name] = distance;
+        // An element whose camera cannot be emitted keeps the function form, so it needs a copy of
+        // the block that still carries the projection.
+        clones[name] = true;
+        out += '@keyframes ' + name + '__pagxCam ' + cssText.slice(open, close + 1);
+      }
+    } else {
+      if (unsplittable) {
+        // Block-level reason: recorded once per `@keyframes` block. The block keeps every authored
+        // projection, and `projected` marks the name so an element playing it declines the wrapper
+        // (and is counted under 'element-keyframes-mixed') instead of being projected twice.
+        recordCameraSkip('keyframes-not-separable');
+        if (name) projected[name] = true;
+      } else if (distance > 0) {
+        // Block-level reason: recorded once per `@keyframes` block, not once per element using it.
+        // Elements declined because of this block are counted separately ('element-keyframes-mixed').
+        recordCameraSkip('keyframes-mixed');
+        if (name) projected[name] = true;
+      }
+      out += cssText.slice(index, close + 1);
+    }
+    index = close + 1;
+  }
+  return out;
 }
 
 // Run `fn` with the element's inline transform temporarily cleared, then
@@ -2611,7 +2971,7 @@ function emitTextSpans(textNode, parentRect, computed, opts) {
     const tl = line.rect.left - parentRect.left;
     const tt = lt - parentRect.top;
     const base = buildStyle(tl, tt, line.rect.width, lh, computed, {
-      box: false, text: true,
+      box: false, text: true, suppressAnimation: true,
     });
     // Force nowrap on every line span so PAGX's text engine never re-breaks.
     let transformed = applyTextTransform(line.text, computed);
@@ -2668,6 +3028,7 @@ function emitVerticalTextSpans(textNode, parentRect, computed, wm, preserve) {
     const tl = cl - parentRect.left;
     const tt = col.rect.top - parentRect.top;
     const base = buildStyle(tl, tt, cw, col.rect.height, computed, {
+      suppressAnimation: true,
       box: false, text: true,
     });
     let transformed = applyTextTransform(col.text, computed);
@@ -4427,8 +4788,176 @@ function applyLayerName(el, html, opts, precomputed) {
 // children, absolute children, body roots, stripped-transform re-entry) picks up name
 // forwarding through the single entry point they all already call.
 function render(el, parentRect, opts, precomputed) {
-  const html = renderElementBox(el, parentRect, opts, precomputed);
-  return applyLayerName(el, html, opts, precomputed);
+  const computed = precomputed || getComputedStyle(el);
+  // The camera is read before `renderElementBox` strips the inline transform: stripping also clears
+  // `transform-origin`, which would reset `perspective-origin` to the box centre and hide a pivot
+  // depth. Only the outermost call wraps — the `_strippedTransform` re-entry renders the pose itself
+  // and must not add a second camera layer above the author `name`.
+  const camera = opts && opts._strippedTransform ? null : staticCameraFor(computed);
+  // Name the element's own box before the camera wrapper is added: an author `name` identifies the
+  // layer that carries the content and the animation, not the structural camera layer above it.
+  const named = applyLayerName(el, renderElementBox(el, parentRect, opts, computed), opts, computed);
+  return withPerspectiveCamera(named, opts, computed, camera, el);
+}
+
+// Camera carried by the element's own static transform (`transform: perspective(<d>) ...`), read
+// from the pre-strip computed style. Returns null when the transform carries no projection.
+function staticCameraFor(computed) {
+  const transform = String((computed && computed.transform) || '').trim();
+  if (!/^matrix3d\(/i.test(transform)) {
+    return null;
+  }
+  const split = splitProjectiveTransform(transform);
+  // `original` keeps the projection so a declined wrap can put it back; `affine` is what the element
+  // carries once the camera has moved onto a wrapper.
+  return split ? { distance: split.distance, original: transform, affine: split.affine } : null;
+}
+
+// Animation names the element plays, trimmed and without the `none` keyword. An empty list means the
+// element has no CSS animation, which lets the callers below return before touching any registry.
+function animationNamesFor(computed) {
+  const raw = String((computed && computed.animationName) || '');
+  if (!raw) return [];
+  return raw
+    .split(',')
+    .map((name) => name.trim())
+    .filter((name) => name && name.toLowerCase() !== 'none');
+}
+
+// Distance of the camera this element needs, either because its own transform carries a
+// `perspective()` (already split out by `renderElementBox`) or because its animation does.
+function cameraDistanceForElement(computed) {
+  // Most elements have no animation at all; touching the registry for them is pure overhead and makes
+  // the payload reach into `globalThis` on every element.
+  const names = animationNamesFor(computed);
+  if (names.length === 0) return 0;
+  const cameras = pagxAnimCameras();
+  for (const name of names) {
+    const distance = cameras[name];
+    if (distance) return distance;
+  }
+  return 0;
+}
+
+// Wraps the element in the camera layer the CSS `perspective` property needs. Falls back to the
+// unwrapped html when the element did not render as a plain positioned <div> (flex items, inline
+// text runs, replaced elements), which keeps those paths exactly as they were.
+// The camera wrapper only reproduces `transform-origin` in the plane: `perspective-origin` takes two
+// components, so a pivot with depth (`transform-origin: 0 80 30px`) cannot be carried over. Rewriting
+// such an element would silently re-place its vanishing point and move the painted box, so the
+// function form is kept instead (the importer then anchors the pivot, which is off by the
+// CSS-vs-PAGX projection order but keeps the geometry).
+function transformOriginDepth(computed) {
+  const parts = String((computed && computed.transformOrigin) || '')
+    .trim()
+    .split(/\s+/);
+  if (parts.length < 3) return 0;
+  const depth = parseFloat(parts[2]);
+  return isFinite(depth) ? depth : 0;
+}
+
+// `perspective-origin` accepts at most two components; passing the computed `transform-origin`
+// through verbatim would emit an invalid declaration that browsers drop, which silently moves the
+// vanishing point to the wrapper's centre.
+function perspectiveOriginXY(computed) {
+  const parts = String((computed && computed.transformOrigin) || '50% 50%')
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2);
+  return parts.length === 2 ? parts[0] + ' ' + parts[1] : '50% 50%';
+}
+
+// Puts the projected transform back on an element whose camera could not be emitted: without this
+// the element keeps the affine remainder only, i.e. silently loses its perspective.
+function restoreProjectedTransform(html, camera) {
+  if (!camera || !camera.original || !camera.affine) return html;
+  const affineDecl = 'transform: ' + camera.affine;
+  if (html.includes(affineDecl)) {
+    return html.replace(affineDecl, 'transform: ' + camera.original);
+  }
+  // A pure text run or a flex item never carried the affine string, so the replace above would miss
+  // and the element would silently stay unprojected. Put the original transform back on the element
+  // instead; without a style attribute there was no transform to restore in the first place.
+  if (html.includes('style="')) {
+    return html.replace('style="', 'style="transform: ' + camera.original + '; ');
+  }
+  return html;
+}
+
+// Points an element whose camera was declined at the un-stripped copy of its keyframes, so the
+// projection survives inside the pose instead of disappearing with the wrapper.
+function useProjectedKeyframes(html, computed) {
+  const clones = pagxAnimCameraClones();
+  let out = html;
+  for (const name of animationNamesFor(computed)) {
+    if (!clones[name]) continue;
+    out = out.replace(
+      new RegExp('(animation-name:\\s*' + name + ')(\\s*[;\"])'),
+      '$1__pagxCam$2',
+    );
+  }
+  return out;
+}
+
+// Whether an ancestor already projects this element (`perspective`) or shares a 3D space with it
+// (`transform-style: preserve-3d`). A wrapper is a flat `perspective` box inserted *between* that
+// ancestor and the element: the ancestor's camera only applies to its direct children's transforms, so
+// the element's pose would stop composing with it and the whole subtree would be flattened out of the
+// ancestor's 3D space. Those elements keep the projection inside their own pose instead.
+function insideAncestorCamera(el) {
+  if (!el || !el.parentElement) return false;
+  for (let parent = el.parentElement; parent; parent = parent.parentElement) {
+    const style = getComputedStyle(parent);
+    const perspective = String(style.getPropertyValue('perspective') || '').trim();
+    if (perspective && perspective !== 'none') return true;
+    const transformStyle = String(style.getPropertyValue('transform-style') || '').trim();
+    if (transformStyle === 'preserve-3d') return true;
+  }
+  return false;
+}
+
+function withPerspectiveCamera(html, opts, computed, staticCamera, el) {
+  if (!html) return html;
+  if (opts && opts._strippedTransform) return html;
+  const distance =
+    (staticCamera && staticCamera.distance) || cameraDistanceForElement(computed);
+  // A keyframe set that kept its own projection needs no wrapper, so the element can end up with no
+  // separable distance at all. It still falls back to the function form, which is an element-level
+  // outcome and must be counted here; otherwise a mixed-only element reports zero affected elements.
+  const projectedNames = pagxAnimProjectedNames();
+  const usesProjectedKeyframes = animationNamesFor(computed).some((name) => projectedNames[name]);
+  if (!distance) {
+    if (usesProjectedKeyframes) {
+      recordCameraSkip('element-keyframes-mixed');
+    }
+    return html;
+  }
+  // The wrapper is the only encoding that keeps the projection exact, so an element that cannot get
+  // one must keep the projection inside its own pose instead of silently turning orthographic.
+  const declined = (reason) => {
+    recordCameraSkip(reason);
+    return useProjectedKeyframes(restoreProjectedTransform(html, staticCamera), computed);
+  };
+  if (Math.abs(transformOriginDepth(computed)) > 1e-6) {
+    return declined('depth-pivot');
+  }
+  // A wrapper between an ancestor camera and this element would cut the element out of that camera's
+  // 3D space, so the pose keeps its own projection (and the `__pagxCam` clone of its keyframes).
+  if (insideAncestorCamera(el)) {
+    return declined('ancestor-camera');
+  }
+  // The same element can play several animations; a wrapper would add a second projection on top of
+  // any keyframe set that kept its own `perspective()`, so decline instead of mixing the two modes.
+  if (usesProjectedKeyframes) {
+    // Element-level key, distinct from the per-block 'keyframes-mixed' so the eval report does not
+    // read one block plus one element as two affected elements.
+    return declined('element-keyframes-mixed');
+  }
+  const wrapped = liftBoxOntoCameraWrapper(html, distance, perspectiveOriginXY(computed));
+  if (!wrapped) {
+    return declined('not-a-sized-div');
+  }
+  return wrapped;
 }
 
 function renderElementBox(el, parentRect, opts, precomputed) {
@@ -4470,8 +4999,14 @@ function renderElementBox(el, parentRect, opts, precomputed) {
   if (!opts._strippedTransform) {
     const boxTransform = readBoxTransform(computed);
     if (boxTransform) {
+      // A transform that carries `perspective()` is split so the projection can move onto a wrapper
+      // (`perspective` property), which is the encoding PAGX reproduces exactly.
+      const split = splitProjectiveTransform(boxTransform.transform);
+      const forwarded = split
+        ? { transform: split.affine, transformOrigin: boxTransform.transformOrigin }
+        : boxTransform;
       return withStrippedTransform(el, () => render(el, parentRect, {
-        ...opts, _strippedTransform: true, transform: boxTransform,
+        ...opts, _strippedTransform: true, transform: forwarded,
       }, getComputedStyle(el)));
     }
   }
@@ -4849,6 +5384,16 @@ function visibleContentExtent() {
 
 function snapshotMainImpl(opts) {
   opts = opts || {};
+  // Rewrite captured keyframes that carry their own `perspective()` into the camera-wrapper form
+  // before any element is rendered: the elements consult `pagxAnimCameras()` while emitting.
+  const keyframeNode = document.getElementById('__pagx_anim_keyframes');
+  // Per-run registries: reset both here so the ordering stays visible in one place (the keyframe
+  // walker only reads them).
+  window.__pagxCameraSkips = {};
+  window.__pagxAnimCameras = {};
+  window.__pagxAnimKeyframesText = rewritePerspectiveKeyframes(
+    keyframeNode && keyframeNode.textContent ? keyframeNode.textContent : '',
+  );
   // Neutralise the page and measure the canvas. When the runner has already
   // resized the viewport to the canvas (the normal split-payload path) it
   // passes the dimensions it measured *before* the resize via
@@ -4900,6 +5445,22 @@ function snapshotMainImpl(opts) {
   if (bodyBgImage) {
     bodyStyle.push(`background-image: ${bodyBgImage}`);
   }
+  // A camera declared on `<body>` projects its direct children. The snapshot's `<body>` otherwise only
+  // carries sizing + background, so the camera has to be forwarded here or the whole page renders
+  // without perspective.
+  const bodyPerspective = bodyComputed.getPropertyValue('perspective').trim();
+  if (bodyPerspective && bodyPerspective !== 'none') {
+    bodyStyle.push(`perspective: ${bodyPerspective}`);
+    const bodyPerspectiveOrigin = bodyComputed.getPropertyValue('perspective-origin').trim();
+    // A centre-pointed camera is the initial value, so it is left out to keep the subset clean. The
+    // reference box here is the emitted <body> (canvas-sized, see the width/height above), not the
+    // live body's own rect: a body that collapsed to zero height would otherwise look off-centre
+    // while its px value is in fact the live centre, and dropping it would move the vanishing point.
+    if (bodyPerspectiveOrigin &&
+        !perspectiveOriginAtBoxCentre(bodyPerspectiveOrigin, canvasWidth, canvasHeight)) {
+      bodyStyle.push(`perspective-origin: ${bodyPerspectiveOrigin}`);
+    }
+  }
 
   // The <style> block centralises four rendering invariants that the
   // user-agent doesn't supply by default — without them, opening the
@@ -4943,9 +5504,9 @@ function snapshotMainImpl(opts) {
   // StyleSheetCollectorPass picks them up alongside the `animation-*` longhands
   // that appendAnimation() forwarded onto each element. The block is appended
   // (not prepended) so element selectors above keep their precedence.
-  const animKeyframes = document.getElementById('__pagx_anim_keyframes');
-  if (animKeyframes && animKeyframes.textContent) {
-    styleBlock += animKeyframes.textContent.trim();
+  const animKeyframesText = window.__pagxAnimKeyframesText || '';
+  if (animKeyframesText) {
+    styleBlock += animKeyframesText.trim();
   }
 
   // Flush the synthesized geometric-clip-path `<clipPath>` defs into a single
@@ -4977,6 +5538,8 @@ ${clipDefsSvg}${parts.join('')}
 `,
     width: canvasWidth,
     height: canvasHeight,
+    // Per-reason counts of perspective elements that kept the function form (see recordCameraSkip).
+    cameraSkips: pagxCameraSkips(),
   };
 }
 
@@ -5089,6 +5652,13 @@ const STYLE_SCHEMA = [
   // ellipse/inset) are also kept and rebuilt into the same contour mask by the
   // importer; other clip-path values collapse to '' so the defaults filter drops them.
   { prop: 'clip-path',        scope: 'box',  defaults: ['none'], normalize: normalizeClipPath },
+  // The perspective declaration on this element is a camera for its children; the importer gives them
+  // a camera wrapper layer that carries it, so no child pose mixes in the parent projection.
+  { prop: 'perspective',      scope: 'box',  defaults: ['none'] },
+  // The vanishing point of the camera above; it is kept together with the distance so the independent
+  // camera wrapper layer can express the parent projection, and must survive for authored origins. Chromium's computed value is in px, so the centre
+  // (the initial 50% 50%) is recognised by value against the element's own box, not by this string.
+  { prop: 'perspective-origin', scope: 'box', defaults: ['50% 50%'], defaultsToBoxCentre: true },
   { prop: 'color',                 scope: 'text', defaults: ['rgb(0, 0, 0)'] },
   { prop: 'font-family',           scope: 'text', normalize: normalizeFontFamily },
   { prop: 'font-size',             scope: 'text' },
@@ -5118,6 +5688,27 @@ const KIND_DISPATCH = { svg: renderSvg, img: renderImg, canvas: renderCanvas, te
 // helpers' source text appears below the constants in the concatenated
 // payload.
 const HELPER_FNS = [
+  cameraRegistry,
+  recordCameraSkip,
+  animationNamesFor,
+  pagxCameraSkips,
+  pagxAnimProjectedNames,
+  pagxAnimCameraClones,
+  restoreProjectedTransform,
+  useProjectedKeyframes,
+  pagxAnimCameras,
+  parseMatrix3DValues,
+  invert3x3,
+  hasProjectionRow,
+  splitProjectiveTransform,
+  liftBoxOntoCameraWrapper,
+  rewritePerspectiveKeyframes,
+  cameraDistanceForElement,
+  staticCameraFor,
+  transformOriginDepth,
+  perspectiveOriginXY,
+  insideAncestorCamera,
+  withPerspectiveCamera,
   normalizeFontFamily,
   normalizeOverflow,
   normalizeBorderRadius,
@@ -5138,6 +5729,7 @@ const HELPER_FNS = [
   normalizeWritingMode,
   roundPx,
   px,
+  pinnedAxisSize,
   formatFlexGrow,
   canForwardFlexGrow,
   escapeHtml,
@@ -5173,6 +5765,7 @@ const HELPER_FNS = [
   syntheticText,
   applyTextTransform,
   classify,
+  perspectiveOriginAtBoxCentre,
   appendStyleProp,
   appendBorder,
   appendBoxShadow,
@@ -6391,6 +6984,23 @@ function expandStickyScrollytelling() {
 // via `<script>`. The puppeteer driver only needs `takeSnapshot` /
 // `inlineExternalImages`.
 export {
+  pagxAnimProjectedNames,
+  pagxAnimCameraClones,
+  restoreProjectedTransform,
+  useProjectedKeyframes,
+  staticCameraFor,
+  withPerspectiveCamera,
+  recordCameraSkip,
+  PAGX_CAMERA_SKIP_BLOCK_LEVEL_REASONS,
+  pagxCameraSkips,
+  transformOriginDepth,
+  perspectiveOriginXY,
+  perspectiveOriginAtBoxCentre,
+  insideAncestorCamera,
+  splitProjectiveTransform,
+  liftBoxOntoCameraWrapper,
+  rewritePerspectiveKeyframes,
+  buildStyle,
   takeSnapshot,
   SNAPSHOT_INIT_SCRIPT,
   TAKE_SNAPSHOT_EXPR,

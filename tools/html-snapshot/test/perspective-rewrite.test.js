@@ -1,0 +1,552 @@
+'use strict';
+
+const {
+  splitProjectiveTransform,
+  liftBoxOntoCameraWrapper,
+  rewritePerspectiveKeyframes,
+  transformOriginDepth,
+  perspectiveOriginXY,
+  perspectiveOriginAtBoxCentre,
+  insideAncestorCamera,
+  recordCameraSkip,
+  pagxCameraSkips,
+  PAGX_CAMERA_SKIP_BLOCK_LEVEL_REASONS,
+  staticCameraFor,
+  withPerspectiveCamera,
+  restoreProjectedTransform,
+  useProjectedKeyframes,
+  pagxAnimCameraClones,
+  pagxAnimProjectedNames,
+  HELPERS_SRC,
+  PAYLOAD_CONSTANTS_SRC,
+} = require('../dist/lib/browser-snapshot');
+
+// `perspective(600px) rotateY(-45deg)`: row 3 = (0, 0, -cos45/600, 1), row 1..2 carry ±sin45.
+const ROTATE_Y_45_PROJECTED =
+  'matrix3d(0.707107, 0, 0.707107, -0.00117851, 0, 1, 0, 0, -0.707107, 0, 0.707107, -0.00117851, 0, 0, 0, 1)';
+
+describe('splitProjectiveTransform', () => {
+  test('pulls the camera out of a projected matrix3d', () => {
+    const split = splitProjectiveTransform(ROTATE_Y_45_PROJECTED);
+    expect(split).not.toBeNull();
+    // Recovered from a float matrix, so only the magnitude is asserted.
+    expect(split.distance).toBeCloseTo(600, 2);
+    // The affine part is the bare rotation: the projection row is gone.
+    const values = split.affine
+      .replace(/^matrix3d\(|\)$/g, '')
+      .split(',')
+      .map((v) => parseFloat(v.trim()));
+    expect(values).toHaveLength(16);
+    expect(values[3]).toBeCloseTo(0, 6);
+    expect(values[7]).toBeCloseTo(0, 6);
+    expect(values[11]).toBeCloseTo(0, 6);
+    expect(values[0]).toBeCloseTo(0.707107, 4);
+    expect(values[8]).toBeCloseTo(-0.707107, 4);
+  });
+
+  test('splits a projection row that carries serialisation residue', () => {
+    // `perspective(500px) rotateY(30deg)` as the browser serialises it: `qx` should be 0, and the
+    // six-decimal matrix leaves ~2.5e-8 behind. An exact-zero gate would refuse every real camera.
+    const measured =
+      'matrix3d(0.866025, 0, -0.5, 0.001, 0, 1, 0, 0, 0.5, 0, 0.866025, -0.001732, 0, 0, 0, 1)';
+    const split = splitProjectiveTransform(measured);
+    expect(split).not.toBeNull();
+    expect(split.distance).toBeCloseTo(500, 1);
+  });
+
+  test('leaves a plane transform alone', () => {
+    expect(splitProjectiveTransform('matrix(2, 0, 0, 2, 10, 20)')).toBeNull();
+    // A flat matrix3d (scale only) carries no projection row either.
+    expect(
+      splitProjectiveTransform('matrix3d(2, 0, 0, 0, 0, 2, 0, 0, 0, 0, 1, 0, 10, 20, 0, 1)'),
+    ).toBeNull();
+  });
+});
+
+describe('liftBoxOntoCameraWrapper', () => {
+  const html = '<div style="position: absolute; left: 60px; top: 40px; width: 120px; height: 80px; background-color: #38BDF8">x</div>';
+
+  test('moves only the offset onto the camera layer', () => {
+    const wrapped = liftBoxOntoCameraWrapper(html, 600, '0px 40px');
+    expect(wrapped).not.toBeNull();
+    expect(wrapped).toContain('perspective: 600px');
+    expect(wrapped).toContain('perspective-origin: 0px 40px');
+    // Wrapper keeps the layout slot; the child is pinned to its origin.
+    expect(wrapped.startsWith('<div style="position: absolute; left: 60px; top: 40px;')).toBe(true);
+    expect(wrapped).toContain('left: 0px; top: 0px;');
+    // The element box keeps its absolute size: `width: 100%` would make `box.widthPx` NaN and break
+    // percentage-derived properties such as `border-radius: 50%` and `background-size`.
+    expect(wrapped).toContain('width: 120px');
+    expect(wrapped).toContain('height: 80px');
+    expect(wrapped).not.toContain('width: 100%');
+    // Balanced tags: one wrapper div plus the original element div.
+    expect((wrapped.match(/<div /g) || []).length).toBe(2);
+    expect((wrapped.match(/<\/div>/g) || []).length).toBe(2);
+  });
+
+  test('declines when the box has no absolute size', () => {
+    const relative =
+      '<div style="position: absolute; left: 0px; top: 0px; width: 100%; height: 100%">x</div>';
+    expect(liftBoxOntoCameraWrapper(relative, 600, '0px 40px')).toBeNull();
+    const auto =
+      '<div style="position: absolute; left: 0px; top: 0px; width: auto; height: 80px">x</div>';
+    expect(liftBoxOntoCameraWrapper(auto, 600, '0px 40px')).toBeNull();
+  });
+
+  test('keeps an authored attribute on the element box, not on the camera layer', () => {
+    // `applyLayerName` names the element before the wrapper is added, so the wrapper must not
+    // swallow the name: `Layer.name` has to stay on the layer that carries content and animation.
+    const named = '<div name="card" style="position: absolute; left: 60px; top: 40px; width: 120px; height: 80px; background-color: rgb(56, 189, 248)" id="x">x</div>';
+    const wrapped = liftBoxOntoCameraWrapper(named, 600, '0px 40px');
+    expect(wrapped).not.toBeNull();
+    expect(wrapped.startsWith('<div style="position: absolute; left: 60px; top: 40px;')).toBe(true);
+    expect(wrapped).not.toContain('<div name="card" style="position: absolute; left: 60px');
+    expect(wrapped).toContain('<div name="card" style="position: absolute; left: 0px;');
+    expect((wrapped.match(/<div /g) || []).length).toBe(2);
+    expect((wrapped.match(/<\/div>/g) || []).length).toBe(2);
+  });
+
+  test('declines when the element did not render as a positioned div', () => {
+    expect(liftBoxOntoCameraWrapper('<span style="left: 0px">x</span>', 600, '50% 50%')).toBeNull();
+    expect(liftBoxOntoCameraWrapper('<div style="position: relative">x</div>', 600, '50% 50%')).toBeNull();
+  });
+});
+
+describe('rewritePerspectiveKeyframes', () => {
+  beforeEach(() => {
+    // The registries live on globalThis so they survive the browser payload boundary.
+    delete globalThis.__pagxAnimCameras;
+    delete globalThis.__pagxAnimProjected;
+    delete globalThis.__pagxAnimCameraClones;
+    delete globalThis.__pagxCameraSkips;
+  });
+
+  test('keeps the block when the stops disagree on the distance', () => {
+    // `-0.00117851` is a 600px camera, `-0.00117772` a 600.4px one: different vanishing points, so
+    // merging them would retime one stop's projection. Only float noise (well under 0.01px) counts as
+    // the same camera; the earlier 0.5px window silently merged real differences like this pair.
+    const css =
+      '@keyframes mixedCamera { 0% { transform: ' + ROTATE_Y_45_PROJECTED + '; } ' +
+      '100% { transform: matrix3d(0.707107, 0, 0.707107, -0.0011777, 0, 1, 0, 0, -0.707107, 0, 0.707107, -0.0011777, 0, 0, 0, 1); } }';
+    const rewritten = rewritePerspectiveKeyframes(css);
+    expect(rewritten).toContain('-0.00117851');
+    expect(rewritten).toContain('-0.0011777');
+    expect(rewritten).not.toContain('__pagxCam');
+  });
+
+  test('strips the projection from every stop and records the distance', () => {
+    // Both stops carry the same camera: the rewrite is only allowed when the distances agree, because
+    // a single wrapper cannot retime stops that disagree.
+    const css =
+      '@keyframes pagxAnim0 { 0% { transform: ' + ROTATE_Y_45_PROJECTED + '; } ' +
+      '100% { transform: matrix3d(0.707107, 0, 0.707107, -0.00117851, 0, 1, 0, 0, -0.707107, 0, 0.707107, -0.00117851, 20, 0, 0, 1); } }';
+    const rewritten = rewritePerspectiveKeyframes(css);
+    // The stripped copy is what a wrapped element plays; a `__pagxCam` clone keeps the projection for
+    // elements whose wrapper is declined at render time.
+    const stripped = rewritten.slice(0, rewritten.indexOf('__pagxCam'));
+    expect(stripped).not.toContain('-0.00117851');
+    expect(stripped).not.toContain('-0.000833');
+    expect(stripped).toContain('@keyframes pagxAnim0');
+    expect(rewritten).toContain('@keyframes pagxAnim0__pagxCam {');
+    // The clone only earns its place if it still carries the projection: read the matrix's 4th column
+    // entries (indices 3 / 11 hold the -1/d terms) and require them non-zero. Asserting only that the
+    // block exists would still pass if the implementation wrote the affine remainder into it, which
+    // would render orthographically and make the clone pointless.
+    const matrixValues = (text) => {
+      const m = /matrix3d\(([^)]*)\)/.exec(text);
+      expect(m).not.toBeNull();
+      return m[1].split(',').map((v) => parseFloat(v));
+    };
+    const clone = rewritten.slice(rewritten.indexOf('@keyframes pagxAnim0__pagxCam'));
+    expect(clone).toContain(ROTATE_Y_45_PROJECTED);
+    const strippedMatrix = matrixValues(stripped);
+    const cloneMatrix = matrixValues(clone);
+    expect(strippedMatrix).toHaveLength(16);
+    expect(cloneMatrix).toHaveLength(16);
+    expect(strippedMatrix[3]).toBe(0);
+    expect(strippedMatrix[11]).toBe(0);
+    expect(cloneMatrix[3]).not.toBe(0);
+    expect(cloneMatrix[11]).not.toBe(0);
+    expect(globalThis.__pagxAnimCameras['pagxAnim0']).toBeCloseTo(600, 2);
+  });
+
+  test('keeps the block untouched when the stops disagree on the distance', () => {
+    const css =
+      '@keyframes pagxAnim1 { 0% { transform: ' + ROTATE_Y_45_PROJECTED +
+      '; } 100% { transform: matrix3d(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1); } }';
+    const rewritten = rewritePerspectiveKeyframes(css);
+    expect(rewritten).toBe(css);
+    expect(globalThis.__pagxAnimCameras['pagxAnim1']).toBeUndefined();
+  });
+
+  test('leaves flights without a projection alone', () => {
+    const css = '@keyframes pagxAnim2 { 0% { transform: matrix(1, 0, 0, 1, 10, 0); } }';
+    expect(rewritePerspectiveKeyframes(css)).toBe(css);
+  });
+
+  test('a qx inside the serialisation noise floor counts as zero', () => {
+    // `qx` / `qy` are derived as `row3·L^-1`, and a `matrix3d` reaches us serialised with six
+    // decimals, so a float residue is unavoidable: a real `perspective(600px) rotateY(30deg)` pose
+    // measures ~2.5e-8. Treating that as a vanishing-point shift would decline every real camera,
+    // so anything at or below the noise floor is equivalent to an unshifted projection row.
+    const noisy = 'matrix3d(1, 0, 0, 0.00000001, 0, 1, 0, 0, 0, 0, 1, -0.00166667, 0, 0, 0, 1)';
+    const css =
+      '@keyframes noisyQx { 0% { transform: ' + noisy + '; } 100% { transform: ' + noisy + '; } }';
+    const rewritten = rewritePerspectiveKeyframes(css);
+    const stripped = rewritten.slice(0, rewritten.indexOf('__pagxCam'));
+    expect(stripped).not.toContain('0.00000001');
+    expect(stripped).toContain('@keyframes noisyQx {');
+    expect(stripped).toContain('matrix(1, 0, 0, 1, 0, 0)');
+    // The `__pagxCam` clone keeps the projection for elements whose wrapper is declined, so the
+    // authored residue stays there by design.
+    expect(rewritten.slice(rewritten.indexOf('__pagxCam'))).toContain('0.00000001');
+    expect(globalThis.__pagxAnimCameras['noisyQx']).toBeCloseTo(600, 2);
+  });
+
+  test('a qx above the noise floor keeps the block as authored', () => {
+    // 1e-5 is ten times the floor: that is an authored vanishing-point shift, which `perspective`
+    // cannot reproduce, so the camera has to stay inside the matrix.
+    const shifted = 'matrix3d(1, 0, 0, 0.00001, 0, 1, 0, 0, 0, 0, 1, -0.00166667, 0, 0, 0, 1)';
+    const css =
+      '@keyframes shiftedQx { 0% { transform: ' + shifted + '; } 100% { transform: ' + shifted + '; } }';
+    expect(rewritePerspectiveKeyframes(css)).toBe(css);
+    expect(globalThis.__pagxAnimCameras['shiftedQx']).toBeUndefined();
+    expect(pagxAnimProjectedNames()['shiftedQx']).toBe(true);
+    expect(pagxCameraSkips()['keyframes-not-separable']).toBe(1);
+  });
+
+  test('a skewed projection row keeps the block as authored', () => {
+    // `qx` is the projection term that shifts the vanishing point inside the projected plane.
+    // `perspective` cannot express it, so a split would strip `qx` from the matrix and put only `qz`
+    // back on the wrapper, moving the camera. 1e-3 is far above the noise floor, so this is an
+    // authored shift and the matrix may not be rewritten.
+    const skewed = 'matrix3d(1, 0, 0, 0.001, 0, 1, 0, 0, 0, 0, 1, -0.00166667, 0, 0, 0, 1)';
+    const css =
+      '@keyframes skewedCamera { 0% { transform: ' + skewed + '; } 100% { transform: ' + skewed + '; } }';
+    expect(rewritePerspectiveKeyframes(css)).toBe(css);
+    expect(globalThis.__pagxAnimCameras['skewedCamera']).toBeUndefined();
+    // The projection is kept, so an element playing this block must decline the wrapper.
+    expect(pagxAnimProjectedNames()['skewedCamera']).toBe(true);
+    expect(pagxCameraSkips()['keyframes-not-separable']).toBe(1);
+  });
+
+  test('a non-normalised m44 keeps the block as authored', () => {
+    // `m44 = 2` scales the homogeneous w. The wrapper only supplies the projection row and the
+    // `matrix(...)` collapse drops everything outside the 2D affine, so neither form can reproduce
+    // the pose: refuse the split instead of quietly turning the stop 2D.
+    const scaledW = 'matrix3d(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, -0.00166667, 0, 0, 0, 2)';
+    const css =
+      '@keyframes scaledW { 0% { transform: ' + scaledW + '; } 100% { transform: ' + scaledW + '; } }';
+    expect(rewritePerspectiveKeyframes(css)).toBe(css);
+    expect(globalThis.__pagxAnimCameras['scaledW']).toBeUndefined();
+    expect(pagxAnimProjectedNames()['scaledW']).toBe(true);
+    expect(pagxCameraSkips()['keyframes-not-separable']).toBe(1);
+  });
+});
+
+describe('camera wrapper guards', () => {
+  test('a pivot with depth disables the rewrite', () => {
+    // `perspective-origin` has no depth component, so a z pivot cannot be carried over; the element
+    // keeps its function form instead of being re-placed.
+    expect(transformOriginDepth({ transformOrigin: '0px 80px 30px' })).toBeCloseTo(30, 6);
+    expect(transformOriginDepth({ transformOrigin: '0px 80px' })).toBe(0);
+    expect(transformOriginDepth({ transformOrigin: '50% 50% 0px' })).toBe(0);
+  });
+
+  test('perspective-origin is emitted with two components', () => {
+    // A three-value declaration is invalid CSS and browsers drop it, which would move the vanishing
+    // point to the wrapper centre.
+    expect(perspectiveOriginXY({ transformOrigin: '0px 80px 30px' })).toBe('0px 80px');
+    expect(perspectiveOriginXY({ transformOrigin: '10px 20px' })).toBe('10px 20px');
+    expect(perspectiveOriginXY({})).toBe('50% 50%');
+  });
+});
+
+describe('perspective-origin default suppression', () => {
+  test('a centre-pointed camera counts as the initial value', () => {
+    // Chromium reports the computed origin in px (`100px 50px` for the centre of a 200x100 box), so
+    // the schema's `50% 50%` string compare never matches and every box would carry the declaration.
+    expect(perspectiveOriginAtBoxCentre('100px 50px', 200, 100)).toBe(true);
+    expect(perspectiveOriginAtBoxCentre('50% 50%', 200, 100)).toBe(true);
+    // An off-centre vanishing point has to survive the snapshot.
+    expect(perspectiveOriginAtBoxCentre('0px 0px', 200, 100)).toBe(false);
+    expect(perspectiveOriginAtBoxCentre('100px 60px', 200, 100)).toBe(false);
+    // Without a box there is no centre to compare against, so the authored value is kept.
+    expect(perspectiveOriginAtBoxCentre('50% 50%', 0, 0)).toBe(false);
+    expect(perspectiveOriginAtBoxCentre('', 200, 100)).toBe(false);
+  });
+
+  // `buildStyle` only runs inside the stringified page payload (its schema constants live in
+  // PAYLOAD_CONSTANTS_SRC), so evaluate exactly the source the payload ships.
+  const payloadScope = new Function(
+    HELPERS_SRC + '\n' + PAYLOAD_CONSTANTS_SRC + '\nreturn { buildStyle };',
+  )();
+  const computedWith = (props) => ({
+    getPropertyValue: (prop) => (prop in props ? props[prop] : ''),
+    transform: 'none',
+    transformOrigin: '',
+    animationName: 'none',
+  });
+
+  test('the centre is judged against the output box, not the measurement', () => {
+    // A measured 100.0625px box is emitted as `width: 100.1px` (px() keeps one decimal), so the
+    // output box's centre is 50.05px; an origin measured at 50.0312px is 0.0188px off it and is a
+    // real vanishing point, not float noise.
+    const offCentre = payloadScope.buildStyle(0, 0, 100.0625, 100, computedWith({
+      perspective: '600px',
+      'perspective-origin': '50.0312px 50px',
+    }), { box: true });
+    expect(offCentre).toContain('width: 100.1px');
+    expect(offCentre).toContain('perspective-origin: 50.0312px 50px');
+
+    // Judged against the measurement instead, the same value would look like the centre (50.03125)
+    // and be dropped, moving the vanishing point.
+    expect(perspectiveOriginAtBoxCentre('50.0312px 50px', 100.0625, 100)).toBe(true);
+
+    // Exactly the output box centre is the CSS initial value and is dropped.
+    const centred = payloadScope.buildStyle(0, 0, 100.0625, 100, computedWith({
+      perspective: '600px',
+      'perspective-origin': '50.05px 50px',
+    }), { box: true });
+    expect(centred).not.toContain('perspective-origin');
+
+    // 0.05px off that centre is still kept.
+    const slightlyOff = payloadScope.buildStyle(0, 0, 100.0625, 100, computedWith({
+      perspective: '600px',
+      'perspective-origin': '50px 50px',
+    }), { box: true });
+    expect(slightlyOff).toContain('perspective-origin: 50px 50px');
+  });
+
+  test('a box whose size the style does not pin is not judged', () => {
+    // A content-sized flex item emits no `width`, so the output box is whatever the importer lays out;
+    // guessing from Chromium's measurement could drop a real camera, so the authored value is kept.
+    const style = payloadScope.buildStyle(0, 0, 100.0625, 100, computedWith({
+      perspective: '600px',
+      'perspective-origin': '50.05px 50px',
+    }), { box: true, flexItem: true, flexContentSized: true });
+    expect(style).not.toContain('width:');
+    expect(style).toContain('perspective-origin: 50.05px 50px');
+  });
+});
+
+describe('camera skip accounting', () => {
+  beforeEach(() => {
+    delete globalThis.__pagxCameraSkips;
+  });
+
+  test('counts one entry per skipped element and reason', () => {
+    recordCameraSkip('depth-pivot');
+    recordCameraSkip('depth-pivot');
+    recordCameraSkip('not-a-sized-div');
+    expect(pagxCameraSkips()).toEqual({ 'depth-pivot': 2, 'not-a-sized-div': 1 });
+  });
+
+  test('reports an empty map before anything was skipped', () => {
+    expect(pagxCameraSkips()).toEqual({});
+  });
+
+  test('block-level keyframe reasons stay out of the affected-element total', () => {
+    // Every reason `rewritePerspectiveKeyframes` records belongs to one `@keyframes` block, so it is
+    // listed in the detail breakdown but never added to the "affected elements" total. Any new
+    // block-level reason missing from this set silently inflates that total.
+    expect(PAGX_CAMERA_SKIP_BLOCK_LEVEL_REASONS.has('keyframes-mixed')).toBe(true);
+    expect(PAGX_CAMERA_SKIP_BLOCK_LEVEL_REASONS.has('keyframes-not-separable')).toBe(true);
+    // Element-level reasons, including the ancestor guard, are counted as affected elements.
+    expect(PAGX_CAMERA_SKIP_BLOCK_LEVEL_REASONS.has('element-keyframes-mixed')).toBe(false);
+    expect(PAGX_CAMERA_SKIP_BLOCK_LEVEL_REASONS.has('ancestor-camera')).toBe(false);
+  });
+});
+
+describe('static camera placement', () => {
+  beforeEach(() => {
+    delete globalThis.__pagxCameraSkips;
+  });
+
+  const named = '<div name="card" style="position: absolute; left: 20px; top: 20px; width: 120px; height: 80px">x</div>';
+
+  test('reads the camera from the pre-strip computed transform', () => {
+    // `computed.transform` is the matrix3d the browser reports for `perspective(600px) rotateY(20deg)`.
+    const projected = {
+      transform:
+        'matrix3d(0.939693, 0, -0.34202, 0.00057, 0, 1, 0, 0, 0.34202, 0, 0.939693, -0.001566, 0, 0, 0, 1)',
+      transformOrigin: '0px 40px',
+    };
+    // The fixture is a 6-decimal matrix, so the recovered distance is 600.06 rather than exactly 600.
+    expect(staticCameraFor(projected).distance).toBeCloseTo(600, 0);
+    // A flat matrix3d carries no projection, so nothing to wrap.
+    expect(
+      staticCameraFor({ transform: 'matrix3d(2, 0, 0, 0, 0, 2, 0, 0, 0, 0, 1, 0, 10, 20, 0, 1)' }),
+    ).toBeNull();
+    expect(staticCameraFor({ transform: 'matrix(1, 0, 0, 1, 5, 5)' })).toBeNull();
+  });
+
+  test('the stripped re-entry never adds a second camera layer', () => {
+    // `renderElementBox` re-renders the same element with its transform cleared; wrapping there would
+    // put the camera above the author `name` (it is applied by the outermost call).
+    const style = { transform: 'none', transformOrigin: '0px 40px' };
+    const html = '<div style="position: absolute; left: 0px; top: 0px; width: 120px; height: 80px">x</div>';
+    expect(withPerspectiveCamera(html, { _strippedTransform: true }, style, { distance: 600 })).toBe(html);
+    // The outermost call does wrap, after naming.
+    const wrapped = withPerspectiveCamera(named, {}, style, { distance: 600 });
+    expect(wrapped).toContain('perspective: 600px');
+    expect(wrapped).toContain('<div name="card" style="position: absolute; left: 0px;');
+  });
+});
+
+describe('declined cameras keep their perspective', () => {
+  const projected =
+    'matrix3d(1, 0, 0, 0, 0, 0.707107, -0.707107, 0.00117851, 0, 0.707107, 0.707107, -0.00117851, 0, 0, 0, 1)';
+  const affine =
+    'matrix3d(1, 0, 0, 0, 0, 0.707107, -0.707107, 0, 0, 0.707107, 0.707107, 0, 0, 0, 0, 1)';
+
+  beforeEach(() => {
+    delete globalThis.__pagxCameraSkips;
+    delete globalThis.__pagxAnimCameras;
+    delete globalThis.__pagxAnimCameraClones;
+  });
+
+  test('the stripped transform is put back when no wrapper can be emitted', () => {
+    const html =
+      '<div style="position: absolute; left: 0px; transform: ' + affine + '" id="card">x</div>';
+    const restored = restoreProjectedTransform(html, { distance: 600, original: projected, affine });
+    expect(restored).toContain(projected);
+    expect(restored).not.toContain('transform: ' + affine);
+    // A pure 2D element has no camera to restore.
+    expect(restoreProjectedTransform(html, null)).toBe(html);
+  });
+
+  test('a declined element is pointed at the un-stripped keyframes', () => {
+    rewritePerspectiveKeyframes(
+      '@keyframes spin { 0% { transform: ' + projected + '; } 100% { transform: ' + projected + '; } }',
+    );
+    const html = '<div style="animation-name: spin; animation-duration: 2s">x</div>';
+    expect(useProjectedKeyframes(html, { animationName: 'spin' })).toContain(
+      'animation-name: spin__pagxCam',
+    );
+    // Elements whose camera was emitted keep the stripped name.
+    expect(useProjectedKeyframes(html, { animationName: 'other' })).toBe(html);
+  });
+
+  test('a depth pivot keeps the projection in the element itself', () => {
+    const wrapped = withPerspectiveCamera(
+      '<div style="position: absolute; left: 0px; top: 0px; width: 10px; height: 10px; transform: ' +
+        affine +
+        '">x</div>',
+      {},
+      { transformOrigin: '0px 80px 30px' },
+      { distance: 600, original: projected, affine },
+    );
+    expect(wrapped).toContain(projected);
+    expect(pagxCameraSkips()['depth-pivot']).toBe(1);
+  });
+});
+
+describe('mixed-only elements are still counted', () => {
+  beforeEach(() => {
+    delete globalThis.__pagxCameraSkips;
+    delete globalThis.__pagxAnimCameras;
+    delete globalThis.__pagxAnimProjected;
+  });
+
+  test('an element whose only camera comes from a kept keyframe block is recorded', () => {
+    // No `distance` can be separated from a block that keeps its projection, so the wrapper path
+    // returns early; the element still falls back to the function form and must be counted, or the
+    // eval report shows `camera-skips: 0` for a page that did fall back.
+    rewritePerspectiveKeyframes(
+      '@keyframes mixed { 0% { transform: ' + ROTATE_Y_45_PROJECTED + '; } 100% { transform: ' +
+        'matrix3d(0.707107, 0, 0.707107, -0.0011777, 0, 1, 0, 0, -0.707107, 0, 0.707107, -0.0011777, 0, 0, 0, 1); } }',
+    );
+    const html = '<div style="position: absolute; left: 0px; top: 0px">x</div>';
+    expect(withPerspectiveCamera(html, {}, { animationName: 'mixed' }, null)).toBe(html);
+    expect(pagxCameraSkips()['element-keyframes-mixed']).toBe(1);
+  });
+});
+
+describe('one element never mixes two camera modes', () => {
+  const flat = 'matrix3d(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1)';
+
+  beforeEach(() => {
+    delete globalThis.__pagxCameraSkips;
+    delete globalThis.__pagxAnimCameras;
+    delete globalThis.__pagxAnimCameraClones;
+    delete globalThis.__pagxAnimProjected;
+  });
+
+  test('a keyframe set that keeps its projection blocks the camera wrapper', () => {
+    // Stops disagree on the distance, so the block stays as authored and still projects.
+    // One stop projects, the other does not, so the block cannot be moved onto a single wrapper and
+    // keeps its authored (projected) form.
+    rewritePerspectiveKeyframes(
+      '@keyframes mixed { 0% { transform: ' + ROTATE_Y_45_PROJECTED + '; } 100% { transform: ' +
+        flat + '; } }',
+    );
+    expect(pagxAnimProjectedNames().mixed).toBe(true);
+
+    const html =
+      '<div style="position: absolute; left: 0px; top: 0px; width: 80px; height: 40px">x</div>';
+    // Without the guard this element would get a wrapper on top of the projection it already carries.
+    // A real camera distance is required for the guard to run at all (the element-level check sits
+    // behind the distance early-return), so pass one instead of relying on the block-level record.
+    const result = withPerspectiveCamera(html, {}, { animationName: 'mixed' }, { distance: 600 });
+    expect(result).toBe(html);
+    // The two units are counted under distinct keys: the block kept its projection once, and the one
+    // element that had to fall back is counted separately, so the eval report no longer reads a
+    // block + its element as two affected elements.
+    expect(pagxCameraSkips()['keyframes-mixed']).toBe(1);
+    expect(pagxCameraSkips()['element-keyframes-mixed']).toBe(1);
+  });
+});
+
+describe('an ancestor camera keeps the element out of a wrapper', () => {
+  const affine =
+    'matrix3d(0.707107, 0, 0.707107, 0, 0, 1, 0, 0, -0.707107, 0, 0.707107, 0, 0, 0, 0, 1)';
+  const originalGetComputedStyle = global.getComputedStyle;
+
+  beforeEach(() => {
+    delete globalThis.__pagxCameraSkips;
+    delete globalThis.__pagxAnimCameras;
+    delete globalThis.__pagxAnimCameraClones;
+    delete globalThis.__pagxAnimProjected;
+  });
+
+  afterEach(() => {
+    global.getComputedStyle = originalGetComputedStyle;
+  });
+
+  const ancestorStyle = (properties) => () => ({
+    getPropertyValue: (prop) => (prop in properties ? properties[prop] : ''),
+  });
+
+  test('a wrapper would cut the element out of the ancestor projection', () => {
+    // The ancestor's `perspective` applies to its direct children's transforms. Inserting a flat
+    // camera wrapper in between makes the element a grandchild, so the ancestor's camera would stop
+    // projecting the pose and a `perspective` of its own on the wrapper would double-project instead.
+    rewritePerspectiveKeyframes(
+      '@keyframes card { 0% { transform: ' + ROTATE_Y_45_PROJECTED + '; } 100% { transform: ' +
+        ROTATE_Y_45_PROJECTED + '; } }',
+    );
+    global.getComputedStyle = ancestorStyle({ perspective: '800px' });
+    const html =
+      '<div style="position: absolute; left: 0px; top: 0px; width: 80px; height: 40px; transform: ' +
+      affine + '; animation-name: card">x</div>';
+    const el = { parentElement: { parentElement: null } };
+    const result = withPerspectiveCamera(
+      html, {}, { animationName: 'card' }, { distance: 600, original: ROTATE_Y_45_PROJECTED, affine }, el,
+    );
+    expect(result).not.toContain('perspective: 600px');
+    // The pose keeps its authored projection and plays the un-stripped keyframes block.
+    expect(result).toContain(ROTATE_Y_45_PROJECTED);
+    expect(result).toContain('animation-name: card__pagxCam');
+    expect(pagxCameraSkips()['ancestor-camera']).toBe(1);
+  });
+
+  test('a preserve-3d ancestor is detected too', () => {
+    global.getComputedStyle = ancestorStyle({ 'transform-style': 'preserve-3d' });
+    expect(insideAncestorCamera({ parentElement: { parentElement: null } })).toBe(true);
+    global.getComputedStyle = ancestorStyle({ perspective: 'none', 'transform-style': 'flat' });
+    expect(insideAncestorCamera({ parentElement: { parentElement: null } })).toBe(false);
+    // A detached element has no ancestor space to preserve.
+    expect(insideAncestorCamera({ parentElement: null })).toBe(false);
+  });
+});

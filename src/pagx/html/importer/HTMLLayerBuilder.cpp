@@ -27,6 +27,7 @@
 #include "pagx/html/importer/HTMLDiagnosticSink.h"
 #include "pagx/html/importer/HTMLIdAllocator.h"
 #include "pagx/html/importer/HTMLSvgFilterDecoder.h"
+#include "pagx/html/importer/HTMLTransform3D.h"
 #include "pagx/html/importer/HTMLValueParser.h"
 #include "pagx/nodes/BackgroundBlurStyle.h"
 #include "pagx/nodes/BlurFilter.h"
@@ -181,6 +182,10 @@ bool HTMLLayerBuilder::requiresInnerHost(const HTMLBoxAttributes& box) {
 
 Layer* HTMLLayerBuilder::createInnerHost(Layer* outer, const HTMLBoxAttributes& box) {
   auto inner = _document->makeNode<Layer>();
+  // The inner host is the layer the children actually hang from, so it has to carry the 3D context as
+  // well: with `preserve-3d` left on the outer layer only, a background / padding element would
+  // flatten its subtree and the parent camera would stop at this host.
+  inner->preserve3D = outer->preserve3D;
   inner->percentWidth = 100.0f;
   inner->percentHeight = 100.0f;
   applyLayoutAttributes(inner, box);
@@ -694,36 +699,57 @@ void HTMLLayerBuilder::applyBackdropFilter(Layer* layer, const HTMLBoxAttributes
 }
 
 void HTMLLayerBuilder::applyBoxTransform(Layer* layer, const HTMLBoxAttributes& box,
-                                         const std::shared_ptr<DOMNode>& element) {
-  if (!box.transform.valid) return;
-  Matrix m = box.transform.matrix;
-  if (m.isIdentity()) return;
-  // Resolve the pivot (cx, cy). CSS resolves `transform-origin: 50% 50%`
-  // (the default) to the box's geometric centre; non-default origins set
-  // `originXPx/originYPx` during parsing so we honour the requested pivot
-  // here. Without explicit width/height on a default-origin transform we
-  // can't compute the centre, so the transform falls back to a top-left
-  // pivot — usually a visible mismatch, hence the warning.
-  float cx = NAN;
-  float cy = NAN;
-  if (!std::isnan(box.transform.originXPx) && !std::isnan(box.transform.originYPx)) {
-    cx = box.transform.originXPx;
-    cy = box.transform.originYPx;
-  } else if (!std::isnan(box.widthPx) && !std::isnan(box.heightPx)) {
-    cx = box.widthPx * 0.5f;
-    cy = box.heightPx * 0.5f;
-  } else {
-    std::string tag = (element ? element->name : std::string("?"));
-    _diagnostics.warn("html: transform on '<" + tag +
-                      ">' without explicit width/height; transform-origin defaults to top-left "
-                      "and may differ from CSS transform-origin: 50% 50%");
+                                         const std::string& elementName) {
+  if (!box.transform.valid) {
+    return;
   }
-  if (!std::isnan(cx) && !std::isnan(cy)) {
-    Matrix toCenter = Matrix::Translate(cx, cy);
-    Matrix fromCenter = Matrix::Translate(-cx, -cy);
-    m = toCenter * m * fromCenter;
+  // The pivot uses the same size fallback chain as the keyframe path, with this layer's final size as
+  // the last step; resolving it here (rather than in the cascade) is what makes the static and the
+  // animated pivot the same point (see `ResolveElementAnchor`).
+  const HTMLElementAnchor anchor =
+      ResolveElementAnchor(box.transform.originValue, box.transform.reference, layer, _valueParser);
+  // The pivot only matters for a pose with a non-identity linear part: a pure translation or a pure
+  // projection is unchanged by it, so an unresolved origin is not worth a diagnostic there.
+  // A declaration that `transform-origin` itself rejected has already been reported by the cascade
+  // with the initial-value fallback; only an unresolvable-but-legal value is worth a second message.
+  if (!anchor.resolved && anchor.valid && !IsLinearIdentity(box.transform.pose)) {
+    const std::string authored = box.transform.originValue.empty()
+                                     ? std::string("50% 50% (default)")
+                                     : box.transform.originValue;
+    _diagnostics.warn("html: transform-origin '" + authored + "' on <" + elementName +
+                      "> cannot be resolved against the box size; pivoting at the top-left "
+                      "corner");
   }
-  layer->matrix = m;
+  // `PlacePose` only classifies this element's own pose: whether it leaves the layer plane and whether
+  // the result is invertible. A `perspective` declared on the parent is carried by a wrapper layer and
+  // is not part of this pose.
+  const PosePlacement placement = PlacePose(box.transform.pose);
+  if (!placement.valid) {
+    _diagnostics.warn("html: transform becomes non-invertible; ignored");
+    return;
+  }
+  // The pivot is never folded into the pose: with a non-zero `anchor` the matrix `tx`/`ty` stay a
+  // pure translation, so the runtime can apply `T(anchor) * pose * T(-anchor)` once, after the
+  // keyframes have been interpolated. A pose whose linear part is the identity (pure translation or
+  // pure projection) is unaffected by the pivot, so it keeps the legacy matrix-only form.
+  const bool needsAnchor = anchor.resolved && !placement.linearIsIdentity;
+  if (placement.flat) {
+    const Matrix affine = ToAffine2D(placement.pose);
+    if (affine.isIdentity()) {
+      return;
+    }
+    if (needsAnchor) {
+      layer->anchor = anchor.point;
+      layer->anchorZ = anchor.depth;
+    }
+    layer->matrix = affine;
+    return;
+  }
+  if (needsAnchor) {
+    layer->anchor = anchor.point;
+    layer->anchorZ = anchor.depth;
+  }
+  layer->matrix3D = placement.pose;
 }
 
 void HTMLLayerBuilder::applyLayerAttributes(Layer* layer, const std::shared_ptr<DOMNode>& element,
@@ -740,6 +766,9 @@ void HTMLLayerBuilder::applyLayerAttributes(Layer* layer, const std::shared_ptr<
       layer->right = NAN;
       layer->centerX = 0.0f;
     }
+  }
+  if (box.preserve3D) {
+    layer->preserve3D = true;
   }
   if (box.opacitySet) layer->alpha = box.opacity;
   if (!box.mixBlendMode.empty()) {
@@ -897,6 +926,10 @@ Layer* HTMLLayerBuilder::maybeSplitBoxShadowFromClip(Layer* inner) {
   outer->blendMode = inner->blendMode;
   outer->matrix = inner->matrix;
   outer->matrix3D = inner->matrix3D;
+  // The pivot belongs to the pose: a layer that takes over the matrix must take over the anchor,
+  // otherwise the runtime would apply the pivot in the wrong coordinate space (or twice).
+  outer->anchor = inner->anchor;
+  outer->anchorZ = inner->anchorZ;
   outer->preserve3D = inner->preserve3D;
   outer->filters = std::move(inner->filters);
   outer->customData = std::move(inner->customData);
@@ -915,6 +948,8 @@ Layer* HTMLLayerBuilder::maybeSplitBoxShadowFromClip(Layer* inner) {
   inner->blendMode = BlendMode::Normal;
   inner->matrix = Matrix{};
   inner->matrix3D = Matrix3D{};
+  inner->anchor = {};
+  inner->anchorZ = 0.0f;
   inner->preserve3D = false;
 
   outer->children.push_back(inner);
@@ -952,6 +987,7 @@ Layer* HTMLLayerBuilder::wrapForMargin(Layer* inner, const HTMLBoxAttributes& bo
   // need to write explicit `inner->left / inner->top` here — the default (NaN, NaN) origin
   // lands on the padded-box top-left automatically.
   auto* outer = _document->makeNode<Layer>();
+  outer->preserve3D = inner->preserve3D;
   outer->padding.top = box.marginTopPx;
   outer->padding.right = box.marginRightPx;
   outer->padding.bottom = box.marginBottomPx;

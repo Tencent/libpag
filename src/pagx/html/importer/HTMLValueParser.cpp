@@ -315,7 +315,15 @@ Color HTMLValueParser::parseColor(const std::string& valueRaw) {
   return {0, 0, 0, 1, ColorSpace::SRGB};
 }
 
-float HTMLValueParser::parseAbsoluteLengthPx(const std::string& valueRaw) {
+float HTMLValueParser::parseQuietLengthPx(const std::string& valueRaw) {
+  const bool previous = _suppressEmNote;
+  _suppressEmNote = true;
+  const float px = parseAbsoluteLengthPx(valueRaw, /*warn=*/false);
+  _suppressEmNote = previous;
+  return px;
+}
+
+float HTMLValueParser::parseAbsoluteLengthPx(const std::string& valueRaw, bool warn) {
   std::string value = Trim(valueRaw);
   if (value.empty()) return NAN;
   char* end = nullptr;
@@ -333,12 +341,17 @@ float HTMLValueParser::parseAbsoluteLengthPx(const std::string& valueRaw) {
   float px = ConvertCssLengthToPx(num, suffix, /*fontSizePx=*/NAN, _canvasWidth, _canvasHeight,
                                   recognized);
   if (recognized) {
-    if (suffix == "em" || suffix == "rem") {
+    // The approximation is reported even when the caller suppresses the generic unit diagnostic:
+    // `warn` only covers the "value ignored" case below, and silently treating `1em` as 16px is worse
+    // than one extra line.
+    if (!_suppressEmNote && (suffix == "em" || suffix == "rem")) {
       _diagnostics.warn("html: em/rem unit not supported here; treated as 16px");
     }
     return px;
   }
-  _diagnostics.warn("html: length unit '" + suffix + "' not supported; value ignored");
+  if (warn) {
+    _diagnostics.warn("html: length unit '" + suffix + "' not supported; value ignored");
+  }
   return NAN;
 }
 

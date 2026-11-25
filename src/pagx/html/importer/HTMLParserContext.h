@@ -83,6 +83,12 @@ class HTMLParserContext {
   Layer* convertElement(const std::shared_ptr<DOMNode>& element,
                         const HTMLInheritedStyle& inherited, int depth);
 
+  void attachParentCamera(const std::shared_ptr<DOMNode>& element,
+                          const HTMLInheritedStyle& inherited);
+  void warnUnprojectedParentCamera(const std::shared_ptr<DOMNode>& element);
+
+  void forwardParentCamera(const HTMLBoxAttributes& box, HTMLInheritedStyle& childInherited);
+
   // Container conversion (for <div>-like elements). Emits the standard "outer
   // background + inner padded container" double-layer when both background and
   // padding/layout are present.
@@ -302,10 +308,30 @@ class HTMLParserContext {
   // `_valueParser` and `_idAllocator`; document handle + keyframes registry bound in parseDOM.
   std::unique_ptr<HTMLAnimationBuilder> _animationBuilder = nullptr;
 
-  // Elements carrying an `animation` declaration, paired with their finalised outer Layer.
+  // Camera attachments that cannot preserve the child's layout report once per document.
+  bool _flowChildPerspectiveWarned = false;
+
+  // Resolve attachment after conversion, when the parent's layout host and the child's sizing
+  // slot are known. Child keys prevent recursive conversion from overwriting a pending camera.
+  struct PendingCamera {
+    HTMLParentCamera camera = {};
+    // Declaring box reference, used by the positioned wrapper and the flow attachment admission.
+    float referenceWidthPx = NAN;
+    float referenceHeightPx = NAN;
+  };
+  std::unordered_map<const DOMNode*, PendingCamera> _pendingChildCamera = {};
+
+  Layer* wrapInCameraLayer(Layer* parent, Layer* child, const std::shared_ptr<DOMNode>& element,
+                           const HTMLParentCamera& camera, float referenceWidthPx,
+                           float referenceHeightPx);
+
   // Recorded during `assignElementId` and processed after the whole tree is built (so background
   // fills used by `color` channels already exist).
-  std::vector<std::pair<std::shared_ptr<DOMNode>, Layer*>> _pendingAnimations = {};
+  struct PendingAnimation {
+    std::shared_ptr<DOMNode> element = nullptr;
+    Layer* layer = nullptr;
+  };
+  std::vector<PendingAnimation> _pendingAnimations = {};
 
   // Inline-SVG shape descendants (`<path>`, `<rect>`, …) that declare a CSS animation. The wrapping
   // `<svg>` is serialised into a single import directive that is expanded (resolved) only after the
