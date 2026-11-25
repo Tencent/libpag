@@ -96,9 +96,11 @@ typedef enum {
 } pag_image_origin;
 
 /**
- * Describes an external OpenGL texture. C callers initialize all fields explicitly; C++ callers
- * keep the historical value-initialized defaults target GL_TEXTURE_2D (0x0DE1) and format
- * GL_RGBA8 (0x8058).
+ * Describes an external OpenGL texture. C callers must initialize every field; `= {0}` is not
+ * enough because C has no member defaults. Use, for example:
+ *   pag_gl_texture_info info = {0, 0x0DE1u, 0x8058u};
+ * C++ callers keep the historical value-initialized defaults target GL_TEXTURE_2D (0x0DE1) and
+ * format GL_RGBA8 (0x8058).
  */
 typedef struct pag_gl_texture_info {
 #ifdef __cplusplus
