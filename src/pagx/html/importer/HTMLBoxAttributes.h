@@ -75,8 +75,8 @@ struct HTMLInheritedStyle {
   // CSS `perspective` declared on the *parent* element (px), carried by the camera wrapper layer the
   // child is wrapped in, never folded into its pose. Not inherited: `resolveInheritedStyle` resets
   // it, and a parent sets it on the bag it hands to its direct children only. The origin is the
-  // parent's `perspective-origin` in the parent's local coordinates; `wrapInCameraLayer` re-expresses
-  // it in the wrapper's coordinates through `TranslateParentAnchors`.
+  // parent's `perspective-origin` in the parent's local coordinates; `wrapInCameraLayer` turns that
+  // into both the projection and the layout coordinates, whichever branch it takes.
   HTMLParentCamera parentCamera = {};
   // The declaring box's content size. The camera wrapper stands in for that box in the layer tree, so
   // it has to keep the same size or percentage / centre constraints of its children resolve against
