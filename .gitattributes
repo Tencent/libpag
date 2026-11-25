@@ -20,3 +20,8 @@
 *.lzma2 filter=lfs diff=lfs merge=lfs -text
 *.wasm filter=lfs diff=lfs merge=lfs -text
 *.bin filter=lfs diff=lfs merge=lfs -text
+# Windows batch files must keep CRLF so labels and goto work in cmd.exe.
+update_baseline.bat text eol=crlf
+autotest.bat text eol=crlf
+win/tools/*.bat text eol=crlf
+*.vcxproj text eol=crlf

@@ -528,7 +528,7 @@ static tgfx::Bitmap RenderCore(const RenderOptions& options) {
     CommandError("pagx render") << "failed to create the GPU device\n";
     return {};
   }
-  auto context = device->lockContext();
+  auto context = pag::Devices::LockContext(device);
   if (context == nullptr) {
     CommandError("pagx render") << "failed to lock the GPU context\n";
     return {};

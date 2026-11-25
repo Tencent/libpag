@@ -883,7 +883,9 @@ std::string HTMLStyleExtractor::Extract(const std::string& html) {
     std::unordered_set<std::string> droppedClasses;
     for (size_t ti = 0; ti < tags.size(); ti++) {
       if (tagClassNames[ti].size() != 1) continue;
-      const auto& name = tagClassNames[ti][0];
+      // Copy the name before clearing tagClassNames; a reference would dangle and make the
+      // droppedClasses lookup miss on implementations that clear the small-string buffer.
+      auto name = tagClassNames[ti][0];
       auto it = classIndex.find(name);
       if (it == classIndex.end()) continue;
       const auto& rule = classRules[it->second];
@@ -892,8 +894,8 @@ std::string HTMLStyleExtractor::Extract(const std::string& html) {
       if (classRefCount[name] != 1) continue;
       inlineStyle[ti] = rule.declarations;  // already in canonical property order
       hasInlineStyle[ti] = true;
-      tagClassNames[ti].clear();
       droppedClasses.insert(name);
+      tagClassNames[ti].clear();
     }
     if (!droppedClasses.empty()) {
       std::vector<ClassRule> kept;

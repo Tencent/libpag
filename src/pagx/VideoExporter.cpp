@@ -34,6 +34,7 @@
 #include "pagx/VideoExportInternal.h"
 #include "pagx/nodes/Animation.h"
 #include "pagx/runtime/Drawable.h"
+#include "rendering/gpu/Devices.h"
 #include "tgfx/core/Bitmap.h"
 #include "tgfx/core/Pixmap.h"
 
@@ -178,7 +179,7 @@ bool VideoExporterImpl::validateHostSurface(const std::shared_ptr<PAGSurface>& h
     failure->set(VideoExportError::DeviceLost, "the export surface has no GPU device");
     return false;
   }
-  auto* context = device->lockContext();
+  auto* context = pag::Devices::LockContext(device);
   if (context == nullptr) {
     failure->set(VideoExportError::DeviceLost, "failed to lock the export surface device");
     return false;

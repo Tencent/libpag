@@ -30,6 +30,7 @@
 #include "utils/TestUtils.h"
 
 namespace pag {
+#ifdef PAG_TEST_ACCESS_PRIVATE
 class ANRAnimatorListener : public PAGAnimator::Listener {
  public:
   void blockFirstUpdate() {
@@ -799,4 +800,5 @@ PAG_TEST(PAGANRRegressionTest, FailedSequenceRequestCanRetry) {
   EXPECT_TRUE(WaitForANRSequenceResult(secondResult, SequenceReadStatus::Succeeded));
   EXPECT_EQ(reader->readCount(), 2);
 }
+#endif
 }  // namespace pag

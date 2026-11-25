@@ -54,10 +54,13 @@ PAG_EXPORT void* pag_surface_get_back_hardware_buffer(pag_surface* surface);
  * Creates a new PAGSurface from specified backend texture and origin. Note, the texture must not
  * be bound to any frame buffer. This allows PAG to render directly into an externally provided texture.
  * Passes true in the forAsyncThread parameter if the returned PAGSurface needs to be used for
- * asynchronous rendering. If passing true, the PAGSurface internally creates an independent GPU
- * context, and the caller can use semaphore objects to synchronize content, otherwise, it uses the
- * GPU context on the calling thread directly.
- * Returns null if the texture is invalid.
+ * asynchronous rendering. If passing true, the surface uses an independent share context on
+ * OpenGL, or the texture's own device on Metal and D3D12 (serialized by the device lock).
+ * Semaphore synchronization is only available on backends that implement it; on D3D12 use
+ * pag_surface_wait_until_completed(). Otherwise OpenGL uses the calling thread's current GL
+ * context, while Metal and D3D12 use the texture's own device. WebGPU uses the runtime's default
+ * GPUDevice and is limited to the main runtime thread. Returns null if the texture is invalid or
+ * its device cannot be resolved.
  * Release it by pag_release.
  */
 PAG_EXPORT pag_surface* pag_surface_make_from_texture(pag_backend_texture* texture,

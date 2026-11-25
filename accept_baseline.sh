@@ -3,14 +3,14 @@
 # Accept screenshot baseline changes through the /accept-baseline command only.
 # Run this when adding new screenshot tests or refactoring rendering with expected output changes.
 # WARNING: Only run after confirming ALL screenshots in test/out/ match expected results.
-# Usage: ./accept_baseline.sh <USE_OPENGL|USE_OPENGL_SWIFTSHADER|USE_METAL>
+# Usage: ./accept_baseline.sh <USE_OPENGL|USE_OPENGL_SWIFTSHADER|USE_METAL|USE_D3D12|USE_D3D12_WARP>
 
 set -e
 cd "$(dirname "$0")"
 
 if [ "$#" -ne 1 ]; then
   echo "Error: specify exactly one backend." >&2
-  echo "Usage: $0 <USE_OPENGL|USE_OPENGL_SWIFTSHADER|USE_METAL>" >&2
+  echo "Usage: $0 <USE_OPENGL|USE_OPENGL_SWIFTSHADER|USE_METAL|USE_D3D12|USE_D3D12_WARP>" >&2
   exit 1
 fi
 
@@ -20,6 +20,14 @@ case "$1" in
     CMAKE_BACKEND_ARGS=(-DPAG_USE_METAL=ON -DPAG_USE_OPENGL=OFF -DPAG_USE_SWIFTSHADER=OFF)
     TARGET_SUFFIX=Metal
     ;;
+  USE_D3D12)
+    CMAKE_BACKEND_ARGS=(-DPAG_USE_D3D12=ON -DPAG_D3D12_USE_WARP=OFF -DPAG_USE_METAL=OFF -DPAG_USE_OPENGL=OFF)
+    TARGET_SUFFIX=D3D12
+    ;;
+  USE_D3D12_WARP)
+    CMAKE_BACKEND_ARGS=(-DPAG_USE_D3D12=ON -DPAG_D3D12_USE_WARP=ON -DPAG_USE_METAL=OFF -DPAG_USE_OPENGL=OFF)
+    TARGET_SUFFIX=D3D12
+    ;;
   USE_OPENGL_SWIFTSHADER)
     CMAKE_BACKEND_ARGS=(-DPAG_USE_METAL=OFF -DPAG_USE_OPENGL=ON -DPAG_USE_SWIFTSHADER=ON)
     TARGET_SUFFIX=OpenGL
@@ -28,7 +36,7 @@ case "$1" in
     TARGET_SUFFIX=OpenGL
     ;;
   -h|--help)
-    echo "Usage: $0 <USE_OPENGL|USE_OPENGL_SWIFTSHADER|USE_METAL>"
+    echo "Usage: $0 <USE_OPENGL|USE_OPENGL_SWIFTSHADER|USE_METAL|USE_D3D12|USE_D3D12_WARP>"
     exit 0
     ;;
   *) echo "Error: unknown backend '$1'." >&2; exit 1 ;;
@@ -38,10 +46,19 @@ if [ "${GTEST_TOTAL_SHARDS+x}" = x ] || [ "${GTEST_SHARD_INDEX+x}" = x ]; then
   echo "Error: baseline acceptance requires an unsharded test run." >&2
   exit 1
 fi
-if ! command -v python3 >/dev/null 2>&1; then
-  echo "Error: python3 is required to validate and merge baseline versions." >&2
+PYTHON=python3
+if ! command -v "$PYTHON" >/dev/null 2>&1; then
+  PYTHON=python
+fi
+if ! command -v "$PYTHON" >/dev/null 2>&1; then
+  echo "Error: Python 3 is required to validate and merge baseline versions." >&2
   exit 1
 fi
+
+EXE_SUFFIX=
+case "$(uname -s)" in
+  MINGW*|MSYS*|CYGWIN*) EXE_SUFFIX=.exe ;;
+esac
 
 BUILD_DIR=cmake-build-debug
 TEST_ARGS=(--gtest_filter='*' --gtest_repeat=1 --gtest_fail_fast=0
@@ -77,14 +94,14 @@ cp test/baseline/version.json "$TEMP_DIR/previous-ledger.json"
 rm -f test/out/version.json
 echo "Step 2: Running the complete PAGFullTest_$TARGET_SUFFIX suite..."
 FULL_TEST_RESULT=0
-"./$BUILD_DIR/PAGFullTest_$TARGET_SUFFIX" "${TEST_ARGS[@]}" || FULL_TEST_RESULT=$?
+"./$BUILD_DIR/PAGFullTest_$TARGET_SUFFIX$EXE_SUFFIX" "${TEST_ARGS[@]}" || FULL_TEST_RESULT=$?
 if [ "$FULL_TEST_RESULT" -ne 0 ] && [ "$FULL_TEST_RESULT" -ne 1 ]; then
   echo "Error: FullTest terminated abnormally (exit $FULL_TEST_RESULT). Baseline versions are unchanged." >&2
   exit 1
 fi
 
 echo "Step 3: Validating test output and merging baseline versions..."
-python3 - "$TEMP_DIR/previous-ledger.json" test/out/version.json \
+"$PYTHON" - "$TEMP_DIR/previous-ledger.json" test/out/version.json \
   "$TEMP_DIR/merged-ledger.json" <<'PY'
 import json
 import sys
@@ -138,7 +155,7 @@ mv "$TEMP_DIR/merged-ledger.json" test/baseline/version.json
 
 echo "Step 4: Building and running UpdateBaseline_$TARGET_SUFFIX..."
 cmake --build "$BUILD_DIR" --target "UpdateBaseline_$TARGET_SUFFIX"
-"./$BUILD_DIR/UpdateBaseline_$TARGET_SUFFIX" "${TEST_ARGS[@]}"
+"./$BUILD_DIR/UpdateBaseline_$TARGET_SUFFIX$EXE_SUFFIX" "${TEST_ARGS[@]}"
 ACCEPTANCE_COMPLETE=1
 
 echo "Baseline changes accepted successfully!"

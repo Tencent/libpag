@@ -18,6 +18,7 @@
 
 #ifndef SKIP_FRAME_COMPARE
 
+#include <filesystem>
 #include <map>
 #include <thread>
 #include <vector>
@@ -52,7 +53,7 @@ struct RenderCost {
 
 static void CompareFileFrames(const std::string& pagPath) {
   Clock fileClock = {};
-  auto fileName = pagPath.substr(pagPath.rfind('/') + 1, pagPath.size());
+  auto fileName = std::filesystem::path(pagPath).filename().string();
   auto pagFile = PAGFile::Load(pagPath);
   ASSERT_NE(pagFile, nullptr);
   auto width = static_cast<float>(pagFile->width());
@@ -109,9 +110,13 @@ static void CompareFileFrames(const std::string& pagPath) {
       Clock clock = {};
       currentSnapshot = MakeSnapshot(pagSurface);
       cost.readPixelsCost = clock.measure();
-      auto cache = pagPlayer->renderCache;
-      cost.totalTime = cache->totalTime + cost.readPixelsCost;
-      cost.performance = cache->getPerformanceString();
+      // clang-format off
+      PAG_PRIVATE_ACCESS(
+        auto cache = pagPlayer->renderCache;
+        cost.totalTime = cache->totalTime + cost.readPixelsCost;
+        cost.performance = cache->getPerformanceString();
+      )
+      // clang-format on
       performanceMap[currentFrame] = cost;
     }
     CompareFrame(currentFrame - 1);

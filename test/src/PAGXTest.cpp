@@ -145,6 +145,7 @@
 #include "utils/TestUtils.h"
 
 namespace pag {
+#ifdef PAG_TEST_ACCESS_PRIVATE
 using namespace tgfx;
 
 static std::shared_ptr<pagx::PAGXDocument> LoadAndResolve(const std::string& filePath) {
@@ -2262,7 +2263,8 @@ PAGX_TEST(PAGXTest, EmbeddingDoesNotMutateMountedDomain) {
 PAGX_TEST(PAGXTest, DetachedImageDomainDoesNotLeavePathIndex) {
   auto doc = pagx::PAGXDocument::Make(100, 100);
   auto* host = doc->makeNode<pagx::Layer>("host");
-  host->importDirective.content = R"(<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20">
+  host->importDirective.content =
+      R"(<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20">
   <image href="inline.png" width="20" height="20"/>
 </svg>)";
   doc->layers.push_back(host);
@@ -18790,4 +18792,5 @@ PAGX_TEST(PAGXTest, ShadowSpreadApproximations) {
 }
 
 // Canonical scene render test: Composition-wrapped layer with animation via scene.
+#endif
 }  // namespace pag

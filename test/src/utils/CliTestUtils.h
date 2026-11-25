@@ -31,8 +31,11 @@ std::string TempDir();
 /** Resolves a fixture name under resources/cli. */
 std::string TestResourcePath(const std::string& name);
 
-/** Reads an entire UTF-8 or byte-oriented test fixture into a string. */
+/** Reads an entire UTF-8 text fixture into a string. */
 std::string ReadTextFile(const std::string& path);
+
+/** Reads a binary fixture or archive into a string without text-mode translation. */
+std::string ReadBinaryTestFile(const std::string& path);
 
 /** Renders the shared animated-timeline fixture at a time in seconds. */
 tgfx::Bitmap RenderAnimatedTimelinesAt(const std::string& timeSeconds,

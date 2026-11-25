@@ -30,17 +30,11 @@
 
 #ifdef TGFX_USE_OPENGL
 #include "tgfx/gpu/opengl/GLTypes.h"
-#ifdef PAG_USE_SWIFTSHADER
-#include <GLES3/gl3.h>
-#else
-#ifndef GL_SILENCE_DEPRECATION
-#define GL_SILENCE_DEPRECATION
-#endif
-#include <OpenGL/gl3.h>
-#endif
+#include "utils/GLHeaders.h"
 #endif
 
 namespace pag {
+#ifdef PAG_TEST_ACCESS_PRIVATE
 
 /** Verifies scene textures are accounted independently and symmetrically with snapshots across
  * reuse, resize, idle release and full release. */
@@ -269,5 +263,6 @@ PAG_TEST(PAGTransform3DResourceTest, QueriesReuseSnapshotsAndReleaseSceneTexture
   EXPECT_EQ(cache.usedAssets, usedAssets);
   EXPECT_EQ(snapshot->idleFrames, 1);
 }
+#endif
 
 }  // namespace pag
