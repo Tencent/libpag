@@ -782,8 +782,8 @@ void HTMLStyleCascade::parseBoxTransform(HTMLBoxAttributes& box, const PropertyM
                                          float referenceHeightPx) {
   // CSS `perspective` on this element projects its children. The value rides on the box so the parser
   // context can hand it to the camera wrapper layer (`wrapInCameraLayer`); nothing is multiplied into
-  // a child pose. `perspective-origin` is resolved against the same reference box and travels with the
-  // camera, because PAGX projects about the layer origin and the wrapper is placed on that point.
+  // a child pose. `perspective-origin` is resolved against the same reference box and kept together
+  // with the distance, so the independent camera wrapper layer can express the parent projection.
   const std::string perspective = LookupLowerTrimmed(props, "perspective");
   if (!perspective.empty() && perspective != "none") {
     const float distance = _valueParser.parseAbsoluteLengthPx(perspective);

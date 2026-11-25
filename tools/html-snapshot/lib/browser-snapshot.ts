@@ -1955,8 +1955,8 @@ function readBoxTransform(computed) {
 // `transform-origin` conjugates the projection and PAGX (which keeps the projection outside
 // `anchor`, like AE / Lottie) cannot reproduce it. The subset therefore rewrites that form into the
 // equivalent `perspective` *property* on a wrapper element: CSS then projects the child's result
-// instead of conjugating it with the child's origin, and PAGX models it exactly (the importer places
-// a camera wrapper layer at the origin, so the child pose itself stays unprojected).
+// instead of conjugating it with the child's origin, and PAGX models it exactly (origin and distance
+// are kept together and the independent camera wrapper layer expresses the parent projection).
 //
 // The rewrite is exact because
 //   T(o) * P * T(-o) * [T(o) * L * T(-o)]  ==  T(o) * P * L * T(-o)
@@ -5655,8 +5655,8 @@ const STYLE_SCHEMA = [
   // The perspective declaration on this element is a camera for its children; the importer gives them
   // a camera wrapper layer that carries it, so no child pose mixes in the parent projection.
   { prop: 'perspective',      scope: 'box',  defaults: ['none'] },
-  // The vanishing point of the camera above; the importer places the camera wrapper layer on it, so it
-  // must survive the snapshot for authored origins. Chromium's computed value is in px, so the centre
+  // The vanishing point of the camera above; it is kept together with the distance so the independent
+  // camera wrapper layer can express the parent projection, and must survive for authored origins. Chromium's computed value is in px, so the centre
   // (the initial 50% 50%) is recognised by value against the element's own box, not by this string.
   { prop: 'perspective-origin', scope: 'box', defaults: ['50% 50%'], defaultsToBoxCentre: true },
   { prop: 'color',                 scope: 'text', defaults: ['rgb(0, 0, 0)'] },
