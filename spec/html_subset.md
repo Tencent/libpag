@@ -741,11 +741,13 @@ Limits of that rewrite, in order of how often they are hit:
 * A `perspective-origin` that cannot be resolved against the declaring box (no absolute size)
   warns once and is **not applied**: the vanishing point cannot be reproduced, so the children are
   left unprojected instead of being projected about the layer origin.
-* A child positioned only by `right` / `bottom` is wrapped like any other positioned child as long
-  as the declaring box has a **resolved reference size**: the far edges shift by `+origin` and the
-  near ones by `-origin`. When that size is unknown the projection is dropped with a diagnostic
-  instead, because the wrapper is the child's containing block and a size-less one collapses the
-  percentages inside it.
+* The wrapper doubles as the child's containing block, so it is only built when the declaring box has
+  a **resolved reference size** — a resolvable `perspective-origin` is not enough. With an unknown
+  size (`width: auto`, a percentage) the camera is **not applied**, the layout and the pose stay as
+  authored, and one diagnostic reports the dropped projection; a size-less wrapper would collapse
+  every percentage inside it.
+* A child positioned only by `right` / `bottom` is wrapped like any other positioned child: the far
+  edges shift by `+origin` and the near ones by `-origin`.
 * An inline-SVG shape animation ignores the parent camera. That is not a loss: shape transforms are
   restricted to the z = 0 plane (a 3D shape pose is rejected with a diagnostic), and a flat pose
   projects to itself (`w = 1`), so folding the camera in would not change a pixel.

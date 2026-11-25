@@ -720,13 +720,12 @@ void HTMLLayerBuilder::applyBoxTransform(Layer* layer, const HTMLBoxAttributes& 
                       "> cannot be resolved against the box size; pivoting at the top-left "
                       "corner");
   }
-  // A `perspective` declared on the parent projects this element's pose; `PlacePose` folds it in and
-  // classifies the result the same way the keyframe path does. The pivot depth takes part in that
-  // decision, because a flat pose pivoted off the layer plane does leave it.
+  // `PlacePose` only classifies this element's own pose: whether it leaves the layer plane and whether
+  // the result is invertible. A `perspective` declared on the parent is carried by a wrapper layer and
+  // is not part of this pose.
   const PosePlacement placement = PlacePose(box.transform.pose);
   if (!placement.valid) {
-    _diagnostics.warn(
-        "html: transform becomes non-invertible under the parent perspective; ignored");
+    _diagnostics.warn("html: transform becomes non-invertible; ignored");
     return;
   }
   // The pivot is never folded into the pose: with a non-zero `anchor` the matrix `tx`/`ty` stay a

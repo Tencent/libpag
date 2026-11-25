@@ -727,10 +727,9 @@ PAG_TEST(PAGXHTML3DTest, AnimatedInlineSvgHostResolvesCenterAnchor) {
 }
 
 /**
- * Test case: a `perspective` declared on the parent projects the child pose. PAGX keeps the
- * projection on the layer that owns the pose, so the importer pushes `P` into the child matrix3D
- * while the pivot stays on the child `anchor` — exactly the CSS "parent camera + child origin"
- * order (and the AE / Lottie one).
+ * Test case: a `perspective` declared on the parent projects the child. The importer gives the child
+ * a camera wrapper layer carrying `perspective`, so the child pose stays unprojected and the pivot
+ * stays on the child `anchor` — exactly the CSS "parent camera + child origin" order.
  */
 PAG_TEST(PAGXHTML3DTest, ParentPerspectiveProjectsTheChildPose) {
   auto doc = ParseHtml(R"HTML(
@@ -780,9 +779,9 @@ PAG_TEST(PAGXHTML3DTest, AuthoredPerspectiveOriginMovesTheVanishingPoint) {
 }
 
 /**
- * Test case: the parent `perspective` also projects animated keyframes, and the pivot stays on the
- * child layer so the interpolation never carries a pivot translation. Only the stops that leave the
- * z = 0 plane are projected; a flat stop keeps its own pose.
+ * Test case: the parent `perspective` also projects animated keyframes. The camera lives on a wrapper
+ * layer, so every stop stays a pure pose (no projection row) and the projection is applied once, after
+ * interpolation; the pivot stays on the child layer.
  */
 PAG_TEST(PAGXHTML3DTest, ParentPerspectiveProjectsAnimatedKeyframes) {
   auto doc = ParseHtml(R"HTML(
@@ -928,9 +927,9 @@ PAG_TEST(PAGXHTML3DTest, PivotDepthAloneDoesNotLeaveTheLayerPlane) {
 }
 
 /**
- * Test case: a flow / flex child has no resolved offset from the parent's box, so the parent camera
- * cannot be projected around the exact vanishing point. That has to be reported once per document
- * instead of silently shifting the centre of every such child.
+ * Test case: a flex-placed child has no resolved offset from the parent's box, so the camera wrapper
+ * has nothing to shift it by. That has to be reported once per document instead of silently moving the
+ * vanishing point of every such child.
  */
 PAG_TEST(PAGXHTML3DTest, FlowChildrenUnderPerspectiveWarnOnce) {
   auto doc = ParseHtml(R"HTML(
@@ -952,7 +951,7 @@ PAG_TEST(PAGXHTML3DTest, FlowChildrenUnderPerspectiveWarnOnce) {
     }
   }
   EXPECT_EQ(warnings, 1) << "a flex container with many children must not repeat the diagnostic";
-  // A flow child cannot be wrapped, so the projection is dropped rather than folded elsewhere.
+  // A flex-placed child has no offset the wrapper could shift, so its projection is dropped.
   auto* a = FindLayerById(doc, "a");
   ASSERT_NE(a, nullptr);
   EXPECT_TRUE(NearlyEqual(a->matrix3D.getRowColumn(3, 2), 0.0f, 1e-5f));
@@ -1271,8 +1270,9 @@ PAG_TEST(PAGXHTML3DTest, Preserve3DFlowLayerKeepsCameraForFlexDescendants) {
 }
 
 /**
- * Test case: a `data-pagx-text` host is converted outside `convertElement`, so the parent camera has
- * to be folded in explicitly; otherwise a 3D transform on a restored text host loses its projection.
+ * Test case: a `data-pagx-text` host is converted outside `convertElement`, so its camera has to be
+ * attached by the same wrapper mechanism explicitly; otherwise a 3D transform on a restored text host
+ * loses its projection.
  */
 PAG_TEST(PAGXHTML3DTest, PAGXTextHostKeepsParentPerspective) {
   auto doc = ParseHtml(R"HTML(
@@ -1532,9 +1532,8 @@ PAG_TEST(PAGXHTML3DTest, PlainIntermediateLayerEndsTheCameraChain) {
 }
 
 /**
- * Test case: a `preserve-3d` layer that has its own non-identity flat transform keeps the existing
- * single-fold route. A flat pose is pivoted on the plane, so the camera does not apply and the layer
- * writes no projection — the flat pose itself is the layer's whole transform.
+ * Test case: a `preserve-3d` layer that has its own non-identity flat transform keeps that pose on the
+ * 2D channel. The camera sits on a wrapper above it, so the layer writes no projection of its own.
  */
 PAG_TEST(PAGXHTML3DTest, Preserve3DWithOwnFlatTransformKeepsTheExistingRoute) {
   auto doc = ParseHtml(R"HTML(
@@ -1613,8 +1612,9 @@ PAG_TEST(PAGXHTML3DTest, IdentityTransformKeepsTheBarePreserve3DCamera) {
     EXPECT_FALSE(HasProjectionRow(card)) << value;
   }
 
-  // An identity pose is no pose, so a flat but non-identity one must not take the bare camera route:
-  // `scale(0)` has to stay a zero linear block, otherwise the invisible-element fix regresses.
+  // An identity pose is no pose, so a flat but non-identity one must keep its own pose instead of
+  // being absorbed by the camera: `scale(0)` has to stay a zero linear block, otherwise the
+  // invisible-element fix regresses.
   auto scaleZero = ParseHtml(R"HTML(
     <html><body style="width:200px;height:120px">
       <div style="position:absolute;left:0;top:0;width:200px;height:120px;perspective:600px;

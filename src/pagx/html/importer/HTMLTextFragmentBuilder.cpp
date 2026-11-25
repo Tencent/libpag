@@ -216,9 +216,10 @@ Layer* HTMLTextFragmentBuilder::convertPAGXTextHost(const std::shared_ptr<DOMNod
   // Child span offsets are relative to the positioned container; recover the absolute position
   // as container + first-child offset. Only left/top are honoured — per-glyph transforms
   // (rotation / scale / skew) belong to individual glyphs and cannot apply to the whole run.
-  // `containerBox` comes from the caller, which already folded in the parent camera: the host is
-  // converted without going through `convertElement`, and resolving the box a second time here
-  // would report every box-level diagnostic for the same element twice.
+  // `containerBox` comes from the caller, which already resolved it: the host is converted without
+  // going through `convertElement`, and resolving the box a second time here would report every
+  // box-level diagnostic for the same element twice. The parent camera is attached outside this
+  // function, so the box itself carries no projection.
   HTMLBoxAttributes box = containerBox;
   if (firstSpan) {
     const HTMLBoxAttributes spanBox = _styleCascade.computeBoxAttributes(firstSpan);
