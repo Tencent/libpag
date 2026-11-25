@@ -72,10 +72,11 @@ static constexpr float HTML_IMAGE_WRAPPER_TOLERANCE_PX = 0.5f;
  * whether to inherit further or use their own defaults).
  */
 struct HTMLInheritedStyle {
-  // CSS `perspective` declared on the *parent* element (px), pushed into this element's pose. Not
-  // inherited: `resolveInheritedStyle` resets it, and a parent sets it on the bag it hands to its
-  // direct children only. The origin is the parent's `perspective-origin` in the parent's local
-  // coordinates; the child subtracts its own offset to express it locally.
+  // CSS `perspective` declared on the *parent* element (px), carried by the camera wrapper layer the
+  // child is wrapped in, never folded into its pose. Not inherited: `resolveInheritedStyle` resets
+  // it, and a parent sets it on the bag it hands to its direct children only. The origin is the
+  // parent's `perspective-origin` in the parent's local coordinates; `wrapInCameraLayer` re-expresses
+  // it in the wrapper's coordinates through `TranslateParentAnchors`.
   HTMLParentCamera parentCamera = {};
   // The declaring box's content size. The camera wrapper stands in for that box in the layer tree, so
   // it has to keep the same size or percentage / centre constraints of its children resolve against
@@ -316,10 +317,10 @@ struct HTMLBoxAttributes {
   // CSS `transform-style: preserve-3d`, forwarded onto `Layer.preserve3D`.
   bool preserve3D = false;
 
-  // CSS `perspective: <d>` on this element: a camera that projects its **children**. PAGX keeps the
-  // projection on the layer that owns the pose, so the parent value is pushed into each child pose
-  // as `P * pose`, where `P` is the identity with bottom row `(0, 0, -1/d, 1)`. 0 means "no
-  // perspective".
+  // CSS `perspective: <d>` on this element: a camera that projects its **children**. PAGX composes
+  // `perspective` outside the pose, so the importer gives the children a wrapper layer carrying it
+  // (`wrapInCameraLayer`) instead of folding `P * pose` into them: folded, a fixed camera would be
+  // interpolated together with the pose. 0 means "no perspective".
   HTMLParentCamera camera = {};
 
   HTMLTransform transform = {};

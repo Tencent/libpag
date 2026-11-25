@@ -472,11 +472,11 @@ const PropertyEntry SubsetPropertyEntries[] = {
     {"margin-right", PropAction::Transform, &ResolveLength, nullptr},
     {"margin-bottom", PropAction::Transform, &ResolveLength, nullptr},
     {"margin-left", PropAction::Transform, &ResolveLength, nullptr},
-    // `perspective` is forwarded so the importer can push it onto the children: PAGX keeps the
-    // projection on the layer that owns the pose, CSS keeps it on the parent.
+    // `perspective` is forwarded so the importer can give the children a wrapper layer carrying it:
+    // PAGX composes the projection outside the pose, so it stays static while the pose animates.
     {"perspective", PropAction::Keep, nullptr, nullptr},
-    // `perspective-origin` is the vanishing point of that camera; the importer folds it into the
-    // child pose, so the authored value has to survive the subset pass.
+    // `perspective-origin` is the vanishing point of that camera; the importer places the wrapper at
+    // it and shifts the child's layout anchors, so the authored value has to survive the subset pass.
     {"perspective-origin", PropAction::Keep, nullptr, nullptr},
     // Explicit drops -- recorded with rich diagnostics rather than the default "not in subset".
     {"outline", PropAction::Drop, nullptr, "is not in the subset"},
