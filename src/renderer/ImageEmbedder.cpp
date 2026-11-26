@@ -31,7 +31,10 @@ static constexpr size_t MaxFileSize = 256 * 1024 * 1024;
 
 static bool IsUrlPath(const std::string& path) {
   auto colon = path.find(':');
-  if (colon == std::string::npos) {
+  auto separator = path.find_first_of("/\\");
+  // A URI scheme must precede path separators. Extended Windows paths have a drive colon after
+  // their prefix separator, so that colon must not make them remote resources.
+  if (colon == std::string::npos || (separator != std::string::npos && separator < colon)) {
     return false;
   }
   // A Windows drive letter ("C:\..." or "C:/...") is a local path, not a URL scheme.

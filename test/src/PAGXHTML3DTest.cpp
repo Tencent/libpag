@@ -1449,14 +1449,11 @@ PAG_TEST(PAGXHTML3DTest, CameraWrapperKeepsTwoEdgeConstraintsEquivalent) {
   EXPECT_TRUE(std::isnan(fill->centerY));
 
   doc->applyLayout();
-  // clang-format off
-  PAG_PRIVATE_ACCESS(
-    EXPECT_FLOAT_EQ(fill->layoutWidth, 200.0f)
-        << "the two-edge span must keep the parent's width, not grow to 300px";
-    EXPECT_FLOAT_EQ(fill->layoutHeight, 100.0f)
-        << "the two-edge span must keep the parent's height, not grow to 150px";
-  )
-  // clang-format on
+  const auto bounds = fill->layoutBounds();
+  EXPECT_FLOAT_EQ(bounds.width, 200.0f)
+      << "the two-edge span must keep the parent's width, not grow to 300px";
+  EXPECT_FLOAT_EQ(bounds.height, 100.0f)
+      << "the two-edge span must keep the parent's height, not grow to 150px";
   // Wrapper space -> parent space: the pinned rect still covers the parent box exactly.
   EXPECT_TRUE(NearlyEqual(wrapper->renderPosition().x + fill->renderPosition().x, 0.0f, 1e-4f));
   EXPECT_TRUE(NearlyEqual(wrapper->renderPosition().y + fill->renderPosition().y, 0.0f, 1e-4f));

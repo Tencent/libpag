@@ -132,9 +132,9 @@ static void ResetDiskCacheFixture(const std::string& cacheDir, size_t maxDiskSiz
 }
 
 #ifdef __APPLE__
-// The committed fixture under resources/disk/libpag was produced with the Apple system LZ4
-// (COMPRESSION_LZ4), which the other platforms' decoders cannot read, so this golden-size case
-// only runs where the fixture can be loaded.
+// The committed fixture under resources/disk/libpag has the LZ4_APPLE compression tag.
+// SequenceFile rejects that tag on non-Apple platforms before decoding any frames, so this
+// fixed-size fixture case only runs where the tag matches the native cache format.
 static constexpr size_t InitialSequenceDiskSize = 568915u;
 
 struct SequenceFileState {

@@ -283,6 +283,10 @@ if not exist "%BUILD_DIR%\%BASELINE_TARGET%.exe" (
 )
 rem A stale baseline-out left by an aborted run must not be renamed in as this run's output.
 if exist "%WORKSPACE%\test\baseline-out" rmdir /s /q "%WORKSPACE%\test\baseline-out"
+if exist "%WORKSPACE%\test\baseline-out" (
+  call :Fail "Cannot clear test\baseline-out. Close any program holding its files before retrying."
+  goto :cleanup
+)
 "%BUILD_DIR%\%BASELINE_TARGET%.exe"
 set "BASELINE_EXIT=%ERRORLEVEL%"
 rem A crashed test binary returns a negative exit code, which `if errorlevel 1` misses because cmd
