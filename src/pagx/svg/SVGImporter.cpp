@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "pagx/SVGImporter.h"
+#include <algorithm>
 #include <cctype>
 #include <cmath>
 #include <cstdlib>
@@ -26,6 +27,7 @@
 #include "pagx/PAGXDocument.h"
 #include "pagx/nodes/AnimationObject.h"
 #include "pagx/nodes/Channel.h"
+#include "pagx/nodes/NoiseFilter.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/SolidColor.h"
 #include "pagx/svg/SVGBlendMode.h"
@@ -2084,6 +2086,101 @@ void SVGParserContext::parseMaskChildren(const std::shared_ptr<DOMNode>& parent,
     child = child->getNextSibling();
   }
 }
+bool SVGParserContext::convertNoiseFilter(
+    const std::vector<std::shared_ptr<DOMNode>>& primitives,
+    std::vector<LayerFilter*>& filters) {
+  std::shared_ptr<DOMNode> turbulence;
+  bool hasShadowPrimitive = false;
+  bool hasMerge = false;
+  bool hasRgbTransfer = false;
+  bool hasDensity = false;
+  float density = 0.5f;
+  float multiOpacity = -1.0f;
+  std::vector<Color> floodColors;
+
+  for (const auto& primitive : primitives) {
+    if (!primitive) {
+      continue;
+    }
+    if (primitive->name == "feTurbulence") {
+      turbulence = primitive;
+    } else if (primitive->name == "feOffset" || primitive->name == "feGaussianBlur" ||
+               primitive->name == "feMorphology") {
+      hasShadowPrimitive = true;
+    } else if (primitive->name == "feMerge") {
+      hasMerge = true;
+    } else if (primitive->name == "feFlood") {
+      auto floodOpacity =
+          strtof(getAttribute(primitive, "flood-opacity", "1").c_str(), nullptr);
+      if (floodOpacity > 0.0f) {
+        floodColors.push_back(parseColor(getAttribute(primitive, "flood-color", "black")));
+      }
+    } else if (primitive->name == "feComponentTransfer") {
+      auto child = primitive->getFirstChild();
+      while (child) {
+        if (child->name == "feFuncR" || child->name == "feFuncG" ||
+            child->name == "feFuncB") {
+          hasRgbTransfer = true;
+        } else if (child->name == "feFuncA") {
+          const auto type = getAttribute(child, "type");
+          auto values = ParseFloatList(getAttribute(child, "tableValues"));
+          if (type == "discrete" && !values.empty() && !hasDensity) {
+            size_t visible = 0;
+            for (float value : values) {
+              if (value > 0.5f) {
+                ++visible;
+              }
+            }
+            auto coverage = static_cast<float>(visible) / static_cast<float>(values.size());
+            density = std::clamp((coverage * 100.0f - 1.0f) / 49.0f, 0.0f, 1.0f);
+            hasDensity = true;
+          } else if (type == "table" && values.size() == 2 && multiOpacity < 0.0f) {
+            multiOpacity = values[1];
+          }
+        }
+        child = child->getNextSibling();
+      }
+    } else if (primitive->name == "feColorMatrix" && multiOpacity < 0.0f) {
+      auto values = ParseFloatList(getAttribute(primitive, "values"));
+      if (values.size() >= 20 && values[18] > 0.0f && values[18] < 1.0f) {
+        multiOpacity = values[18];
+      }
+    }
+  }
+
+  if (!turbulence || hasShadowPrimitive) {
+    return false;
+  }
+  if (floodColors.empty() && !hasRgbTransfer) {
+    return false;
+  }
+  if (!hasMerge && floodColors.empty() && !hasRgbTransfer) {
+    return false;
+  }
+
+  auto* noise = _document->makeNode<NoiseFilter>();
+  auto baseFrequency = ParseFloatList(getAttribute(turbulence, "baseFrequency", "0.25"));
+  float frequency = baseFrequency.empty() ? 0.25f : baseFrequency[0];
+  noise->size = frequency > 0.0f ? 1.0f / frequency : 4.0f;
+  noise->seed = strtof(getAttribute(turbulence, "seed", "0").c_str(), nullptr);
+  noise->density = hasDensity ? density : 0.5f;
+
+  if (floodColors.size() >= 2) {
+    noise->mode = NoiseMode::Duo;
+    noise->firstColor = floodColors[0];
+    noise->secondColor = floodColors[1];
+  } else if (hasRgbTransfer) {
+    noise->mode = NoiseMode::Multi;
+    noise->opacity = multiOpacity >= 0.0f ? multiOpacity : 0.15f;
+  } else {
+    noise->mode = NoiseMode::Mono;
+    noise->color = floodColors[0];
+  }
+
+  filters.push_back(noise);
+  return true;
+}
+
 bool SVGParserContext::convertFilterElement(const std::shared_ptr<DOMNode>& filterElement,
                                             std::vector<LayerFilter*>& filters,
                                             std::vector<LayerStyle*>& styles,
@@ -2129,6 +2226,11 @@ bool SVGParserContext::convertFilterElement(const std::shared_ptr<DOMNode>& filt
     if (blurMergesWithSource) {
       break;
     }
+  }
+
+  // A pure feTurbulence chain is a noise effect, not a shadow/blur; consume it as one NoiseFilter.
+  if (convertNoiseFilter(primitives, filters)) {
+    return true;
   }
 
   // Detect Figma-style drop shadow pattern and extract shadow parameters.

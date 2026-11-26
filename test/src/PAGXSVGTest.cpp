@@ -50,6 +50,7 @@
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/ImagePattern.h"
 #include "pagx/nodes/InnerShadowFilter.h"
+#include "pagx/nodes/NoiseFilter.h"
 #include "pagx/nodes/LinearGradient.h"
 #include "pagx/nodes/MergePath.h"
 #include "pagx/nodes/Path.h"
@@ -7669,6 +7670,91 @@ PAGX_TEST(PAGXSVGTest, SVGImport_FigmaDropShadowInnerShadowForegroundBlur) {
   ASSERT_EQ(blur->nodeType(), pagx::NodeType::BlurFilter);
   EXPECT_FLOAT_EQ(blur->blurX, 15.0f);
   EXPECT_FLOAT_EQ(blur->blurY, 15.0f);
+}
+
+
+/**
+ * Figma Duo noise: feTurbulence -> two thresholded alpha bands filled with two flood colors and
+ * merged over the shape. Maps to NoiseFilter mode=Duo.
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_FigmaDuoNoise) {
+  std::string svg =
+      "<svg width=\"50\" height=\"50\"><g filter=\"url(#n)\">"
+      "<rect width=\"50\" height=\"50\" fill=\"#D9D9D9\"/></g>"
+      "<defs><filter id=\"n\"><feTurbulence type=\"fractalNoise\" "
+      "baseFrequency=\"0.6666667\" numOctaves=\"3\" seed=\"2488\"/>"
+      "<feColorMatrix type=\"luminanceToAlpha\" result=\"alphaNoise\"/>"
+      "<feComponentTransfer in=\"alphaNoise\" result=\"band1\">"
+      "<feFuncA type=\"discrete\" tableValues=\"0 1 0 1\"/></feComponentTransfer>"
+      "<feComponentTransfer in=\"alphaNoise\" result=\"band2\">"
+      "<feFuncA type=\"discrete\" tableValues=\"1 0 1 0\"/></feComponentTransfer>"
+      "<feFlood flood-color=\"rgba(255, 0, 0, 0.25)\"/>"
+      "<feComposite operator=\"in\" in2=\"band1\"/>"
+      "<feFlood flood-color=\"rgba(255, 234, 0, 0.25)\"/>"
+      "<feComposite operator=\"in\" in2=\"band2\"/>"
+      "<feMerge><feMergeNode in=\"SourceGraphic\"/></feMerge>"
+      "</filter></defs></svg>";
+  auto doc = pagx::SVGImporter::ParseString(svg);
+  ASSERT_NE(doc, nullptr);
+  pagx::Layer* filtered = nullptr;
+  for (auto* root : doc->layers) {
+    filtered = FindLayerWithFilters(root);
+    if (filtered != nullptr) {
+      break;
+    }
+  }
+  ASSERT_NE(filtered, nullptr);
+  ASSERT_EQ(filtered->filters.size(), 1u);
+  auto* noise = static_cast<pagx::NoiseFilter*>(filtered->filters[0]);
+  ASSERT_EQ(noise->nodeType(), pagx::NodeType::NoiseFilter);
+  EXPECT_EQ(noise->mode, pagx::NoiseMode::Duo);
+  EXPECT_NEAR(noise->size, 1.5f, 1e-4f);
+  EXPECT_FLOAT_EQ(noise->seed, 2488.0f);
+  EXPECT_NEAR(noise->density, 1.0f, 1e-4f);
+  EXPECT_FLOAT_EQ(noise->firstColor.red, 1.0f);
+  EXPECT_FLOAT_EQ(noise->firstColor.alpha, 0.25f);
+  EXPECT_FLOAT_EQ(noise->secondColor.red, 1.0f);
+  EXPECT_NEAR(noise->secondColor.green, 234.0f / 255.0f, 1e-4f);
+  EXPECT_FLOAT_EQ(noise->secondColor.alpha, 0.25f);
+}
+
+/**
+ * Figma Multi noise: feTurbulence RGB with contrast, discrete alpha band, final alpha table that
+ * sets the noise opacity. Maps to NoiseFilter mode=Multi with the table's second value as opacity.
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_FigmaMultiNoise) {
+  std::string svg =
+      "<svg width=\"50\" height=\"50\"><g filter=\"url(#n)\">"
+      "<rect width=\"50\" height=\"50\" fill=\"#D9D9D9\"/></g>"
+      "<defs><filter id=\"n\"><feTurbulence type=\"fractalNoise\" "
+      "baseFrequency=\"0.6666667\" numOctaves=\"3\" seed=\"2488\"/>"
+      "<feComponentTransfer in=\"noise\"><feFuncR type=\"linear\" slope=\"2\" intercept=\"-0.5\"/>"
+      "<feFuncG type=\"linear\" slope=\"2\" intercept=\"-0.5\"/>"
+      "<feFuncB type=\"linear\" slope=\"2\" intercept=\"-0.5\"/>"
+      "<feFuncA type=\"discrete\" tableValues=\"1 1 0 0\"/></feComponentTransfer>"
+      "<feComposite operator=\"in\" in2=\"SourceGraphic\"/>"
+      "<feComponentTransfer><feFuncA type=\"table\" tableValues=\"0 0.29\"/>"
+      "</feComponentTransfer>"
+      "<feMerge><feMergeNode in=\"SourceGraphic\"/></feMerge>"
+      "</filter></defs></svg>";
+  auto doc = pagx::SVGImporter::ParseString(svg);
+  ASSERT_NE(doc, nullptr);
+  pagx::Layer* filtered = nullptr;
+  for (auto* root : doc->layers) {
+    filtered = FindLayerWithFilters(root);
+    if (filtered != nullptr) {
+      break;
+    }
+  }
+  ASSERT_NE(filtered, nullptr);
+  ASSERT_EQ(filtered->filters.size(), 1u);
+  auto* noise = static_cast<pagx::NoiseFilter*>(filtered->filters[0]);
+  ASSERT_EQ(noise->nodeType(), pagx::NodeType::NoiseFilter);
+  EXPECT_EQ(noise->mode, pagx::NoiseMode::Multi);
+  EXPECT_NEAR(noise->size, 1.5f, 1e-4f);
+  EXPECT_FLOAT_EQ(noise->seed, 2488.0f);
+  EXPECT_NEAR(noise->density, 1.0f, 1e-4f);
+  EXPECT_FLOAT_EQ(noise->opacity, 0.29f);
 }
 
 }  // namespace pag

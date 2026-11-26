@@ -212,6 +212,11 @@ class SVGParserContext {
   std::pair<float, float> parseFilterBlur(const std::shared_ptr<DOMNode>& node);
   Color parseFilterColorMatrix(const std::shared_ptr<DOMNode>& node);
 
+  // Converts a Figma/exporter-style feTurbulence noise filter. Returns true when the filter is
+  // fully represented by one NoiseFilter and the remaining primitives should not be parsed again.
+  bool convertNoiseFilter(const std::vector<std::shared_ptr<DOMNode>>& primitives,
+                          std::vector<LayerFilter*>& filters);
+
   // Create a DropShadowFilter node with the given parameters.
   DropShadowFilter* createDropShadow(float offsetX, float offsetY, float blurX, float blurY,
                                      const Color& color, bool shadowOnly);
