@@ -182,6 +182,6 @@ Please comply with [the personal information processing rules of PAG SDK](https:
 If you have any ideas or suggestions to improve libpag, welcome to submit
 an [issue](https://github.com/Tencent/libpag/issues/new/choose)
 / [pull request](https://github.com/Tencent/libpag/pulls). Before making a pull request or issue,
-please make sure to read [Contributing Guide](./CONTRIBUTING.md).
+please make sure to read [Contributing Guide](../../CONTRIBUTING.md).
 
 
