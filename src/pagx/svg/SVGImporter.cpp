@@ -2309,6 +2309,37 @@ bool SVGParserContext::convertFilterElement(const std::shared_ptr<DOMNode>& filt
       }
     }
 
+    // Skia/Figma style shadow without SourceAlpha: feOffset (implicit input or
+    // SourceGraphic) -> feGaussianBlur -> [feColorMatrix]. The first primitive has no
+    // "in", so it offsets the source graphic itself instead of its alpha channel.
+    if (node->name == "feOffset") {
+      const std::string offsetIn = getAttribute(node, "in");
+      const bool offsetsSource = offsetIn.empty() || offsetIn == "SourceGraphic";
+      if (offsetsSource && i + 1 < primitives.size() &&
+          primitives[i + 1]->name == "feGaussianBlur") {
+        auto [offsetX, offsetY] = parseFilterOffset(node);
+        auto [blurX, blurY] = parseFilterBlur(primitives[i + 1]);
+
+        Color shadowColor = {0, 0, 0, 1.0f};
+        if (i + 2 < primitives.size() && primitives[i + 2]->name == "feColorMatrix") {
+          shadowColor = parseFilterColorMatrix(primitives[i + 2]);
+        }
+
+        auto* filter = createDropShadow(offsetX, offsetY, blurX, blurY, shadowColor, shadowOnly);
+        registerFilterAnimationTarget(filter, primitives[i + 1], node);
+        filters.push_back(filter);
+
+        i += 2;
+        if (i < primitives.size() && primitives[i]->name == "feColorMatrix") {
+          i++;
+        }
+        while (i < primitives.size() && primitives[i]->name == "feBlend") {
+          i++;
+        }
+        continue;
+      }
+    }
+
     // Check for blur filter that should apply to the source graphic.
     // This includes:
     // 1. feGaussianBlur with in="SourceGraphic"
