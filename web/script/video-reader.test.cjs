@@ -281,7 +281,6 @@ function assertClean(environment, video) {
   assert.equal(environment.clock.frames.size, 0);
   assert.equal(environment.document.count(), 0);
   assert.equal(video.count(), 0);
-  assert.equal(video.frameCallbacks.size, 0);
 }
 
 test('same-frame preparation follows the latest play intent and playback rate', async function () {
@@ -424,19 +423,20 @@ test('the final frame waits until the video element presents it', async function
   const pending = reader.prepare(59, 1);
   await drainMicrotasks();
   assert.equal(reader.getCurrentFrame(), -1);
-  assert.equal(video.frameCallbacks.size, 1);
+  assert.equal(video.frameCallbacks.size, 2);
   video.presentFrame(58 / 30);
   await drainMicrotasks();
   assert.equal(reader.getCurrentFrame(), -1);
-  assert.equal(video.frameCallbacks.size, 1);
+  assert.equal(video.frameCallbacks.size, 2);
   video.presentFrame(59 / 30);
   assert.equal(await pending, true);
   assert.equal(reader.getCurrentFrame(), 59);
   assert.equal(reader.getError(), null);
+  assert.equal(video.frameCallbacks.size, 1);
   assertClean(environment, video);
 });
 
-test('a missing final frame presentation keeps the current picture', async function () {
+test('a missing final frame presentation falls back to a forced seek', async function () {
   const environment = createEnvironment();
   const video = new Video();
   video.duration = 2;
@@ -445,27 +445,38 @@ test('a missing final frame presentation keeps the current picture', async funct
   const reader = makeReader(environment, video);
   const pending = reader.prepare(59, 1);
   await drainMicrotasks();
-  assert.equal(video.frameCallbacks.size, 1);
   environment.clock.advance(100);
+  await drainMicrotasks();
+  assert.equal(video.seeking, true);
+  assert.equal(video.currentTimeValue, 59.5 / 30);
+  video.finishSeek();
+  await drainMicrotasks();
+  environment.clock.renderFrame();
   assert.equal(await pending, true);
   assert.equal(reader.getCurrentFrame(), 59);
   assert.equal(reader.getError(), null);
   assertClean(environment, video);
 });
 
-test('a paused final frame is committed without waiting for presentation', async function () {
+test('a paused final frame is forced by seeking to the middle of the frame', async function () {
   const environment = createEnvironment();
   const video = new Video();
   video.duration = 2;
   video.currentTimeValue = 59 / 30;
   const reader = makeReader(environment, video);
-  assert.equal(await reader.prepare(59, 1), true);
+  const pending = reader.prepare(59, 1);
+  await drainMicrotasks();
+  assert.equal(video.seeking, true);
+  assert.equal(video.currentTimeValue, 59.5 / 30);
+  video.finishSeek();
+  await drainMicrotasks();
+  environment.clock.renderFrame();
+  assert.equal(await pending, true);
   assert.equal(reader.getCurrentFrame(), 59);
-  assert.equal(video.frameCallbacks.size, 0);
   assertClean(environment, video);
 });
 
-test('destroy during the final frame wait releases the frame callback', async function () {
+test('destroy during the final frame wait releases the frame callbacks', async function () {
   const environment = createEnvironment();
   const video = new Video();
   video.duration = 2;
@@ -475,10 +486,11 @@ test('destroy during the final frame wait releases the frame callback', async fu
   const reader = makeReader(environment, video, owner);
   const pending = reader.prepare(59, 1);
   await drainMicrotasks();
-  assert.equal(video.frameCallbacks.size, 1);
+  assert.equal(video.frameCallbacks.size, 2);
   reader.onDestroy();
   assert.equal(await pending, false);
   assert.equal(reader.getCurrentFrame(), -1);
+  assert.equal(video.frameCallbacks.size, 0);
   assert.equal(owner.readers.size, 0);
   assertClean(environment, video);
 });
@@ -559,6 +571,7 @@ test('destroy settles each outstanding wait and late callbacks cannot use the vi
     assert.equal(reader.getVideo(), null);
     assert.equal(reader.getCurrentFrame(), -1);
     assert.equal(owner.readers.size, 0);
+    assert.equal(video.frameCallbacks.size, 0);
     assertClean(environment, video);
     const playCalls = video.playCalls;
     const pauseCalls = video.pauseCalls;
@@ -591,11 +604,13 @@ test('reader ownership is explicit and external media resources are not revoked'
   assert.equal(environment.wrongOwner.readers.size, 0);
   first.onDestroy();
   assert.equal(external.src, 'https://example.test/external.mp4');
+  assert.equal(external.frameCallbacks.size, 0);
   assert.equal(environment.revokedURLs.length, 0);
   assert.equal(secondOwner.readers.has(second), true);
   second.onDestroy();
   assert.deepEqual(environment.revokedURLs, ['blob:owned-1']);
   assert.equal(environment.videos[0].src, '');
+  assert.equal(environment.videos[0].frameCallbacks.size, 0);
   second.onDestroy();
   assert.equal(environment.revokedURLs.length, 1);
 });
@@ -620,6 +635,7 @@ test('partial video initialization rolls back the owned URL and reader registrat
     assert.equal(owner.readers.size, 0);
     assert.deepEqual(environment.revokedURLs, ['blob:owned-1']);
     assert.equal(environment.videos[0].src, '');
+    assert.equal(environment.videos[0].frameCallbacks.size, 0);
     assertClean(environment, environment.videos[0]);
   }
 });

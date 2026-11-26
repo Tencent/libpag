@@ -112,6 +112,9 @@ export class VideoReader {
   private error: any = null;
   private owner: VideoReaderOwner | null = null;
   private currentFrame = -1;
+  private presentedTime = -1;
+  private trackingPresentation = false;
+  private presentationHandle = 0;
   private objectURL: string | null = null;
   private prepareOperation: VideoReaderOperation | null = null;
   private playOperation: VideoReaderOperation | null = null;
@@ -132,6 +135,7 @@ export class VideoReader {
     this.disablePlaybackRate = UHD_RESOLUTION < width || UHD_RESOLUTION < height;
     try {
       this.initializeVideo(source, width, height);
+      this.trackPresentation();
       this.isPlaying = owner.isVideoPlaying();
       this.owner = owner;
       owner.linkVideoReader(this);
@@ -242,6 +246,7 @@ export class VideoReader {
     const video = this.videoEl;
     const objectURL = this.objectURL;
     this.objectURL = null;
+    this.stopPresentation();
     this.videoEl = null;
     this.bitmap = null;
     this.isDestroyed = true;
@@ -281,11 +286,11 @@ export class VideoReader {
     const targetTime = targetFrame / this.frameRate;
     const currentTime = video.currentTime;
     const atTarget = !video.seeking && Math.round(currentTime * this.frameRate) === targetFrame;
-    if (atTarget && targetFrame === this.currentFrame) {
-      return this.waitForLastFramePresentation(operation, targetFrame);
-    }
+    if (atTarget && targetFrame === this.currentFrame) return true;
     if (!video.seeking && currentTime === 0 && targetTime === 0) return this.prepareFirstFrame(operation);
-    if (atTarget) return this.waitForLastFramePresentation(operation, targetFrame);
+    const lastFrame = this.lastFrame();
+    if (lastFrame >= 0 && targetFrame >= lastFrame) return this.prepareLastFrame(operation, targetFrame);
+    if (atTarget) return true;
     if (this.staticTimeRanges.contains(targetFrame)) return this.seek(operation, targetTime);
     if (
       video.seeking ||
@@ -295,33 +300,33 @@ export class VideoReader {
       this.isSought = true;
       return this.seek(operation, targetTime);
     }
-    return this.waitForLastFramePresentation(operation, targetFrame);
+    return true;
   }
 
   /**
-   * While playing, the video element presents frames slightly behind its currentTime, so the picture
-   * sampled here may still be the previous one. Every other frame is corrected by the following
-   * frame, but the last frame of the video has no later frame to correct it, which leaves the tail
-   * of a playback with a stale picture on Safari. Waits until the video element reports that frame
-   * as presented so the final picture is uploaded. Paused playback is excluded: it presents no new
-   * frame, so waiting would only run into the timeout on every prepare.
+   * The video element presents frames slightly behind its currentTime, and Safari presents the
+   * previous frame when seeking to an exact frame boundary. Both are corrected by the frame that
+   * follows, but the last frame has no next frame, so it would keep a stale picture. Waits for the
+   * live presentation first, then forces the frame with a mid-frame seek when playback stops on the
+   * wrong picture instead of waiting for the next frame.
    */
-  private async waitForLastFramePresentation(operation: VideoReaderOperation, targetFrame: number): Promise<boolean> {
-    const video = this.videoEl;
-    if (video === null || video.paused || video.ended || typeof video.requestVideoFrameCallback !== 'function') {
-      return true;
+  private async prepareLastFrame(operation: VideoReaderOperation, targetFrame: number): Promise<boolean> {
+    const video = this.videoEl!;
+    if (this.presentedFrame() >= targetFrame) return true;
+    if (!video.paused && !video.ended && typeof video.requestVideoFrameCallback === 'function') {
+      try {
+        const presented = await operation.wait(
+          this.registerFramePresented.bind(this, targetFrame),
+          (1000 / this.frameRate) * VIDEO_PRESENT_TIMEOUT_FRAME,
+          'Video presentation timed out.',
+        );
+        if (presented) return true;
+        return false;
+      } catch {
+        // Fall back to the seek below instead of keeping a stale picture.
+      }
     }
-    const lastFrame = this.lastFrame();
-    if (lastFrame < 0 || targetFrame < lastFrame) return true;
-    try {
-      await operation.wait(
-        this.registerFramePresented.bind(this, targetFrame),
-        (1000 / this.frameRate) * VIDEO_PRESENT_TIMEOUT_FRAME,
-        'Video presentation timed out.',
-      );
-    } catch {
-      // Keeping the picture that is already on screen is better than dropping the last frame.
-    }
+    await this.seekToLastFrame(operation, targetFrame);
     return this.isActive(operation);
   }
 
@@ -331,6 +336,49 @@ export class VideoReader {
       return -1;
     }
     return Math.round(video.duration * this.frameRate) - 1;
+  }
+
+  private presentedFrame(): number {
+    return this.presentedTime < 0 ? -1 : Math.round(this.presentedTime * this.frameRate);
+  }
+
+  private trackPresentation() {
+    if (this.trackingPresentation) return;
+    const video = this.videoEl;
+    if (video === null || typeof video.requestVideoFrameCallback !== 'function') return;
+    this.trackingPresentation = true;
+    const track = (_now: number, metadata: VideoFrameCallbackMetadata) => {
+      if (this.isDestroyed || this.videoEl !== video) return;
+      this.presentedTime = metadata.mediaTime;
+      this.presentationHandle = video.requestVideoFrameCallback(track);
+    };
+    this.presentationHandle = video.requestVideoFrameCallback(track);
+  }
+
+  private stopPresentation() {
+    if (!this.trackingPresentation) return;
+    this.trackingPresentation = false;
+    if (this.videoEl !== null && this.presentationHandle !== 0) {
+      this.videoEl.cancelVideoFrameCallback(this.presentationHandle);
+    }
+    this.presentationHandle = 0;
+    this.presentedTime = -1;
+  }
+
+  private async seekToLastFrame(operation: VideoReaderOperation, targetFrame: number): Promise<void> {
+    const video = this.videoEl;
+    if (video === null) return;
+    // Aim at the middle of the frame: seeking to the frame start makes Safari present the previous
+    // frame because of how the media timeline is rounded.
+    const targetTime = Math.min((targetFrame + 0.5) / this.frameRate, video.duration);
+    this.isSought = true;
+    try {
+      if (!(await this.seek(operation, targetTime)) || !this.isActive(operation)) return;
+      this.presentedTime = targetFrame / this.frameRate;
+      await operation.wait(this.registerAnimationFrame.bind(this), VIDEO_WAIT_TIMEOUT, 'Video frame timed out.');
+    } catch {
+      // Keep the picture that is already on screen when the seek does not finish.
+    }
   }
 
   private registerFramePresented(targetFrame: number, complete: () => void): () => void {
@@ -480,6 +528,7 @@ export class VideoReader {
       }
     }
     const cleanup = this.registerVideoEvent('seeked', onSeeked, fail);
+    this.presentedTime = -1;
     try {
       video.currentTime = targetTime;
     } catch (error) {
