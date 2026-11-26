@@ -383,6 +383,27 @@ PAGX_TEST(PAGXImporterValidationTest, OutputViewRejectsInvalidTargets) {
 }
 
 /**
+ * Test case: the importer coalesces duplicate ids into one node, and the repeated pointer must not
+ * invalidate an otherwise unique target reference.
+ */
+PAGX_TEST(PAGXImporterValidationTest, OutputViewIgnoresUnrelatedDuplicateIds) {
+  std::string xml =
+      "<pagx width=\"100\" height=\"100\" targetLayer=\"@target\" outputBounds=\"0,0,10,10\">\n"
+      "  <Layer id=\"dup\"/>\n"
+      "  <Layer id=\"dup\"/>\n"
+      "  <Layer id=\"target\"/>\n"
+      "</pagx>\n";
+  auto doc = pagx::PAGXImporter::FromXML(xml);
+  ASSERT_NE(doc, nullptr);
+  const pagx::Layer* target = nullptr;
+  std::string error;
+  EXPECT_EQ(pagx::ResolveOutputView(doc.get(), &target, &error), pagx::OutputViewStatus::Valid);
+  EXPECT_TRUE(error.empty());
+  ASSERT_NE(target, nullptr);
+  EXPECT_EQ(target->id, "target");
+}
+
+/**
  * Test case: target view documents are static-only this round. Declaring animations or data binds
  * alongside the target fields is rejected at parse time so consumers never silently ignore motion.
  */

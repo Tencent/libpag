@@ -679,18 +679,27 @@ bool PAGScene::renderTo(const std::shared_ptr<PAGSurface>& surface, tgfx::Contex
 }
 
 std::optional<Rect> PAGScene::getOutputBounds() const {
-  if (outputViewStatus != OutputViewStatus::Valid || document == nullptr ||
-      !document->outputBounds.has_value()) {
-    return std::nullopt;
+  return getOutputViewInfo().bounds;
+}
+
+OutputViewInfo PAGScene::getOutputViewInfo() const {
+  OutputViewInfo info = {};
+  info.status = outputViewStatus;
+  if (outputViewStatus == OutputViewStatus::Valid && document != nullptr) {
+    // Read the live field: a host that clears outputBounds without notifyChange() leaves the
+    // cached status Valid, and this accessor must report the same absence renderTo() observes.
+    info.bounds = document->outputBounds;
+  } else if (outputViewStatus == OutputViewStatus::Invalid) {
+    info.error = outputViewError;
   }
-  return document->outputBounds;
+  return info;
 }
 
 OutputViewStatus PAGScene::getOutputViewStatus() const {
   return outputViewStatus;
 }
 
-const std::string& PAGScene::getOutputViewError() const {
+std::string PAGScene::getOutputViewError() const {
   return outputViewError;
 }
 

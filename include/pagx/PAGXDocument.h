@@ -27,6 +27,7 @@
 #include <vector>
 #include "pagx/FontConfig.h"
 #include "pagx/PAGFont.h"
+#include "pagx/PAGOutputViewStatus.h"
 #include "pagx/nodes/Animation.h"
 #include "pagx/nodes/Layer.h"
 #include "pagx/nodes/Node.h"
@@ -42,28 +43,6 @@ class PAGScene;
 class ViewModel;
 class Image;
 class ImagePattern;
-
-/**
- * Status of the default static output view declared by the paired `targetLayer` / `outputBounds`
- * root attributes. Resolve it with pagx::ResolveOutputView() or PAGScene::getOutputViewStatus().
- */
-enum class OutputViewStatus {
-  /**
-   * The document does not declare a target view; it renders the whole canvas.
-   */
-  None,
-
-  /**
-   * The document declares a valid target view.
-   */
-  Valid,
-
-  /**
-   * The document declares invalid target view fields. The document is not renderable through the
-   * default static output path.
-   */
-  Invalid,
-};
 
 /**
  * PAGXDocument is the root container for a PAGX document. It owns the resources, layers, and font

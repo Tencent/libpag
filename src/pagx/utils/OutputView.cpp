@@ -60,23 +60,29 @@ struct TargetSearch {
   const std::string& targetId;
   const Layer* found = nullptr;
   int matches = 0;
-  bool ambiguousPath = false;
+  bool ambiguous = false;
   std::unordered_set<const Layer*> onPath = {};
   std::unordered_set<const Layer*> visited = {};
 };
 
 void SearchLayers(const std::vector<Layer*>& layers, TargetSearch* search) {
   for (auto* layer : layers) {
-    if (layer == nullptr || search->ambiguousPath) {
+    if (layer == nullptr || search->ambiguous) {
       continue;
     }
     if (search->onPath.find(layer) != search->onPath.end()) {
-      search->ambiguousPath = true;
+      search->ambiguous = true;
       return;
     }
     if (!search->visited.insert(layer).second) {
-      search->ambiguousPath = true;
-      return;
+      // A repeated pointer is not a second path: duplicate ids make the importer reuse one node,
+      // so an unrelated repeated subtree must not invalidate an otherwise unique reference. Only a
+      // repeated target means the reference itself is ambiguous.
+      if (layer->id == search->targetId) {
+        search->ambiguous = true;
+        return;
+      }
+      continue;
     }
     if (layer->id == search->targetId) {
       search->found = layer;
@@ -133,6 +139,112 @@ const Layer* ReportTargetError(std::string* error, const std::string& message) {
   return nullptr;
 }
 
+struct DeclarationFields {
+  std::optional<std::string> targetText = std::nullopt;
+  std::optional<std::string> boundsText = std::nullopt;
+  bool hasTarget = false;
+  bool hasBounds = false;
+};
+
+// A field counts as declared when it either parsed or still carries raw authored text, so clearing
+// the parsed pair returns the document to the whole-canvas state instead of leaving a sticky parse
+// error behind.
+DeclarationFields CollectDeclaration(const PAGXDocument& document) {
+  DeclarationFields fields = {};
+  fields.targetText = OutputViewDeclarationAccess::DeclaredTargetLayer(document);
+  fields.boundsText = OutputViewDeclarationAccess::DeclaredBounds(document);
+  fields.hasTarget = !document.targetLayerId.empty() || fields.targetText.has_value();
+  fields.hasBounds = document.outputBounds.has_value() || fields.boundsText.has_value();
+  return fields;
+}
+
+// Checks the declaration fields, their text and the numeric rules, leaving target resolution to
+// FindUniqueTargetLayer(). Returns None when the document declares no output view at all.
+OutputViewStatus ValidateOutputViewDeclaration(const PAGXDocument& document, std::string* error) {
+  auto fields = CollectDeclaration(document);
+  if (!fields.hasTarget && !fields.hasBounds) {
+    return OutputViewStatus::None;
+  }
+  if (fields.hasTarget != fields.hasBounds) {
+    return ReportInvalid(
+        error, "The 'targetLayer' and 'outputBounds' attributes must be specified together.");
+  }
+  // Report the authored text for an attribute that never parsed; a present parsed value is the
+  // only evidence that the declaration survived import.
+  if (document.targetLayerId.empty()) {
+    return ReportInvalid(error,
+                         "Invalid value '" +
+                             (fields.targetText.has_value() ? *fields.targetText : std::string()) +
+                             "' for 'targetLayer' attribute. Expected a Layer reference "
+                             "'@id'.");
+  }
+  if (!document.outputBounds.has_value()) {
+    return ReportInvalid(
+        error, "Invalid value '" +
+                   (fields.boundsText.has_value() ? *fields.boundsText : std::string()) +
+                   "' for 'outputBounds' attribute. Expected 'x,y,width,height' with finite "
+                   "components and positive width/height.");
+  }
+  if (!IsValidTargetId(document.targetLayerId)) {
+    return ReportInvalid(error, "Invalid 'targetLayer' value '" + document.targetLayerId +
+                                    "': the id must be non-empty and contain no whitespace.");
+  }
+  if (!IsValidOutputBounds(*document.outputBounds)) {
+    return ReportInvalid(
+        error, std::string("Invalid 'outputBounds': expected ") + OutputBoundsRequirement() + ".");
+  }
+  std::unordered_set<const PAGXDocument*> visitedDocuments;
+  if (HasDynamicContent(&document, visitedDocuments)) {
+    return ReportInvalid(
+        error,
+        "Target view documents with animations, state machines or data binds are not "
+        "supported.");
+  }
+  return OutputViewStatus::Valid;
+}
+
+// Resolves the parsed id to one Layer. The caller has already validated the id syntax, so this only
+// resolves the reference: one registry scan for existence, uniqueness and type, followed by one
+// tree walk for reachability.
+const Layer* FindUniqueTargetLayer(const PAGXDocument& document, std::string* error) {
+  const Node* node = nullptr;
+  int matchingNodes = 0;
+  for (const auto& candidate : document.nodes) {
+    if (candidate != nullptr && candidate->id == document.targetLayerId) {
+      node = candidate.get();
+      matchingNodes++;
+    }
+  }
+  if (matchingNodes == 0) {
+    return ReportTargetError(error, "The 'targetLayer' reference '@" + document.targetLayerId +
+                                        "' does not match any node in the document.");
+  }
+  if (matchingNodes != 1) {
+    return ReportTargetError(error, "The 'targetLayer' reference '@" + document.targetLayerId +
+                                        "' is ambiguous: the id is used by multiple nodes.");
+  }
+  if (node->nodeType() != NodeType::Layer) {
+    return ReportTargetError(error, "The 'targetLayer' reference '@" + document.targetLayerId +
+                                        "' does not resolve to a Layer.");
+  }
+  TargetSearch search = {document.targetLayerId};
+  SearchLayers(document.layers, &search);
+  if (search.ambiguous) {
+    return ReportTargetError(error,
+                             "The 'targetLayer' reference '@" + document.targetLayerId +
+                                 "' is not uniquely reachable from the document layer tree.");
+  }
+  if (search.matches == 0) {
+    return ReportTargetError(error, "The 'targetLayer' reference '@" + document.targetLayerId +
+                                        "' is not reachable from the document layer tree.");
+  }
+  if (search.matches > 1) {
+    return ReportTargetError(error, "The 'targetLayer' reference '@" + document.targetLayerId +
+                                        "' is reachable through multiple paths.");
+  }
+  return search.found;
+}
+
 }  // namespace
 
 std::optional<std::string> OutputViewDeclarationAccess::DeclaredTargetLayer(
@@ -166,41 +278,7 @@ const Layer* ResolveOutputTargetLayer(const PAGXDocument* document, std::string*
     return ReportTargetError(error, "Invalid 'targetLayer' value '" + document->targetLayerId +
                                         "': the id must be non-empty and contain no whitespace.");
   }
-  if (document->findNode(document->targetLayerId) == nullptr) {
-    return ReportTargetError(error, "The 'targetLayer' reference '@" + document->targetLayerId +
-                                        "' does not match any node in the document.");
-  }
-  int matchingNodes = 0;
-  for (const auto& node : document->nodes) {
-    if (node != nullptr && node->id == document->targetLayerId) {
-      matchingNodes++;
-    }
-  }
-  if (matchingNodes != 1) {
-    return ReportTargetError(error, "The 'targetLayer' reference '@" + document->targetLayerId +
-                                        "' is ambiguous: the id is used by multiple nodes.");
-  }
-  auto* node = document->findNode(document->targetLayerId);
-  if (node->nodeType() != NodeType::Layer) {
-    return ReportTargetError(error, "The 'targetLayer' reference '@" + document->targetLayerId +
-                                        "' does not resolve to a Layer.");
-  }
-  TargetSearch search = {document->targetLayerId};
-  SearchLayers(document->layers, &search);
-  if (search.ambiguousPath) {
-    return ReportTargetError(error,
-                             "The 'targetLayer' reference '@" + document->targetLayerId +
-                                 "' is not uniquely reachable from the document layer tree.");
-  }
-  if (search.matches == 0) {
-    return ReportTargetError(error, "The 'targetLayer' reference '@" + document->targetLayerId +
-                                        "' is not reachable from the document layer tree.");
-  }
-  if (search.matches > 1) {
-    return ReportTargetError(error, "The 'targetLayer' reference '@" + document->targetLayerId +
-                                        "' is reachable through multiple paths.");
-  }
-  return search.found;
+  return FindUniqueTargetLayer(*document, error);
 }
 
 OutputViewStatus ResolveOutputView(const PAGXDocument* document, const Layer** targetLayer,
@@ -214,53 +292,12 @@ OutputViewStatus ResolveOutputView(const PAGXDocument* document, const Layer** t
   if (document == nullptr) {
     return OutputViewStatus::None;
   }
-  auto declaredTarget = OutputViewDeclarationAccess::DeclaredTargetLayer(*document);
-  auto declaredBounds = OutputViewDeclarationAccess::DeclaredBounds(*document);
-  // A field counts as declared when it either parsed or still carries raw authored text, so
-  // clearing the parsed pair returns the document to the whole-canvas state instead of leaving a
-  // sticky parse error behind.
-  bool hasTarget = !document->targetLayerId.empty() || declaredTarget.has_value();
-  bool hasBounds = document->outputBounds.has_value() || declaredBounds.has_value();
-  if (!hasTarget && !hasBounds) {
-    return OutputViewStatus::None;
-  }
-  if (hasTarget != hasBounds) {
-    return ReportInvalid(
-        error, "The 'targetLayer' and 'outputBounds' attributes must be specified together.");
-  }
-  // Report the authored text for an attribute that never parsed; a present parsed value is the
-  // only evidence that the declaration survived import.
-  if (document->targetLayerId.empty()) {
-    return ReportInvalid(error, "Invalid value '" +
-                                    (declaredTarget.has_value() ? *declaredTarget : std::string()) +
-                                    "' for 'targetLayer' attribute. Expected a Layer reference "
-                                    "'@id'.");
-  }
-  if (!document->outputBounds.has_value()) {
-    return ReportInvalid(
-        error, "Invalid value '" + (declaredBounds.has_value() ? *declaredBounds : std::string()) +
-                   "' for 'outputBounds' attribute. Expected 'x,y,width,height' with finite "
-                   "components and positive width/height.");
-  }
-  if (!IsValidTargetId(document->targetLayerId)) {
-    // Kept before the bounds and dynamic checks to preserve the existing diagnostic priority;
-    // ResolveOutputTargetLayer() repeats the same lightweight check when called on its own.
-    return ReportInvalid(error, "Invalid 'targetLayer' value '" + document->targetLayerId +
-                                    "': the id must be non-empty and contain no whitespace.");
-  }
-  if (!IsValidOutputBounds(*document->outputBounds)) {
-    return ReportInvalid(
-        error, std::string("Invalid 'outputBounds': expected ") + OutputBoundsRequirement() + ".");
-  }
-  std::unordered_set<const PAGXDocument*> visitedDocuments;
-  if (HasDynamicContent(document, visitedDocuments)) {
-    return ReportInvalid(
-        error,
-        "Target view documents with animations, state machines or data binds are not "
-        "supported.");
+  auto status = ValidateOutputViewDeclaration(*document, error);
+  if (status != OutputViewStatus::Valid) {
+    return status;
   }
   std::string targetError;
-  auto* target = ResolveOutputTargetLayer(document, &targetError);
+  auto* target = FindUniqueTargetLayer(*document, &targetError);
   if (target == nullptr) {
     return ReportInvalid(error, targetError);
   }
@@ -271,9 +308,8 @@ OutputViewStatus ResolveOutputView(const PAGXDocument* document, const Layer** t
 }
 
 bool HasDeclaredOutputView(const PAGXDocument& document) {
-  return !document.targetLayerId.empty() || document.outputBounds.has_value() ||
-         OutputViewDeclarationAccess::DeclaredTargetLayer(document).has_value() ||
-         OutputViewDeclarationAccess::DeclaredBounds(document).has_value();
+  auto fields = CollectDeclaration(document);
+  return fields.hasTarget || fields.hasBounds;
 }
 
 bool CheckOutputViewExportSupport(const PAGXDocument& document, const char* format,

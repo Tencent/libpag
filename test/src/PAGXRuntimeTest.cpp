@@ -1842,6 +1842,10 @@ PAGX_TEST(PAGXRuntimeTest, InvalidOutputViewAfterEditRejectsDraw) {
   EXPECT_EQ(scene->getOutputViewStatus(), pagx::OutputViewStatus::Invalid);
   EXPECT_FALSE(scene->getOutputViewError().empty());
   EXPECT_FALSE(scene->getOutputBounds().has_value());
+  auto info = scene->getOutputViewInfo();
+  EXPECT_EQ(info.status, pagx::OutputViewStatus::Invalid);
+  EXPECT_FALSE(info.error.empty());
+  EXPECT_FALSE(info.bounds.has_value());
   EXPECT_TRUE(scene->hasContentChanged());
   EXPECT_FALSE(scene->draw(surface));
   EXPECT_FALSE(scene->hasContentChanged());
@@ -1850,6 +1854,10 @@ PAGX_TEST(PAGXRuntimeTest, InvalidOutputViewAfterEditRejectsDraw) {
   doc->notifyChange({doc.get()}, true);
   EXPECT_EQ(scene->getOutputViewStatus(), pagx::OutputViewStatus::None);
   EXPECT_FALSE(scene->getOutputBounds().has_value());
+  info = scene->getOutputViewInfo();
+  EXPECT_EQ(info.status, pagx::OutputViewStatus::None);
+  EXPECT_TRUE(info.error.empty());
+  EXPECT_FALSE(info.bounds.has_value());
   EXPECT_TRUE(scene->draw(surface));
   EXPECT_FALSE(scene->hasContentChanged());
 
@@ -1858,6 +1866,11 @@ PAGX_TEST(PAGXRuntimeTest, InvalidOutputViewAfterEditRejectsDraw) {
   doc->notifyChange({doc.get()}, true);
   EXPECT_EQ(scene->getOutputViewStatus(), pagx::OutputViewStatus::Valid);
   ASSERT_TRUE(scene->getOutputBounds().has_value());
+  info = scene->getOutputViewInfo();
+  EXPECT_EQ(info.status, pagx::OutputViewStatus::Valid);
+  EXPECT_TRUE(info.error.empty());
+  ASSERT_TRUE(info.bounds.has_value());
+  EXPECT_EQ(info.bounds->width, 20.0f);
   EXPECT_TRUE(scene->draw(surface));
   EXPECT_FALSE(scene->hasContentChanged());
 }

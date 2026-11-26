@@ -28,9 +28,9 @@
 #include "pagx/PAGAnimation.h"
 #include "pagx/PAGComposition.h"
 #include "pagx/PAGDisplayOptions.h"
+#include "pagx/PAGOutputViewStatus.h"
 #include "pagx/PAGStateMachine.h"
 #include "pagx/PAGTimeline.h"
-#include "pagx/PAGXDocument.h"
 #include "pagx/types/Point.h"
 #include "pagx/types/Rect.h"
 
@@ -58,6 +58,30 @@ class OutputTargetState;
 struct Matrix;
 struct OutputViewValidationSnapshot;
 struct RuntimeBinding;
+
+/**
+ * Snapshot of a scene's default static output view state, returned by
+ * PAGScene::getOutputViewInfo().
+ */
+struct OutputViewInfo {
+  /**
+   * None when the document renders the whole canvas, Valid when draw() renders only the target
+   * layer into bounds, Invalid when the declaration cannot be honored.
+   */
+  OutputViewStatus status = OutputViewStatus::None;
+
+  /**
+   * The output window in document-root coordinates when status is Valid, otherwise std::nullopt.
+   * It reflects the document's current bounds, so it is std::nullopt when a host cleared
+   * outputBounds without notifying the scene.
+   */
+  std::optional<Rect> bounds = std::nullopt;
+
+  /**
+   * Diagnostic for an invalid declaration; empty when status is None or Valid.
+   */
+  std::string error = {};
+};
 
 /**
  * PAGScene is the runtime host for a PAGXDocument. It builds the runtime layer tree from the
@@ -178,10 +202,17 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
    * draw() clips content to the output window; uncovered surface pixels retain the configured
    * background when clearing, so they are transparent only when that background is transparent.
    * @return the output rectangle, or std::nullopt when the document has no target view and draw()
-   *         renders the whole canvas, or when the declaration is invalid. Use
-   *         getOutputViewStatus() to tell those two cases apart.
+   *         renders the whole canvas, or when the declaration is invalid. Use getOutputViewInfo()
+   *         to read the status, bounds and diagnostic in one call.
    */
   std::optional<Rect> getOutputBounds() const;
+
+  /**
+   * Returns the scene's default static output view state in a single query. The status tells None
+   * from Valid and Invalid, bounds is set only when the view is valid, and error is set only when
+   * it is invalid.
+   */
+  OutputViewInfo getOutputViewInfo() const;
 
   /**
    * Returns the state of the document's default static output view. None means the document renders
@@ -192,10 +223,10 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
   OutputViewStatus getOutputViewStatus() const;
 
   /**
-   * Returns the diagnostic for an invalid default static output view, or an empty string when the
-   * view is absent or valid.
+   * Returns a copy of the diagnostic for an invalid default static output view, or an empty string
+   * when the view is absent or valid. The copy stays valid after the scene changes.
    */
-  const std::string& getOutputViewError() const;
+  std::string getOutputViewError() const;
 
   /**
    * Returns the display options used when drawing this PAGScene. The returned object is owned by
@@ -255,8 +286,8 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
   // document (its nodes are not owned by this scene's document). `dirtyNodes` is the collapsed
   // Layer set used for the runtime refresh; `reportedDirty` is the pre-collapse owned set used to
   // decide whether the output view declaration still has to be re-validated.
-  void onNodesChanged(const std::vector<Node*>& dirtyNodes,
-                      const std::vector<Node*>& reportedDirty, bool layoutChanged);
+  void onNodesChanged(const std::vector<Node*>& dirtyNodes, const std::vector<Node*>& reportedDirty,
+                      bool layoutChanged);
 
   // Dispatch target for PAGXDocument::notifyChange when <Image> resource nodes change (e.g. host
   // loadFileData). Re-decodes any ViewModel image value built from a changed Image node, unless the
@@ -328,8 +359,7 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
 
   // Hit tests one layer handle against a surface point. Honors the output view window and target
   // subtree when the document declares one.
-  bool hitTestLayer(const PAGLayer* layer, float surfaceX, float surfaceY,
-                    bool pixelHitTest) const;
+  bool hitTestLayer(const PAGLayer* layer, float surfaceX, float surfaceY, bool pixelHitTest) const;
 
   std::shared_ptr<PAGXDocument> document = nullptr;
   std::shared_ptr<PAGComposition> _rootComposition = nullptr;
