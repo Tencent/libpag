@@ -19,7 +19,9 @@
 #include "renderer/ImageEmbedder.h"
 #include <fstream>
 #include <unordered_map>
+#include <vector>
 #include "base/utils/Log.h"
+#include "pagx/nodes/Image.h"
 #include "pagx/types/Data.h"
 
 namespace pagx {
@@ -50,20 +52,34 @@ static std::shared_ptr<pagx::Data> ReadFileToData(const std::string& path) {
 
 bool ImageEmbedder::embed(PAGXDocument* document) {
   if (document == nullptr) return false;
-  auto paths = document->getExternalImagePaths();
+  std::vector<Image*> images = {};
   std::unordered_map<std::string, std::shared_ptr<Data>> fileDataMap;
-  for (const auto& path : paths) {
-    if (fileDataMap.count(path) > 0) {
+  for (const auto& node : document->nodes) {
+    if (node->nodeType() != NodeType::Image) {
       continue;
     }
-    auto data = ReadFileToData(path);
-    if (data == nullptr) {
-      lastErrorPath_ = path;
-      return false;
+    auto* image = static_cast<Image*>(node.get());
+    const auto& path = image->filePath;
+    if (image->data != nullptr || path.empty() || path.find(':') != std::string::npos) {
+      continue;
     }
-    fileDataMap[path] = data;
+    images.push_back(image);
+    if (fileDataMap.count(path) == 0) {
+      auto data = ReadFileToData(path);
+      if (data == nullptr) {
+        lastErrorPath_ = path;
+        return false;
+      }
+      fileDataMap[path] = std::move(data);
+    }
   }
-  document->loadFileDataMap(fileDataMap);
+  std::vector<Node*> dirtyImages = {};
+  for (auto* image : images) {
+    image->data = fileDataMap[image->filePath];
+    image->filePath.clear();
+    dirtyImages.push_back(image);
+  }
+  document->notifyChange(dirtyImages, false);
   return true;
 }
 

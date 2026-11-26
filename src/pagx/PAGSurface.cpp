@@ -25,6 +25,9 @@
 #include "pagx/tgfx.h"
 #include "rendering/gpu/Devices.h"
 #include "tgfx/core/ImageInfo.h"
+#include "tgfx/gpu/CommandQueue.h"
+#include "tgfx/gpu/Context.h"
+#include "tgfx/gpu/GPU.h"
 
 namespace pagx {
 
@@ -43,7 +46,9 @@ std::shared_ptr<PAGSurface> PAGSurface::MakeFrom(std::shared_ptr<Drawable> drawa
 std::shared_ptr<PAGSurface> PAGSurface::MakeFrom(const pag::BackendTexture& texture,
                                                  pag::ImageOrigin origin) {
   auto tgfxTexture = pag::ToTGFX(texture);
-  auto device = pag::Devices::ResolveForExternalResource(tgfxTexture, false).device;
+  auto device = pag::Devices::ResolveForExternalResource(
+                    tgfxTexture, false, pag::ExternalResourceUsage::SampledRenderTarget)
+                    .device;
   auto drawable = TextureDrawable::MakeFrom(device, tgfxTexture, pag::ToTGFX(origin));
   return MakeFrom(drawable);
 }
@@ -77,7 +82,7 @@ bool PAGSurface::readPixels(void* dstPixels, size_t dstRowBytes) {
   if (device == nullptr) {
     return false;
   }
-  auto* context = device->lockContext();
+  auto* context = pag::Devices::LockContext(device);
   if (context == nullptr) {
     return false;
   }
@@ -92,6 +97,33 @@ bool PAGSurface::readPixels(void* dstPixels, size_t dstRowBytes) {
   bool ok = !info.isEmpty() && surface->readPixels(info, dstPixels);
   device->unlock();
   return ok;
+}
+
+bool PAGSurface::waitUntilCompleted() {
+  if (drawable == nullptr) {
+    return false;
+  }
+  auto device = drawable->getDevice();
+  if (device == nullptr) {
+    return false;
+  }
+  auto context = pag::Devices::LockContext(device);
+  if (context == nullptr) {
+    return false;
+  }
+  // On D3D12 the queue wait may mark the context as lost. Reacquire the lock afterward so that
+  // loss is rejected; other backends only recheck the state supported by their device locks.
+  auto healthy = pag::Devices::WaitForQueue(context);
+  device->unlock();
+  if (!healthy) {
+    return false;
+  }
+  context = pag::Devices::LockContext(device);
+  if (context == nullptr) {
+    return false;
+  }
+  device->unlock();
+  return true;
 }
 
 std::shared_ptr<PAGSurface> MakeFrom(const std::shared_ptr<tgfx::Device>& device,

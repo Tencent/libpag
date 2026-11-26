@@ -17,14 +17,15 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PAGEngineImp.h"
-
 #include <iostream>
 #include <string>
 
 namespace pagengine {
-PAGEngineImpl::PAGEngineImpl() {}
+PAGEngineImpl::PAGEngineImpl() {
+}
 
-PAGEngineImpl::~PAGEngineImpl() {}
+PAGEngineImpl::~PAGEngineImpl() {
+}
 
 bool PAGEngineImpl::InitOnscreenRender(PAGEngineInitData init_data) {
   pag_engine_callback_ = init_data.pag_engine_callback_;
@@ -32,8 +33,16 @@ bool PAGEngineImpl::InitOnscreenRender(PAGEngineInitData init_data) {
 
   auto drawable = pag::GPUDrawable::FromWindow(render_window_);
   pag_drawable_ = std::shared_ptr<pag::GPUDrawable>(drawable);
+  if (pag_drawable_ == nullptr) {
+    std::cout << "[PAGDemo] failed to create the GPU drawable for the window" << std::endl;
+    return false;
+  }
 
   pag_surface_ = pag::PAGSurface::MakeFrom(pag_drawable_);
+  if (pag_surface_ == nullptr) {
+    std::cout << "[PAGDemo] failed to create the PAG surface" << std::endl;
+    return false;
+  }
 
   pag_player_ = std::make_shared<pag::PAGPlayer>();
   pag_player_->setSurface(pag_surface_);
@@ -71,6 +80,9 @@ bool PAGEngineImpl::SetPagFile(const char* file_path, int path_length) {
 }
 
 bool PAGEngineImpl::SetPagFileBuffer(const byte* file_buffer, int buffer_length) {
+  if (pag_player_ == nullptr) {
+    return false;
+  }
   auto file = pag::PAGFile::Load(file_buffer, buffer_length);
   if (file == nullptr) {
     return false;
@@ -78,7 +90,7 @@ bool PAGEngineImpl::SetPagFileBuffer(const byte* file_buffer, int buffer_length)
 
   pag_file_ = file;
   pag_player_->setComposition(pag_file_);
-  return false;
+  return true;
 }
 
 bool PAGEngineImpl::IsPagFileValid() {
@@ -96,7 +108,9 @@ bool PAGEngineImpl::SetProgress(double percent) {
   return true;
 }
 
-bool PAGEngineImpl::Flush(bool animating) { return DrawPAG(animating); }
+bool PAGEngineImpl::Flush(bool animating) {
+  return DrawPAG(animating);
+}
 
 bool PAGEngineImpl::Resize(int width, int height) {
   if (pag_surface_) {
@@ -119,9 +133,14 @@ unsigned int PAGEngineImpl::GetPagFileDuration() {
   return pag_file_->duration();
 }
 
-void PAGEngineImpl::SetLoop(bool loop) { is_loop_ = loop; }
+void PAGEngineImpl::SetLoop(bool loop) {
+  is_loop_ = loop;
+}
 
 bool PAGEngineImpl::DrawPAG(bool animating) {
+  if (pag_player_ == nullptr) {
+    return false;
+  }
   if (animating && pag_file_) {
     if (is_loop_ && current_progress_ == 1) {
       return false;
@@ -140,7 +159,6 @@ bool PAGEngineImpl::DrawPAG(bool animating) {
       }
     }
 
-    std::cout << " progress : " << progress << std::endl;
     pag_player_->setProgress(progress);
     current_progress_ = progress;
     if (!is_loop_ && current_progress_ == 1) {

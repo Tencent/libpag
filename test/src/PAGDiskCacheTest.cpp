@@ -19,7 +19,12 @@
 #include <algorithm>
 #include <atomic>
 #include <chrono>
+#include <cstdlib>
+#include <cstring>
 #include <filesystem>
+#include <fstream>
+#include <functional>
+#include <mutex>
 #include <thread>
 #include <vector>
 #include "pag/pag.h"
@@ -29,6 +34,8 @@
 #include "rendering/utils/BitmapBuffer.h"
 #include "rendering/utils/Directory.h"
 #include "tgfx/core/Clock.h"
+#include "utils/ScopedDiskCacheDirectory.h"
+#include "utils/ScopedDiskIOWorkerBlock.h"
 #include "utils/TestUtils.h"
 
 #ifdef TGFX_USE_OPENGL
@@ -88,6 +95,7 @@ namespace pag {
 //  std::filesystem::remove_all(cacheDir);
 //}
 
+#ifdef PAG_TEST_ACCESS_PRIVATE
 namespace {
 static constexpr size_t InitialSequenceDiskSize = 568915u;
 
@@ -97,23 +105,6 @@ static void ClearDiskCacheAndWait() {
   PAGDiskCache::RemoveAll();
   worker->waitAll();
 }
-
-class ScopedDiskCacheCleanup {
- public:
-  const size_t originalMaxDiskSize;
-
-  ScopedDiskCacheCleanup() : originalMaxDiskSize(PAGDiskCache::MaxDiskSize()) {
-  }
-
-  ScopedDiskCacheCleanup(const ScopedDiskCacheCleanup&) = delete;
-  ScopedDiskCacheCleanup& operator=(const ScopedDiskCacheCleanup&) = delete;
-
-  ~ScopedDiskCacheCleanup() {
-    DiskIOWorker::GetInstance()->waitAll();
-    PAGDiskCache::SetMaxDiskSize(originalMaxDiskSize);
-    ClearDiskCacheAndWait();
-  }
-};
 
 static void ResetDiskCacheFixture(const std::string& cacheDir, size_t maxDiskSize,
                                   const std::string& fixturePath = {}) {
@@ -137,7 +128,7 @@ static void ResetDiskCacheFixture(const std::string& cacheDir, size_t maxDiskSiz
     // Reload the fixture into the already-live singleton, not just its on-disk files.
     diskCache->fileIDCount = DiskCache::InitialFileID;
     diskCache->maxDiskSize = maxDiskSize;
-    ASSERT_TRUE(diskCache->readConfig());
+    ASSERT_TRUE(diskCache->reloadConfig());
   }
   DiskIOWorker::GetInstance()->waitAll();
 }
@@ -296,14 +287,33 @@ static void CheckSequenceFileReuseAndRelease(SequenceFileState& state,
   DiskIOWorker::GetInstance()->waitAll();
   EXPECT_FALSE(std::filesystem::exists(cacheDir + "/files/4.bin"));
 }
+
+static void CheckSequenceFilePixels(const std::shared_ptr<SequenceFile>& sequenceFile,
+                                    const tgfx::ImageInfo& info, int frameCount) {
+  ASSERT_EQ(sequenceFile->info(), info);
+  ASSERT_EQ(sequenceFile->numFrames(), static_cast<uint32_t>(frameCount));
+  EXPECT_EQ(sequenceFile->cachedFrames, frameCount);
+  std::vector<uint8_t> decodedPixels(info.byteSize());
+  auto decodedBuffer = BitmapBuffer::Wrap(info, decodedPixels.data());
+  ASSERT_TRUE(decodedBuffer != nullptr);
+  std::vector<uint8_t> expectedPixels(info.byteSize());
+  for (int i = 0; i < frameCount; i++) {
+    SCOPED_TRACE(i);
+    std::fill(expectedPixels.begin(), expectedPixels.end(), i + 1);
+    std::fill(decodedPixels.begin(), decodedPixels.end(), 0);
+    ASSERT_TRUE(sequenceFile->readFrame(i, decodedBuffer));
+    EXPECT_EQ(memcmp(decodedPixels.data(), expectedPixels.data(), expectedPixels.size()), 0);
+  }
+}
 }  // namespace
 
 /**
  * 用例描述: 测试 SequenceFile 的磁盘缓存功能。
  */
 PAG_PIXEL_TEST(PAGDiskCacheTest, SequenceFile) {
-  auto cacheDir = Platform::Current()->getCacheDir();
-  ScopedDiskCacheCleanup cleanup;
+  ScopedDiskCacheDirectory cleanup;
+  ASSERT_FALSE(cleanup.directory.empty());
+  auto cacheDir = cleanup.directory;
   ASSERT_NO_FATAL_FAILURE(ResetDiskCacheFixture(cacheDir, cleanup.originalMaxDiskSize,
                                                 ProjectPath::Absolute("resources/disk/libpag")));
   SequenceFileState state;
@@ -312,6 +322,71 @@ PAG_PIXEL_TEST(PAGDiskCacheTest, SequenceFile) {
   ASSERT_NO_FATAL_FAILURE(CheckHalfResolutionSequence(state));
   ASSERT_NO_FATAL_FAILURE(CheckSequenceFileEviction(state, cacheDir));
   ASSERT_NO_FATAL_FAILURE(CheckSequenceFileReuseAndRelease(state, cacheDir));
+}
+
+/**
+ * 用例描述: 同一 key 在上一次的异步关闭任务尚未执行时被重新打开。重开的文件必须能看到已写入
+ * 的全部帧，且旧的关闭任务不能清除新打开文件的打开登记，否则 removeAll() 会误删仍在使用的缓存。
+ */
+PAG_TEST(PAGDiskCacheTest, ReopenWhileCloseTaskPending) {
+  constexpr int Size = 16;
+  constexpr int FrameCount = 8;
+  ScopedDiskCacheDirectory cleanup;
+  ASSERT_FALSE(cleanup.directory.empty());
+  auto cacheDir = cleanup.directory;
+  ASSERT_NO_FATAL_FAILURE(ResetDiskCacheFixture(cacheDir, cleanup.originalMaxDiskSize));
+  auto key = std::string("PAGDiskCacheTest/ReopenWhileCloseTaskPending");
+  auto info = tgfx::ImageInfo::Make(Size, Size, tgfx::ColorType::RGBA_8888);
+  tgfx::Bitmap bitmap = {};
+  ASSERT_TRUE(bitmap.allocPixels(Size, Size, false, false));
+  tgfx::Pixmap pixmap(bitmap);
+  auto buffer = BitmapBuffer::Wrap(pixmap.info(), pixmap.writablePixels());
+
+  auto diskCache = DiskCache::GetInstance();
+  auto sequenceFile = DiskCache::OpenSequence(key, info, FrameCount, 30.0f);
+  ASSERT_TRUE(sequenceFile != nullptr);
+  for (int i = 0; i < FrameCount; i++) {
+    memset(pixmap.writablePixels(), i + 1, pixmap.rowBytes() * Size);
+    ASSERT_TRUE(sequenceFile->writeFrame(i, buffer));
+  }
+  EXPECT_EQ(sequenceFile->cachedFrames, FrameCount);
+  auto fileID = sequenceFile->fileID;
+  auto filePath = cacheDir + "/files/" + std::to_string(fileID) + ".bin";
+
+  ScopedDiskIOWorkerBlock workerBlock;
+  sequenceFile = nullptr;
+  {
+    std::lock_guard<std::mutex> lock(diskCache->locker);
+    EXPECT_EQ(diskCache->openedFiles.count(fileID), 1u);
+  }
+
+  auto reopened = DiskCache::OpenSequence(key, info, FrameCount, 30.0f);
+  ASSERT_TRUE(reopened != nullptr);
+  EXPECT_EQ(reopened->fileID, fileID);
+  ASSERT_NO_FATAL_FAILURE(CheckSequenceFilePixels(reopened, info, FrameCount))
+      << "Immediately after reopening";
+
+  workerBlock.release();
+  {
+    std::lock_guard<std::mutex> lock(diskCache->locker);
+    EXPECT_EQ(diskCache->openedFiles.count(reopened->fileID), 1u);
+  }
+  ASSERT_NO_FATAL_FAILURE(CheckSequenceFilePixels(reopened, info, FrameCount))
+      << "After the pending close task";
+  PAGDiskCache::RemoveAll();
+  DiskIOWorker::GetInstance()->waitAll();
+  EXPECT_TRUE(std::filesystem::exists(filePath));
+  ASSERT_NO_FATAL_FAILURE(CheckSequenceFilePixels(reopened, info, FrameCount))
+      << "After removing the disk cache";
+  reopened = nullptr;
+  DiskIOWorker::GetInstance()->waitAll();
+  // The cache was cleared while the file was still registered, so this close notification is what
+  // finally deletes the file and releases the entry.
+  EXPECT_FALSE(std::filesystem::exists(filePath));
+  {
+    std::lock_guard<std::mutex> lock(diskCache->locker);
+    EXPECT_TRUE(diskCache->openedFiles.empty());
+  }
 }
 
 namespace {
@@ -471,8 +546,9 @@ static void CheckDecoderFileLifetimes(DecoderCacheState& state, const std::strin
 }  // namespace
 
 PAG_PIXEL_TEST(PAGDiskCacheTest, PAGDecoder) {
-  auto cacheDir = Platform::Current()->getCacheDir();
-  ScopedDiskCacheCleanup cleanup;
+  ScopedDiskCacheDirectory cleanup;
+  ASSERT_FALSE(cleanup.directory.empty());
+  auto cacheDir = cleanup.directory;
   ASSERT_NO_FATAL_FAILURE(ResetDiskCacheFixture(cacheDir, cleanup.originalMaxDiskSize));
   DecoderCacheState state;
   ASSERT_NO_FATAL_FAILURE(CheckDecoderFrameCache(state));
@@ -480,6 +556,7 @@ PAG_PIXEL_TEST(PAGDiskCacheTest, PAGDecoder) {
   ASSERT_NO_FATAL_FAILURE(CheckDecoderCompositionChanges(state));
   ASSERT_NO_FATAL_FAILURE(CheckDecoderFileLifetimes(state, cacheDir));
 }
+#endif
 
 /**
  * Regression test for the iOS dangling GL context crash: after MakeFrom captures the caller's
@@ -500,8 +577,10 @@ static void ReadFirstFrame(PAGDecoder* decoder, bool* success) {
 // GLDevice::CurrentNativeHandle() and keeps working after the caller destroys that context.
 // Metal / Vulkan / D3D12 / WebGPU have no thread-local "current context" concept, so the same
 // scenario does not apply; skip the case on non-GL backends.
-#ifdef TGFX_USE_OPENGL
+#if defined(TGFX_USE_OPENGL) && defined(PAG_TEST_ACCESS_PRIVATE)
 PAG_TEST(PAGDiskCacheTest, PAGDecoderContextDestroyed) {
+  ScopedDiskCacheDirectory cleanup;
+  ASSERT_FALSE(cleanup.directory.empty());
   pag::PAGDiskCache::RemoveAll();
   auto pagFile = LoadPAGFile("resources/apitest/data_bmp.pag");
   ASSERT_TRUE(pagFile != nullptr);
@@ -514,7 +593,7 @@ PAG_TEST(PAGDiskCacheTest, PAGDecoderContextDestroyed) {
   ASSERT_TRUE(callerContext != nullptr);
   auto decoder = PAGDecoder::MakeFrom(pagFile, 30, 0.5f);
   ASSERT_TRUE(decoder != nullptr);
-  EXPECT_TRUE(decoder->sharedDevice != nullptr);
+  PAG_PRIVATE_ACCESS(EXPECT_TRUE(decoder->sharedDevice != nullptr);)
 
   // Destroy the caller's context; a correct decoder no longer depends on its lifetime.
   callerDevice->unlock();
@@ -526,13 +605,14 @@ PAG_TEST(PAGDiskCacheTest, PAGDecoderContextDestroyed) {
   std::thread reader(ReadFirstFrame, decoder.get(), &success);
   reader.join();
   EXPECT_TRUE(success);
-  EXPECT_TRUE(decoder->reader != nullptr);
+  PAG_PRIVATE_ACCESS(EXPECT_TRUE(decoder->reader != nullptr);)
 
   decoder = nullptr;
   pag::PAGDiskCache::RemoveAll();
 }
-#endif  // TGFX_USE_OPENGL
+#endif  // TGFX_USE_OPENGL && PAG_TEST_ACCESS_PRIVATE
 
+#ifdef PAG_TEST_ACCESS_PRIVATE
 PAG_PIXEL_TEST(PAGDiskCacheTest, PAGDecoder_StaticTimeRanges) {
   pag::PAGDiskCache::RemoveAll();
   auto pagFile = LoadPAGFile("resources/apitest/polygon.pag");
@@ -604,8 +684,13 @@ PAG_PIXEL_TEST(PAGDiskCacheTest, PAGDecoder_StaticTimeRanges) {
   decoder = nullptr;
   pag::PAGDiskCache::RemoveAll();
 }
+#endif
+
+#ifdef PAG_TEST_ACCESS_PRIVATE
 
 PAG_TEST(PAGDiskCacheTest, FileCache) {
+  ScopedDiskCacheDirectory cleanup;
+  ASSERT_FALSE(cleanup.directory.empty());
   pag::PAGDiskCache::RemoveAll();
   auto data = ReadFile("resources/apitest/polygon.pag");
   ASSERT_TRUE(data != nullptr);
@@ -622,6 +707,8 @@ PAG_TEST(PAGDiskCacheTest, FileCache) {
 /**
  * Tests for DiskIOWorker: serial execution order and waitAll behavior.
  */
+#endif  // PAG_TEST_ACCESS_PRIVATE
+
 PAG_TEST(PAGDiskCacheTest, DiskIOWorker) {
   auto worker = DiskIOWorker::GetInstance();
 
@@ -684,7 +771,11 @@ PAG_TEST(PAGDiskCacheTest, DiskIOWorker) {
  * exercises the destructor locking and the shared DiskCache paths under concurrent load, guarding
  * against regressions of #3684 without pinning down the exact race window.
  */
+#ifdef PAG_TEST_ACCESS_PRIVATE
+
 PAG_TEST(PAGDiskCacheTest, PAGDecoderTeardownRace) {
+  ScopedDiskCacheDirectory cleanup;
+  ASSERT_FALSE(cleanup.directory.empty());
   pag::PAGDiskCache::RemoveAll();
   std::vector<std::shared_ptr<PAGFile>> pagFiles;
   for (int i = 0; i < 4; i++) {
@@ -737,6 +828,9 @@ PAG_TEST(PAGDiskCacheTest, PAGDecoderTeardownRace) {
  * graduated backoff as RenderCache, so a transient failure recovers quickly instead of freezing for
  * the full ceiling.
  */
+#endif  // PAG_TEST_ACCESS_PRIVATE
+
+#ifdef PAG_TEST_ACCESS_PRIVATE
 PAG_TEST(PAGDiskCacheTest, SequenceRetryDelayGraduatesAndCaps) {
   EXPECT_EQ(SequenceRetryDelay(0), SEQUENCE_RETRY_INITIAL_DELAY);
   EXPECT_EQ(SequenceRetryDelay(1), SEQUENCE_RETRY_INITIAL_DELAY * 2);
@@ -748,6 +842,8 @@ PAG_TEST(PAGDiskCacheTest, SequenceRetryDelayGraduatesAndCaps) {
 }
 
 PAG_TEST(PAGDiskCacheTest, PAGDecoderFailedRenderCooldown) {
+  ScopedDiskCacheDirectory cleanup;
+  ASSERT_FALSE(cleanup.directory.empty());
   pag::PAGDiskCache::RemoveAll();
   auto pagFile = LoadPAGFile("resources/apitest/data_bmp.pag");
   ASSERT_TRUE(pagFile != nullptr);
@@ -772,5 +868,6 @@ PAG_TEST(PAGDiskCacheTest, PAGDecoderFailedRenderCooldown) {
   EXPECT_TRUE(success);
   pag::PAGDiskCache::RemoveAll();
 }
+#endif
 
 }  // namespace pag

@@ -20,25 +20,26 @@
 
 #include <memory>
 #include <string>
+#include <string_view>
 #include "pagx/types/Data.h"
 
 namespace pagx {
 
-std::shared_ptr<Data> Base64Decode(const std::string& encodedString);
+std::shared_ptr<Data> Base64Decode(std::string_view encodedString);
 
 /**
  * Returns true when `uri` starts with the `data:` scheme, matched case-insensitively as RFC 3986
  * requires of URI schemes. A URI this returns true for may still fail to decode when its payload
  * is not base64 or is malformed.
  */
-bool IsDataUri(const std::string& uri);
+bool IsDataUri(std::string_view uri);
 
 /**
  * Decodes the base64 payload of a `data:` URI. Returns nullptr when `dataURI` is not a
  * base64-encoded data URI. The `data:` scheme is matched case-insensitively, as RFC 3986 requires
  * of URI schemes.
  */
-std::shared_ptr<Data> DecodeBase64DataURI(const std::string& dataURI);
+std::shared_ptr<Data> DecodeBase64DataURI(std::string_view dataURI);
 
 /**
  * Decodes the first `maxBytes` bytes of a `data:` URI's base64 payload, and no more. Same

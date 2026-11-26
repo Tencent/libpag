@@ -16,14 +16,11 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include <cmath>
-#include <cstring>
 #include <string>
 #include <vector>
 #include "base/PAGTest.h"
+#include "base/PAGXTestCommon.h"
 #include "pagx/PAGAnimation.h"
-#include "pagx/PAGScene.h"
-#include "pagx/PAGSurface.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/PAGXExporter.h"
 #include "pagx/PAGXImporter.h"
@@ -32,55 +29,12 @@
 #include "pagx/nodes/Layer.h"
 #include "pagx/utils/ExporterUtils.h"
 #include "pagx/utils/LayerTransformUtils.h"
-#include "tgfx/core/Bitmap.h"
-#include "tgfx/core/Pixmap.h"
 
 namespace pag {
 namespace {
 
-constexpr int DocSize = 200;
-
 std::shared_ptr<pagx::PAGXDocument> ParseDoc(const std::string& xml) {
   return pagx::PAGXImporter::FromXML(xml);
-}
-
-// Renders one frame of the document through the runtime path (PAGScene + PAGSurface), matching how
-// the CLI and the player draw, and returns the RGBA pixels.
-std::vector<uint8_t> RenderFrame(const std::shared_ptr<pagx::PAGXDocument>& doc,
-                                 int64_t timeUs = 0) {
-  std::vector<uint8_t> pixels = {};
-  if (doc == nullptr) {
-    return pixels;
-  }
-  auto scene = pagx::PAGScene::Make(doc);
-  if (scene == nullptr) {
-    return pixels;
-  }
-  if (timeUs != 0) {
-    for (const auto& id : scene->getAnimationIds()) {
-      auto animation = scene->getAnimation(id);
-      if (animation != nullptr) {
-        animation->setCurrentTime(timeUs);
-        animation->apply(1.0f);
-      }
-    }
-  }
-  scene->advanceAndApply(timeUs);
-  auto surface = pagx::PAGSurface::MakeOffscreen(DocSize, DocSize);
-  if (surface == nullptr || !scene->draw(surface)) {
-    return {};
-  }
-  tgfx::Bitmap bitmap(DocSize, DocSize, false, false);
-  if (bitmap.isEmpty()) {
-    return {};
-  }
-  tgfx::Pixmap pixmap(bitmap);
-  if (!surface->readPixels(pixmap.writablePixels(), pixmap.rowBytes())) {
-    return {};
-  }
-  const auto* src = reinterpret_cast<const uint8_t*>(pixmap.writablePixels());
-  pixels.assign(src, src + static_cast<size_t>(pixmap.rowBytes()) * DocSize);
-  return pixels;
 }
 
 size_t CountOpaquePixels(const std::vector<uint8_t>& pixels) {
@@ -91,19 +45,6 @@ size_t CountOpaquePixels(const std::vector<uint8_t>& pixels) {
     }
   }
   return opaque;
-}
-
-size_t CountDifferentPixels(const std::vector<uint8_t>& a, const std::vector<uint8_t>& b) {
-  if (a.size() != b.size() || a.empty()) {
-    return a.size() + 1;
-  }
-  size_t different = 0;
-  for (size_t i = 0; i + 3 < a.size(); i += 4) {
-    if (std::memcmp(&a[i], &b[i], 4) != 0) {
-      ++different;
-    }
-  }
-  return different;
 }
 
 std::string MakeDoc(const std::string& layerAttributes, const std::string& animations) {

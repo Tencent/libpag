@@ -41,3 +41,10 @@ bool pag_surface_read_pixels(pag_surface* surface, pag_color_type colorType,
   }
   return surface->p->readPixels(pagColorType, pagAlphaType, dstPixels, dstRowBytes);
 }
+
+bool pag_surface_wait_until_completed(pag_surface* surface) {
+  if (surface == nullptr) {
+    return false;
+  }
+  return surface->p->waitUntilCompleted();
+}

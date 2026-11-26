@@ -54,8 +54,8 @@ function main() {
     process.stderr.write('check-artifacts: ERROR: missing required artifacts:\n');
     for (const rel of missing) process.stderr.write(`  ${rel}\n`);
     process.stderr.write(
-      'check-artifacts: run `npm run prebuild` from the pagx-preview directory ' +
-      'and make sure pagx-viewer has been built first.\n'
+      'check-artifacts: run `npm run build` from the pagx-preview directory ' +
+      '(it builds pagx-viewer and pagx-player automatically).\n'
     );
     process.exit(1);
   }

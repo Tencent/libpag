@@ -424,16 +424,13 @@ static tgfx::Bitmap RenderCore(const RenderOptions& options) {
   if (document == nullptr) {
     return {};
   }
-  if (document->hasUnresolvedImports()) {
-    CommandError("pagx render") << "unresolved import directive, run 'pagx resolve' first\n";
-    return {};
-  }
-
   FontConfig fontConfig = {};
   if (!LoadFontConfig(&fontConfig, options.fontFiles, options.fallbacks, "pagx render")) {
     return {};
   }
-  document->applyLayout(&fontConfig);
+  if (!PrepareDocumentForRendering(document.get(), &fontConfig, "pagx render")) {
+    return {};
+  }
 
   const pagx::Layer* documentTarget = nullptr;
   std::string outputViewError;
@@ -563,7 +560,7 @@ static tgfx::Bitmap RenderCore(const RenderOptions& options) {
     CommandError("pagx render") << "failed to create the GPU device\n";
     return {};
   }
-  auto context = device->lockContext();
+  auto context = pag::Devices::LockContext(device);
   if (context == nullptr) {
     CommandError("pagx render") << "failed to lock the GPU context\n";
     return {};

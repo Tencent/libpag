@@ -107,10 +107,14 @@ int RunFormat(int argc, char* argv[]) {
   ReorderAttributesRecursive(root);
 
   std::string output;
-  std::ifstream probe(inputPath);
-  std::string firstLine;
-  if (std::getline(probe, firstLine) && firstLine.find("<?xml") != std::string::npos) {
-    output = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
+  {
+    // Close the probe before replacing the file in place: Windows refuses to replace a file that
+    // still has an open read handle without share-delete.
+    std::ifstream probe(inputPath);
+    std::string firstLine;
+    if (std::getline(probe, firstLine) && firstLine.find("<?xml") != std::string::npos) {
+      output = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
+    }
   }
   SerializeNode(output, doc->children, 0, indentSpaces);
 

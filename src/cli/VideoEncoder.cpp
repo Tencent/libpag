@@ -458,9 +458,17 @@ std::string FormatCommandLine(const std::vector<std::string>& arguments) {
     }
     line += '"';
     for (char ch : argument) {
+#ifdef _WIN32
+      // Windows command lines use backslashes as path separators; escaping them would print a
+      // path that no longer matches the argument.
+      if (ch == '"') {
+        line += '\\';
+      }
+#else
       if (ch == '"' || ch == '\\' || ch == '$' || ch == '`') {
         line += '\\';
       }
+#endif
       line += ch;
     }
     line += '"';

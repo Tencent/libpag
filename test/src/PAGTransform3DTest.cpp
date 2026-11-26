@@ -40,6 +40,7 @@
 #include "utils/TestUtils.h"
 
 namespace pag {
+#ifdef PAG_TEST_ACCESS_PRIVATE
 namespace {
 
 class Test3DGPU : public tgfx::GPU {
@@ -1683,5 +1684,6 @@ PAG_PIXEL_TEST(PAGTransform3DTest, AsymmetricProjectedContent) {
   EXPECT_EQ(SamplePixel(surface, 30, 40)[2], 255);
   EXPECT_EQ(SamplePixel(surface, 30, 80)[3], 0);
 }
+#endif
 
 }  // namespace pag

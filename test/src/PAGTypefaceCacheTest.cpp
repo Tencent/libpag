@@ -84,10 +84,15 @@ static pagx::PAGFont FindSystemFamilyWithUnavailableStyle() {
 
 // Returns the cached tgfx typeface on a Font node, or nullptr if no cache has been built yet.
 static std::shared_ptr<Typeface> CachedTypeface(const pagx::Font* fontNode) {
-  if (fontNode == nullptr || fontNode->renderCache == nullptr) {
-    return nullptr;
-  }
-  return fontNode->renderCache->typeface;
+  // clang-format off
+  PAG_PRIVATE_ACCESS(
+    if (fontNode == nullptr || fontNode->renderCache == nullptr) {
+      return nullptr;
+    }
+    return fontNode->renderCache->typeface;
+  )
+  // clang-format on
+  return nullptr;
 }
 
 // Builds a minimal text document, embeds fonts, and reloads it from XML so the embedded glyphRun
@@ -152,7 +157,7 @@ static pagx::Font* FindFirstEmbeddedFont(pagx::PAGXDocument* doc) {
   return nullptr;
 }
 
-CLI_TEST(PAGTypefaceCacheTest, BuildPopulatesFontTypeface) {
+CLI_TEST_PRIVATE(PAGTypefaceCacheTest, BuildPopulatesFontTypeface) {
   auto doc = MakeReloadedEmbeddedTextDocument();
   ASSERT_NE(doc, nullptr) << "Failed to load the font or embed and reload the text document.";
 
@@ -166,7 +171,7 @@ CLI_TEST(PAGTypefaceCacheTest, BuildPopulatesFontTypeface) {
   EXPECT_TRUE(CachedTypeface(fontNode) != nullptr);
 }
 
-CLI_TEST(PAGTypefaceCacheTest, RepeatedBuildReusesCachedTypeface) {
+CLI_TEST_PRIVATE(PAGTypefaceCacheTest, RepeatedBuildReusesCachedTypeface) {
   auto doc = MakeReloadedEmbeddedTextDocument();
   ASSERT_NE(doc, nullptr) << "Failed to load the font or embed and reload the text document.";
 
@@ -183,7 +188,7 @@ CLI_TEST(PAGTypefaceCacheTest, RepeatedBuildReusesCachedTypeface) {
       << "second LayerBuilder::Build should hit the cache, not rebuild the typeface";
 }
 
-CLI_TEST(PAGTypefaceCacheTest, PerDocumentTypefacesAreIsolated) {
+CLI_TEST_PRIVATE(PAGTypefaceCacheTest, PerDocumentTypefacesAreIsolated) {
   auto docA = MakeReloadedEmbeddedTextDocument();
   auto docB = MakeReloadedEmbeddedTextDocument();
   ASSERT_NE(docA, nullptr) << "Failed to prepare the first embedded text document.";
@@ -198,7 +203,7 @@ CLI_TEST(PAGTypefaceCacheTest, PerDocumentTypefacesAreIsolated) {
   EXPECT_EQ(CachedTypeface(fontB), nullptr);
 }
 
-CLI_TEST(PAGTypefaceCacheTest, DocumentDestructionReleasesTypeface) {
+CLI_TEST_PRIVATE(PAGTypefaceCacheTest, DocumentDestructionReleasesTypeface) {
   auto doc = MakeReloadedEmbeddedTextDocument();
   ASSERT_NE(doc, nullptr) << "Failed to load the font or embed and reload the text document.";
 
@@ -214,7 +219,7 @@ CLI_TEST(PAGTypefaceCacheTest, DocumentDestructionReleasesTypeface) {
   EXPECT_TRUE(weak.expired());
 }
 
-CLI_TEST(PAGTypefaceCacheTest, ClearEmbedResetsFontTypeface) {
+CLI_TEST_PRIVATE(PAGTypefaceCacheTest, ClearEmbedResetsFontTypeface) {
   auto doc = MakeReloadedEmbeddedTextDocument();
   ASSERT_NE(doc, nullptr) << "Failed to load the font or embed and reload the text document.";
 

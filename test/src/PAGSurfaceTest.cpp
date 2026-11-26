@@ -32,15 +32,7 @@
 #ifdef TGFX_USE_OPENGL
 
 #include "tgfx/gpu/opengl/GLDevice.h"
-
-#if defined(PAG_USE_SWIFTSHADER) || defined(__EMSCRIPTEN__)
-#include <GLES3/gl3.h>
-#else
-#ifndef GL_SILENCE_DEPRECATION
-#define GL_SILENCE_DEPRECATION
-#endif
-#include <OpenGL/gl3.h>
-#endif
+#include "utils/GLHeaders.h"
 
 namespace pag {
 using namespace tgfx;
@@ -80,6 +72,8 @@ uint32_t GetGLVersion(const char* versionString) {
  * and native builds keep it.
  */
 #ifndef PAG_WEBGL_ONLY
+// Builds a tgfx TextureDrawable and inspects PAGSurface::drawable, both private to libpag.
+#ifdef PAG_TEST_ACCESS_PRIVATE
 PAG_PIXEL_TEST(PAGSurfaceTest, FromTexture) {
   auto pagFile = LoadPAGFile("resources/apitest/test.pag");
   int width = pagFile->width();
@@ -132,6 +126,7 @@ PAG_PIXEL_TEST(PAGSurfaceTest, FromTexture) {
     EXPECT_TRUE(Baseline::Compare(pagSurface, "PAGSurfaceTest/FromTexture"));
   }
 }
+#endif  // PAG_TEST_ACCESS_PRIVATE
 #endif
 
 /**
@@ -169,9 +164,10 @@ PAG_PIXEL_TEST(PAGSurfaceTest, Mask) {
  * 用例描述: 测试 GLRestorer 在共享纹理场景下正确保存和恢复 OpenGL 状态
  * Excluded from the webgl lane (PAG_WEBGL_ONLY): the case asserts cross-context
  * viewport/scissor/FBO state restoration, which does not exist on Emscripten's single
- * global GL context. The webgpu lane and native builds keep it.
+ * global GL context. Windows keeps a null state guard for GL as well (see CMakeLists.txt),
+ * so the restored-state assertions only apply to the native Apple GL backend.
  */
-#ifndef PAG_WEBGL_ONLY
+#if !defined(PAG_WEBGL_ONLY) && !defined(_WIN32)
 PAG_TEST(PAGSurfaceTest, GLRestorer) {
   auto pagFile = LoadPAGFile("resources/apitest/test.pag");
   int width = pagFile->width();

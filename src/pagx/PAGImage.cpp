@@ -34,7 +34,7 @@ std::shared_ptr<PAGImage> PAGImage::MakeFromPath(const std::string& path) {
   if (image == nullptr) {
     return nullptr;
   }
-  return std::shared_ptr<PAGImage>(new PAGImage(std::move(image), path));
+  return std::shared_ptr<PAGImage>(new PAGImage(std::move(image), nullptr, path));
 }
 
 std::shared_ptr<PAGImage> PAGImage::MakeFromDataURI(const std::string& dataURI) {
@@ -47,7 +47,7 @@ std::shared_ptr<PAGImage> PAGImage::MakeFromDataURI(const std::string& dataURI) 
   if (image == nullptr) {
     return nullptr;
   }
-  return std::shared_ptr<PAGImage>(new PAGImage(std::move(image), dataURI));
+  return std::shared_ptr<PAGImage>(new PAGImage(std::move(image), nullptr, dataURI));
 }
 
 std::shared_ptr<PAGImage> PAGImage::MakeFromData(const std::shared_ptr<Data>& data) {
@@ -59,17 +59,19 @@ std::shared_ptr<PAGImage> PAGImage::MakeFromData(const std::shared_ptr<Data>& da
   if (image == nullptr) {
     return nullptr;
   }
-  return std::shared_ptr<PAGImage>(new PAGImage(std::move(image), {}));
+  return std::shared_ptr<PAGImage>(new PAGImage(std::move(image), nullptr, {}));
 }
 
 std::shared_ptr<PAGImage> PAGImage::MakeFromTexture(const pag::BackendTexture& texture,
                                                     pag::ImageOrigin origin) {
   auto tgfxTexture = pag::ToTGFX(texture);
-  auto device = pag::Devices::ResolveForExternalResource(tgfxTexture, false).device;
+  auto adopted = pag::Devices::ResolveForExternalResource(tgfxTexture, false,
+                                                          pag::ExternalResourceUsage::Sampled);
+  auto device = adopted.device;
   if (device == nullptr) {
     return nullptr;
   }
-  auto* context = device->lockContext();
+  auto* context = pag::Devices::LockContext(device);
   if (context == nullptr) {
     return nullptr;
   }
@@ -78,21 +80,25 @@ std::shared_ptr<PAGImage> PAGImage::MakeFromTexture(const pag::BackendTexture& t
   if (image == nullptr) {
     return nullptr;
   }
-  return std::shared_ptr<PAGImage>(new PAGImage(std::move(image), {}));
+  // The image retains GPU resources bound to this exact tgfx context. Keep the device alive for
+  // as long as the image can be drawn, and rely on the backend device registry so a target
+  // surface built from the same native device uses the same context ID.
+  return std::shared_ptr<PAGImage>(new PAGImage(std::move(image), std::move(device), {}));
 }
 
 const std::string& PAGImage::source() const {
   return _source;
 }
-PAGImage::PAGImage(std::shared_ptr<tgfx::Image> image, std::string source)
-    : _tgfxImage(std::move(image)), _source(std::move(source)) {
+PAGImage::PAGImage(std::shared_ptr<tgfx::Image> image, std::shared_ptr<tgfx::Device> device,
+                   std::string source)
+    : _device(std::move(device)), _tgfxImage(std::move(image)), _source(std::move(source)) {
 }
 
 std::shared_ptr<PAGImage> MakeFrom(const std::shared_ptr<tgfx::Image>& image) {
   if (image == nullptr) {
     return nullptr;
   }
-  return std::shared_ptr<PAGImage>(new PAGImage(image, {}));
+  return std::shared_ptr<PAGImage>(new PAGImage(image, nullptr, {}));
 }
 
 }  // namespace pagx

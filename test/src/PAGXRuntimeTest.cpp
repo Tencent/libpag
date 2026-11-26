@@ -49,14 +49,7 @@
 #include "utils/TestUtils.h"
 
 #ifdef TGFX_USE_OPENGL
-#if defined(PAG_USE_SWIFTSHADER) || defined(__EMSCRIPTEN__)
-#include <GLES3/gl3.h>
-#else
-#ifndef GL_SILENCE_DEPRECATION
-#define GL_SILENCE_DEPRECATION
-#endif
-#include <OpenGL/gl3.h>
-#endif
+#include "utils/GLHeaders.h"
 #endif  // TGFX_USE_OPENGL
 
 namespace pag {
@@ -65,6 +58,7 @@ namespace pag {
  * Test case: PAGScene registers itself with the source document on creation and unregisters on
  * destruction.
  */
+#ifdef PAG_TEST_ACCESS_PRIVATE
 PAGX_TEST(PAGXRuntimeTest, PAGSceneLiveSceneRegistration) {
   auto doc = pagx::PAGXDocument::Make(100, 100);
 
@@ -83,6 +77,7 @@ PAGX_TEST(PAGXRuntimeTest, PAGSceneLiveSceneRegistration) {
   EXPECT_EQ(file2->width(), 100.0f);
   EXPECT_EQ(file2->height(), 100.0f);
 }
+#endif
 
 /**
  * Test case: PAGScene timeline lookup by name and identity sharing.
@@ -610,6 +605,46 @@ PAGX_TEST(PAGXRuntimeTest, MatrixInterpolationRespectsPivotFlag) {
   EXPECT_NEAR(pivotCssMid.ty, 14.64f, 0.5f);
 }
 
+// Known gap against the CSS reciprocal-space result, in CSS pixels: PAGX's Value space lands on
+// 600px at the midpoint of a 1000px -> 200px `perspective` channel, while a browser renders the
+// harmonic mean 333.33px. This is the distance between the two spaces as the test observes it today,
+// NOT a value the test should keep asserting: `feature/mite085_perspective_interp` adds
+// `KeyframeInterpolationSpace::Reciprocal` and drives the channel in that space, which closes the
+// gap. Re-derive this constant (and turn the assertion into an equality against the CSS midpoint)
+// when that lands; until then it pins today's behaviour so a silent drift on either side shows up.
+static constexpr float RECIPROCAL_KNOWN_GAP_PX = 266.6667f;
+
+/**
+ * Test case: a `perspective` distance channel interpolates the distance itself in PAGX's Value space,
+ * while CSS interpolates its reciprocal. Exporting the two endpoint keys alone therefore matches at
+ * the keys and diverges in between (measured ~0.82 SSIM on the mid frames of
+ * `resources/pagx_to_html/animations/layer/12_perspective.pagx`), which is the gap the Reciprocal
+ * interpolation space has to close.
+ */
+PAGX_TEST(PAGXRuntimeTest, PerspectiveChannelInterpolatesDistanceNotReciprocal) {
+  const std::vector<pagx::Keyframe<float>> keys = {
+      {0, 1000.0f, pagx::KeyframeInterpolationType::Linear, {}, {}},
+      {60, 200.0f, pagx::KeyframeInterpolationType::Linear, {}, {}},
+  };
+
+  // Value space (the default, and the space every channel starts in): the distance itself is what
+  // interpolates, so the midpoint is the arithmetic mean.
+  const double valueMidpoint = pagx::EvaluateKeyframeSequence(keys, 30.0);
+  EXPECT_NEAR(valueMidpoint, 600.0, 0.01) << "Value space interpolates the distance linearly";
+
+  // What a browser renders for the same pair of `perspective` keyframes: the reciprocal of the
+  // distance is what interpolates, so the midpoint is the harmonic mean of the endpoints.
+  const float cssMidpoint = 1.0f / ((1.0f / 1000.0f + 1.0f / 200.0f) * 0.5f);
+  EXPECT_NEAR(cssMidpoint, 333.33f, 0.05f);
+
+  // Both endpoints are pinned above, so this only fails when the Value-space result drifts: it
+  // records the known gap between the two spaces rather than a correct value.
+  const float gapPx = static_cast<float>(valueMidpoint) - cssMidpoint;
+  EXPECT_NEAR(gapPx, RECIPROCAL_KNOWN_GAP_PX, 0.5f)
+      << "Known gap between Value space and the CSS reciprocal space; re-derive "
+         "kReciprocalKnownGapPx once the Reciprocal interpolation space lands";
+}
+
 /**
  * Test case: a perspective distance mixes its projection coefficient -1/d instead of the distance,
  * so a distance going from 1000 to 200 passes through 333.33 at the midpoint instead of 600. This is
@@ -738,6 +773,7 @@ PAGX_TEST(PAGXRuntimeTest, PerspectiveChannelBlendsThroughEvaluation) {
  * that starts at no perspective lands on twice the target distance halfway, and one that starts at
  * 1000 lands on 333.33. A negative distance is rejected and leaves the pose untouched.
  */
+#ifdef PAG_TEST_ACCESS_PRIVATE
 PAGX_TEST(PAGXRuntimeTest, PerspectiveComponentWriteMixesTheProjectionCoefficient) {
   auto doc = pagx::PAGXDocument::Make(200, 200);
   auto* layer = doc->makeNode<pagx::Layer>("L");
@@ -765,6 +801,7 @@ PAGX_TEST(PAGXRuntimeTest, PerspectiveComponentWriteMixesTheProjectionCoefficien
   ASSERT_TRUE(binding->read(layer, "perspective", &value));
   EXPECT_FLOAT_EQ(std::get<float>(value), unchanged);
 }
+#endif
 
 /**
  * Test case: EvaluateKeyframeSegment evaluates a single keyframe pair at the boundary and mid
@@ -1134,8 +1171,9 @@ static std::shared_ptr<pagx::PAGXDocument> MakeTargetViewDocument() {
   return doc;
 }
 
-// Returns the public handle registered for an authored layer node, or nullptr when the node has no
-// runtime layer in this scene.
+// Returns the public handle for an authored layer node, or nullptr when the node has no runtime
+// layer in this scene. The runtime tree can contain helper layers without a PAGLayer handle, so the
+// walk matches the runtime layer object itself instead of a position in the authored tree.
 static std::shared_ptr<pagx::PAGLayer> LayerHandleFor(pagx::PAGScene* scene,
                                                       const pagx::Layer* node) {
   auto composition = scene != nullptr ? scene->rootComposition() : nullptr;
@@ -1147,8 +1185,20 @@ static std::shared_ptr<pagx::PAGLayer> LayerHandleFor(pagx::PAGScene* scene,
   if (runtimeLayer == nullptr) {
     return nullptr;
   }
-  auto it = scene->layerRegistry.find(runtimeLayer.get());
-  return it != scene->layerRegistry.end() ? it->second->shared_from_this() : nullptr;
+  std::vector<std::shared_ptr<pagx::PAGLayer>> pending = {composition};
+  while (!pending.empty()) {
+    auto layer = pending.back();
+    pending.pop_back();
+    if (layer == nullptr) {
+      continue;
+    }
+    if (layer->runtimeLayer == runtimeLayer) {
+      return layer;
+    }
+    const auto& children = layer->getChildren();
+    pending.insert(pending.end(), children.begin(), children.end());
+  }
+  return nullptr;
 }
 
 // Adds a layer whose only content is a 10x10 opaque rect centered at root (25,25), so the layer
@@ -1228,13 +1278,7 @@ PAGX_TEST(PAGXRuntimeTest, TargetViewHitTestOriginAndDisplayTransform) {
   EXPECT_EQ(scene->getOutputViewStatus(), pagx::OutputViewStatus::Valid);
   auto* targetNode = doc->findNode<pagx::Layer>("target");
   ASSERT_NE(targetNode, nullptr);
-  auto* binding = scene->rootComposition()->binding.get();
-  ASSERT_NE(binding, nullptr);
-  auto runtimeTarget = binding->get<tgfx::Layer>(targetNode);
-  ASSERT_NE(runtimeTarget, nullptr);
-  auto it = scene->layerRegistry.find(runtimeTarget.get());
-  ASSERT_NE(it, scene->layerRegistry.end());
-  auto target = it->second->shared_from_this();
+  auto target = LayerHandleFor(scene.get(), targetNode);
   ASSERT_NE(target, nullptr);
 
   auto bounds = scene->getGlobalBounds(target);

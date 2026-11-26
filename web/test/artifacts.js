@@ -17,11 +17,17 @@ function ResolveRepositoryPath(target) {
   return resolved;
 }
 
-function ValidateBuildInfo(info, backend, mode) {
+function ValidateBuildInfo(info, backend, mode, variant = '') {
   if (!info || info.protocol !== 1 || !Backends.includes(backend) || !Modes.includes(mode) ||
-      info.backend !== backend || info.mode !== mode || !/^[a-f0-9]{32}$/.test(info.buildId) ||
-      !/^[a-f0-9]{40}$/.test(info.sourceRevision) || !/^[a-f0-9]{40}$/.test(info.tgfxRevision)) {
+      info.backend !== backend || info.mode !== mode || typeof info.asyncify !== 'boolean' ||
+      !/^[a-f0-9]{32}$/.test(info.buildId) || !/^[a-f0-9]{40}$/.test(info.sourceRevision) ||
+      !/^[a-f0-9]{40}$/.test(info.tgfxRevision)) {
     throw new Error('Build identity does not match the requested backend or mode. Rebuild the tests.');
+  }
+  // The asyncify and non-asyncify builds share one dist directory, so a lane that depends on one
+  // variant must ask for it explicitly instead of trusting whatever was published last.
+  if (variant && info.asyncify !== (variant === 'asyncify')) {
+    throw new Error(`Build is not the ${variant} variant. Rebuild the tests.`);
   }
 }
 
@@ -40,9 +46,9 @@ function HashFile(file) {
   return hash.digest('hex');
 }
 
-function ReadBuild(directory, backend, mode) {
+function ReadBuild(directory, backend, mode, variant = '') {
   const manifest = JSON.parse(fs.readFileSync(path.join(directory, 'build-info.json'), 'utf8'));
-  ValidateBuildInfo(manifest, backend, mode);
+  ValidateBuildInfo(manifest, backend, mode, variant);
   for (const name of ArtifactNames) {
     if (manifest.files?.[name] !== HashFile(path.join(directory, name))) {
       throw new Error(`Artifact hash mismatch: ${name}`);
@@ -55,12 +61,12 @@ function HashText(text) {
   return crypto.createHash('sha256').update(text).digest('hex');
 }
 
-function SnapshotBuild(source, destination, backend, mode) {
+function SnapshotBuild(source, destination, backend, mode, variant = '') {
   fs.mkdirSync(destination);
   for (const name of [...ArtifactNames, 'build-info.json']) {
     fs.copyFileSync(path.join(source, name), path.join(destination, name));
   }
-  return ReadBuild(destination, backend, mode);
+  return ReadBuild(destination, backend, mode, variant);
 }
 
 function RemoveBackup(backup) {

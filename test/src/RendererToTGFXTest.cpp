@@ -35,8 +35,9 @@ PAGX_TEST(RendererToTGFXTest, NullInputReturnsNull) {
  * The public Data factories reject empty input, so the size-0 buffer is built through the private
  * constructor (the test target compiles with -fno-access-control).
  */
-PAGX_TEST(RendererToTGFXTest, EmptyDataReturnsValidEmpty) {
-  auto emptyData = std::shared_ptr<pagx::Data>(new pagx::Data(nullptr, 0));
+PAGX_TEST_PRIVATE(RendererToTGFXTest, EmptyDataReturnsValidEmpty) {
+  std::shared_ptr<pagx::Data> emptyData = nullptr;
+  PAG_PRIVATE_ACCESS(emptyData = std::shared_ptr<pagx::Data>(new pagx::Data(nullptr, 0));)
   ASSERT_TRUE(emptyData != nullptr);
   ASSERT_EQ(emptyData->size(), 0u);
 
@@ -58,6 +59,48 @@ PAGX_TEST(RendererToTGFXTest, NonEmptyDataMatchesBytes) {
   ASSERT_TRUE(result != nullptr);
   ASSERT_EQ(result->size(), sizeof(bytes));
   EXPECT_EQ(std::memcmp(result->bytes(), bytes, sizeof(bytes)), 0);
+}
+
+/**
+ * Test case: an sRGB color reaches tgfx untouched, since tgfx::Color is defined in sRGB.
+ */
+PAGX_TEST(RendererToTGFXTest, SRGBColorPassesThroughUnchanged) {
+  pagx::Color color{0.2f, 0.4f, 0.6f, 0.75f, pagx::ColorSpace::SRGB};
+
+  auto result = pagx::ToTGFX(color);
+  EXPECT_FLOAT_EQ(result.red, 0.2f);
+  EXPECT_FLOAT_EQ(result.green, 0.4f);
+  EXPECT_FLOAT_EQ(result.blue, 0.6f);
+  EXPECT_FLOAT_EQ(result.alpha, 0.75f);
+}
+
+/**
+ * Test case: a saturated Display P3 red maps onto sRGB red instead of overshooting the sRGB gamut.
+ * The gamut transform has to run in linear light, so an encoded-space matrix multiply that would
+ * push the red channel above 1 is not acceptable.
+ */
+PAGX_TEST(RendererToTGFXTest, DisplayP3SaturatedRedLandsInsideSRGBGamut) {
+  pagx::Color color{1.0f, 0.0f, 0.0f, 1.0f, pagx::ColorSpace::DisplayP3};
+
+  auto result = pagx::ToTGFX(color);
+  EXPECT_NEAR(result.red, 1.0f, 1e-3f);
+  EXPECT_NEAR(result.green, 0.0f, 1e-3f);
+  EXPECT_NEAR(result.blue, 0.0f, 1e-3f);
+  EXPECT_FLOAT_EQ(result.alpha, 1.0f);
+}
+
+/**
+ * Test case: a Display P3 mid-tone converts to the linear-light sRGB value, so rendering agrees
+ * with the shared pagx conversion used by color animation and ViewModel binding.
+ */
+PAGX_TEST(RendererToTGFXTest, DisplayP3MidToneUsesLinearLightConversion) {
+  pagx::Color color{0.8f, 0.2f, 0.2f, 0.5f, pagx::ColorSpace::DisplayP3};
+
+  auto result = pagx::ToTGFX(color);
+  EXPECT_NEAR(result.red, 0.872f, 2e-3f);
+  EXPECT_NEAR(result.green, 0.094f, 2e-3f);
+  EXPECT_NEAR(result.blue, 0.160f, 2e-3f);
+  EXPECT_FLOAT_EQ(result.alpha, 0.5f);
 }
 
 }  // namespace pag

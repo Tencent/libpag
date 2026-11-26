@@ -26,6 +26,7 @@ namespace pagx {
 
 class Drawable;
 class PAGScene;
+class VideoExportSurfaceAccess;
 
 /**
  * PAGSurface is a render target that PAGScene draws into. It is a thin opaque wrapper around an
@@ -56,8 +57,9 @@ class PAGSurface {
 
   /**
    * Creates a PAGSurface from the specified backend texture. The texture must not be bound to any
-   * framebuffer. The PAGSurface uses the GPU context on the calling thread directly via
-   * GLDevice::Current(). Returns nullptr if the texture is invalid or no GPU context is available.
+   * framebuffer. On OpenGL the PAGSurface uses the calling thread's current GL context; Metal
+   * and D3D12 use the device that owns the texture. WebGPU uses the runtime's default GPUDevice.
+   * Returns nullptr if the texture is invalid or the device cannot be resolved.
    * @param texture the backend texture to render into.
    * @param origin  the origin of the texture coordinate system.
    */
@@ -65,9 +67,9 @@ class PAGSurface {
                                               pag::ImageOrigin origin);
 
   /**
-   * Creates a PAGSurface from the specified backend render target. The PAGSurface uses the GPU
-   * context on the calling thread directly via GLDevice::Current(). Returns nullptr if the render
-   * target is invalid or no GPU context is available.
+   * Creates a PAGSurface from the specified backend render target. On OpenGL the PAGSurface uses
+   * the calling thread's current GL context; Metal and D3D12 use the device that owns the render
+   * target. Returns nullptr if the render target is invalid or the device cannot be resolved.
    * @param renderTarget the backend render target to render into.
    * @param origin       the origin of the render target coordinate system.
    */
@@ -101,12 +103,25 @@ class PAGSurface {
    */
   bool readPixels(void* dstPixels, size_t dstRowBytes);
 
+  /**
+   * Submits pending commands. Backends with synchronous completion support also wait for prior
+   * work on the surface's device queue. D3D12 surfaces using the same libpag registry device
+   * share that queue; the wait does not cover other host queues. WebGPU only guarantees
+   * submission, not GPU completion. Does not draw another frame. The method manages the device
+   * lock internally; callers must not already hold the same GPU device's context lock.
+   * @return true after submission and successful backend device-health checks. On WebGPU true
+   *         does not mean that GPU work has completed. Returns false if the device cannot be
+   *         locked, fails a health check, or its context has been lost.
+   */
+  bool waitUntilCompleted();
+
  private:
   explicit PAGSurface(std::shared_ptr<Drawable> drawable);
 
   std::shared_ptr<Drawable> drawable = nullptr;
 
   friend class PAGScene;
+  friend class VideoExportSurfaceAccess;
 };
 
 }  // namespace pagx

@@ -21,12 +21,20 @@
 
 namespace pag {
 std::shared_ptr<PAGSurface> OffscreenSurface::Make(int width, int height) {
+  if (width <= 0 || height <= 0) {
+    return nullptr;
+  }
+#ifdef PAG_TEST_ACCESS_PRIVATE
   auto device = DevicePool::Make();
-  if (device == nullptr || width <= 0 || height <= 0) {
+  if (device == nullptr) {
     return nullptr;
   }
   auto drawable =
       std::shared_ptr<OffscreenDrawable>(new OffscreenDrawable(width, height, std::move(device)));
+#else
+  // MSVC cannot disable access control, so use the public factory and its default device.
+  auto drawable = OffscreenDrawable::Make(width, height);
+#endif
   return PAGSurface::MakeFrom(std::move(drawable));
 }
 }  // namespace pag

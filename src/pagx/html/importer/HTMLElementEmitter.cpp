@@ -707,7 +707,7 @@ Layer* HTMLParserContext::convertImage(const std::shared_ptr<DOMNode>& element,
     auto* layer = _document->makeNode<Layer>();
     _layerBuilder->applySizeAndPosition(layer, box);
     _layerBuilder->applyLayerAttributes(layer, element, box);
-    _layerBuilder->applyBoxTransform(layer, box, element);
+    _layerBuilder->applyBoxTransform(layer, box, element->name);
 
     // A Layer with an unresolved import directive cannot also carry vector contents. When the
     // replaced SVG has box visuals, keep those on an outer layer, resolve the SVG in a filling
@@ -771,7 +771,7 @@ Layer* HTMLParserContext::convertImage(const std::shared_ptr<DOMNode>& element,
   // The image is the foreground paint: CSS backgrounds sit behind it, while border and box
   // effects remain visible around it. The shared geometry also preserves border-radius.
   _layerBuilder->applyBackgroundVisuals(layer, box, fill);
-  _layerBuilder->applyBoxTransform(layer, box, element);
+  _layerBuilder->applyBoxTransform(layer, box, element->name);
   auto* wrapper = _layerBuilder->maybeSplitBoxShadowFromClip(layer);
   assignElementId(wrapper, element);
   return wrapper;
@@ -783,7 +783,7 @@ Layer* HTMLParserContext::convertInlineSvg(const std::shared_ptr<DOMNode>& eleme
   auto* layer = _document->makeNode<Layer>();
   _layerBuilder->applySizeAndPosition(layer, box);
   _layerBuilder->applyLayerAttributes(layer, element, box);
-  _layerBuilder->applyBoxTransform(layer, box, element);
+  _layerBuilder->applyBoxTransform(layer, box, element->name);
 
   // CSS `color` cascades into the SVG and is what `currentColor` resolves to.
   // `resolveInheritedStyle` returns the style descendants see, but `resolvedTextColor`
@@ -1075,11 +1075,12 @@ void HTMLParserContext::applyMaskOrClip(Layer* layer, const HTMLBoxAttributes& b
   if (maskLayer->id.empty()) {
     maskLayer->id = _idAllocator->generateUnique("mask");
   }
-  for (auto& node : svgDoc->nodes) {
-    _document->nodes.push_back(std::move(node));
-  }
-  svgDoc->nodes.clear();
-  svgDoc->layers.clear();
+  // Adopt the mask's nodes. adoptNodes() renames the SVG importer's auto-generated ids (path1,
+  // color1, ...) first: they are numbered from scratch per document and would otherwise collide
+  // with ids this document already uses, which would report duplicates or hijack its "@id"
+  // references during registration.
+  // adoptNodes() drains svgDoc, so its layer list goes with the nodes.
+  _document->adoptNodes(*svgDoc);
 
   layer->mask = maskLayer;
   layer->maskType = maskType;

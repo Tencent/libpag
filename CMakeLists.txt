@@ -41,6 +41,7 @@ option(PAG_USE_OPENGL "Allow use of OpenGL as GPU backend" ON)
 option(PAG_USE_METAL "Use Metal as the GPU backend on Apple platforms" OFF)
 option(PAG_USE_VULKAN "Use Vulkan as the GPU backend" OFF)
 option(PAG_USE_D3D12 "Use D3D12 as the GPU backend on Windows" OFF)
+option(PAG_D3D12_USE_WARP "Force the D3D12 backend onto the WARP software rasterizer" OFF)
 option(PAG_USE_WEBGPU "Use WebGPU as the GPU backend on Web" OFF)
 option(PAG_USE_SWIFTSHADER "Allow build with the SwiftShader library" OFF)
 option(PAG_USE_ANGLE "Allow build with the ANGLE library" OFF)
@@ -138,6 +139,18 @@ if (PAG_USE_WEBGPU AND NOT WEB)
     message(FATAL_ERROR "PAG_USE_WEBGPU is only supported on the Web platform.")
 endif ()
 
+# D3D12 only exists on Windows — reject it elsewhere up front instead of failing later with a
+# pile of undefined symbols. WARP is a D3D12-only test/CI mode.
+if (PAG_USE_D3D12 AND NOT WIN32)
+    message(FATAL_ERROR "PAG_USE_D3D12 is only supported on Windows.")
+endif ()
+if (PAG_D3D12_USE_WARP)
+    if (NOT PAG_USE_D3D12)
+        message(FATAL_ERROR "PAG_D3D12_USE_WARP requires PAG_USE_D3D12=ON.")
+    endif ()
+    list(APPEND PAG_DEFINES PAG_D3D12_USE_WARP)
+endif ()
+
 if (PAG_USE_QT)
     set(PAG_USE_SWIFTSHADER OFF)
     set(PAG_USE_ANGLE OFF)
@@ -189,7 +202,7 @@ endif ()
 list(GET PAG_ENABLED_GPU_BACKENDS 0 PAG_GPU_BACKEND)
 
 # tgfx backend availability does not imply that libpag has implemented its device and platform glue.
-set(PAG_IMPLEMENTED_GPU_BACKENDS OPENGL METAL WEBGPU)
+set(PAG_IMPLEMENTED_GPU_BACKENDS OPENGL METAL WEBGPU D3D12)
 if (NOT PAG_GPU_BACKEND IN_LIST PAG_IMPLEMENTED_GPU_BACKENDS)
     message(FATAL_ERROR "The libpag ${PAG_GPU_BACKEND} backend is not yet implemented.")
 endif ()
@@ -220,8 +233,9 @@ if (PAG_BUILD_TESTS)
 endif ()
 
 # VideoExporter is native-only. CLI and tests require it, so explicitly disabling it for those
-# builds is rejected rather than silently overriding the user's choice.
-if (WEB)
+# builds is rejected rather than silently overriding the user's choice. The wasm test binary is the
+# one web build that needs the exporter, because its async video export lane drives it directly.
+if (WEB AND NOT PAG_BUILD_WEB_VIDEO_EXPORT_TESTS)
     set(PAG_BUILD_VIDEO_EXPORTER OFF)
 elseif ((PAG_BUILD_CLI OR PAG_BUILD_TESTS) AND NOT PAG_BUILD_VIDEO_EXPORTER)
     message(FATAL_ERROR "PAG_BUILD_CLI and PAG_BUILD_TESTS require PAG_BUILD_VIDEO_EXPORTER=ON")
@@ -314,14 +328,19 @@ endif ()
 if (PAG_USE_METAL)
     list(FILTER SRC_FILES EXCLUDE REGEX "/base/utils/cast/MetalTexture\\.cpp$")
 endif ()
+if (PAG_USE_D3D12)
+    list(FILTER SRC_FILES EXCLUDE REGEX "/base/utils/cast/D3D12Texture\\.cpp$")
+endif ()
 list(APPEND PAG_FILES ${SRC_FILES} ${PAG_GPU_BACKEND_FILES} ${PAG_CAST_BACKEND_FILES})
 
 if (PAG_BUILD_PAGX)
     # pagx core + utils + xml (always included with PAGX)
     file(GLOB PAGX_CORE_SOURCES CONFIGURE_DEPENDS src/pagx/*.cpp)
-    list(FILTER PAGX_CORE_SOURCES EXCLUDE REGEX "/VideoExporter\\.cpp$")
+    list(REMOVE_ITEM PAGX_CORE_SOURCES
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/pagx/VideoExporter.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/pagx/VideoExportFrame.cpp)
     if (PAG_BUILD_VIDEO_EXPORTER)
-        list(APPEND PAGX_CORE_SOURCES src/pagx/VideoExporter.cpp)
+        list(APPEND PAGX_CORE_SOURCES src/pagx/VideoExporter.cpp src/pagx/VideoExportFrame.cpp)
     endif ()
     file(GLOB PAGX_NODES_SOURCES CONFIGURE_DEPENDS src/pagx/nodes/*.cpp)
     list(APPEND PAGX_CORE_SOURCES ${PAGX_NODES_SOURCES})
@@ -383,6 +402,8 @@ if (PAG_BUILD_PAGX)
             src/pagx/html/importer/HTMLSvgFilterDecoder.h
             src/pagx/html/importer/HTMLTextFragmentBuilder.cpp
             src/pagx/html/importer/HTMLTextFragmentBuilder.h
+            src/pagx/html/importer/HTMLTransform3D.cpp
+            src/pagx/html/importer/HTMLTransform3D.h
             src/pagx/html/importer/HTMLTransformContext.h
             src/pagx/html/importer/HTMLTransformPasses.cpp
             src/pagx/html/importer/HTMLTransformPasses.h
@@ -473,7 +494,8 @@ if (PAG_USE_QT)
     list(APPEND PAG_FILES ${PLATFORM_FILES})
     list(APPEND PAG_DEFINES GL_SILENCE_DEPRECATION)
     if (MACOS)
-        file(GLOB CGL_PLATFORM_FILES src/platform/mac/private/HardwareDecoder.mm)
+        file(GLOB CGL_PLATFORM_FILES src/platform/mac/private/HardwareDecoder.mm
+                src/platform/cocoa/private/HardwareDecodeContext.mm)
         list(APPEND PAG_FILES ${CGL_PLATFORM_FILES})
     endif ()
 elseif (PAG_USE_SWIFTSHADER)
@@ -732,8 +754,21 @@ elseif (WIN32)
     set(BUILD_USE_64BITS ON)
     list(APPEND PAG_DEFINES NOMINMAX _USE_MATH_DEFINES)
 
+    if (PAG_USE_D3D12)
+        find_library(D3D12_LIB d3d12)
+        find_library(DXGI_LIB dxgi)
+        find_library(D3DCOMPILER_LIB d3dcompiler)
+        find_library(DCOMP_LIB dcomp)
+        if (NOT D3D12_LIB OR NOT DXGI_LIB OR NOT D3DCOMPILER_LIB OR NOT DCOMP_LIB)
+            message(FATAL_ERROR "PAG_USE_D3D12 requires the d3d12, dxgi, d3dcompiler and dcomp libraries.")
+        endif ()
+        list(APPEND PAG_SHARED_LIBS ${D3D12_LIB} ${DXGI_LIB} ${D3DCOMPILER_LIB} ${DCOMP_LIB})
+    endif ()
+
     if (USE_NATIVE_PLATFORM)
-        if (PAG_USE_ANGLE)
+        if (PAG_USE_D3D12)
+            # D3D12 window rendering does not need OpenGL or ANGLE.
+        elseif (PAG_USE_ANGLE)
             list(APPEND PAG_DEFINES PAG_USE_ANGLE)
             list(APPEND PAG_INCLUDES ${TGFX_DIR}/vendor/angle/include)
             file(GLOB ANGLE_LIBS ${TGFX_DIR}/vendor/angle/${PLATFORM}/${ARCH}/*${CMAKE_STATIC_LIBRARY_SUFFIX})
@@ -1113,6 +1148,11 @@ if (PAG_BUILD_CLI)
     message("PAGX_CLI_VERSION: ${PAGX_CLI_VERSION}")
 
     # Generate pagx_xsd.h from spec/pagx.xsd
+    # The schema is embedded into a generated header at configure time. Declare the source as a
+    # configure dependency so an XSD edit re-runs CMake instead of leaving 'cmake --build'
+    # validating documents against a stale schema.
+    set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
+                 "${CMAKE_CURRENT_SOURCE_DIR}/spec/pagx.xsd")
     # Use HEX encoding to avoid MSVC string literal length limit (C2026)
     file(READ "${CMAKE_CURRENT_SOURCE_DIR}/spec/pagx.xsd" PAGX_XSD_CONTENT HEX)
     string(LENGTH "${PAGX_XSD_CONTENT}" PAGX_XSD_HEX_LEN)
@@ -1196,6 +1236,13 @@ if (PAG_BUILD_TESTS)
     if (PAG_USE_METAL)
         set(PAG_BACKEND_NAME "metal")
         set(TEST_TARGET_SUFFIX "Metal")
+    elseif (PAG_USE_D3D12)
+        if (PAG_D3D12_USE_WARP)
+            set(PAG_BACKEND_NAME "d3d12-warp")
+        else ()
+            set(PAG_BACKEND_NAME "d3d12")
+        endif ()
+        set(TEST_TARGET_SUFFIX "D3D12")
     elseif (PAG_USE_OPENGL)
         if (PAG_USE_SWIFTSHADER)
             set(PAG_BACKEND_NAME "opengl-swiftshader")
@@ -1204,7 +1251,7 @@ if (PAG_BUILD_TESTS)
         endif ()
         set(TEST_TARGET_SUFFIX "OpenGL")
     else ()
-        message(FATAL_ERROR "libpag tests only support OpenGL and Metal backends.")
+        message(FATAL_ERROR "libpag tests only support OpenGL, Metal and D3D12 backends.")
     endif ()
     message(STATUS "PAG_BACKEND_NAME: ${PAG_BACKEND_NAME}")
 
@@ -1223,14 +1270,29 @@ if (PAG_BUILD_TESTS)
         if (HAS_DIFF)
             string(REPLACE "-" "_" BACKEND_ARG_NAME "${PAG_BACKEND_NAME}")
             string(TOUPPER "${BACKEND_ARG_NAME}" BACKEND_ARG_NAME)
-            message(WARNING "The local md5 cache for '${PAG_BACKEND_NAME}' is out of date! Please run './update_baseline.sh USE_${BACKEND_ARG_NAME}' to regenerate the cache.")
+            if (WIN32)
+                if (PAG_USE_D3D12)
+                    set(BASELINE_UPDATE_COMMAND "update_baseline.bat --no-checkout USE_${BACKEND_ARG_NAME}")
+                else ()
+                    set(BASELINE_UPDATE_COMMAND "update_baseline.bat USE_${BACKEND_ARG_NAME}")
+                endif ()
+            else ()
+                set(BASELINE_UPDATE_COMMAND "./update_baseline.sh USE_${BACKEND_ARG_NAME}")
+            endif ()
+            message(WARNING "The local md5 cache for '${PAG_BACKEND_NAME}' is out of date! Please run '${BASELINE_UPDATE_COMMAND}' to regenerate the cache.")
         endif ()
     endif ()
 
     file(GLOB_RECURSE SRC_FILES test/src/*.*)
     list(FILTER SRC_FILES EXCLUDE REGEX "/MetalTestSupport\\.(cpp|h)$")
+    if (NOT PAG_USE_D3D12)
+        list(FILTER SRC_FILES EXCLUDE REGEX "PAGD3D12(Device|Surface)Test\\.cpp$")
+    endif ()
     if (NOT APPLE OR NOT USE_NATIVE_PLATFORM)
-        list(FILTER SRC_FILES EXCLUDE REGEX "PAG(Metal(Surface|Texture|Atlas)|CocoaSurface(Header)?)Test\\.mm$")
+        # VTDecodeContextPoolTest links the VideoToolbox decode-context pool, which only the native
+        # Apple platforms compile; the swiftshader/non-native builds omit src/platform/cocoa.
+        list(FILTER SRC_FILES EXCLUDE REGEX
+                "PAG(Metal(Surface|Texture|Atlas)|CocoaSurface(Header)?)Test\\.mm$|VTDecodeContextPoolTest\\.cpp$")
     else ()
         set_source_files_properties(test/src/PAGCocoaSurfaceTest.mm test/src/PAGCocoaSurfaceHeaderTest.mm
                 PROPERTIES COMPILE_OPTIONS "-fobjc-arc")
@@ -1266,12 +1328,32 @@ if (PAG_BUILD_TESTS)
     find_vendor_libraries(test-vendor STATIC TEST_VENDOR_STATIC_LIBRARIES)
     list(APPEND PAG_TEST_LIBS ${TEST_VENDOR_STATIC_LIBRARIES})
 
+    # Baseline MD5 uses tgfx's private portable implementation, which is not part of tgfx's
+    # public include directory. Keep the private include scoped to the files that need it.
+    set_source_files_properties(test/src/utils/Baseline.cpp PROPERTIES
+            INCLUDE_DIRECTORIES "${TGFX_DIR}/src")
+
     file(GLOB FFAVC_LIB vendor/ffavc/${PLATFORM}/${ARCH}/*${CMAKE_SHARED_LIBRARY_SUFFIX})
     list(APPEND PAG_TEST_LIBS ${FFAVC_LIB})
     list(APPEND PAG_TEST_INCLUDES vendor/ffavc/include)
 
-    list(APPEND PAG_TEST_COMPILE_OPTIONS ${PAG_COMPILE_OPTIONS} -fno-access-control)
+    list(APPEND PAG_TEST_COMPILE_OPTIONS ${PAG_COMPILE_OPTIONS})
+    if (MSVC AND CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+        # clang-cl ignores the GNU flag unless it is forwarded to the clang driver.
+        list(APPEND PAG_TEST_COMPILE_OPTIONS /clang:-fno-access-control)
+        list(APPEND PAG_TEST_DEFINES PAG_TEST_ACCESS_PRIVATE)
+    elseif (MSVC)
+        # MSVC cannot disable access control. Tests that inspect private members are compiled
+        # out through PAG_TEST_PRIVATE / PAG_PRIVATE_ACCESS, matching tgfx's test setup.
+        message(STATUS "MSVC cannot disable access control; private-access tests are disabled.")
+    else ()
+        list(APPEND PAG_TEST_COMPILE_OPTIONS -fno-access-control)
+        list(APPEND PAG_TEST_DEFINES PAG_TEST_ACCESS_PRIVATE)
+    endif ()
     list(APPEND PAG_TEST_DEFINES ${PAG_DEFINES} PAG_BACKEND_NAME="${PAG_BACKEND_NAME}")
+    if (FFAVC_LIB)
+        list(APPEND PAG_TEST_DEFINES PAG_HAS_EXTERNAL_FFAVC)
+    endif ()
 
     foreach (FILE_PATH ${PAG_TEST_FILES})
         get_filename_component(FILE_NAME "${FILE_PATH}" NAME_WE)
@@ -1310,6 +1392,18 @@ if (PAG_BUILD_TESTS)
     target_compile_definitions(PAGFullTest_${TEST_TARGET_SUFFIX} PUBLIC ${PAG_TEST_DEFINES})
     target_compile_options(PAGFullTest_${TEST_TARGET_SUFFIX} PUBLIC ${PAG_TEST_COMPILE_OPTIONS})
     target_link_libraries(PAGFullTest_${TEST_TARGET_SUFFIX} ${PAG_TEST_LIBS})
+
+    # Compile the public C API headers with a real C compiler in every test build. When the C API
+    # is enabled, also link the D3D12 entry points so their ABI cannot regress silently.
+    add_library(pag-c-api-check OBJECT test/c/CApiCheck.c)
+    target_include_directories(pag-c-api-check PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+    if (PAG_USE_C)
+        target_compile_definitions(pag-c-api-check PRIVATE PAG_C_API_LINK_CHECK)
+    endif ()
+    foreach (C_API_TEST_TARGET UpdateBaseline_${TEST_TARGET_SUFFIX}
+            PAGUnitTest_${TEST_TARGET_SUFFIX} PAGFullTest_${TEST_TARGET_SUFFIX})
+        target_sources(${C_API_TEST_TARGET} PRIVATE $<TARGET_OBJECTS:pag-c-api-check>)
+    endforeach ()
 
     if (PAG_USE_METAL)
         # Only this object target sees tgfx's private atlas headers. Revalidate it on tgfx upgrades;

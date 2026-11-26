@@ -37,7 +37,6 @@
 namespace tgfx {
 class Context;
 class DisplayList;
-class Layer;
 class Recording;
 }  // namespace tgfx
 
@@ -330,6 +329,8 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
   void clearAllViewModelsDirty();
   static void ClearCompositionTreeDirty(PAGComposition* comp);
 
+  void reapplyDataBindsForTarget(const Node* targetNode, RuntimeBinding* scopeBinding);
+
   RuntimeBinding* mutableBinding();
 
   tgfx::DisplayList* getDisplayListForOptions() const;
@@ -414,9 +415,6 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
   // RefreshLayerInPlace). flushTextHolders and hasContentChanged iterate this list directly so the
   // common case (no text reshape in the document) avoids walking the composition tree every frame.
   std::vector<std::shared_ptr<TextHolder>> textHolders = {};
-
-  // Maps tgfx layers in the runtime tree to their PAGLayer nodes for hit-test resolution.
-  std::unordered_map<const tgfx::Layer*, PAGLayer*> layerRegistry = {};
 
   friend class PAGXDocument;
   friend class PAGTimeline;

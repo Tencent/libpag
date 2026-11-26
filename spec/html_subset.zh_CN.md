@@ -176,8 +176,9 @@
 | `mix-blend-mode: <mode>` | `Layer.blendMode = <mode>` |
 | `filter: blur(X) drop-shadow(X Y [B] [C])`（不支持 spread 或 `inset`） | `<BlurFilter>` / `<DropShadowFilter>` 链；静态颜色调整使用 `<ColorMatrixFilter>` |
 | `backdrop-filter: blur(X)` | `<BackgroundBlurStyle>` |
-| `transform: <fn>` | 映射到 `Layer.matrix`。支持单函数形式（`skewX`/`skewY`/`rotate`/`scale[X\|Y]`/`translate[X\|Y]`/`matrix(a,b,c,d,tx,ty)`）以及 `matrix3d(...)`（投影为其 2D 仿射分量）；复合链与其它 3D 变体（`rotate3d`/`perspective`）告警丢弃 |
-| `transform-origin` | 透传；当其等于盒子中心（`50% 50%`、`center`、`center center`，或等于盒心的 px 值）时被尊重，其它原点告警 |
+| `transform: <fn-list>` | 按 CSS 顺序合成为一个 4x4 姿态。所有函数都支持：`translate[X\|Y\|Z\|3d]`、`scale[X\|Y\|Z\|3d]`、`rotate[X\|Y\|Z\|3d]`、`skewX`/`skewY`/`skew`、`matrix`、`matrix3d`、`perspective`。函数之间不需要分隔（`rotate(45deg)scale(2)` 合法），长度参数可以是 `px`、相对元素盒的百分比（X 取宽度、Y 取高度）。`calc()` 暂不支持：它需要 CSS 量纲校验，而快照链路给的是已计算值。角度参数接受 `deg` / `grad` / `rad` / `turn`（大小写不敏感）；无单位角度只有 `0` 合法，其它单位会让整条声明失效。仍停留在 z = 0 平面的姿态写入 `Layer.matrix`；带深度或透视的姿态写入 `Layer.matrix3D`（3D 姿态必须可逆）。`transform-style: preserve-3d` 映射到 `Layer.preserve3D` |
+| `perspective` / `perspective-origin` | 声明元素作为相机作用于**直接子级**：距离必须是非负长度；小于 1px 在渲染时按 1px 处理，只有 `none` 表示无相机。固定相机由wrapper承载，元素自身姿态保留；非flex布局宿主下无位置约束的流式子层保留父投影，不改变百分比或内容测量，其preserve-3d后代继续获得投影。位置或相机无法表示的子层（包括flex定位、未解析的远边定位）仍不投影并诊断。详见 §13.7 |
+| `transform-origin` | 按元素盒子解析（`px`、`%`、`left`/`center`/`right`/`top`/`bottom`，以及可选的 px 深度），写入 `Layer.anchor` / `anchorZ`，姿态本身不带支点。token 非法（坏单位、坏百分比或四个分量）会被拒绝并告警，支点回退到**盒中心**；合法的值若缺少可用的盒子尺寸，则告警并退到左上角支点 |
 | Layer 上的 `overflow: hidden` | `Layer.clipToBounds = true` |
 | Layer 上的 `overflow: <x> <y>`（两值简写） | 任一轴不是 `visible`（`hidden` / `clip` / `scroll` / `auto` / `overlay`）时 `Layer.clipToBounds = true`，与 CSS「任一轴非 `visible` 即成为裁剪容器」的规则一致；`visible visible` 则不裁剪。`scroll` / `auto` / `overlay` 另外告警，因为 PAGX 无法表达它们隐含的滚动能力 |
 
@@ -185,9 +186,8 @@
 `content-box` 会保留：携带该关键字的每个渐变层重建为内缩子层，即 CSS 绘制渐变边框的方式（纯色
 `background-color` 仍按 border box 绘制）。其它未知值告警丢弃。
 
-禁用（告警并跳过）：单边 `border-*`、单角 `border-*-radius`、`outline`、`perspective`、
-几何 `clip-path` 形式（`inset`/`circle`/`ellipse`/`polygon`/`path`），以及复合链与非
-`matrix3d` 的 3D `transform`。
+禁用（告警并跳过）：单边 `border-*`、单角 `border-*-radius`、`outline`、几何 `clip-path` 形式
+（`inset`/`circle`/`ellipse`/`polygon`/`path`）。
 
 ### 4.5 文本
 
@@ -353,7 +353,7 @@ CSS 圆角头像的常见写法是用 `border-radius` + `overflow: hidden` 的�
 | DocumentSkeleton | 合并重复的 `<head>` / `<body>`、小写化标签、去掉注释与处理指令、丢弃 `<head>` 中除 `<title>` / `<meta>` / `<style>` 之外的元素 | `<script>` 等不允许的 `<head>` 内容（`subset:unsupported-tag`）；外部 `<link rel="stylesheet">`（`subset:external-stylesheet`）；`<html>` 与 `<body>` 之间的多余顶层元素（`subset:unsupported-tag`） |
 | StyleSheetCollector | 把 `<style>` 中的类选择器与元素选择器规则展开到每个元素的内联级联里，并移除 `<style>` 元素本身 | `*`、后代/伪类/属性选择器（`subset:unsupported-selector`）；`@media`、`@font-face`、`@keyframes` 等 at-rule（`subset:unsupported-at-rule`） |
 | ComputedStyle | 完成 CSS 级联（继承 → 元素默认 → 元素规则 → 类规则 → 内联 `style`），并把合并后的属性写回内联 style；把 `-webkit-` 前缀声明合并到标准名（如 `-webkit-background-clip` → `background-clip`） | — |
-| PropertyFilter | 把 `em` 转 px（基准为父元素计算后的 `font-size`），`rem` 转 px（基准 16px），`vw`/`vh` 转 px（基准为画布尺寸），`pt` 转 px（`subset:unit-coerced`）；把 `flex: <grow> <shrink> <basis>` 收敛为 `flex: <grow>`（`subset:flex-shorthand-collapsed`），`flex: none`→`0`、`auto`/`initial`→`1`；丢弃 `flex-shrink: 0`（PAGX 从不收缩）；把 `display: inline \| inline-block` 降级为 `block`、`flex-direction: *-reverse` 降为 `row`/`column`；静默丢弃 `position: relative`（PAGX 无操作,见 §4.3）；把 `position: fixed \| sticky` 降级为 `position: absolute`；保留 `margin*`（后续折叠）、`transform`/`transform-origin`（仅单函数/`matrix()`/`matrix3d()`）、`object-fit`、`writing-mode`、`background-image` + `background-size`/`background-repeat`/`background-position`（url 背景）、`mask-*`、`clip-path: url(#id)`、`-webkit-text-stroke*` | `transform` 复合链与非 `matrix3d` 的 3D 形式、`flex-shrink`（非零）、几何 `clip-path` 形式、`outline`、`float`、`order`、`align-content`、`align-self`、`direction`、`unicode-bidi`、`flex-wrap`、`flex-grow`、`flex-basis`、`min-*`、`max-*`、`aspect-ratio`、`text-transform`、`text-indent`、`word-*`、`overflow-wrap`、`font-variant`、`font-stretch`、`font` 简写、`grid-*`、单边 `border-*`、单角 `border-*-radius`、`z-index`、`cursor`、`pointer-events`、`user-select`、`visibility`（`subset:unsupported-property`）；`var()`、`calc()`、`min/max/clamp()`（`subset:unsupported-property`）；其它不支持的单位（`subset:unsupported-property`） |
+| PropertyFilter | 把 `em` 转 px（基准为父元素计算后的 `font-size`），`rem` 转 px（基准 16px），`vw`/`vh` 转 px（基准为画布尺寸），`pt` 转 px（`subset:unit-coerced`）；把 `flex: <grow> <shrink> <basis>` 收敛为 `flex: <grow>`（`subset:flex-shorthand-collapsed`），`flex: none`→`0`、`auto`/`initial`→`1`；丢弃 `flex-shrink: 0`（PAGX 从不收缩）；把 `display: inline \| inline-block` 降级为 `block`、`flex-direction: *-reverse` 降为 `row`/`column`；静默丢弃 `position: relative`（PAGX 无操作,见 §4.3）；把 `position: fixed \| sticky` 降级为 `position: absolute`；保留 `margin*`（后续折叠）、`transform`/`transform-origin`（任意受支持的函数列表）、`transform-style`、`object-fit`、`writing-mode`、`background-image` + `background-size`/`background-repeat`/`background-position`（url 背景）、`mask-*`、`clip-path: url(#id)`、`-webkit-text-stroke*` | 不受支持的 `transform` 函数、`flex-shrink`（非零）、几何 `clip-path` 形式、`outline`、`float`、`order`、`align-content`、`align-self`、`direction`、`unicode-bidi`、`flex-wrap`、`flex-grow`、`flex-basis`、`min-*`、`max-*`、`aspect-ratio`、`text-transform`、`text-indent`、`word-*`、`overflow-wrap`、`font-variant`、`font-stretch`、`font` 简写、`grid-*`、单边 `border-*`、单角 `border-*-radius`、`z-index`、`cursor`、`pointer-events`、`user-select`、`visibility`（`subset:unsupported-property`）；`var()`、`calc()`、`min/max/clamp()`（`subset:unsupported-property`）；其它不支持的单位（`subset:unsupported-property`） |
 | HTMLFlexInference *（默认开启：`Options::inferFlexFromAbsolute`；`autoNormalize` 为 false 时无效）* | 当某容器的所有子元素都是 `position: absolute` 且能整齐拼成一行/一列时，把容器改写为 `display: flex` 并填入推断出的 `gap`、`padding`、`align-items`、`flex-direction`；当容器有显式主轴尺寸且内容两端留白（近似）相等时，用 `justify-content: center` 取代对称的主轴 padding；同时移除子元素的 `position` / `left` / `right` / `top` / `bottom`（`subset:flex-inferred`） | 子元素在两个轴向都重叠、跨轴对齐方式不一致、或主轴间距不均匀的容器一律保留绝对定位（`subset:flex-inference-skipped`） |
 | MarginToGapPromotion | 当 `display: flex` 容器的在流子元素带有统一的逐子主轴 margin（leading 或 trailing 模式）时，把该 margin 提升到容器的 `gap` 并清除逐子 margin（`subset:margin-promoted-to-gap`） | 容器换行、已有正 `gap`、参与子元素少于两个、子元素带 `flex` grow、或 margin 非 px 时跳过（margin 留给 `wrapForMargin` 折叠） |
 | SpaceJustifyOverflowCollapse | 当使用 `space-between` / `space-around` / `space-evenly` 的 `display: flex` 容器子元素在主轴溢出时，把 `justify-content` 改写为 `flex-start`，避免 PAGX flex 引擎重叠（`subset:space-justify-collapsed-on-overflow`） | 尺寸数据不全（无显式 px 主轴尺寸、padding/gap 非 px、子元素尺寸无法解析、或子元素带 `flex` grow）时保持原样 |
@@ -456,21 +456,44 @@ CSS 圆角头像的常见写法是用 `border-radius` + `overflow: hidden` 的�
 |--------------|-----------|----------|--------|
 | `opacity` | `alpha` | 元素的 `Layer` | float |
 | `transform`（仅纯平移） | `x` / `y` | 元素的 `Layer` | float |
-| `transform`（scale / rotate / skew / 任意非纯平移） | `matrix` | 元素的 `Layer` | matrix |
+| `transform`（scale / rotate / skew / 任意非纯平移，且停留在平面上） | `matrix` | 元素的 `Layer` | matrix |
+| `transform`（带深度或透视） | `matrix3D` | 元素的 `Layer` | matrix3D |
 | `color` / `background-color` | `color` | 元素 `Fill` 内的 `SolidColor` | color |
 | `filter: drop-shadow(...)` | `offsetX` / `offsetY` / `blurX` / `blurY` / `color` | 元素 `Layer` 上的 `DropShadowFilter` | float / color |
 | `filter: blur(...)` | `blurX` / `blurY` | 元素 `Layer` 上的 `BlurFilter` | float |
 | `filter: brightness(...)` | `alpha`（钳制到 `[0,1]`） | 自动生成的嵌套 `Layer` | float |
 | `clip-path`（几何形式 `inset`/`circle`/`ellipse`/`polygon`/`path`） | `point{i}.x` / `point{i}.y` | 轮廓 mask `Layer` 内的 `Path` | float |
 
-`transform` 会逐关键帧解析为一个 2D 仿射矩阵（单函数与空格分隔的复合链——`translate[X|Y]` /
-`scale[X|Y]` / `rotate` / `skewX|Y|skew` / `matrix(...)`）。当*每一个*关键帧都是纯平移时，动画使用更
-廉价的 `x` / `y` 通道（它们叠加在布局分配的位置之上）。一旦任一关键帧带有 scale / rotate / skew
-（或一个非平移的 `matrix(...)`），整个仿射就被路由到单个 `matrix` 通道，并像静态 `transform` 路径一样
-围绕元素的 `transform-origin` 取轴（`T(cx,cy) · M · T(-cx,-cy)`），使静态与动画的变换一致。3D 形式
-（`matrix3d` / `rotate3d` / `perspective`）没有 2D 仿射表示，被丢弃并告警
-（`subset:animation-unsupported-property`）。影响布局的属性（`width`、`height`、`margin`、
-`padding`、`gap`、`flex` …）永远不可动画（见 §4.4），同样被丢弃。
+`transform` 会逐关键帧解析成与静态路径相同的 4x4 姿态（空格分隔的函数列表按 CSS 顺序合成）。当
+*每一个*关键帧都是纯平移时，动画使用更廉价的 `x` / `y` 通道（它们叠加在布局分配的位置之上）。停留在
+平面上的姿态整条路由到单个 `matrix` 通道，带深度或透视的姿态则路由到单个 `matrix3D` 通道。
+拒绝与丢弃发生在不同阶段，不能混为一谈：无法放置的停靠点在解析阶段就被拒绝（该帧被丢弃）；
+而放置阶段已经接受的平面帧一旦抬到 `matrix3D` 上变成奇异矩阵（典型是 `scale(0)`），PAGX 无法持久化
+——每个 `matrix3D` 关键帧都必须可逆。若这个零缩放来自**函数因子**（`rotateY(-90deg) scale(0)`），
+则把该因子在**相乘之前**钳到 `epsilon = min(1e-3, 0.5 / max(width, height))`，从而保住它的旋转而
+不是丢掉。这个替代因子取**固定上界与“由参考盒推导的预算”中的较小者**：`1e-3` 让不超过 500px 的盒子保持在半个
+像素以内，也远离 float32 下运行时旋转/缩放分解开始抖动的位置；更大的盒子则由 `0.5 / max(width, height)`
+收紧——60px 盒子用 `1e-3`（渲染边长 0.06px），20000px 盒子用 `2.5e-5`。这个界是**盒子自身坐标系内的局部界**，
+不是对合成结果的承诺：祖先变换或相机仍可能把它放大成可见像素；`overflow: visible` 时，实际绘制内容
+也可能超出推导预算所用的参考盒。
+**先乘后钳没有意义**——零乘任何数仍是零、方向已经不存在。若奇异帧来自作者直接写的**矩阵**
+（`matrix3d(0, …)`），那里没有方向可救，仍按“丢弃 + 报告（`subset:animation-unsupported-property`）”处理。
+同一个钳位也用于 `matrix3D` 通道的 fill 保持帧：静态姿态为 `scale(0)` 的元素在活跃窗口之外保持亚像素，
+而不是按原尺寸显示。若该保持帧的奇异静态姿态来自**矩阵**，则没有方向可恢复，保持帧写成
+`diag(epsilon, epsilon, 1)` 并保留作者写的平移列：仍然可逆，并且在同一半像素界下于元素原位置不可见。
+静态姿态与 2D 轨道仍保留作者写的 `0`：2D 的 `matrix` 通道接受奇异矩阵，CSS 对奇异矩阵端点同样按离散处理。
+
+有两类 CSS 行为是刻意不复现的，在不改动 PAGX 关键帧格式的前提下也无法复现：
+
+* CSS 插值的是**每个函数的参数**，而 PAGX 插值的是分解后的关键帧矩阵（位移、旋转、缩放、斜切）。
+  即使首尾一致，重复相同函数列表的轨道在中间帧仍可能不同——`translateX(100px)` → `rotate(90deg)`
+  与相反顺序可以产生**完全相同的端点矩阵、却不同的中点**，而矩阵无法反推出作者想表达的是哪条路径。
+  只有端点是可保证的。
+* 作者写的 `perspective()` 与带深度的支点组合时无法复现：CSS 的 `transform-origin` 共轭整条函数列表，
+  而 PAGX 只通过 `anchor` 共轭仿射部分。导入器会报告这一点，并保留它能表达的形态。两条通道都不携带支点：
+`transform-origin` 以 `anchor` / `anchorZ` 的形式留在被动画的图层上，由运行时在插值之后统一施加一次，
+因此支点不会在关键帧之间漂移。影响布局的属性（`width`、`height`、`margin`、`padding`、`gap`、
+`flex` …）永远不可动画（见 §4.4），被丢弃并告警（`subset:animation-unsupported-property`）。
 
 > matrix 通道插值会把每个关键帧分解为 平移 / 缩放 / 旋转 / 错切 并对这些分量插值
 > （`pagx/runtime/MatrixDecompose.h`）；它无法在相邻两个关键帧之间还原整圈或跨越 ±180° 的旋转，因此
@@ -600,3 +623,35 @@ CSS 圆角头像的常见写法是用 `border-radius` + `overflow: hidden` 的�
 | `subset:animation-delay-replayed` | 无限循环动画带有非零 `animation-delay`；PAGX 重复转换后的整个播放窗口，而非仅在首轮应用延迟 |
 | `subset:animation-timeline-shifted` | 负的 `animation-delay` 将组内时间原点移到 CSS `t=0` 之前；PAGX 默认从负时间段开始播放 |
 | `subset:animation-multiple` | 以逗号分隔的 `animation` 列表被截断为第一项 |
+### 13.7 透视语义
+
+CSS 有两种声明相机的方式，二者对支点（pivot）的处理不同：
+
+| 写法 | 投影挂在哪 | `transform-origin` 是否共轭它 |
+|------|------------|--------------------------------|
+| 父级 `perspective: <d>` + 子元素 `transform` | 父级（一台相机） | 否 —— 与 PAGX / AE / Lottie 一致 |
+| 元素自身 `transform: perspective(<d>) …` | 元素（自带相机） | 是 —— CSS 会共轭整条函数列表 |
+
+PAGX 把投影留在 `anchor` 之外（`M = P · T(anchor) · L · T(-anchor)`），即第一种写法。
+因此 `tools/html-snapshot` 会把第二种写法改写成第一种：元素外再包一层承载
+`perspective: <d>` 与 `perspective-origin: <元素的 transform-origin>` 的 wrapper，元素自身的
+`transform` 去掉 `perspective()` 项。当支点**位于**图层平面上时，两种写法在代数上严格相等。
+
+改写的限制（按命中频率排序）：
+
+* 支点带深度（`transform-origin: 0 80px 30px`）时无法迁移，因为 `perspective-origin` 没有 z
+  分量；此时改写被跳过（`eval-animation` 记为 `camera-skips: depth-pivot`），元素保留函数写法：
+  姿态里仍然带着投影，但 PAGX 按 `P · T(a) · L · T(-a)` 合成、CSS 按 `T(a) · P · L · T(-a)`，
+  两者相差这个次序项（`d = 600px`、支点深度 30px 时约百分之几）。跳过改写绝不能把投影本身丢掉。
+* 声明盒尺寸及消失点已解析时，非flex布局宿主下无位置约束的流式子层落在padding原点，可由逐分支
+  wrapper接管其尺寸slot并承载 `T(origin) * P * T(-origin)`，百分比、内容测量及自身pose仍独立。
+  原preserve-3d标志和生成的margin宿主保留后代深度，不打开真实flat／裁剪边界，也不合并兄弟3D分组。
+  flex定位或相机／位置无法表示的子层仍**不做投影并诊断**；不冻结首次布局坐标，不把相机折进对象关键帧。
+* 作者写的 `perspective()` 同时带深度支点时，导入期会报告：投影中心无法复现（见 §13.2 的插值限制），
+  姿态保留 PAGX 能承载的表达式。
+* `perspective-origin` 无法相对声明盒解析（没有绝对尺寸）时告警一次，且**不施加投影**：消失点无法复现，因此子层不做投影，而不是退化为绕图层原点投影。
+* 包装层同时是子层的包含块，因此只有在声明盒有**已解析的参考尺寸**时才创建——`perspective-origin` 能解析并不够。
+  参考尺寸未知（`width: auto`、百分比）时**不施加投影**，布局与姿态保持原样，并发出**一条**诊断；缺尺寸的包装层会把它内部的百分比全部塌掉。
+* 子层只靠 `right` / `bottom` 定位时，与其他定位子层一样会被包装（远边约束按 `+origin` 平移、近边按 `−origin`）。
+* inline-SVG 形状的动画不带父级相机。这不是信息丢失：形状的位姿被限制在 z = 0 平面上
+  （3D 形状位姿会被告警拒绝），而平面位姿投影后仍是自身（`w = 1`），把相机折进去不会改变任何像素。

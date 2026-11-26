@@ -24,12 +24,15 @@
 #include "rendering/drawables/Drawable.h"
 #include "rendering/gpu/Devices.h"
 #include "rendering/graphics/Recorder.h"
+#include "rendering/utils/AsyncReadback.h"
 #include "rendering/utils/LockGuard.h"
 #include "rendering/utils/shaper/TextShaper.h"
 #include "tgfx/core/Clock.h"
 #include "tgfx/core/Pixmap.h"
 #include "tgfx/core/SurfaceReadback.h"
-#include "tgfx/gpu/GPUBuffer.h"
+#include "tgfx/gpu/CommandQueue.h"
+#include "tgfx/gpu/Context.h"
+#include "tgfx/gpu/GPU.h"
 
 namespace pag {
 
@@ -70,7 +73,7 @@ ReadbackStatus PAGSurfaceReadback::status() {
   if (context == nullptr) {
     return ReadbackStatus::Failed;
   }
-  auto result = ToPAGReadbackStatus(readback->status(context));
+  auto result = ToPAGReadbackStatus(PollAsyncReadback(context, readback));
   pagSurface->unlockContext();
   return result;
 }
@@ -288,8 +291,8 @@ std::shared_ptr<PAGSurfaceReadback> AsyncReadPixels(std::shared_ptr<PAGSurface> 
     surface->unlockContext();
     return nullptr;
   }
-  auto readback =
-      tgfxSurface->asyncReadPixels(tgfx::Rect::MakeWH(tgfxSurface->width(), tgfxSurface->height()));
+  bool flipY = false;
+  auto readback = StartAsyncReadback(context, tgfxSurface, &flipY);
   if (readback == nullptr) {
     LOGE(
         "AsyncReadPixels() The surface does not support readback. Canvas-backed "
@@ -298,16 +301,6 @@ std::shared_ptr<PAGSurfaceReadback> AsyncReadPixels(std::shared_ptr<PAGSurface> 
     surface->unlockContext();
     return nullptr;
   }
-  context->flushAndSubmit();
-  auto buffer = readback->getGPUBuffer(context);
-  if (buffer == nullptr) {
-    surface->unlockContext();
-    return nullptr;
-  }
-  // WebGPU does not start the buffer mapping on its own; without this call isReady() would stay
-  // false forever. On backends with blocking readback this is a no-op.
-  buffer->requestMapAsync();
-  auto flipY = tgfxSurface->origin() == tgfx::ImageOrigin::BottomLeft;
   surface->unlockContext();
   return std::shared_ptr<PAGSurfaceReadback>(
       new PAGSurfaceReadback(std::move(surface), std::move(readback), flipY));
@@ -374,7 +367,8 @@ bool PAGSurface::draw(RenderCache* cache, std::shared_ptr<Graphic> graphic,
         break;
       case tgfx::Backend::Vulkan:
       case tgfx::Backend::D3D12:
-        LOGE("PAGSurface::draw() cannot forward a semaphore of this backend yet.");
+        // These backends have no BackendSemaphore ABI; the caller should use
+        // waitUntilCompleted() instead. Leaving the semaphore uninitialized is expected.
         break;
     }
   }
@@ -431,12 +425,33 @@ bool PAGSurface::hitTest(RenderCache* cache, std::shared_ptr<Graphic> graphic, f
   return result;
 }
 
+bool PAGSurface::waitUntilCompleted() {
+  LockGuard autoLock(rootLocker);
+  auto context = lockContext();
+  if (context == nullptr) {
+    return false;
+  }
+  // On D3D12 the queue wait may mark the context as lost. Reacquire the lock afterward so that
+  // loss is rejected; other backends only recheck the state supported by their device locks.
+  auto healthy = Devices::WaitForQueue(context);
+  unlockContext();
+  if (!healthy) {
+    return false;
+  }
+  auto relockedContext = lockContext();
+  if (relockedContext == nullptr) {
+    return false;
+  }
+  unlockContext();
+  return true;
+}
+
 tgfx::Context* PAGSurface::lockContext() {
   auto device = drawable->getDevice();
   if (device == nullptr) {
     return nullptr;
   }
-  auto context = device->lockContext();
+  auto context = pag::Devices::LockContext(device);
   if (context != nullptr && stateGuard != nullptr) {
     static_cast<ExternalStateGuard*>(stateGuard)->save(context);
   }

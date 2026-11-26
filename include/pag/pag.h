@@ -194,6 +194,8 @@ class PAGImageLayer;
 
 class PAGStage;
 
+class PAG_API PAGDecoder;
+
 class PAG_API PAGFont {
  public:
   /**
@@ -999,7 +1001,7 @@ class PAG_API PAGComposition : public PAGLayer {
                          std::shared_ptr<PAGLayer> pagLayer);
   static void MeasureChildLayer(tgfx::Rect* bounds, PAGLayer* childLayer);
   static void DrawChildLayer(Recorder* recorder, PAGLayer* childLayer,
-                              std::shared_ptr<FilterModifier> filterModifier);
+                             std::shared_ptr<FilterModifier> filterModifier);
   static bool GetTrackMatteLayerAtPoint(PAGLayer* childLayer, float x, float y,
                                         std::vector<std::shared_ptr<PAGLayer>>* results);
   static bool GetChildLayerAtPoint(PAGLayer* childLayer, float x, float y,
@@ -1189,10 +1191,13 @@ class PAGPlayer;
 /**
  * A GPU-backed render target that manages its device's context lock internally. Callers must not
  * hold the same GPU device's context lock while calling methods that access its GPU resources,
- * including readPixels(), clearAll(), freeCache(), updateSize(), and getHardwareBuffer().
+ * including readPixels(), clearAll(), freeCache(), updateSize(), getHardwareBuffer(), and
+ * waitUntilCompleted().
  *
  * A PAGSurface must always be created through the MakeFrom()/MakeOffscreen() factories and held
- * by std::shared_ptr.
+ * by std::shared_ptr. A surface cannot survive loss of its GPU device, including D3D12 TDR. Release
+ * the affected surfaces and external resources before requesting a new device; retained native
+ * resources can prevent the same adapter's D3D12 device from being recreated.
  */
 class PAG_API PAGSurface {
  public:
@@ -1202,8 +1207,11 @@ class PAG_API PAGSurface {
   static std::shared_ptr<PAGSurface> MakeFrom(std::shared_ptr<Drawable> drawable);
 
   /**
-   * Creates a new PAGSurface from specified backend render target and origin. The PAGSurface uses
-   * the GPU context on the calling thread directly. Returns null if the render target is invalid.
+   * Creates a new PAGSurface from the specified backend render target and origin. OpenGL uses
+   * the calling thread's current GL context; Metal and D3D12 use the render target's own device.
+   * @param renderTarget the backend render target to render into.
+   * @param origin the origin of the render target coordinate system.
+   * @return a surface, or nullptr if the render target is invalid or its device cannot be resolved.
    */
   static std::shared_ptr<PAGSurface> MakeFrom(const BackendRenderTarget& renderTarget,
                                               ImageOrigin origin);
@@ -1211,10 +1219,14 @@ class PAG_API PAGSurface {
   /**
    * Creates a new PAGSurface from specified backend texture and origin. Note, the texture must not
    * be bound to any frame buffer. Passes true in the forAsyncThread parameter if the returned
-   * PAGSurface needs to be used for asynchronous rendering. If passing true, the PAGSurface
-   * internally creates an independent GPU context, and the caller can use semaphore objects to
-   * synchronize content (see flushAndSignalSemaphore() and wait()), otherwise, it uses the GPU
-   * context on the calling thread directly. Returns null if the texture is invalid.
+   * PAGSurface needs to be used for asynchronous rendering. If passing true, the surface uses a
+   * device suitable for another thread: an independent share context on OpenGL, or the texture's
+   * own device on Metal and D3D12, where access is serialized by the device lock. Semaphore
+   * synchronization is only available on backends that implement BackendSemaphore; on D3D12 use
+   * waitUntilCompleted() instead. Otherwise the surface uses the calling thread's current GL
+   * context on OpenGL, or the texture's own device on Metal and D3D12. WebGPU uses the runtime's
+   * default GPUDevice and is limited to the main runtime thread. Returns null if the texture is
+   * invalid or its device cannot be resolved.
    */
   static std::shared_ptr<PAGSurface> MakeFrom(const BackendTexture& texture, ImageOrigin origin,
                                               bool forAsyncThread = false);
@@ -1272,6 +1284,19 @@ class PAG_API PAGSurface {
    * row bytes. Returns true if pixels are copied to dstPixels.
    */
   bool readPixels(ColorType colorType, AlphaType alphaType, void* dstPixels, size_t dstRowBytes);
+
+  /**
+   * Submits pending commands. Backends with synchronous completion support also wait for prior
+   * work on this surface's device queue. D3D12 surfaces using the same libpag registry device
+   * share that queue; the wait is not limited to this surface and does not cover other host
+   * queues. WebGPU only guarantees submission, not GPU completion. Does not advance playback or
+   * draw another frame. The method manages the device lock internally; callers must not already
+   * hold the same device's context lock.
+   * @return true after submission and successful backend device-health checks. On WebGPU true
+   *         does not mean that GPU work has completed. Returns false if the device cannot be
+   *         locked, fails a health check, or its context has been lost.
+   */
+  bool waitUntilCompleted();
 
  protected:
   explicit PAGSurface(std::shared_ptr<Drawable> drawable, bool externalContext = false);
@@ -1715,8 +1740,8 @@ class PAG_API PAGDiskCache {
   /**
    * Sets the disk cache directory. This should be called before any disk cache operations.
    * If the directory does not exist, it will be created automatically.
-   * Note: Changing the cache directory after cache operations have started may cause
-   * existing cached files to become inaccessible.
+   * Directory changes are ignored while sequence files are open, including files awaiting
+   * asynchronous closure. Release all decoders before switching to a different directory.
    * @param dir The absolute path of the cache directory. Pass an empty string to use the
    * platform default cache directory.
    */

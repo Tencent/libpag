@@ -21,6 +21,7 @@
 #include <cstdio>
 #include <set>
 #include <vector>
+#include "base/utils/Log.h"
 #include "pagx/PAGXDefaults.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/nodes/Animation.h"
@@ -79,6 +80,7 @@
 #include "pagx/svg/SVGPathParser.h"
 #include "pagx/types/Data.h"
 #include "pagx/utils/ImageMime.h"
+#include "pagx/utils/ImportFormat.h"
 #include "pagx/utils/OutputView.h"
 #include "pagx/utils/PAGXArchiveWriter.h"
 #include "pagx/utils/StringParser.h"
@@ -105,6 +107,7 @@ class PAGXSerializer {
   XMLBuilder _xml;
   const PAGXExporter::Options& _options;
   PAGXArchiveWriter* _archive = nullptr;
+  const PAGXDocument* _doc = nullptr;
 };
 
 //==============================================================================
@@ -1839,7 +1842,8 @@ void PAGXSerializer::writeLayer(const Layer* node) {
   if (node->maskType != Default<Layer>().maskType) {
     xml.addAttribute("maskType", MaskTypeToString(node->maskType));
   }
-  if (node->composition != nullptr && !node->composition->id.empty()) {
+  if (node->composition != nullptr && !_doc->isMountedComposition(node->composition) &&
+      !node->composition->id.empty()) {
     xml.addAttribute("composition", "@" + node->composition->id);
   } else if (!node->compositionFilePath.empty()) {
     xml.addAttribute("composition", node->compositionFilePath);
@@ -1929,6 +1933,10 @@ void PAGXSerializer::writeLayer(const Layer* node) {
 //==============================================================================
 
 std::string PAGXExporter::ToXML(const PAGXDocument& doc, const Options& options) {
+  if (DocumentHasConflictingImportSources(&doc)) {
+    LOGE("Layer cannot declare both 'composition' and 'import' sources.");
+    return {};
+  }
   PAGXSerializer serializer(options, nullptr);
   return serializer.serialize(doc);
 }
@@ -1943,6 +1951,12 @@ std::shared_ptr<Data> PAGXExporter::ToData(const PAGXDocument& doc, const Option
   }
   if (warnings != nullptr) {
     warnings->clear();
+  }
+  if (DocumentHasConflictingImportSources(&doc)) {
+    if (errorMsg != nullptr) {
+      *errorMsg = "Layer cannot declare both 'composition' and 'import' sources.";
+    }
+    return nullptr;
   }
   PAGXArchiveWriter archive(doc);
   PAGXSerializer serializer(options, &archive);
@@ -1960,6 +1974,7 @@ PAGXSerializer::PAGXSerializer(const Options& options, PAGXArchiveWriter* archiv
 
 std::string PAGXSerializer::serialize(const PAGXDocument& doc) {
   auto& xml = _xml;
+  _doc = &doc;
   xml.appendDeclaration();
 
   xml.openElement("pagx");
@@ -2066,7 +2081,8 @@ std::string PAGXSerializer::serialize(const PAGXDocument& doc) {
   // Write Resources section at the end (only if there are exportable resources)
   bool hasResources = false;
   for (const auto& resource : doc.nodes) {
-    if (resource->id.empty() || !IsExportableResource(resource.get())) {
+    if (doc.isMountedComposition(resource.get()) || resource->id.empty() ||
+        !IsExportableResource(resource.get())) {
       continue;
     }
     if (_options.skipGlyphData && resource->nodeType() == NodeType::Font) {
@@ -2080,7 +2096,8 @@ std::string PAGXSerializer::serialize(const PAGXDocument& doc) {
     xml.closeElementStart();
 
     for (const auto& resource : doc.nodes) {
-      if (!resource->id.empty() && IsExportableResource(resource.get())) {
+      if (!doc.isMountedComposition(resource.get()) && !resource->id.empty() &&
+          IsExportableResource(resource.get())) {
         writeResource(resource.get());
       }
     }

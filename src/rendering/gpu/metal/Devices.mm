@@ -66,6 +66,14 @@ bool Devices::SupportsBackend(tgfx::Backend backend) {
   return backend == tgfx::Backend::Metal;
 }
 
+bool Devices::ValidateExternalResource(const tgfx::BackendTexture& texture, ExternalResourceUsage) {
+  return SupportsBackend(texture.backend());
+}
+
+bool Devices::ValidateExternalResource(const tgfx::BackendRenderTarget& renderTarget) {
+  return SupportsBackend(renderTarget.backend());
+}
+
 std::shared_ptr<tgfx::Device> Devices::MakeForAsyncThread() {
   // Metal has no "current context" concept. Command encoders are thread-safe by design, so an
   // async worker can just use a fresh default device. Any resource sharing with the caller must
@@ -150,6 +158,10 @@ std::shared_ptr<ExternalDeviceRef> Devices::CaptureFromTexture(
 
 bool Devices::RequiresCapturedIdentity() {
   return false;
+}
+
+bool Devices::IsDeviceHealthy(tgfx::Context* context) {
+  return context != nullptr;
 }
 
 bool Devices::CanSampleFrom(tgfx::Context* context, const ExternalDeviceRef* deviceRef) {

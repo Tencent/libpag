@@ -31,4 +31,16 @@ PAG_EXPORT pag_surface* pag_surface_make_offscreen(int width, int height);
 PAG_EXPORT bool pag_surface_read_pixels(pag_surface* surface, pag_color_type colorType,
                                      pag_alpha_type alphaType, void* dstPixels, size_t dstRowBytes);
 
+/**
+ * Submits pending commands. Backends with synchronous completion support also wait for prior
+ * work on the surface's device queue. D3D12 surfaces using the same libpag registry device share
+ * that queue; the wait does not cover other host queues. WebGPU only guarantees submission, not
+ * GPU completion. The caller must not already hold the same device's context lock.
+ * @param surface the surface whose pending commands should be submitted.
+ * @return true after submission and successful backend device-health checks. On WebGPU true
+ *         does not mean that GPU work has completed. Returns false if surface is null, the device
+ *         cannot be locked, fails a health check, or its context has been lost.
+ */
+PAG_EXPORT bool pag_surface_wait_until_completed(pag_surface* surface);
+
 PAG_C_PLUS_PLUS_END_GUARD

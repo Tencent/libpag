@@ -169,6 +169,19 @@ void PAGComposition::spawnTimelines(const std::shared_ptr<PAGScene>& scene) {
       auto smTimeline =
           std::shared_ptr<PAGStateMachine>(new PAGStateMachine(sm, binding.get(), document, scene));
       binding->setTarget(sm, std::make_unique<StateMachineInputTarget>(smTimeline, sm));
+      // A timeline rebuild replaces the state-machine instance, dropping bound inputs back to
+      // their declared defaults while the data-bind entries stay clean (no ViewModel change is
+      // pending). Re-push the ViewModel's current values now, scoped to this composition's
+      // binding so sibling instances of the same source node are untouched; during initial
+      // construction the bind pass has not run yet, so this is a harmless no-op then.
+      // Re-apply through this composition's own data-bind runtime instead of walking the whole
+      // composition tree: every composition owns an independent binding, so a scope-based tree
+      // walk can only ever match this subtree. Doing the full walk per spawned timeline turned a
+      // rebuild/reset into O(N^2), and it is pure no-op work during initial construction (the bind
+      // pass has not run yet, so dataBindRuntime is still null).
+      if (dataBindRuntime != nullptr) {
+        dataBindRuntime->reapplyForTarget(sm);
+      }
       timelines.push_back(std::move(smTimeline));
     }
   }
