@@ -26,6 +26,7 @@
 #include <cstring>
 #include <fstream>
 #include <memory>
+#include <optional>
 #include <vector>
 #include "base/utils/Log.h"
 #include "pagx/PAGXDefaults.h"
@@ -90,6 +91,7 @@
 #include "pagx/utils/ImportFormat.h"
 #include "pagx/utils/ImportResources.h"
 #include "pagx/utils/LayerTransformUtils.h"
+#include "pagx/utils/OutputView.h"
 #include "pagx/utils/StringParser.h"
 #include "pagx/xml/XMLDOM.h"
 
@@ -2852,6 +2854,10 @@ static Size ParseSize(const std::string& str, bool* outValid) {
   return {width, height};
 }
 
+// Legacy lenient rect parser used by scrollRect: whitespace or comma separators are both accepted,
+// the numbers go through strtof (so exponents and hex floats are allowed), and trailing text is
+// ignored. outputBounds deliberately does not use this parser because its text must match the XSD
+// RectType lexical space exactly; see ParseOutputBounds().
 static Rect ParseRect(const std::string& str, bool* outValid) {
   Rect rect = {};
   const char* ptr = str.c_str();
@@ -3009,9 +3015,120 @@ std::shared_ptr<PAGXDocument> PAGXImporter::FromXML(const uint8_t* data, size_t 
   return doc;
 }
 
+// Matches one number token of the XSD RectType pattern `-?[0-9]*\.?[0-9]+`: an optional minus,
+// digits with an optional fractional part, and no exponent, hex prefix, plus sign or whitespace.
+// Returns the end of the token, or nullptr when the text at ptr is not such a number.
+static const char* ScanRectTypeNumber(const char* ptr, const char* end) {
+  if (ptr < end && *ptr == '-') {
+    ++ptr;
+  }
+  const char* integerStart = ptr;
+  while (ptr < end && *ptr >= '0' && *ptr <= '9') {
+    ++ptr;
+  }
+  bool hasIntegerDigits = ptr > integerStart;
+  if (ptr < end && *ptr == '.') {
+    ++ptr;
+    const char* fractionStart = ptr;
+    while (ptr < end && *ptr >= '0' && *ptr <= '9') {
+      ++ptr;
+    }
+    if (ptr == fractionStart) {
+      return nullptr;
+    }
+  } else if (!hasIntegerDigits) {
+    return nullptr;
+  }
+  return ptr;
+}
+
+// Strictly parses four comma-separated numbers, accepting exactly the lexical space of the XSD
+// RectType. strtof alone is wider than the schema (it also takes exponents, hex floats and leading
+// whitespace), which would render a document that `pagx verify` rejects. Only the text format is
+// checked here; the numeric rule lives in IsValidOutputBounds().
+static bool ParseOutputBounds(const std::string& str, Rect* rect) {
+  const char* ptr = str.c_str();
+  const char* end = ptr + str.size();
+  float* fields[] = {&rect->x, &rect->y, &rect->width, &rect->height};
+  for (auto* field : fields) {
+    if (field != fields[0]) {
+      if (ptr == end || *ptr != ',') {
+        return false;
+      }
+      ++ptr;
+    }
+    const char* tokenStart = ptr;
+    ptr = ScanRectTypeNumber(ptr, end);
+    if (ptr == nullptr) {
+      return false;
+    }
+    char* endPtr = nullptr;
+    *field = strtof(tokenStart, &endPtr);
+    if (endPtr != ptr) {
+      return false;
+    }
+  }
+  return ptr == end;
+}
+
+// Parses the paired root attributes that declare the document's default static output view. An
+// authored text that fails to parse stays on the document so export can replay it, and the
+// diagnostic is recorded in document->errors so consumers reject the document instead of silently
+// rendering the whole canvas.
+static void ParseOutputView(const DOMNode* root, PAGXDocument* doc) {
+  std::optional<std::string> declaredTargetLayer = std::nullopt;
+  std::optional<std::string> declaredOutputBounds = std::nullopt;
+  for (const auto& attribute : root->attributes) {
+    if (attribute.name == "targetLayer") {
+      declaredTargetLayer = attribute.value;
+    } else if (attribute.name == "outputBounds") {
+      declaredOutputBounds = attribute.value;
+    }
+  }
+  // Keep the authored text until the pair parses cleanly: the exporter replays it verbatim so an
+  // invalid declaration survives a round trip instead of degrading into a whole-canvas document.
+  OutputViewDeclarationAccess::SetDeclared(doc, declaredTargetLayer, declaredOutputBounds);
+  if (!declaredTargetLayer.has_value() && !declaredOutputBounds.has_value()) {
+    return;
+  }
+  if (declaredTargetLayer.has_value() != declaredOutputBounds.has_value()) {
+    ReportError(doc, root,
+                "The 'targetLayer' and 'outputBounds' attributes must be specified together.");
+    return;
+  }
+  const auto& targetAttr = *declaredTargetLayer;
+  const auto& boundsAttr = *declaredOutputBounds;
+  bool targetValid = targetAttr.size() >= 2 && targetAttr[0] == '@';
+  Rect bounds = {};
+  bool boundsValid = ParseOutputBounds(boundsAttr, &bounds) && IsValidOutputBounds(bounds);
+  if (!targetValid) {
+    ReportError(doc, root,
+                "Invalid value '" + targetAttr +
+                    "' for 'targetLayer' attribute. Expected a Layer reference '@id'.");
+  }
+  if (!boundsValid) {
+    ReportError(doc, root,
+                "Invalid value '" + boundsAttr + "' for 'outputBounds' attribute. Expected " +
+                    OutputBoundsRequirement() + ".");
+  }
+  // Keep whichever attribute parsed so ResolveOutputView() blames the attribute that actually
+  // failed instead of blaming the one that was never reached.
+  if (targetValid) {
+    doc->targetLayerId = targetAttr.substr(1);
+  }
+  if (boundsValid) {
+    doc->outputBounds = bounds;
+  }
+  if (!targetValid || !boundsValid) {
+    return;
+  }
+  OutputViewDeclarationAccess::SetDeclared(doc, std::nullopt, std::nullopt);
+}
+
 static void ParseDocument(const DOMNode* root, PAGXDocument* doc) {
   doc->width = GetFloatAttribute(root, "width", 0, doc);
   doc->height = GetFloatAttribute(root, "height", 0, doc);
+  ParseOutputView(root, doc);
   ParseCustomData(root, doc);
   gPendingMaskRefs.clear();
 
@@ -3064,6 +3181,15 @@ static void ParseDocument(const DOMNode* root, PAGXDocument* doc) {
     }
   }
   gPendingMaskRefs.clear();
+
+  // Resolve the target view only after every Layer id is registered, so forward references work.
+  if (!doc->targetLayerId.empty() && doc->outputBounds.has_value()) {
+    const Layer* targetLayer = nullptr;
+    std::string viewError;
+    if (ResolveOutputView(doc, &targetLayer, &viewError) == OutputViewStatus::Invalid) {
+      ReportError(doc, root, viewError);
+    }
+  }
 }
 
 // Splits a comma-joined enum "options" attribute, honoring backslash escapes produced on export:

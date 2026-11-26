@@ -81,6 +81,7 @@
 #include "pagx/types/Data.h"
 #include "pagx/utils/ImageMime.h"
 #include "pagx/utils/ImportFormat.h"
+#include "pagx/utils/OutputView.h"
 #include "pagx/utils/PAGXArchiveWriter.h"
 #include "pagx/utils/StringParser.h"
 #include "pagx/xml/XMLBuilder.h"
@@ -1980,6 +1981,21 @@ std::string PAGXSerializer::serialize(const PAGXDocument& doc) {
   xml.addAttribute("width", doc.width);
   xml.addAttribute("height", doc.height);
   if (doc.viewModel != nullptr) xml.addAttribute("viewModel", "@" + doc.viewModel->id);
+  // Write the target view fields exactly as authored. A pair that failed to parse is written back
+  // from its raw declaration instead of being silently dropped, so the resulting file keeps failing
+  // validation on reload instead of quietly turning into a whole-canvas document.
+  auto declaredTargetLayer = OutputViewDeclarationAccess::DeclaredTargetLayer(doc);
+  auto declaredOutputBounds = OutputViewDeclarationAccess::DeclaredBounds(doc);
+  if (!doc.targetLayerId.empty()) {
+    xml.addAttribute("targetLayer", "@" + doc.targetLayerId);
+  } else if (declaredTargetLayer.has_value()) {
+    xml.addRequiredAttribute("targetLayer", *declaredTargetLayer);
+  }
+  if (doc.outputBounds.has_value()) {
+    xml.addAttribute("outputBounds", RectToString(*doc.outputBounds));
+  } else if (declaredOutputBounds.has_value()) {
+    xml.addRequiredAttribute("outputBounds", *declaredOutputBounds);
+  }
   WriteCustomData(xml, &doc);
   xml.closeElementStart();
 

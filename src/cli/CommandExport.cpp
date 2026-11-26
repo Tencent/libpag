@@ -38,6 +38,7 @@
 #include "pagx/VideoExportInternal.h"
 #include "pagx/VideoExporter.h"
 #include "pagx/types/Color.h"
+#include "pagx/utils/OutputView.h"
 #include "rendering/gpu/Devices.h"
 #include "tgfx/gpu/Context.h"
 #include "tgfx/gpu/GPU.h"
@@ -558,13 +559,23 @@ static int ExportToSVG(const ExportOptions& options) {
   if (!PrepareDocumentForRendering(document.get(), nullptr, "pagx export")) {
     return 1;
   }
+  std::string outputViewError;
+  if (!CheckOutputViewExportSupport(*document, "SVG", &outputViewError)) {
+    std::cerr << "pagx export: error: " << outputViewError << "\n";
+    return 1;
+  }
 
   SVGExporter::Options svgOptions = {};
   svgOptions.indent = options.svgIndent;
   svgOptions.xmlDeclaration = !options.svgNoXmlDeclaration;
   svgOptions.convertTextToPath = options.textToPath;
 
-  if (!SVGExporter::ToFile(*document, options.outputFile, svgOptions)) {
+  std::vector<std::string> warnings;
+  auto written = SVGExporter::ToFile(*document, options.outputFile, svgOptions, &warnings);
+  for (const auto& warning : warnings) {
+    std::cerr << "pagx export: warning: " << warning << "\n";
+  }
+  if (!written) {
     std::cerr << "pagx export: error: failed to write '" << options.outputFile << "'\n";
     return 1;
   }
@@ -584,6 +595,11 @@ static int ExportToHTML(const ExportOptions& options) {
     std::cerr << "pagx export: warning: " << error << "\n";
   }
   if (!PrepareDocumentForRendering(document.get(), nullptr, "pagx export")) {
+    return 1;
+  }
+  std::string outputViewError;
+  if (!CheckOutputViewExportSupport(*document, "HTML", &outputViewError)) {
+    std::cerr << "pagx export: error: " << outputViewError << "\n";
     return 1;
   }
 
@@ -615,6 +631,11 @@ static int ExportToPPT(const ExportOptions& options) {
     }
     if (document->errors.size() != errorCount) {
       std::cerr << "pagx export: error: layout failed for '" << inputFile << "'\n";
+      return 1;
+    }
+    std::string outputViewError;
+    if (!CheckOutputViewExportSupport(*document, "PPT", &outputViewError)) {
+      std::cerr << "pagx export: error: " << inputFile << ": " << outputViewError << "\n";
       return 1;
     }
     documents.emplace_back(std::move(document));

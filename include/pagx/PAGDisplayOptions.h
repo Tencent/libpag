@@ -82,6 +82,9 @@ enum class PAGTileUpdateMode {
 /**
  * PAGDisplayOptions exposes display-list rendering options owned by a PAGScene. Use
  * PAGScene::getDisplayOptions() to obtain the options and PAGScene::draw() to render with them.
+ * When the document declares an output view, only the zoom scale, content offset and
+ * background color apply; the render mode, tile options and subtree cache are ignored because the
+ * target layer is drawn directly instead of through the display list.
  */
 class PAGDisplayOptions {
  public:
@@ -91,24 +94,27 @@ class PAGDisplayOptions {
   PAGDisplayOptions& operator=(const PAGDisplayOptions&) = delete;
 
   /**
-   * Returns the scale factor applied to the runtime layer tree during drawing.
+   * Returns the effective scale factor applied during drawing after quantization at the current
+   * zoom scale precision. Use this value for geometry and output surface sizing.
    */
   float getZoomScale() const;
 
   /**
    * Sets the scale factor applied to the runtime layer tree during drawing. Adjusting this value is
-   * more cache-friendly than modifying layer transforms for viewport zooming.
-   * @param zoomScale the scale factor to apply.
+   * more cache-friendly than modifying layer transforms for viewport zooming. The request is
+   * quantized at the current precision; getZoomScale() returns the actual drawing value.
+   * @param zoomScale the requested scale factor.
    */
   void setZoomScale(float zoomScale);
 
   /**
-   * Returns the integer precision used when converting zoomScale into cache keys.
+   * Returns the integer precision used to quantize the drawing scale and its cache keys.
    */
   int getZoomScalePrecision() const;
 
   /**
-   * Sets the integer precision used when converting zoomScale into cache keys.
+   * Sets the integer precision used to quantize the drawing scale and its cache keys. Changing
+   * precision can also change the effective scale returned by getZoomScale().
    * @param precision the precision multiplier.
    */
   void setZoomScalePrecision(int precision);

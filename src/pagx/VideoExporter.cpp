@@ -34,6 +34,7 @@
 #include "pagx/VideoExportInternal.h"
 #include "pagx/nodes/Animation.h"
 #include "pagx/runtime/Drawable.h"
+#include "pagx/utils/OutputView.h"
 #include "rendering/gpu/Devices.h"
 #include "tgfx/core/Bitmap.h"
 #include "tgfx/core/Pixmap.h"
@@ -100,6 +101,11 @@ bool VideoExporterImpl::validateOptions(const std::shared_ptr<PAGXDocument>& doc
                                         VideoExportFailure* failure) const {
   if (document == nullptr) {
     failure->set(VideoExportError::InvalidArgument, "the document is null");
+    return false;
+  }
+  std::string outputViewError = {};
+  if (!CheckOutputViewExportSupport(*document, "Video", &outputViewError)) {
+    failure->set(VideoExportError::InvalidArgument, outputViewError);
     return false;
   }
   const auto& rate = options.frameRate;

@@ -84,7 +84,8 @@ class VideoExporter {
    *
    * After Make() succeeds, the source document and all reachable external composition documents
    * must remain unmodified until the exporter is destroyed. Create a new exporter after changing
-   * their contents, dimensions, frame rates, or timeline structure.
+   * their contents, dimensions, frame rates, or timeline structure. Documents declaring a default
+   * output view (the paired `targetLayer` / `outputBounds` root attributes) are rejected.
    *
    * @param document the source document, which is retained for the lifetime of the returned
    *                 exporter. Must be non-null.
@@ -92,9 +93,9 @@ class VideoExporter {
    *                explicit output size.
    * @param errorMsg optional pointer that receives a human-readable description on failure.
    * @param errorCode optional pointer that receives the stable failure code on failure.
-   * @return a new exporter, or nullptr when the document or options are invalid, an animation has
-   *         no duration and none was supplied, the computed frame range or dimensions overflow, or
-   *         the offscreen surface cannot be created.
+   * @return a new exporter, or nullptr when the document declares an output view, the document or
+   *         options are invalid, an animation has no duration and none was supplied, the computed
+   *         frame range or dimensions overflow, or the offscreen surface cannot be created.
    */
   static std::shared_ptr<VideoExporter> Make(std::shared_ptr<PAGXDocument> document,
                                              const Options& options = {},
@@ -117,9 +118,10 @@ class VideoExporter {
    *                output size that the surface has to match.
    * @param errorMsg optional pointer that receives a human-readable description on failure.
    * @param errorCode optional pointer that receives the stable failure code on failure.
-   * @return a new exporter, or nullptr when the document, surface or options are invalid, the
-   *         surface dimensions do not match the resolved output size, the surface has no valid GPU
-   *         device or context, or the document playback plan cannot be resolved.
+   * @return a new exporter, or nullptr when the document declares an output view, the document,
+   *         surface or options are invalid, the surface dimensions do not match the resolved output
+   *         size, the surface has no valid GPU device or context, or the document playback plan
+   *         cannot be resolved.
    */
   static std::shared_ptr<VideoExporter> MakeWithSurface(std::shared_ptr<PAGXDocument> document,
                                                         std::shared_ptr<PAGSurface> surface,

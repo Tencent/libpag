@@ -25,8 +25,10 @@
 #include "pagx/PAGXImporter.h"
 #include "pagx/PAGXOptimizer.h"
 #include "pagx/PAGXOptimizerOptions.h"
+#include "pagx/nodes/Animation.h"
 #include "pagx/nodes/BlurFilter.h"
 #include "pagx/nodes/Composition.h"
+#include "pagx/nodes/DataBind.h"
 #include "pagx/nodes/DropShadowStyle.h"
 #include "pagx/nodes/Ellipse.h"
 #include "pagx/nodes/Fill.h"
@@ -41,8 +43,11 @@
 #include "pagx/nodes/PathData.h"
 #include "pagx/nodes/Rectangle.h"
 #include "pagx/nodes/SolidColor.h"
+#include "pagx/nodes/StateMachine.h"
+#include "pagx/nodes/StateRegion.h"
 #include "pagx/nodes/Stroke.h"
 #include "pagx/nodes/Text.h"
+#include "pagx/utils/OutputView.h"
 #include "pagx/utils/VerifyUtils.h"
 #include "renderer/LayerBuilder.h"
 #include "tgfx/core/Bitmap.h"
@@ -152,6 +157,284 @@ CLI_TEST(PAGXOptimizerTest, PruneEmptyLayer) {
   PAGXOptimizer::Optimize(doc.get());
   ASSERT_EQ(doc->layers.size(), 1u);
   EXPECT_EQ(doc->layers[0], good);
+}
+
+CLI_TEST(PAGXOptimizerTest, PruneEmptyKeepsOutputTarget) {
+  auto doc = PAGXDocument::Make(100, 100);
+  auto* target = doc->makeNode<pagx::Layer>("target");
+  doc->layers.push_back(target);
+  auto* other = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(other);
+  doc->targetLayerId = "target";
+  doc->outputBounds = pagx::Rect::MakeXYWH(0, 0, 10, 10);
+
+  PAGXOptimizer::Optimize(doc.get());
+  ASSERT_EQ(doc->layers.size(), 1u);
+  EXPECT_EQ(doc->layers[0], target);
+  EXPECT_NE(doc->findNode("target"), nullptr);
+}
+
+// The declared output target is semantically required even when the view cannot be rendered at
+// runtime, so the optimizer must resolve only the reference instead of falling back to the full
+// output-view validation.
+enum class DynamicTargetKind {
+  Animation,
+  DataBind,
+  StateMachine,
+  ExternalDocument,
+};
+
+static std::shared_ptr<PAGXDocument> MakeDynamicTargetDocument(DynamicTargetKind kind) {
+  auto doc = PAGXDocument::Make(100, 100);
+  auto* target = doc->makeNode<Layer>("target");
+  doc->layers.push_back(target);
+  doc->layers.push_back(doc->makeNode<Layer>());
+  switch (kind) {
+    case DynamicTargetKind::Animation: {
+      auto* animation = doc->makeNode<pagx::Animation>("anim");
+      doc->animations.push_back(animation);
+      break;
+    }
+    case DynamicTargetKind::DataBind:
+      doc->makeNode<pagx::DataBind>();
+      break;
+    case DynamicTargetKind::StateMachine: {
+      auto* stateMachine = doc->makeNode<pagx::StateMachine>("sm");
+      stateMachine->regions.push_back(doc->makeNode<pagx::StateRegion>());
+      break;
+    }
+    case DynamicTargetKind::ExternalDocument: {
+      auto external = PAGXDocument::Make(10, 10);
+      auto* animation = external->makeNode<pagx::Animation>("inner");
+      external->animations.push_back(animation);
+      auto* host = doc->makeNode<Layer>();
+      host->externalDoc = external;
+      doc->layers.push_back(host);
+      break;
+    }
+  }
+  doc->targetLayerId = "target";
+  doc->outputBounds = pagx::Rect::MakeXYWH(0, 0, 10, 10);
+  return doc;
+}
+
+static void ExpectTopLevelOutputTarget(PAGXDocument* doc) {
+  auto* node = doc->findNode("target");
+  ASSERT_NE(node, nullptr);
+  ASSERT_EQ(node->nodeType(), NodeType::Layer);
+  auto* target = static_cast<Layer*>(node);
+  bool topLevel = false;
+  for (auto* layer : doc->layers) {
+    if (layer == target) {
+      topLevel = true;
+    }
+  }
+  EXPECT_TRUE(topLevel);
+  std::string error;
+  EXPECT_EQ(pagx::ResolveOutputTargetLayer(doc, &error), target);
+  EXPECT_TRUE(error.empty());
+}
+
+CLI_TEST(PAGXOptimizerTest, TargetViewPruneKeepsDynamicOutputTarget) {
+  const DynamicTargetKind kinds[] = {DynamicTargetKind::Animation, DynamicTargetKind::DataBind,
+                                     DynamicTargetKind::StateMachine,
+                                     DynamicTargetKind::ExternalDocument};
+  for (auto kind : kinds) {
+    auto doc = MakeDynamicTargetDocument(kind);
+    std::string error;
+    EXPECT_EQ(pagx::ResolveOutputView(doc.get(), nullptr, &error), pagx::OutputViewStatus::Invalid);
+    EXPECT_NE(error.find("animations, state machines or data binds"), std::string::npos);
+
+    PAGXOptimizer::Optimize(doc.get());
+    ExpectTopLevelOutputTarget(doc.get());
+    // The target must still fail through the dynamic-content rule, not through a missing
+    // reference created by the optimizer.
+    error.clear();
+    EXPECT_EQ(pagx::ResolveOutputView(doc.get(), nullptr, &error), pagx::OutputViewStatus::Invalid);
+    EXPECT_NE(error.find("animations, state machines or data binds"), std::string::npos);
+  }
+}
+
+CLI_TEST(PAGXOptimizerTest, TargetViewExportKeepsDynamicOutputTarget) {
+  const DynamicTargetKind kinds[] = {DynamicTargetKind::Animation, DynamicTargetKind::DataBind,
+                                     DynamicTargetKind::StateMachine,
+                                     DynamicTargetKind::ExternalDocument};
+  for (auto kind : kinds) {
+    auto doc = MakeDynamicTargetDocument(kind);
+    PAGXOptimizer::Optimize(doc.get());
+    auto xml = PAGXExporter::ToXML(*doc);
+    EXPECT_NE(xml.find("targetLayer=\"@target\""), std::string::npos);
+    auto reloaded = PAGXImporter::FromXML(xml);
+    ASSERT_NE(reloaded, nullptr);
+    EXPECT_EQ(reloaded->targetLayerId, "target");
+    auto* node = reloaded->findNode("target");
+    ASSERT_NE(node, nullptr);
+    ASSERT_EQ(node->nodeType(), NodeType::Layer);
+    EXPECT_EQ(pagx::ResolveOutputTargetLayer(reloaded.get(), nullptr), static_cast<Layer*>(node));
+  }
+}
+
+enum class TargetRule {
+  PruneEmpty,
+  DowngradeShellChildren,
+  MergeAdjacentShellLayers,
+  CollapseSingleChildLayers,
+  RectMaskToScrollRect,
+};
+
+static PAGXOptimizerOptions RuleOnlyOptions(TargetRule rule) {
+  auto options = OnlyRuleOptions();
+  switch (rule) {
+    case TargetRule::PruneEmpty:
+      options.pruneEmpty = true;
+      break;
+    case TargetRule::DowngradeShellChildren:
+      options.downgradeShellChildren = true;
+      break;
+    case TargetRule::MergeAdjacentShellLayers:
+      options.mergeAdjacentShellLayers = true;
+      break;
+    case TargetRule::CollapseSingleChildLayers:
+      options.collapseSingleChildLayers = true;
+      break;
+    case TargetRule::RectMaskToScrollRect:
+      options.rectMaskToScrollRect = true;
+      break;
+  }
+  return options;
+}
+
+static std::shared_ptr<PAGXDocument> MakeRuleTargetDocument(TargetRule rule) {
+  auto doc = PAGXDocument::Make(100, 100);
+  auto* target = doc->makeNode<Layer>("target");
+  doc->layers.push_back(target);
+  switch (rule) {
+    case TargetRule::PruneEmpty:
+      doc->layers.push_back(doc->makeNode<Layer>());
+      break;
+    case TargetRule::DowngradeShellChildren: {
+      auto* shell = doc->makeNode<Layer>();
+      auto* child = doc->makeNode<Layer>();
+      child->contents.push_back(MakeFilledRectGroup(doc.get(), 20, 20, 1, 0, 0));
+      shell->children.push_back(child);
+      target->children.push_back(shell);
+      break;
+    }
+    case TargetRule::MergeAdjacentShellLayers: {
+      auto* adjacent = doc->makeNode<Layer>();
+      auto* adjacentChild = doc->makeNode<Layer>();
+      adjacentChild->contents.push_back(MakeFilledRectGroup(doc.get(), 20, 20, 0, 1, 0));
+      adjacent->children.push_back(adjacentChild);
+      auto* targetChild = doc->makeNode<Layer>();
+      targetChild->contents.push_back(MakeFilledRectGroup(doc.get(), 20, 20, 1, 0, 0));
+      target->children.push_back(targetChild);
+      doc->layers.push_back(adjacent);
+      break;
+    }
+    case TargetRule::CollapseSingleChildLayers: {
+      auto* child = doc->makeNode<Layer>();
+      child->contents.push_back(MakeFilledRectGroup(doc.get(), 20, 20, 1, 0, 0));
+      target->children.push_back(child);
+      break;
+    }
+    case TargetRule::RectMaskToScrollRect: {
+      auto* mask = doc->makeNode<Layer>("mask");
+      auto* rect = doc->makeNode<Rectangle>();
+      rect->position = {5, 5};
+      rect->size = {10, 10};
+      mask->contents.push_back(rect);
+      doc->layers.push_back(mask);
+      target->mask = mask;
+      target->maskType = MaskType::Alpha;
+      target->contents.push_back(MakeFilledRectGroup(doc.get(), 20, 20, 1, 0, 0));
+      break;
+    }
+  }
+  doc->targetLayerId = "target";
+  doc->outputBounds = pagx::Rect::MakeXYWH(0, 0, 10, 10);
+  return doc;
+}
+
+CLI_TEST(PAGXOptimizerTest, TargetViewRulesKeepOutputTarget) {
+  const TargetRule rules[] = {TargetRule::PruneEmpty, TargetRule::DowngradeShellChildren,
+                              TargetRule::MergeAdjacentShellLayers,
+                              TargetRule::CollapseSingleChildLayers,
+                              TargetRule::RectMaskToScrollRect};
+  for (auto rule : rules) {
+    auto doc = MakeRuleTargetDocument(rule);
+    OptimizeWithOptions(doc.get(), RuleOnlyOptions(rule));
+    ExpectTopLevelOutputTarget(doc.get());
+  }
+}
+
+CLI_TEST(PAGXOptimizerTest, ResolveOutputTargetLayerReferenceOnly) {
+  {
+    auto doc = PAGXDocument::Make(100, 100);
+    auto* parent = doc->makeNode<Layer>("parent");
+    auto* target = doc->makeNode<Layer>("target");
+    parent->children.push_back(target);
+    doc->layers.push_back(parent);
+    doc->targetLayerId = "target";
+    std::string error = "stale";
+    EXPECT_EQ(pagx::ResolveOutputTargetLayer(doc.get(), &error), target);
+    EXPECT_TRUE(error.empty());
+  }
+  {
+    auto doc = PAGXDocument::Make(100, 100);
+    doc->makeNode<Group>("target");
+    doc->targetLayerId = "target";
+    std::string error;
+    EXPECT_EQ(pagx::ResolveOutputTargetLayer(doc.get(), &error), nullptr);
+    EXPECT_NE(error.find("does not resolve to a Layer"), std::string::npos);
+  }
+  {
+    auto doc = PAGXDocument::Make(100, 100);
+    auto* first = doc->makeNode<Layer>("target");
+    auto* second = doc->makeNode<Layer>("target");
+    doc->layers = {first, second};
+    doc->targetLayerId = "target";
+    std::string error;
+    EXPECT_EQ(pagx::ResolveOutputTargetLayer(doc.get(), &error), nullptr);
+    EXPECT_NE(error.find("ambiguous"), std::string::npos);
+  }
+  {
+    auto doc = PAGXDocument::Make(100, 100);
+    auto* composition = doc->makeNode<Composition>("comp");
+    auto* inner = doc->makeNode<Layer>("target");
+    composition->layers.push_back(inner);
+    doc->targetLayerId = "target";
+    std::string error;
+    EXPECT_EQ(pagx::ResolveOutputTargetLayer(doc.get(), &error), nullptr);
+    EXPECT_NE(error.find("not reachable"), std::string::npos);
+  }
+  {
+    auto doc = PAGXDocument::Make(100, 100);
+    auto* shared = doc->makeNode<Layer>("target");
+    auto* left = doc->makeNode<Layer>("left");
+    auto* right = doc->makeNode<Layer>("right");
+    left->children.push_back(shared);
+    right->children.push_back(shared);
+    doc->layers = {left, right};
+    doc->targetLayerId = "target";
+    std::string error;
+    EXPECT_EQ(pagx::ResolveOutputTargetLayer(doc.get(), &error), nullptr);
+    EXPECT_NE(error.find("not uniquely reachable"), std::string::npos);
+  }
+  {
+    auto doc = PAGXDocument::Make(100, 100);
+    auto* target = doc->makeNode<Layer>("target");
+    target->children.push_back(target);
+    doc->layers.push_back(target);
+    doc->targetLayerId = "target";
+    std::string error;
+    EXPECT_EQ(pagx::ResolveOutputTargetLayer(doc.get(), &error), nullptr);
+    EXPECT_NE(error.find("not uniquely reachable"), std::string::npos);
+  }
+  EXPECT_EQ(pagx::ResolveOutputTargetLayer(nullptr, nullptr), nullptr);
+  {
+    auto doc = PAGXDocument::Make(100, 100);
+    EXPECT_EQ(pagx::ResolveOutputTargetLayer(doc.get(), nullptr), nullptr);
+  }
 }
 
 CLI_TEST(PAGXOptimizerTest, PruneEmptyGroup) {

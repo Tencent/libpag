@@ -75,6 +75,7 @@
 #include "pagx/utils/ImageFormatUtils.h"
 #include "pagx/utils/ImageMime.h"
 #include "pagx/utils/ModifierResolver.h"
+#include "pagx/utils/OutputView.h"
 #include "pagx/utils/RasterUtils.h"
 #include "pagx/utils/StringParser.h"
 #include "pagx/utils/StrokeGeometryUtils.h"
@@ -3528,6 +3529,13 @@ std::string SVGWriter::writeScrollRectClipDef(const Layer* layer) {
 
 std::string SVGExporter::ToSVG(PAGXDocument& doc, const Options& options,
                                std::vector<std::string>* warnings) {
+  std::string outputViewError;
+  if (!CheckOutputViewExportSupport(doc, "SVG", &outputViewError)) {
+    if (warnings != nullptr) {
+      warnings->push_back(outputViewError);
+    }
+    return {};
+  }
   // Mirror PPTExporter: resolve layout before reading the matrix helpers. BuildLayerMatrix composes
   // each Layer's generated layout position outside its authored x / y and transform, and
   // BuildGroupMatrix reads each Group's renderPosition().

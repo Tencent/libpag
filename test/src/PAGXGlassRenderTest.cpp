@@ -38,6 +38,7 @@
 #include "tgfx/layers/DisplayList.h"
 #include "tgfx/layers/Layer.h"
 #include "utils/PAGXTestUtils.h"
+#include "utils/TestUtils.h"
 
 namespace pag {
 
@@ -72,7 +73,7 @@ static std::shared_ptr<pagx::PAGXDocument> MakeGlassDocument(bool withGlass) {
   auto document = pagx::PAGXDocument::Make(300, 300);
   AppendBackdropLayer(document.get());
 
-  auto detailLayer = document->makeNode<pagx::Layer>();
+  auto detailLayer = document->makeNode<pagx::Layer>("detail");
   auto detailRect = document->makeNode<pagx::Rectangle>();
   detailRect->size = {100.0f, 60.0f};
   detailRect->position = {130.0f, 150.0f};
@@ -83,7 +84,7 @@ static std::shared_ptr<pagx::PAGXDocument> MakeGlassDocument(bool withGlass) {
   detailLayer->contents = {detailRect, detailFill};
   document->layers.push_back(detailLayer);
 
-  auto glassLayer = document->makeNode<pagx::Layer>();
+  auto glassLayer = document->makeNode<pagx::Layer>("glass");
   auto glassRect = document->makeNode<pagx::Rectangle>();
   glassRect->size = {200.0f, 200.0f};
   glassRect->position = {150.0f, 150.0f};
@@ -115,10 +116,7 @@ static tgfx::Bitmap RenderViaDisplayList(pagx::PAGXDocument* document, tgfx::Con
   tgfx::DisplayList displayList;
   displayList.root()->addChild(layer);
   displayList.render(surface.get(), false);
-
-  tgfx::Bitmap bitmap(surface->width(), surface->height(), false, false, nullptr);
-  tgfx::Pixmap pixmap(bitmap);
-  return surface->readPixels(pixmap.info(), pixmap.writablePixels()) ? bitmap : tgfx::Bitmap{};
+  return MakeSnapshot(surface);
 }
 
 static tgfx::Bitmap RenderViaOrphanDirectDraw(pagx::PAGXDocument* document,
@@ -136,51 +134,7 @@ static tgfx::Bitmap RenderViaOrphanDirectDraw(pagx::PAGXDocument* document,
     return {};
   }
   layer->draw(surface->getCanvas(), layer->alpha());
-
-  tgfx::Bitmap bitmap(surface->width(), surface->height(), false, false, nullptr);
-  tgfx::Pixmap pixmap(bitmap);
-  return surface->readPixels(pixmap.info(), pixmap.writablePixels()) ? bitmap : tgfx::Bitmap{};
-}
-
-// Counts pixels differing by more than 8 levels in any channel inside the given rect.
-static int CountDifferentPixelsInRect(const tgfx::Bitmap& first, const tgfx::Bitmap& second,
-                                      int left, int top, int right, int bottom) {
-  if (first.isEmpty() || second.isEmpty() || first.width() != second.width() ||
-      first.height() != second.height()) {
-    return -1;
-  }
-  const int width = first.width();
-  const int height = first.height();
-  left = std::max(left, 0);
-  top = std::max(top, 0);
-  right = std::min(right, width);
-  bottom = std::min(bottom, height);
-  tgfx::Pixmap firstPixmap(first);
-  tgfx::Pixmap secondPixmap(second);
-  const auto* firstPixels = static_cast<const uint8_t*>(firstPixmap.pixels());
-  const auto* secondPixels = static_cast<const uint8_t*>(secondPixmap.pixels());
-  const size_t rowBytes = firstPixmap.rowBytes();
-  int differentPixels = 0;
-  for (int y = top; y < bottom; y++) {
-    for (int x = left; x < right; x++) {
-      const auto offset = static_cast<size_t>(y) * rowBytes + static_cast<size_t>(x) * 4;
-      for (size_t channel = 0; channel < 4; channel++) {
-        if (std::abs(firstPixels[offset + channel] - secondPixels[offset + channel]) > 8) {
-          differentPixels++;
-          break;
-        }
-      }
-    }
-  }
-  return differentPixels;
-}
-
-static int CountDifferentPixels(const tgfx::Bitmap& first, const tgfx::Bitmap& second) {
-  // Guard the empty bitmap before touching width(); size mismatches are handled by InRect.
-  if (first.isEmpty() || second.isEmpty()) {
-    return -1;
-  }
-  return CountDifferentPixelsInRect(first, second, 0, 0, first.width(), first.height());
+  return MakeSnapshot(surface);
 }
 
 // Largest single-channel difference inside the rect: the pixel counter above saturates at "differs",
@@ -841,6 +795,34 @@ PAGX_TEST(PAGXGlassRenderTest, GlassStyleContourFallbackReplacesGradientFillWith
   const int solidGap = CountDifferentPixelsInRect(glass, solidGlass, 162, 62, 238, 238);
   ASSERT_GE(solidGap, 0) << "a rect count must not be an error code";
   EXPECT_EQ(solidGap, 0) << "the gradient end must match an alpha-0 solid fill, got " << solidGap;
+}
+
+PAGX_TEST(PAGXGlassRenderTest, TargetViewSamplesBackdropAndKeepsOutputBounds) {
+  auto glassDocument = MakeGlassDocument(true);
+  glassDocument->targetLayerId = "glass";
+  glassDocument->outputBounds = pagx::Rect::MakeXYWH(0, 0, 300, 300);
+  auto controlDocument = MakeGlassDocument(false);
+  controlDocument->targetLayerId = "glass";
+  controlDocument->outputBounds = pagx::Rect::MakeXYWH(0, 0, 300, 300);
+
+  auto glassView = RenderTargetView(glassDocument);
+  auto controlView = RenderTargetView(controlDocument);
+  ASSERT_FALSE(glassView.isEmpty());
+  ASSERT_FALSE(controlView.isEmpty());
+  EXPECT_EQ(glassView.width(), 300);
+  EXPECT_EQ(glassView.height(), 300);
+
+  // The page background and the preceding detail layer are only sampling input: outside the
+  // target's own 200x200 box the delivered pixels must stay transparent.
+  auto outside = glassView.getColor(10, 10);
+  EXPECT_NEAR(outside.alpha, 0.0f, 0.01f);
+
+  // Inside the target the glass effect must actually change the backdrop, proving the backdrop
+  // synthesis saw the preceding layers instead of an empty canvas.
+  EXPECT_GT(CountDifferentPixels(glassView, controlView), 500);
+  auto center = glassView.getColor(150, 150);
+  EXPECT_GT(center.alpha, 0.95f);
+  EXPECT_GT(center.blue, center.red);
 }
 
 }  // namespace pag

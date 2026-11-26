@@ -302,6 +302,23 @@ PAGX_TEST(PAGXVideoExporterTest, MakeRejectsNullDocument) {
  * Test case: the documented 1-120 frame rate range is enforced instead of producing a broken
  * sequence, and the rejection happens before any scene or GPU resource is created.
  */
+PAGX_TEST(PAGXVideoExporterTest, TargetViewExportRejected) {
+  const char* attributes[] = {
+      "targetLayer=\"@target\" outputBounds=\"0,0,10,10\"",
+      "targetLayer=\"@target\"",
+      "targetLayer=\"@target\" outputBounds=\"invalid\"",
+  };
+  for (const auto* declaration : attributes) {
+    auto document = pagx::PAGXImporter::FromXML(std::string("<pagx width=\"100\" height=\"100\" ") +
+                                                declaration + "><Layer id=\"target\"/></pagx>");
+    ASSERT_NE(document, nullptr);
+    std::string errorMsg;
+    EXPECT_EQ(pagx::VideoExporter::Make(document, {}, &errorMsg), nullptr);
+    EXPECT_EQ(errorMsg, "Video export does not support documents with targetLayer/outputBounds.");
+    EXPECT_FALSE(document->isLayoutApplied());
+  }
+}
+
 PAGX_TEST(PAGXVideoExporterTest, MakeRejectsOutOfRangeFrameRate) {
   auto document = MakeStaticDocument();
   ASSERT_TRUE(document != nullptr);

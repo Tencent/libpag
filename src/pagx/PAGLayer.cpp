@@ -71,12 +71,7 @@ bool PAGLayer::hitTestPoint(float surfaceX, float surfaceY, bool pixelHitTest) {
   if (runtimeLayer == nullptr || scene == nullptr) {
     return false;
   }
-  float rootX = 0;
-  float rootY = 0;
-  if (!scene->surfaceToRoot(surfaceX, surfaceY, &rootX, &rootY)) {
-    return false;
-  }
-  return runtimeLayer->hitTestPoint(rootX, rootY, pixelHitTest);
+  return scene->hitTestLayer(this, surfaceX, surfaceY, pixelHitTest);
 }
 
 Rect PAGLayer::getBounds() const {

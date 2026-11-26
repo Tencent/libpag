@@ -46,7 +46,16 @@
 #include <thread>
 #include <utility>
 #include "cli/CliUtils.h"
+// The vendored JSON header uses literal declarations deprecated by newer Clang versions.
+#ifdef __clang__
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunknown-warning-option"
+#pragma clang diagnostic ignored "-Wdeprecated-literal-operator"
+#endif
 #include "nlohmann/json.hpp"
+#ifdef __clang__
+#pragma clang diagnostic pop
+#endif
 
 namespace pagx::cli {
 

@@ -181,8 +181,8 @@ class PAGXViewModel : public ContentViewModel {
     std::shared_ptr<pagx::PAGScene> scene;
     std::shared_ptr<pagx::PAGAnimation> animation;
     pagx::LoopMode loopMode = pagx::LoopMode::Once;
-    int contentWidth = 0;
-    int contentHeight = 0;
+    qreal contentWidth = 0;
+    qreal contentHeight = 0;
     bool isPlaying = false;
     double progress = 0.0;
     bool seekRequested = false;
@@ -243,6 +243,7 @@ class PAGXViewModel : public ContentViewModel {
 
  private:
   void clearContent();
+  void clearContentOnLoadFailure();
   void clearDocumentXml();
   Q_SLOT void appendEditorChunk();
   Q_SLOT void onEditorContentsChange();
@@ -277,6 +278,7 @@ class PAGXViewModel : public ContentViewModel {
   pagx::LoopMode defaultLoopMode = pagx::LoopMode::Once;
   int pagxWidth = 0;
   int pagxHeight = 0;
+  QSizeF logicalContentSize = {};
   std::string currentFilePath = {};
   // XML text of the loaded file, published to the editor through documentXmlChanged.
   QString documentXmlText = {};

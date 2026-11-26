@@ -215,7 +215,7 @@ QColor PAGXViewModel::getBackgroundColor() const {
 }
 
 QSizeF PAGXViewModel::getPreferredSize() const {
-  if (window == nullptr || pagxWidth == 0 || pagxHeight == 0) {
+  if (window == nullptr || logicalContentSize.isEmpty()) {
     return {0, 0};
   }
   auto screen = window->screen();
@@ -228,12 +228,12 @@ QSizeF PAGXViewModel::getPreferredSize() const {
   qreal width = 0;
   qreal height = 0;
 
-  if (pagxHeight < minHeight) {
+  if (logicalContentSize.height() < minHeight) {
     height = minHeight;
-    width = pagxWidth * height / pagxHeight;
+    width = logicalContentSize.width() * height / logicalContentSize.height();
   } else {
-    height = pagxHeight;
-    width = pagxWidth;
+    height = logicalContentSize.height();
+    width = logicalContentSize.width();
   }
 
   if (height > maxHeight) {
@@ -313,8 +313,8 @@ PAGXViewModel::RenderState PAGXViewModel::getRenderState() {
   return {scene,
           defaultAnimation,
           defaultLoopMode,
-          pagxWidth,
-          pagxHeight,
+          logicalContentSize.width(),
+          logicalContentSize.height(),
           isPlaying_.load(),
           progress,
           pendingSeek.exchange(false),
@@ -429,6 +429,28 @@ static void RegisterDocumentFonts(pagx::PAGXDocument* document) {
   }
 }
 
+static bool GetContentSize(const std::shared_ptr<pagx::PAGScene>& scene, QSizeF* logicalSize,
+                           QSize* displaySize) {
+  if (scene == nullptr) {
+    return false;
+  }
+  auto bounds = scene->getOutputBounds();
+  if (!bounds.has_value()) {
+    *displaySize = {static_cast<int>(scene->width()), static_cast<int>(scene->height())};
+    *logicalSize = *displaySize;
+    return true;
+  }
+  double width = std::ceil(static_cast<double>(bounds->width));
+  double height = std::ceil(static_cast<double>(bounds->height));
+  if (!std::isfinite(width) || !std::isfinite(height) || width <= 0 || height <= 0 ||
+      width > std::numeric_limits<int>::max() || height > std::numeric_limits<int>::max()) {
+    return false;
+  }
+  *logicalSize = {bounds->width, bounds->height};
+  *displaySize = {static_cast<int>(width), static_cast<int>(height)};
+  return true;
+}
+
 bool PAGXViewModel::loadFile(const QString& filePath) {
   // Keep the file-system path in the local 8-bit encoding: tgfx's ByteData::FromPath ultimately
   // opens the file through narrow-char fopen(), which interprets the path in the system ANSI code
@@ -441,15 +463,13 @@ bool PAGXViewModel::loadFile(const QString& filePath) {
   }
   auto byteData = pag::ByteData::FromPath(strPath);
   if (byteData == nullptr) {
-    clearDocumentXml();
-    Q_EMIT filePathChanged("");
+    clearContentOnLoadFailure();
     return false;
   }
 
   auto document = pagx::PAGXImporter::FromXML(byteData->data(), byteData->length());
   if (document == nullptr) {
-    clearDocumentXml();
-    Q_EMIT filePathChanged("");
+    clearContentOnLoadFailure();
     return false;
   }
   ResolveResourcePaths(document.get(), strPath);
@@ -457,18 +477,10 @@ bool PAGXViewModel::loadFile(const QString& filePath) {
   document->applyLayout();
 
   auto newScene = pagx::PAGScene::Make(document);
-  if (newScene == nullptr) {
-    {
-      std::lock_guard<std::mutex> lock(renderMutex);
-      clearContent();
-      // Reset playback state so a prior playing session does not leave the controls stuck; with a
-      // null timeline this stops playback, zeroes the frame counters, and bumps the generation.
-      updateAnimationState();
-    }
-    clearDocumentXml();
-    Q_EMIT filePathChanged("");
-    Q_EMIT pagxDocumentChanged(nullptr);
-    emitContentStateReset();
+  QSizeF logicalSize;
+  QSize displaySize;
+  if (!GetContentSize(newScene, &logicalSize, &displaySize)) {
+    clearContentOnLoadFailure();
     return false;
   }
 
@@ -482,8 +494,9 @@ bool PAGXViewModel::loadFile(const QString& filePath) {
     pagxDocument = document;
     scene = newScene;
     resolveDefaultAnimation(document);
-    pagxWidth = static_cast<int>(document->width);
-    pagxHeight = static_cast<int>(document->height);
+    logicalContentSize = logicalSize;
+    pagxWidth = displaySize.width();
+    pagxHeight = displaySize.height();
     updateAnimationState();
     needsRender = true;
   }
@@ -543,6 +556,26 @@ void PAGXViewModel::clearContent() {
   scene = nullptr;
   defaultAnimation = nullptr;
   defaultLoopMode = pagx::LoopMode::Once;
+  pagxWidth = 0;
+  pagxHeight = 0;
+  logicalContentSize = {};
+}
+
+void PAGXViewModel::clearContentOnLoadFailure() {
+  {
+    std::lock_guard<std::mutex> lock(renderMutex);
+    clearContent();
+    currentFilePath.clear();
+    updateAnimationState();
+  }
+  clearDocumentXml();
+  Q_EMIT filePathChanged("");
+  Q_EMIT widthChanged(0);
+  Q_EMIT heightChanged(0);
+  Q_EMIT contentSizeChanged();
+  Q_EMIT preferredSizeChanged();
+  Q_EMIT pagxDocumentChanged(nullptr);
+  emitContentStateReset();
 }
 
 void PAGXViewModel::resolveDefaultAnimation(const std::shared_ptr<pagx::PAGXDocument>& document) {
@@ -607,15 +640,18 @@ QString PAGXViewModel::applyXmlChanges(const QString& newXml) {
   document->applyLayout();
 
   auto newScene = pagx::PAGScene::Make(document);
-  if (newScene == nullptr) {
+  QSizeF logicalSize;
+  QSize displaySize;
+  if (!GetContentSize(newScene, &logicalSize, &displaySize)) {
     return tr("Failed to build PAGScene from XML document");
   }
 
   {
     std::lock_guard<std::mutex> lock(renderMutex);
     pagxDocument = document;
-    pagxWidth = static_cast<int>(document->width);
-    pagxHeight = static_cast<int>(document->height);
+    logicalContentSize = logicalSize;
+    pagxWidth = displaySize.width();
+    pagxHeight = displaySize.height();
     scene = newScene;
     resolveDefaultAnimation(document);
     updateAnimationState();

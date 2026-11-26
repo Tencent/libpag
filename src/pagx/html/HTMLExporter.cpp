@@ -31,6 +31,7 @@
 #endif
 #include "pagx/nodes/Font.h"
 #include "pagx/utils/ExporterUtils.h"
+#include "pagx/utils/OutputView.h"
 #include "pagx/utils/StringParser.h"
 #include "pagx/utils/Woff2FontGenerator.h"
 
@@ -320,6 +321,9 @@ std::string BuildHTML(PAGXDocument& doc, HTMLOutputMode mode, const HTMLExporter
 std::string HTMLExporter::ToHTML(PAGXDocument& doc, const std::string& resourceDir,
                                  HTMLOutputMode mode, const Options& options,
                                  std::string* errorMsg) {
+  if (!CheckOutputViewExportSupport(doc, "HTML", errorMsg)) {
+    return {};
+  }
   if (resourceDir.empty()) {
     if (errorMsg) {
       *errorMsg = "resourceDir must not be empty.";
@@ -420,6 +424,9 @@ bool HTMLExporter::ToFile(PAGXDocument& document, const std::string& filePath,
 
 std::shared_ptr<Data> HTMLExporter::ToData(PAGXDocument& document, const Options& options,
                                            std::string* errorMsg) {
+  if (!CheckOutputViewExportSupport(document, "HTML", errorMsg)) {
+    return nullptr;
+  }
 #if defined(PAG_BUILD_HTML) || defined(PAG_BUILD_PPT)
   MemZipWriter zipWriter;
   HTMLWriterContext ctx;

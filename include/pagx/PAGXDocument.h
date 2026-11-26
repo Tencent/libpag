@@ -18,17 +18,21 @@
 
 #pragma once
 
+#include <cstdint>
 #include <memory>
+#include <optional>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
 #include "pagx/FontConfig.h"
 #include "pagx/PAGFont.h"
+#include "pagx/PAGOutputViewStatus.h"
 #include "pagx/nodes/Animation.h"
 #include "pagx/nodes/Layer.h"
 #include "pagx/nodes/Node.h"
 #include "pagx/types/Data.h"
+#include "pagx/types/Rect.h"
 
 namespace pagx {
 
@@ -72,6 +76,26 @@ class PAGXDocument : public Node {
    * Canvas height.
    */
   float height = 0;
+
+  /**
+   * The id (without the leading '@') of the Layer that the document renders as its default static
+   * output, or empty when the document renders the whole canvas. Declared by the `targetLayer`
+   * root attribute, which must be paired with `outputBounds`.
+   */
+  std::string targetLayerId = {};
+
+  /**
+   * The output rectangle in document-root coordinates used when `targetLayerId` is set. Declared by
+   * the `outputBounds` root attribute. std::nullopt when the document renders the whole canvas.
+   */
+  std::optional<Rect> outputBounds = std::nullopt;
+
+  /**
+   * Removes the document's output view declaration, including authored attribute text that failed
+   * to parse. After this call the document renders the whole canvas again. Live scenes are notified
+   * automatically; no separate notifyChange() call is required.
+   */
+  void clearOutputView();
 
   /**
    * Top-level layers (raw pointers, owned by nodes).
@@ -457,6 +481,20 @@ class PAGXDocument : public Node {
   std::unordered_map<std::string, std::vector<const Layer*>> layersByImageFilePath = {};
   bool layersByImageFilePathBuilt = false;
 
+  // Raw text of the `targetLayer`/`outputBounds` root attributes that could not be parsed into
+  // targetLayerId/outputBounds. The exporter replays them verbatim so an invalid declaration keeps
+  // failing on reload instead of degrading into a whole-canvas document. std::nullopt means the
+  // attribute was absent or parsed successfully; an empty string means it was present but empty.
+  std::optional<std::string> declaredTargetLayer = std::nullopt;
+  std::optional<std::string> declaredOutputBounds = std::nullopt;
+
+  // Incremented whenever the node registry changes shape: a node is created, actually removed, or
+  // re-indexed under a new id. PAGScene compares it with its output view validation snapshot to
+  // prove that a notification cannot have changed which ids exist in this document.
+  uint64_t nodeRegistryVersion = 0;
+
+  friend class OutputViewDeclarationAccess;
+  friend class OutputViewValidationAccess;
   friend class PAGXImporter;
   friend class PAGXExporter;
   friend class TextLayoutContext;

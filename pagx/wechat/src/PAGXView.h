@@ -22,6 +22,7 @@
 #include <cstdint>
 #include <deque>
 #include <memory>
+#include <optional>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -200,8 +201,9 @@ class PAGXView {
 
   /**
    * Returns bounds mapped into canvas pixel space by the contain-mode fit transform (fitScale +
-   * centerOffset, WITHOUT the user pan/zoom folded in) for every filePath in the input list. Each
-   * returned entry has both a unionBounds (axis-aligned union of every referencing layer, used
+   * centerOffset, WITHOUT the user pan/zoom folded in) for every filePath in the input list. A
+   * declared output window's origin is subtracted before fitting. Each returned entry has both a
+   * unionBounds (axis-aligned union of every referencing layer, used
    * for viewport-intersection tests) and a largestBounds (the single referencing layer with the
    * biggest area, used for focus-distance scoring). filePaths with no matching layer map to
    * null so callers can tell apart "off-canvas" from "no such filePath".
@@ -304,14 +306,16 @@ class PAGXView {
   void resetForFreshCapture();
 
   /**
-   * Returns the width of the PAGX content in content pixels.
+   * Returns the logical output width: the declared output window width, or the document canvas
+   * width when no output view is declared. Available after parsing; zero for an invalid view.
    */
   float contentWidth() const {
     return pagxWidth;
   }
 
   /**
-   * Returns the height of the PAGX content in content pixels.
+   * Returns the logical output height: the declared output window height, or the document canvas
+   * height when no output view is declared. Available after parsing; zero for an invalid view.
    */
   float contentHeight() const {
     return pagxHeight;
@@ -347,10 +351,11 @@ class PAGXView {
   /**
    * Returns the content transform parameters needed for mapping cocraft canvas coordinates to
    * canvas pixel positions. The returned JavaScript object contains:
-   * - boundsOriginX/Y: PAGX content origin in cocraft canvas coordinates.
+   * - boundsOriginX/Y: custom/overridden content origin plus the output window's root origin.
    * - fitScale: scale factor applied to fit PAGX content into the canvas (contain mode).
    * - centerOffsetX/Y: pixel offset for centering the scaled content in the canvas.
    *
+   * These are the static base fit parameters, without user pan/zoom.
    * Usage: baseX = (cocraftX - boundsOriginX) * fitScale + centerOffsetX
    */
   emscripten::val getContentTransform() const;
@@ -398,6 +403,8 @@ class PAGXView {
   void captureFitSnapshot(tgfx::Context* context);
 
   void applyDocumentCustomData();
+  bool updateOutputBounds();
+  Point outputOrigin() const;
 
   // Shared contain-mode fit scale used by both the content matrix and the JS-facing content
   // transform. Keeping a single source of truth prevents comment pins from drifting relative to
@@ -649,8 +656,8 @@ class PAGXView {
   std::unordered_map<std::string, std::vector<tgfx::Rect>> collectRootLocalImageBounds() const;
 
   // Returns the given runtime layer's bounds in the root composition's local coordinate space.
-  // PAGScene only exposes getGlobalBounds (surface space = root-local * zoom + offset), so this
-  // inverts that uniform-scale-plus-translate transform to recover the root-local rect. Returns an
+  // PAGScene exposes getGlobalBounds in surface space, with output origin, zoom and offset applied.
+  // This inverts that transform to recover the root-local rect. Returns an
   // empty rect when the scene is missing, the layer is null, the effective zoom is non-positive, or
   // the surface bounds are empty.
   tgfx::Rect rootLocalBounds(const std::shared_ptr<PAGLayer>& layer) const;
@@ -684,6 +691,7 @@ class PAGXView {
   void emitTextureEvict(const std::vector<std::string>& filePaths);
   float pagxWidth = 0.0f;
   float pagxHeight = 0.0f;
+  std::optional<Rect> outputBounds = std::nullopt;
   int canvasWidth = 0;
   int canvasHeight = 0;
   FontConfig fontConfig = {};

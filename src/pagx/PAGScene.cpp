@@ -41,6 +41,7 @@
 #include "pagx/tgfx.h"
 #include "pagx/types/Matrix.h"
 #include "pagx/utils/ImportFormat.h"
+#include "pagx/utils/OutputView.h"
 #include "renderer/LayerBuilder.h"
 #include "renderer/TextHolder.h"
 #include "renderer/ToTGFX.h"
@@ -206,15 +207,32 @@ std::shared_ptr<PAGScene> PAGScene::Make(std::shared_ptr<PAGXDocument> document)
       return nullptr;
     }
   }
+  // A document with a broken default target view must not fall back to rendering the whole
+  // canvas: the output would silently include ancestor and surrounding content.
+  const Layer* outputTarget = nullptr;
+  std::string outputViewError;
+  auto outputViewStatus = ResolveOutputView(document.get(), &outputTarget, &outputViewError);
+  if (outputViewStatus == OutputViewStatus::Invalid) {
+    LOGE("PAGScene::Make() aborted: %s", outputViewError.c_str());
+    return nullptr;
+  }
   auto scene = std::shared_ptr<PAGScene>(new PAGScene());
   scene->document = document;
+  // The runtime tree build captures the validation snapshot from these fields instead of resolving
+  // the same declaration a second time.
+  scene->outputViewStatus = outputViewStatus;
+  scene->outputTargetNode = outputTarget;
+  scene->outputViewError = std::move(outputViewError);
   scene->displayList = std::make_unique<tgfx::DisplayList>();
   scene->displayOptions = std::unique_ptr<PAGDisplayOptions>(new PAGDisplayOptions(scene.get()));
-  scene->buildRuntimeTree();
+  scene->buildRuntimeTree(true);
   return scene;
 }
 
-void PAGScene::buildRuntimeTree() {
+void PAGScene::buildRuntimeTree(bool preResolvedOutputView) {
+  // A rebuild destroys the runtime tree the wrapper was inserted into. Restore the original tree
+  // and drop the prepared state before removing the old root or replacing the binding.
+  outputTargetState.reset();
   if (!document->isLayoutApplied()) {
     // A detach must rebuild before releasing its old domain, without mounting that import again.
     std::unordered_set<const PAGXDocument*> visited = {};
@@ -276,7 +294,72 @@ void PAGScene::buildRuntimeTree() {
   // Cache the flat TextHolder list so flushTextHolders / hasContentChanged iterate it directly
   // instead of walking the composition tree every frame.
   collectTextHolders();
+  outputViewDirty = true;
+  if (preResolvedOutputView) {
+    captureOutputViewValidation();
+  } else {
+    resolveOutputTarget();
+  }
   document->registerLiveScene(shared_from_this());
+}
+
+void PAGScene::resolveOutputTarget() {
+  outputTargetNode = nullptr;
+  outputViewError.clear();
+  outputViewStatus = ResolveOutputView(document.get(), &outputTargetNode, &outputViewError);
+  captureOutputViewValidation();
+}
+
+void PAGScene::captureOutputViewValidation() {
+  ++outputViewValidationRuns;
+  if (outputViewStatus != OutputViewStatus::Valid || document == nullptr ||
+      outputTargetNode == nullptr) {
+    outputViewValidation.reset();
+    return;
+  }
+  if (outputViewValidation == nullptr) {
+    outputViewValidation = std::make_unique<OutputViewValidationSnapshot>();
+  }
+  if (!CaptureOutputViewValidation(*document, outputTargetNode, outputViewValidation.get())) {
+    outputViewValidation.reset();
+  }
+}
+
+bool PAGScene::canReuseOutputViewValidation(const std::vector<Node*>& reportedDirty,
+                                            bool layoutChanged) const {
+  if (outputViewStatus != OutputViewStatus::Valid || outputViewValidation == nullptr ||
+      document == nullptr) {
+    return false;
+  }
+  return CanReuseOutputViewValidation(*document, reportedDirty, layoutChanged,
+                                      *outputViewValidation);
+}
+
+bool PAGScene::ensureOutputTargetState() {
+  auto root = _rootComposition != nullptr ? _rootComposition->runtimeLayer : nullptr;
+  auto target = _rootComposition != nullptr && _rootComposition->binding != nullptr
+                    ? _rootComposition->binding->get<tgfx::Layer>(outputTargetNode)
+                    : nullptr;
+  if (root == nullptr || target == nullptr) {
+    outputTargetState.reset();
+    return false;
+  }
+  if (outputTargetState != nullptr) {
+    // A state that was already created may only be reused. A different binding or a disturbed
+    // hookup means the tree changed without an invalidation path: fail rather than silently
+    // re-hooking and reporting the frame as drawn. Only explicit invalidation resets the state.
+    if (!outputTargetState->binds(root, target)) {
+      return false;
+    }
+    return outputTargetState->isPrepared();
+  }
+  // No state yet: this is either the first draw or a draw after an explicit invalidation.
+  outputTargetState = std::make_unique<OutputTargetState>();
+  if (!outputTargetState->prepare(root, target)) {
+    outputTargetState.reset();
+    return false;
+  }
+  return true;
 }
 
 std::shared_ptr<PAGViewModel> PAGScene::CreateViewModelFromSchema(
@@ -529,6 +612,9 @@ void PAGScene::buildViewModels() {
 }
 
 PAGScene::~PAGScene() {
+  // Release the wrapper while the runtime tree is still alive so it can restore the original
+  // parent, child order and mask ownership.
+  outputTargetState.reset();
   UnregisterCompositionDocuments(_rootComposition.get(), this, &PAGComposition::document,
                                  &PAGComposition::CollectChildCompositions,
                                  &PAGXDocument::unregisterLiveScene);
@@ -690,9 +776,89 @@ bool PAGScene::renderTo(const std::shared_ptr<PAGSurface>& surface, tgfx::Contex
   if (tgfxSurface == nullptr) {
     return false;
   }
+  if (outputViewStatus == OutputViewStatus::Invalid) {
+    // The declaration cannot be rendered, so there is nothing left to redraw. Release any prepared
+    // wrapper and consume the flag to keep hosts from retrying the same failed draw forever.
+    outputTargetState.reset();
+    outputViewDirty = false;
+    return false;
+  }
+  if (outputViewStatus == OutputViewStatus::Valid) {
+    auto zoomScale = displayList->zoomScale();
+    if (zoomScale <= 0.0f) {
+      return false;
+    }
+    auto canvas = tgfxSurface->getCanvas();
+    // The surface keeps one Canvas across frames, so the view transform must be scoped to this
+    // draw. Otherwise every frame accumulates the translate/scale and the content drifts out of
+    // the output window.
+    tgfx::AutoCanvasRestore canvasRestore(canvas);
+    const auto& background = displayList->backgroundColor();
+    if (autoClear) {
+      canvas->clear(background);
+    } else if (background.alpha > 0.0f) {
+      canvas->drawColor(background);
+    }
+    const auto& contentOffset = displayList->contentOffset();
+    // Read the window through the same accessor hosts use: outputBounds is public and editable, so
+    // a host that clears it without notifyChange() leaves the cached state Valid while the field
+    // is already empty.
+    auto outputBounds = getOutputBounds();
+    if (!outputBounds.has_value()) {
+      // The window was cleared without a declaration change: consume the pending redraw but also
+      // release the wrapper so a later re-declaration prepares against the current tree.
+      outputTargetState.reset();
+      outputViewDirty = false;
+      return false;
+    }
+    const auto& bounds = *outputBounds;
+    ApplyOutputViewTransform(canvas, bounds, zoomScale, contentOffset);
+    // The output window is the only visible area. A host that keeps sizing its surface from
+    // width()/height() must not see target content painted outside the declared rectangle, and
+    // the extra pixel that ceil(bounds * scale) adds for fractional bounds must stay transparent.
+    // The clip is expressed in root coordinates, which is the space the current canvas matrix
+    // maps to the surface.
+    canvas->clipRect(tgfx::Rect::MakeXYWH(bounds.x, bounds.y, bounds.width, bounds.height));
+    // Prepare the reusable wrapper just before drawing. A failure here or in draw() must not
+    // consume the pending redraw: the host has to retry once the tree is repaired.
+    if (!ensureOutputTargetState() || !outputTargetState->draw(canvas)) {
+      return false;
+    }
+    clearAllViewModelsDirty();
+    outputViewDirty = false;
+    return true;
+  }
+  // A declaration that transitioned to None renders the whole canvas; the wrapper from a previous
+  // Valid state must have been released by onNodesChanged() or the declaration change path.
+  outputTargetState.reset();
   displayList->render(tgfxSurface.get(), autoClear);
   clearAllViewModelsDirty();
   return true;
+}
+
+std::optional<Rect> PAGScene::getOutputBounds() const {
+  return getOutputViewInfo().bounds;
+}
+
+OutputViewInfo PAGScene::getOutputViewInfo() const {
+  OutputViewInfo info = {};
+  info.status = outputViewStatus;
+  if (outputViewStatus == OutputViewStatus::Valid && document != nullptr) {
+    // Read the live field: a host that clears outputBounds without notifyChange() leaves the
+    // cached status Valid, and this accessor must report the same absence renderTo() observes.
+    info.bounds = document->outputBounds;
+  } else if (outputViewStatus == OutputViewStatus::Invalid) {
+    info.error = outputViewError;
+  }
+  return info;
+}
+
+OutputViewStatus PAGScene::getOutputViewStatus() const {
+  return outputViewStatus;
+}
+
+std::string PAGScene::getOutputViewError() const {
+  return outputViewError;
 }
 
 float PAGScene::width() const {
@@ -808,25 +974,115 @@ void PAGScene::onImageResourcesChanged(const std::vector<Image*>& changedImages)
   if (changedImages.empty() || _rootComposition == nullptr) {
     return;
   }
+  outputViewDirty = true;
+  // Image replacement can rebuild layer content; conservatively drop the prepared wrapper so the
+  // next draw hooks into the current tree while keeping the existing refresh and dirty behavior.
+  outputTargetState.reset();
   std::unordered_set<const Image*> changed(changedImages.begin(), changedImages.end());
   RefreshViewModelImages(_rootComposition.get(), changed);
 }
 
-// Maps the tgfx probe results back to PAGLayer handles without a persistent registry. The runtime
-// tree can contain helper layers (mask owners, composition slots) that have no PAGLayer, so only
-// hits present in the order map are kept. A single walk keeps the mapping in sync with the current
-// tree without register/unregister bookkeeping.
-std::vector<std::shared_ptr<PAGLayer>> PAGScene::getLayersUnderPoint(float surfaceX,
-                                                                     float surfaceY) {
+// Walks the runtime path from layer up to hitRoot and applies the per-layer hit constraints TGFX
+// would apply while traversing the whole tree: hidden layers, scroll rects and masks. hitRoot
+// itself is checked and then stops the walk, so ancestors above the query root still contribute
+// coordinates but never reject a hit the rendered subtree would accept.
+static bool CanHitLayerPath(tgfx::Layer* layer, const tgfx::Layer* hitRoot, const Point& rootPoint,
+                            bool pixelHitTest) {
+  auto globalPoint = tgfx::Point::Make(rootPoint.x, rootPoint.y);
+  for (auto* current = layer; current != nullptr; current = current->parent()) {
+    if (!current->visible()) {
+      return false;
+    }
+    auto scrollRect = current->scrollRect();
+    if (!scrollRect.isEmpty()) {
+      auto localPoint = current->globalToLocal(globalPoint);
+      if (!scrollRect.contains(localPoint.x, localPoint.y)) {
+        return false;
+      }
+    }
+    auto mask = current->mask();
+    if (mask != nullptr && !mask->hitTestPoint(globalPoint.x, globalPoint.y, pixelHitTest)) {
+      return false;
+    }
+    if (current == hitRoot) {
+      return true;
+    }
+  }
+  return false;
+}
+
+bool PAGScene::prepareHitTest(float surfaceX, float surfaceY, Point* rootPoint,
+                              std::shared_ptr<tgfx::Layer>* hitRoot) const {
+  if (rootPoint == nullptr || hitRoot == nullptr || displayList == nullptr ||
+      _rootComposition == nullptr || _rootComposition->runtimeLayer == nullptr ||
+      outputViewStatus == OutputViewStatus::Invalid) {
+    return false;
+  }
+  std::optional<Rect> bounds = std::nullopt;
+  if (outputViewStatus == OutputViewStatus::Valid) {
+    // getOutputBounds() re-checks the cached state and the authored field, so a host that cleared
+    // outputBounds without notifyChange() is rejected here as well.
+    bounds = getOutputBounds();
+    if (!bounds.has_value() || displayList->zoomScale() <= 0.0f) {
+      return false;
+    }
+  }
   float rootX = 0;
   float rootY = 0;
   if (!surfaceToRoot(surfaceX, surfaceY, &rootX, &rootY)) {
+    return false;
+  }
+  *rootPoint = {rootX, rootY};
+  if (outputViewStatus == OutputViewStatus::None) {
+    *hitRoot = _rootComposition->runtimeLayer;
+    return true;
+  }
+  if (!ToTGFX(*bounds).contains(rootX, rootY)) {
+    return false;
+  }
+  // Always resolve the target from the live binding: a cached runtime pointer would go stale when
+  // an edit rebuilds the tree.
+  *hitRoot = _rootComposition->binding != nullptr
+                 ? _rootComposition->binding->get<tgfx::Layer>(outputTargetNode)
+                 : nullptr;
+  return *hitRoot != nullptr;
+}
+
+bool PAGScene::hitTestLayer(const PAGLayer* layer, float surfaceX, float surfaceY,
+                            bool pixelHitTest) const {
+  if (layer == nullptr || layer->runtimeLayer == nullptr || layer->rootScene.lock().get() != this) {
+    return false;
+  }
+  Point rootPoint = {};
+  std::shared_ptr<tgfx::Layer> hitRoot = nullptr;
+  if (!prepareHitTest(surfaceX, surfaceY, &rootPoint, &hitRoot)) {
+    return false;
+  }
+  if (outputViewStatus == OutputViewStatus::Valid) {
+    if (!hitRoot->contains(layer->runtimeLayer)) {
+      return false;
+    }
+    if (!CanHitLayerPath(layer->runtimeLayer.get(), hitRoot.get(), rootPoint, pixelHitTest)) {
+      return false;
+    }
+  }
+  return layer->runtimeLayer->hitTestPoint(rootPoint.x, rootPoint.y, pixelHitTest);
+}
+
+std::vector<std::shared_ptr<PAGLayer>> PAGScene::getLayersUnderPoint(float surfaceX,
+                                                                     float surfaceY) {
+  Point rootPoint = {};
+  std::shared_ptr<tgfx::Layer> hitRoot = nullptr;
+  if (!prepareHitTest(surfaceX, surfaceY, &rootPoint, &hitRoot)) {
     return {};
   }
-  if (_rootComposition == nullptr || _rootComposition->runtimeLayer == nullptr) {
+  // TGFX skips visibility, scroll rect and mask checks for the layer the query starts from, so the
+  // target itself needs the same constraints applied before its subtree is searched.
+  if (outputViewStatus == OutputViewStatus::Valid &&
+      !CanHitLayerPath(hitRoot.get(), hitRoot.get(), rootPoint, false)) {
     return {};
   }
-  auto runtimeHits = _rootComposition->runtimeLayer->getLayersUnderPoint(rootX, rootY);
+  auto runtimeHits = hitRoot->getLayersUnderPoint(rootPoint.x, rootPoint.y);
   std::unordered_map<const tgfx::Layer*, size_t> hitOrder = {};
   for (size_t i = 0; i < runtimeHits.size(); ++i) {
     hitOrder.emplace(runtimeHits[i].get(), i);
@@ -876,6 +1132,14 @@ Rect PAGScene::getGlobalBounds(const std::shared_ptr<PAGLayer>& pagLayer) const 
   return FromTGFX(surfaceBounds);
 }
 
+Point PAGScene::outputViewOrigin() const {
+  if (outputViewStatus != OutputViewStatus::Valid || document == nullptr ||
+      !document->outputBounds.has_value()) {
+    return {};
+  }
+  return {document->outputBounds->x, document->outputBounds->y};
+}
+
 bool PAGScene::surfaceToRoot(float surfaceX, float surfaceY, float* rootX, float* rootY) const {
   if (rootX == nullptr || rootY == nullptr) {
     return false;
@@ -885,8 +1149,9 @@ bool PAGScene::surfaceToRoot(float surfaceX, float surfaceY, float* rootX, float
     return false;
   }
   const auto& contentOffset = displayList->contentOffset();
-  *rootX = (surfaceX - contentOffset.x) / zoomScale;
-  *rootY = (surfaceY - contentOffset.y) / zoomScale;
+  const auto origin = outputViewOrigin();
+  *rootX = (surfaceX - contentOffset.x) / zoomScale + origin.x;
+  *rootY = (surfaceY - contentOffset.y) / zoomScale + origin.y;
   return true;
 }
 
@@ -896,11 +1161,25 @@ bool PAGScene::rootToSurfaceMatrix(Matrix* out) const {
   }
   float zoomScale = displayList->zoomScale();
   const auto& contentOffset = displayList->contentOffset();
-  *out = {zoomScale, 0, 0, zoomScale, contentOffset.x, contentOffset.y};
+  const auto origin = outputViewOrigin();
+  *out = {zoomScale,
+          0,
+          0,
+          zoomScale,
+          contentOffset.x - origin.x * zoomScale,
+          contentOffset.y - origin.y * zoomScale};
   return true;
 }
 
-void PAGScene::onNodesChanged(const std::vector<Node*>& dirtyNodes) {
+void PAGScene::onNodesChanged(const std::vector<Node*>& dirtyNodes,
+                              const std::vector<Node*>& reportedDirty, bool layoutChanged) {
+  // Restore and drop the wrapper before any tree edit. refreshNodes() and buildRuntimeTree() can
+  // reorder or replace layers, so the prepared hookup cannot survive this entry point. The next
+  // valid draw lazily prepares against the refreshed tree.
+  outputTargetState.reset();
+  // Every content, layout or resource notification invalidates the rendered frame, including the
+  // render-only edits that skip declaration validation below.
+  outputViewDirty = true;
   // The dirty nodes belong either to this scene's own document or to an external (child) document
   // this scene embeds. A child document dispatches to this scene through its own notifyChange; in
   // that case the nodes are not owned here, and an external composition is built into the runtime
@@ -913,7 +1192,7 @@ void PAGScene::onNodesChanged(const std::vector<Node*>& dirtyNodes) {
     }
   }
   if (foreign) {
-    buildRuntimeTree();
+    buildRuntimeTree(false);
     return;
   }
   // The document node itself (NodeType::Document) triggers a full rebuild so changes to
@@ -922,11 +1201,11 @@ void PAGScene::onNodesChanged(const std::vector<Node*>& dirtyNodes) {
   // the foreign rebuild branch.
   for (auto* node : dirtyNodes) {
     if (node != nullptr && node->nodeType() == NodeType::Document) {
-      buildRuntimeTree();
+      buildRuntimeTree(false);
       return;
     }
   }
-  if (_rootComposition != nullptr) {
+  if (!dirtyNodes.empty() && _rootComposition != nullptr) {
     // The root composition has no source Composition node (it represents the document body), so the
     // ancestor path begins empty. refreshNodes pushes each child composition's source as it
     // descends.
@@ -955,6 +1234,15 @@ void PAGScene::onNodesChanged(const std::vector<Node*>& dirtyNodes) {
         static_cast<PAGStateMachine*>(entry.second.get())->markInternalTargetsDirty();
       }
     }
+  }
+  // Declaration validation applies to every semantic notification, even when the collapsed Layer
+  // set is empty (for example an Image used only by a ViewModel default has no owning Layer). A
+  // render-only leaf batch reuses the last Valid result instead of scanning the document and the
+  // whole authored layer tree again.
+  if (canReuseOutputViewValidation(reportedDirty, layoutChanged)) {
+    ++outputViewValidationReuses;
+  } else {
+    resolveOutputTarget();
   }
   // Reset every timeline only when a timeline node changed. Timelines (Animation drivers and the
   // state machines that play them) can share targets and cross-reference, so the whole timeline
@@ -1039,6 +1327,9 @@ bool PAGScene::hasContentChanged() const {
     if (holder != nullptr && holder->isDirty()) {
       return true;
     }
+  }
+  if (outputViewStatus != OutputViewStatus::None) {
+    return outputViewDirty;
   }
   return displayList->hasContentChanged();
 }

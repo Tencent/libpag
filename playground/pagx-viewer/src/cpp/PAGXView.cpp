@@ -24,6 +24,8 @@
 #include "pagx/PAGXImporter.h"
 #include "pagx/tgfx.h"
 #include "pagx/types/Data.h"
+#include "renderer/ToTGFX.h"
+#include "tgfx/core/Canvas.h"
 #include "tgfx/core/Data.h"
 #include "tgfx/core/Surface.h"
 #include "tgfx/core/Typeface.h"
@@ -102,18 +104,27 @@ void PAGXView::registerFonts(const val& fontVal, const val& emojiFontVal) {
   }
 }
 
-void PAGXView::loadPAGX(const val& pagxData) {
+bool PAGXView::loadPAGX(const val& pagxData) {
   parsePAGX(pagxData);
-  buildLayers();
+  return buildLayers();
+}
+
+void PAGXView::resetScene() {
+  scene = nullptr;
+  defaultTimeline = nullptr;
+  defaultAnimation = nullptr;
+  hasOutputView = false;
+  outputSurface = nullptr;
+  pagxWidth = 0.0f;
+  pagxHeight = 0.0f;
+  lastRecording = nullptr;
+  lastAnimationTimeMs = -1.0;
+  presentImmediately = true;
 }
 
 void PAGXView::parsePAGX(const val& pagxData) {
   document = nullptr;
-  scene = nullptr;
-  defaultTimeline = nullptr;
-  defaultAnimation = nullptr;
-  lastRecording = nullptr;
-  lastAnimationTimeMs = -1.0;
+  resetScene();
   auto data = GetPagxDataFromEmscripten(pagxData);
   if (!data) {
     return;
@@ -139,14 +150,15 @@ bool PAGXView::loadFileData(const std::string& filePath, const val& fileData) {
   return document->loadFileData(filePath, std::move(data));
 }
 
-void PAGXView::buildLayers() {
+bool PAGXView::buildLayers() {
+  resetScene();
   if (!document) {
-    return;
+    return false;
   }
   document->applyLayout(&fontConfig);
   scene = PAGScene::Make(document);
   if (scene == nullptr) {
-    return;
+    return false;
   }
   defaultTimeline = scene->getDefaultTimeline();
   defaultAnimation = nullptr;
@@ -155,11 +167,16 @@ void PAGXView::buildLayers() {
   }
   playing = true;
   lastAnimationTimeMs = -1.0;
-  pagxWidth = scene->width();
-  pagxHeight = scene->height();
+  // PAGScene already compensates for the output origin; use only its size to frame the view so
+  // the origin offset is not applied twice.
+  auto outputBounds = scene->getOutputBounds();
+  hasOutputView = outputBounds.has_value();
+  pagxWidth = hasOutputView ? outputBounds->width : scene->width();
+  pagxHeight = hasOutputView ? outputBounds->height : scene->height();
   applySceneDisplayOptions();
   updateContentTransform();
   presentImmediately = true;
+  return true;
 }
 
 void PAGXView::advanceTimelines(double frameStartMs) {
@@ -252,6 +269,7 @@ void PAGXView::syncSurfaceSize(int canvasWidth, int canvasHeight) {
     return;
   }
   tgfxSurface = tgfx::Surface::MakeFrom(context, window);
+  outputSurface = nullptr;
   device->unlock();
   if (tgfxSurface == nullptr) {
     return;
@@ -292,6 +310,11 @@ void PAGXView::applySceneDisplayOptions() {
     return;
   }
   auto options = scene->getDisplayOptions();
+  if (hasOutputView) {
+    options->setRenderMode(PAGRenderMode::Direct);
+    options->setBackgroundColor({0, 0, 0, 0});
+    return;
+  }
   if (defaultTimeline != nullptr) {
     // Tiled caches are invalidated on every animated frame, so tiling only adds overhead during
     // playback. Partial mode redraws just the dirty regions and keeps animated frames smooth.
@@ -305,6 +328,14 @@ void PAGXView::applySceneDisplayOptions() {
 }
 
 void PAGXView::updateZoomScaleAndOffset(float zoom, float offsetX, float offsetY) {
+  if (hasOutputView) {
+    userZoom = zoom;
+    userOffsetX = offsetX;
+    userOffsetY = offsetY;
+    applyDisplayTransform();
+    presentImmediately = true;
+    return;
+  }
   if (scene != nullptr) {
     if (zoom <= 1.0f) {
       scene->getDisplayOptions()->setSubtreeCacheMaxSize(1024);
@@ -340,7 +371,7 @@ void PAGXView::setBackgroundColor(float red, float green, float blue, float alph
   useCustomBackgroundColor = true;
   customBackgroundColor = {std::clamp(red, 0.0f, 1.0f), std::clamp(green, 0.0f, 1.0f),
                            std::clamp(blue, 0.0f, 1.0f), std::clamp(alpha, 0.0f, 1.0f)};
-  if (scene != nullptr) {
+  if (scene != nullptr && !hasOutputView) {
     scene->getDisplayOptions()->setBackgroundColor(customBackgroundColor);
   }
   presentImmediately = true;
@@ -349,14 +380,133 @@ void PAGXView::setBackgroundColor(float red, float green, float blue, float alph
 void PAGXView::clearBackgroundColor() {
   useCustomBackgroundColor = false;
   customBackgroundColor = {};
-  if (scene != nullptr) {
+  if (scene != nullptr && !hasOutputView) {
     scene->getDisplayOptions()->setBackgroundColor(customBackgroundColor);
   }
   presentImmediately = true;
 }
 
+// Clip the output window after sampling to preserve the backdrop input for Glass/BackgroundBlur.
+// Size the intermediate surface to the viewport to avoid allocating huge textures for the full
+// document or the scaled output window when zooming.
+bool PAGXView::drawOutputView(tgfx::Context* context) {
+  if (outputSurface == nullptr) {
+    outputSurface =
+        tgfx::Surface::Make(context, lastSurfaceWidth, lastSurfaceHeight,
+                            tgfx::ColorType::RGBA_8888, 1, false, 0, tgfxSurface->colorSpace());
+  }
+  if (outputSurface == nullptr) {
+    return false;
+  }
+  auto surface = pagx::MakeFrom(window->getDevice(), outputSurface);
+  // PAGScene::renderTo() scopes its canvas transform with AutoCanvasRestore, so the shared
+  // outputSurface canvas needs no extra save/restore here.
+  auto recording = pagx::Record(context, scene, surface, true);
+  if (recording == nullptr) {
+    return false;
+  }
+  context->submit(std::move(recording));
+  auto image = outputSurface->makeImageSnapshot();
+  if (image == nullptr) {
+    return false;
+  }
+  auto canvas = tgfxSurface->getCanvas();
+  auto saveCount = canvas->save();
+  canvas->resetMatrix();
+  canvas->clear(useCustomBackgroundColor ? ToTGFX(customBackgroundColor)
+                                         : tgfx::Color::Transparent());
+  auto options = scene->getDisplayOptions();
+  auto offset = options->getContentOffset();
+  auto scale = options->getZoomScale();
+  canvas->clipRect(tgfx::Rect::MakeXYWH(offset.x, offset.y, std::ceil(pagxWidth * scale),
+                                        std::ceil(pagxHeight * scale)),
+                   false);
+  canvas->drawImage(image);
+  canvas->restoreToCount(saveCount);
+  recording = context->flush();
+  if (recording == nullptr) {
+    return false;
+  }
+  context->submit(std::move(recording));
+  return true;
+}
+
+void PAGXView::drawStaticFrame() {
+  updateSize();
+  if (tgfxSurface == nullptr) {
+    return;
+  }
+  // A loaded or edited output view is dirty even when no host action set presentImmediately:
+  // loadFileData() notifies the document and the scene marks itself dirty. A scene-less canvas
+  // still needs the explicit flag because there is no content to query.
+  bool hasPendingContent = scene != nullptr && scene->hasContentChanged();
+  if (!presentImmediately && !hasPendingContent) {
+    return;
+  }
+  auto device = window->getDevice();
+  auto context = device->lockContext();
+  if (context == nullptr) {
+    return;
+  }
+  // Mark the frame pending before the first Record. Record consumes the scene's dirty flag, so a
+  // later snapshot or flush failure must still leave the host a reason to retry this frame.
+  presentImmediately = true;
+  bool drawn = false;
+  if (scene == nullptr) {
+    tgfxSurface->getCanvas()->clear(useCustomBackgroundColor ? ToTGFX(customBackgroundColor)
+                                                             : tgfx::Color::Transparent());
+    auto recording = context->flush();
+    if (recording != nullptr) {
+      context->submit(std::move(recording));
+      drawn = true;
+    }
+  } else {
+    drawn = drawOutputView(context);
+  }
+  if (drawn) {
+    presentImmediately = false;
+    lastRecording = nullptr;
+  }
+  device->unlock();
+}
+
+void PAGXView::updateFrameScheduling(double frameStartMs) {
+  double frameEndMs = emscripten_get_now();
+  double frameDurationMs = frameEndMs - frameStartMs;
+  updatePerformanceState(frameDurationMs);
+
+  if (isZooming && lastZoomUpdateTimestampMs > 0.0) {
+    double currentTimeoutMs = isZoomingIn ? ZoomInEndTimeoutMs : ZoomOutEndTimeoutMs;
+    double timeSinceLastUpdate = frameStartMs - lastZoomUpdateTimestampMs;
+    if (timeSinceLastUpdate >= currentTimeoutMs) {
+      onZoomEnd();
+    }
+  }
+
+  if (!isZooming && tryUpgradeTimestampMs > 0.0) {
+    if (frameStartMs >= tryUpgradeTimestampMs) {
+      if (!lastFrameSlow) {
+        int targetCount = calculateTargetTileRefinement(lastZoom);
+        currentMaxTilesRefinedPerFrame = targetCount;
+        if (scene != nullptr) {
+          scene->getDisplayOptions()->setMaxTilesRefinedPerFrame(targetCount);
+        }
+        tryUpgradeTimestampMs = 0.0;
+      } else {
+        tryUpgradeTimestampMs = frameStartMs + UpgradeRetryDelayMs;
+      }
+    }
+  } else if (!isZooming) {
+    updateAdaptiveTileRefinement();
+  }
+}
+
 void PAGXView::draw() {
-  if (!ensureWindow() || scene == nullptr) {
+  if (!ensureWindow()) {
+    return;
+  }
+  if (scene == nullptr || hasOutputView) {
+    drawStaticFrame();
     return;
   }
   double frameStartMs = emscripten_get_now();
@@ -405,35 +555,7 @@ void PAGXView::draw() {
     }
     device->unlock();
   }
-
-  double frameEndMs = emscripten_get_now();
-  double frameDurationMs = frameEndMs - frameStartMs;
-  updatePerformanceState(frameDurationMs);
-
-  if (isZooming && lastZoomUpdateTimestampMs > 0.0) {
-    double currentTimeoutMs = isZoomingIn ? ZoomInEndTimeoutMs : ZoomOutEndTimeoutMs;
-    double timeSinceLastUpdate = frameStartMs - lastZoomUpdateTimestampMs;
-    if (timeSinceLastUpdate >= currentTimeoutMs) {
-      onZoomEnd();
-    }
-  }
-
-  if (!isZooming && tryUpgradeTimestampMs > 0.0) {
-    if (frameStartMs >= tryUpgradeTimestampMs) {
-      if (!lastFrameSlow) {
-        int targetCount = calculateTargetTileRefinement(lastZoom);
-        currentMaxTilesRefinedPerFrame = targetCount;
-        if (scene != nullptr) {
-          scene->getDisplayOptions()->setMaxTilesRefinedPerFrame(targetCount);
-        }
-        tryUpgradeTimestampMs = 0.0;
-      } else {
-        tryUpgradeTimestampMs = frameStartMs + UpgradeRetryDelayMs;
-      }
-    }
-  } else if (!isZooming) {
-    updateAdaptiveTileRefinement();
-  }
+  updateFrameScheduling(frameStartMs);
 }
 
 void PAGXView::onZoomEnd() {

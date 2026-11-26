@@ -571,6 +571,33 @@ PAGX_TEST(PAGXSVGTest, SVGExport_ToFile) {
 }
 
 /**
+ * Test case: SVG export rejects a document that declares a target view and reports the reason
+ * through the warnings channel instead of exporting the whole canvas.
+ */
+PAGX_TEST(PAGXSVGTest, TargetViewExportRejected) {
+  auto doc = pagx::PAGXImporter::FromXML(
+      "<pagx width=\"100\" height=\"100\" targetLayer=\"@target\" outputBounds=\"0,0,50,50\">"
+      "<Layer id=\"target\"><Rectangle position=\"50,50\" size=\"100,100\"/>"
+      "<Fill color=\"#3366FF\"/></Layer></pagx>");
+  ASSERT_NE(doc, nullptr);
+  const std::string expected =
+      "SVG export does not support documents with targetLayer/outputBounds.";
+
+  std::vector<std::string> warnings;
+  EXPECT_TRUE(pagx::SVGExporter::ToSVG(*doc, {}, &warnings).empty());
+  ASSERT_EQ(warnings.size(), 1u);
+  EXPECT_EQ(warnings[0], expected);
+
+  auto outPath = ProjectPath::Absolute("test/out/PAGXSVGTest/target_view_rejected.svg");
+  std::filesystem::remove(outPath);
+  std::vector<std::string> fileWarnings;
+  EXPECT_FALSE(pagx::SVGExporter::ToFile(*doc, outPath, {}, &fileWarnings));
+  ASSERT_EQ(fileWarnings.size(), 1u);
+  EXPECT_EQ(fileWarnings[0], expected);
+  EXPECT_FALSE(std::filesystem::exists(outPath));
+}
+
+/**
  * Test multiple SVG <-> PAGX round-trips.
  * Each iteration feeds the previous output back as input: SVG -> PAGX -> SVG -> PAGX -> ...
  */

@@ -19,6 +19,7 @@
 #pragma once
 
 #include <iostream>
+#include <memory>
 #include <sstream>
 #include <string>
 #include <utility>
@@ -26,6 +27,14 @@
 #include "cli/CommandVerify.h"
 #include "gtest/gtest.h"
 #include "utils/ProjectPath.h"
+
+namespace pagx {
+class PAGXDocument;
+}  // namespace pagx
+
+namespace tgfx {
+class Bitmap;
+}  // namespace tgfx
 
 namespace pag {
 
@@ -69,5 +78,12 @@ inline static void VerifyFile(const std::string& filePath, const std::string& ke
   std::cerr.rdbuf(oldErr);
   EXPECT_EQ(verifyRet, 0) << "pagx verify failed for " << key << ":\n" << verifyErr.str();
 }
+
+/**
+ * Renders the document through its default output view into an offscreen surface sized from
+ * getOutputBounds(), and returns the resulting pixels. Returns an empty bitmap when the scene or
+ * surface cannot be created, the declaration has no bounds, the draw fails, or the readback fails.
+ */
+tgfx::Bitmap RenderTargetView(const std::shared_ptr<pagx::PAGXDocument>& document);
 
 }  // namespace pag

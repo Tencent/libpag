@@ -99,14 +99,14 @@ export class PAGXView {
   }
 
   /**
-   * The original width of the PAGX content.
+   * The output window width when a default output view is present, or the document width.
    */
   public get contentWidth(): number {
     return this.nativeView._contentWidth();
   }
 
   /**
-   * The original height of the PAGX content.
+   * The output window height when a default output view is present, or the document height.
    */
   public get contentHeight(): number {
     return this.nativeView._contentHeight();
@@ -135,7 +135,12 @@ export class PAGXView {
    * @param data PAGX file binary data
    */
   public loadPAGX(data: Uint8Array): void {
-    this.nativeView._loadPAGX(data);
+    if (!this.nativeView._loadPAGX(data)) {
+      this.nativeView._draw();
+      throw new Error(
+        'PAGXView: failed to load the document, or its output view is invalid or unsupported.'
+      );
+    }
   }
 
   /**
@@ -144,6 +149,7 @@ export class PAGXView {
    */
   public clear(): void {
     this.nativeView._loadPAGX(new Uint8Array(0));
+    this.nativeView._draw();
   }
 
   /**
@@ -188,7 +194,12 @@ export class PAGXView {
    * Must be called after parsePAGX() and any loadFileData() calls.
    */
   public buildLayers(): void {
-    this.nativeView._buildLayers();
+    if (!this.nativeView._buildLayers()) {
+      this.nativeView._draw();
+      throw new Error(
+        'PAGXView: failed to build the scene, or its output view is invalid or unsupported.'
+      );
+    }
   }
 
   /**
