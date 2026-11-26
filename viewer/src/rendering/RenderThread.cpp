@@ -36,13 +36,23 @@ void RenderThread::flush() {
   if (renderer == nullptr) {
     return;
   }
-  if (view->takeSizeChanged()) {
-    renderer->updateSize();
+  IContentRenderer::RenderMetrics metrics = {};
+  quint64 resizeGeneration = 0;
+  {
+    std::lock_guard<std::mutex> lock(view->renderedFrameMutex);
+    resizeGeneration = view->contentResizeGeneration.load();
+    if (view->takeSizeChanged()) {
+      renderer->updateSize();
+    }
+    metrics = renderer->flush();
+    if (!metrics.rendered) {
+      return;
+    }
+    view->renderedContentSize = QSizeF(metrics.contentWidth, metrics.contentHeight);
+    view->setRenderActive(metrics.wantsMoreFrames);
   }
-  auto metrics = renderer->flush();
-  if (!metrics.rendered) {
-    return;
-  }
+  QMetaObject::invokeMethod(view, "endContentResize", Qt::QueuedConnection,
+                            Q_ARG(quint64, resizeGeneration));
   Q_EMIT rendered();
   Q_EMIT renderMetricsReady(metrics.renderTime, metrics.presentTime, metrics.imageDecodeTime,
                             metrics.currentFrame);

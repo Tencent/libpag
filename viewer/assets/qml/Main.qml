@@ -435,6 +435,9 @@ PAGWindow {
             hasAnimation: Qt.binding(function () {
                 return mainForm.hasAnimation;
             }),
+            isSeekable: Qt.binding(function () {
+                return mainForm.isSeekable;
+            }),
             windowActive: Qt.binding(function () {
                 return viewWindow.active;
             }),

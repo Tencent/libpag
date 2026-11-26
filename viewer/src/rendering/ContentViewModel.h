@@ -22,10 +22,40 @@
 #include <QObject>
 #include <QSizeF>
 #include <QString>
+#include <cstdint>
 #include <memory>
 #include <mutex>
 
 namespace pag {
+
+/**
+ * Centered fit of a content rectangle inside a surface: the uniform scale applied to the content and
+ * the top-left offset of the scaled content inside the surface.
+ */
+struct ContentFit {
+  double scale = 1.0;
+  double offsetX = 0.0;
+  double offsetY = 0.0;
+};
+
+/**
+ * Computes the centered fit of contentWidth x contentHeight into surfaceWidth x surfaceHeight.
+ * Every renderer and every gesture inverse-mapping must share this mapping: if they disagree, zoom
+ * anchors and pan distances silently drift apart. Returns a scale of 1 and zero offsets when either
+ * size is not positive.
+ */
+ContentFit ComputeContentFit(double contentWidth, double contentHeight, double surfaceWidth,
+                             double surfaceHeight);
+
+/**
+ * 将微秒周期换算为四舍五入后的帧数，非正周期或帧率返回零。
+ */
+int64_t ComputeFrameCount(int64_t periodUs, double frameRate);
+
+/**
+ * 将线性播放进度映射到有效帧索引，无有效帧时返回零。
+ */
+int64_t ComputeFrameIndex(double progress, int64_t totalFrames);
 
 /**
  * Abstract ViewModel base class for content views. Holds all playback and file state, exposing
@@ -44,6 +74,10 @@ class ContentViewModel : public QObject {
   Q_PROPERTY(int width READ getWidth NOTIFY widthChanged)
   Q_PROPERTY(int height READ getHeight NOTIFY heightChanged)
   Q_PROPERTY(bool hasAnimation READ hasAnimation NOTIFY hasAnimationChanged)
+  /// True when the content has a time base that supports progress and frame seeking. PAG files do
+  /// once a file is loaded; PAGX files only when their default timeline is an animation. Content
+  /// driven by a PAGX state machine plays continuously but exposes no progress, duration or frames.
+  Q_PROPERTY(bool isSeekable READ isSeekable NOTIFY isSeekableChanged)
   Q_PROPERTY(bool isPlaying READ isPlaying WRITE setIsPlaying NOTIFY isPlayingChanged)
   Q_PROPERTY(double progress READ getProgress WRITE setProgress NOTIFY progressChanged)
   Q_PROPERTY(QString totalFrame READ getTotalFrame NOTIFY totalFrameChanged)
@@ -67,6 +101,7 @@ class ContentViewModel : public QObject {
   virtual int getWidth() const = 0;
   virtual int getHeight() const = 0;
   virtual bool hasAnimation() const = 0;
+  virtual bool isSeekable() const = 0;
   virtual bool isPlaying() const = 0;
   virtual double getProgress() const = 0;
   virtual QString getTotalFrame() const = 0;
@@ -103,23 +138,31 @@ class ContentViewModel : public QObject {
   /// Returns a snapshot of the current view transform (zoom + pan offset).
   ViewTransform getViewTransform() const;
 
-  /// Applies a zoom factor anchored at the given point in surface pixel coordinates.
-  void zoomAt(double factor, double anchorX, double anchorY);
+  /// Inverse-maps the anchor from current physical viewport pixels to the transform's render surface,
+  /// then applies the zoom factor. viewportSize is the current physical viewport size.
+  void zoomAt(double factor, double anchorX, double anchorY, const QSizeF& viewportSize);
 
-  /// Pans the view by the given delta in surface pixel coordinates.
-  void panBy(double deltaX, double deltaY);
+  /// Inverse-maps the delta from current physical viewport pixels to the transform's render surface,
+  /// then pans the view. viewportSize is the current physical viewport size.
+  void panBy(double deltaX, double deltaY, const QSizeF& viewportSize);
 
   /// Resets the view transform to the default (no zoom, no pan).
   void resetView();
 
-  /// Adjusts the pan offset to compensate for a surface size change, keeping the content visually
-  /// anchored at the same position. All parameters are in surface pixel coordinates.
+  /// Records the size of the render surface the transform is applied to. Called whenever the
+  /// drawable surface is created or resized; a non-positive size clears the record.
+  void setSurfaceSize(const QSizeF& size);
+
+  /// Adjusts the pan offset to preserve the content point at the viewport center while keeping the
+  /// user zoom. Only the pan math lives here; the new surface size must be recorded separately with
+  /// setSurfaceSize(). All parameters are in pixels.
   void adjustForSurfaceResize(double oldSurfaceWidth, double oldSurfaceHeight,
                               double newSurfaceWidth, double newSurfaceHeight, double contentWidth,
                               double contentHeight);
 
   Q_SIGNAL void isPlayingChanged(bool isPlaying);
   Q_SIGNAL void hasAnimationChanged(bool hasAnimation);
+  Q_SIGNAL void isSeekableChanged();
   Q_SIGNAL void progressChanged(double progress);
   Q_SIGNAL void filePathChanged(const QString& filePath);
   Q_SIGNAL void editableTextLayerCountChanged(int count);
@@ -141,6 +184,8 @@ class ContentViewModel : public QObject {
 
   mutable std::mutex viewTransformMutex = {};
   ViewTransform viewTransform = {};
+  // Protected by viewTransformMutex; tracks the transform's surface, not the last delivered texture.
+  QSizeF surfaceSize = {};
 };
 
 }  // namespace pag

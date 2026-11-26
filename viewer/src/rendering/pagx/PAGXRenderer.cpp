@@ -34,6 +34,10 @@ PAGXRenderer::PAGXRenderer(PAGXViewModel* viewModel) : viewModel(viewModel) {
 
 void PAGXRenderer::setDrawable(GPUDrawable* drawable) {
   this->drawable = drawable;
+  if (drawable != nullptr) {
+    viewModel->setSurfaceSize(
+        QSizeF(static_cast<double>(drawable->width()), static_cast<double>(drawable->height())));
+  }
 }
 
 bool PAGXRenderer::isReady() const {
@@ -51,10 +55,12 @@ void PAGXRenderer::updateSize() {
   auto newWidth = static_cast<double>(drawable->width());
   auto newHeight = static_cast<double>(drawable->height());
   if (oldWidth != newWidth || oldHeight != newHeight) {
+    viewModel->setSurfaceSize(QSizeF(newWidth, newHeight));
     viewModel->adjustForSurfaceResize(oldWidth, oldHeight, newWidth, newHeight,
                                       static_cast<double>(viewModel->getWidth()),
                                       static_cast<double>(viewModel->getHeight()));
   }
+  viewModel->markNeedsRender();
 }
 
 IContentRenderer::RenderMetrics PAGXRenderer::flush() {
@@ -100,10 +106,16 @@ IContentRenderer::RenderMetrics PAGXRenderer::flush() {
     playbackFinishNotified = false;
   }
 
-  if (state.isPlaying && state.animation != nullptr && state.animation->duration() > 0) {
-    advancePlayback(state, reseat);
-  } else if (state.animation != nullptr && state.animation->duration() > 0) {
-    seekPaused(state, reseat);
+  metrics.wantsMoreFrames = false;
+  if (state.isTimeBased()) {
+    if (state.isPlaying) {
+      advancePlayback(state, reseat);
+      metrics.wantsMoreFrames = !playbackFinishNotified;
+    } else {
+      seekPaused(state, reseat);
+    }
+  } else if (state.isPlaying) {
+    metrics.wantsMoreFrames = advanceTimeline(state);
   }
 
   metrics.currentFrame = computeProfileFrame(state);
@@ -131,6 +143,8 @@ IContentRenderer::RenderMetrics PAGXRenderer::flush() {
   drawable->present(context);
   metrics.presentTime = tgfx::Clock::Now() - presentStart;
 
+  metrics.contentWidth = state.contentWidth;
+  metrics.contentHeight = state.contentHeight;
   metrics.rendered = true;
   device->unlock();
   return metrics;
@@ -146,13 +160,14 @@ void PAGXRenderer::advancePlayback(PAGXViewModel::RenderState& state, bool resea
     // regardless of where the timeline was left. A finished non-looping (Once) animation is
     // rewound to the start: the replay path (play button) leaves progress at ~1.0, and the user
     // expects a restart rather than resuming stuck at the end. Looping animations (Loop/PingPong)
-    // are never rewound here because PingPong can legitimately sit at currentTime == duration at
-    // the mirror peak; they always resume from their reported progress. state.progress is in [0,1].
-    auto durationUs = state.animation->duration();
+    // are never rewound here because PingPong legitimately sits at the end of its period when it
+    // completes a round trip; they always resume from their reported progress. state.progress is in
+    // [0,1] over the full playback period, which spans one round trip for PingPong.
+    auto periodUs = state.animation->playbackPeriod();
     int64_t targetUs =
-        state.loopMode == pagx::LoopMode::Once && state.animation->currentTime() >= durationUs
+        state.loopMode == pagx::LoopMode::Once && state.animation->playbackPosition() >= periodUs
             ? 0
-            : static_cast<int64_t>(state.progress * static_cast<double>(durationUs));
+            : static_cast<int64_t>(state.progress * static_cast<double>(periodUs));
     state.animation->setCurrentTime(targetUs);
     state.animation->apply();
   }
@@ -166,10 +181,12 @@ void PAGXRenderer::advancePlayback(PAGXViewModel::RenderState& state, bool resea
     state.animation->advanceAndApply(deltaUs);
     state.scene->advanceAndApply(deltaUs);
   }
-  // Report the current playback progress back to the main thread for UI updates.
-  auto durationUs = state.animation->duration();
-  auto currentUs = state.animation->currentTime();
-  auto renderProgress = static_cast<double>(currentUs) / static_cast<double>(durationUs);
+  // Report the current playback progress back to the main thread for UI updates. The linear
+  // playback position is used instead of the folded in-cycle time, otherwise a PingPong return
+  // half would make the progress bar run backward.
+  auto periodUs = state.animation->playbackPeriod();
+  auto positionUs = state.animation->playbackPosition();
+  auto renderProgress = static_cast<double>(positionUs) / static_cast<double>(periodUs);
   if (renderProgress < 0.0) {
     renderProgress = 0.0;
   }
@@ -179,24 +196,59 @@ void PAGXRenderer::advancePlayback(PAGXViewModel::RenderState& state, bool resea
   viewModel->updateProgressFromRender(renderProgress, state.generation);
   // A non-looping animation stays at the last frame once it reaches the end. Notify the main
   // thread so it flips the UI back to the paused state and stops requesting further renders.
-  // Looping modes (Loop/PingPong) never report finished: Loop keeps currentTime in [0, duration),
-  // while PingPong can momentarily land exactly on duration at the mirror peak, which must NOT be
-  // treated as finished.
-  if (state.loopMode == pagx::LoopMode::Once &&
-      state.animation->currentTime() >= state.animation->duration() && !playbackFinishNotified) {
+  // Looping modes (Loop/PingPong) never report finished: Loop keeps wrapping at its period, while
+  // PingPong turns around at the mirror peak inside its period, which must NOT be treated as the
+  // end.
+  if (state.loopMode == pagx::LoopMode::Once && positionUs >= periodUs && !playbackFinishNotified) {
     playbackFinishNotified = true;
     viewModel->notifyPlaybackFinished(state.generation);
   }
 }
 
+bool PAGXRenderer::advanceTimeline(PAGXViewModel::RenderState& state) {
+  // State machines have no seekable time base, so they are driven purely by wall-clock deltas. The
+  // scene is advanced as well because it carries the auto-playing nested compositions that no
+  // top-level timeline drives. The reported change decides whether the view keeps requesting
+  // frames: a state machine waiting for an input changes nothing, so rendering it at the refresh
+  // rate would only burn GPU time.
+  auto now = tgfx::Clock::Now();
+  // The first flush applies the initial timeline pose at zero elapsed time.
+  // Resetting the wall clock excludes pause duration on resume.
+  bool resuming = lastAdvanceTimeUs < 0;
+  int64_t deltaUs = resuming ? 0 : now - lastAdvanceTimeUs;
+  lastAdvanceTimeUs = now;
+  if (deltaUs < 0) {
+    return true;
+  }
+  bool changed = false;
+  if (state.timeline != nullptr) {
+    changed = state.timeline->advanceAndApply(deltaUs);
+  }
+  if (state.scene != nullptr) {
+    state.scene->advanceAndApply(deltaUs);
+    changed = state.scene->hasContentChanged() || changed;
+  }
+  if (resuming) {
+    // A zero delta cannot report a change, yet the state machine has just been seated at its
+    // initial pose and still has to keep advancing on the following frames.
+    return true;
+  }
+  if (!changed) {
+    // Nothing moved. Keep the wall clock unseated so the next flush, which an input or a seek will
+    // trigger, does not charge the whole idle stretch to the timeline as one huge delta.
+    lastAdvanceTimeUs = -1;
+  }
+  return changed;
+}
+
 void PAGXRenderer::seekPaused(PAGXViewModel::RenderState& state, bool reseat) {
-  auto durationUs = state.animation->duration();
+  auto periodUs = state.animation->playbackPeriod();
   if (reseat) {
     if (state.seekRequested) {
       // An explicit seek was requested alongside the pause (frame-step controls or slider while
       // transitioning). Honor the target progress instead of reporting the timeline's actual
       // position, which would overwrite the user's intent.
-      auto targetUs = static_cast<int64_t>(state.progress * static_cast<double>(durationUs));
+      auto targetUs = static_cast<int64_t>(state.progress * static_cast<double>(periodUs));
       lastSeekTimeUs = targetUs;
       state.animation->setCurrentTime(targetUs);
       state.animation->apply();
@@ -204,9 +256,9 @@ void PAGXRenderer::seekPaused(PAGXViewModel::RenderState& state, bool reseat) {
       // Pure pause (play button): the timeline already sits at the true playback position, which
       // leads the main thread's progress snapshot by up to one queued frame. Keep the timeline
       // where it is and report its actual position so the UI catches up.
-      auto currentUs = state.animation->currentTime();
-      lastSeekTimeUs = currentUs;
-      auto pausedProgress = static_cast<double>(currentUs) / static_cast<double>(durationUs);
+      auto positionUs = state.animation->playbackPosition();
+      lastSeekTimeUs = positionUs;
+      auto pausedProgress = static_cast<double>(positionUs) / static_cast<double>(periodUs);
       if (pausedProgress < 0.0) {
         pausedProgress = 0.0;
       }
@@ -217,7 +269,7 @@ void PAGXRenderer::seekPaused(PAGXViewModel::RenderState& state, bool reseat) {
     }
   } else {
     // Steady-state paused (e.g. slider scrubbing): seek to the requested progress position.
-    auto targetUs = static_cast<int64_t>(state.progress * static_cast<double>(durationUs));
+    auto targetUs = static_cast<int64_t>(state.progress * static_cast<double>(periodUs));
     if (lastSeekTimeUs < 0 || std::abs(targetUs - lastSeekTimeUs) >= SeekThresholdUs) {
       lastSeekTimeUs = targetUs;
       state.animation->setCurrentTime(targetUs);
@@ -227,44 +279,29 @@ void PAGXRenderer::seekPaused(PAGXViewModel::RenderState& state, bool reseat) {
 }
 
 int64_t PAGXRenderer::computeProfileFrame(const PAGXViewModel::RenderState& state) const {
-  if (state.animation == nullptr || state.animation->duration() <= 0) {
+  if (!state.isTimeBased()) {
     return -1;
   }
-  auto rate = state.animation->frameRate();
-  if (rate <= 0) {
-    return -1;
-  }
-  auto durationUs = state.animation->duration();
-  auto currentUs = state.animation->currentTime();
-  auto totalFrames =
-      static_cast<int64_t>(std::round(static_cast<double>(durationUs) * rate / 1000000.0));
-  auto frame = static_cast<int64_t>(static_cast<double>(currentUs) * rate / 1000000.0);
-  // Clamp to the last valid frame index so an animation ending exactly on a frame boundary
-  // (integer fps) still records the final frame instead of overflowing totalFrame.
-  if (totalFrames > 0 && frame >= totalFrames) {
-    frame = totalFrames - 1;
-  }
-  return frame;
+  auto progress = static_cast<double>(state.animation->playbackPosition()) /
+                  static_cast<double>(state.animation->playbackPeriod());
+  return ComputeFrameIndex(progress, state.totalFrames);
 }
 
 void PAGXRenderer::applyDisplayTransform(PAGXViewModel::RenderState& state, int surfaceWidth,
                                          int surfaceHeight) {
-  float scaleX = static_cast<float>(surfaceWidth) / static_cast<float>(state.contentWidth);
-  float scaleY = static_cast<float>(surfaceHeight) / static_cast<float>(state.contentHeight);
-  float contentScale = std::min(scaleX, scaleY);
-  float contentOffsetX =
-      (static_cast<float>(surfaceWidth) - static_cast<float>(state.contentWidth) * contentScale) *
-      0.5f;
-  float contentOffsetY =
-      (static_cast<float>(surfaceHeight) - static_cast<float>(state.contentHeight) * contentScale) *
-      0.5f;
+  auto fit = ComputeContentFit(
+      static_cast<double>(state.contentWidth), static_cast<double>(state.contentHeight),
+      static_cast<double>(surfaceWidth), static_cast<double>(surfaceHeight));
 
   // Combine fit-to-screen transform with user zoom/pan from gesture interaction.
-  float finalScale = contentScale * static_cast<float>(state.viewTransform.zoomScale);
-  float finalOffsetX = contentOffsetX * static_cast<float>(state.viewTransform.zoomScale) +
-                       static_cast<float>(state.viewTransform.offsetX);
-  float finalOffsetY = contentOffsetY * static_cast<float>(state.viewTransform.zoomScale) +
-                       static_cast<float>(state.viewTransform.offsetY);
+  float finalScale =
+      static_cast<float>(fit.scale) * static_cast<float>(state.viewTransform.zoomScale);
+  float finalOffsetX =
+      static_cast<float>(fit.offsetX) * static_cast<float>(state.viewTransform.zoomScale) +
+      static_cast<float>(state.viewTransform.offsetX);
+  float finalOffsetY =
+      static_cast<float>(fit.offsetY) * static_cast<float>(state.viewTransform.zoomScale) +
+      static_cast<float>(state.viewTransform.offsetY);
   state.scene->getDisplayOptions()->setZoomScale(finalScale);
   state.scene->getDisplayOptions()->setContentOffset(finalOffsetX, finalOffsetY);
 }

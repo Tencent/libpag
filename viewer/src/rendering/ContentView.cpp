@@ -19,9 +19,14 @@
 #include "ContentView.h"
 #include <QQuickWindow>
 #include <QSGImageNode>
+#include <algorithm>
+#include <cmath>
 #include "RenderThread.h"
 
 namespace pag {
+
+// Delay applied to window resizes before the drawable surface is reallocated.
+static constexpr int ResizeDebounceMs = 400;
 
 ContentView::ContentView(QQuickItem* parent) : QQuickItem(parent) {
   setFlag(ItemHasContents, true);
@@ -69,12 +74,14 @@ void ContentView::prepareForRemoval() {
 
 void ContentView::zoomAt(double factor, double x, double y) {
   auto pixelRatio = window() == nullptr ? 1.0 : window()->devicePixelRatio();
-  getViewModel()->zoomAt(factor, x * pixelRatio, y * pixelRatio);
+  getViewModel()->zoomAt(factor, x * pixelRatio, y * pixelRatio,
+                         QSizeF(std::ceil(width() * pixelRatio), std::ceil(height() * pixelRatio)));
 }
 
 void ContentView::panBy(double deltaX, double deltaY) {
   auto pixelRatio = window() == nullptr ? 1.0 : window()->devicePixelRatio();
-  getViewModel()->panBy(deltaX * pixelRatio, deltaY * pixelRatio);
+  getViewModel()->panBy(deltaX * pixelRatio, deltaY * pixelRatio,
+                        QSizeF(std::ceil(width() * pixelRatio), std::ceil(height() * pixelRatio)));
 }
 
 void ContentView::resetView() {
@@ -93,12 +100,30 @@ void ContentView::sizeChangedDelayHandle() {
   }
 }
 
+void ContentView::beginContentResize() {
+  contentResizeGeneration++;
+  contentResizing = true;
+}
+
+void ContentView::endContentResize(quint64 generation) {
+  if (generation == contentResizeGeneration.load()) {
+    contentResizing = false;
+  }
+}
+
 void ContentView::geometryChange(const QRectF& newGeometry, const QRectF& oldGeometry) {
   if (newGeometry == oldGeometry) {
     return;
   }
   QQuickItem::geometryChange(newGeometry, oldGeometry);
-  resizeTimer->start(400);
+  if (contentResizing) {
+    // The intermediate geometries produced while the window is fitted to newly loaded content are
+    // not worth debouncing: waiting for the timer keeps the previous texture stretched onto every
+    // one of them, which is visible as a wrong aspect ratio right after a file is opened.
+    sizeChanged = true;
+    triggerFlush();
+  }
+  resizeTimer->start(ResizeDebounceMs);
 }
 
 RenderThread* ContentView::getRenderThread() const {
@@ -107,6 +132,14 @@ RenderThread* ContentView::getRenderThread() const {
 
 bool ContentView::takeSizeChanged() {
   return sizeChanged.exchange(false);
+}
+
+bool ContentView::isRenderActive() const {
+  return renderActive;
+}
+
+void ContentView::setRenderActive(bool active) {
+  renderActive = active;
 }
 
 GPUDrawable* ContentView::getDrawable() const {
@@ -120,6 +153,7 @@ void ContentView::triggerFlush() const {
 }
 
 QSGNode* ContentView::updateTextureNode(QSGNode* oldNode) {
+  std::lock_guard<std::mutex> lock(renderedFrameMutex);
   auto node = static_cast<QSGImageNode*>(oldNode);
   if (drawable != nullptr) {
     auto texture = drawable->getTexture();
@@ -129,10 +163,41 @@ QSGNode* ContentView::updateTextureNode(QSGNode* oldNode) {
       }
       node->setTexture(texture);
       node->markDirty(QSGNode::DirtyMaterial);
-      node->setRect(boundingRect());
+      node->setRect(textureRect(texture));
     }
   }
   return node;
+}
+
+QRectF ContentView::textureRect(QSGTexture* texture) const {
+  auto rect = boundingRect();
+  auto textureSize = texture->textureSize();
+  auto viewModel = getViewModel();
+  if (viewModel == nullptr || textureSize.isEmpty() || rect.isEmpty()) {
+    return rect;
+  }
+  auto contentWidth = static_cast<double>(viewModel->getWidth());
+  auto contentHeight = static_cast<double>(viewModel->getHeight());
+  if (contentWidth <= 0 || contentHeight <= 0) {
+    return rect;
+  }
+  auto textureWidth = static_cast<double>(textureSize.width());
+  auto textureHeight = static_cast<double>(textureSize.height());
+  auto pixelRatio = window() == nullptr ? 1.0 : window()->devicePixelRatio();
+  auto targetWidth = std::ceil(rect.width() * pixelRatio);
+  auto targetHeight = std::ceil(rect.height() * pixelRatio);
+  if (renderedContentSize.isEmpty()) {
+    return rect;
+  }
+  auto textureFit = ComputeContentFit(renderedContentSize.width(), renderedContentSize.height(),
+                                      textureWidth, textureHeight);
+  auto canvasFit = ComputeContentFit(contentWidth, contentHeight, targetWidth, targetHeight);
+  auto ratio = canvasFit.scale / textureFit.scale;
+  auto width = textureWidth * ratio;
+  auto height = textureHeight * ratio;
+  return {rect.x() + (targetWidth - width) / (2 * pixelRatio),
+          rect.y() + (targetHeight - height) / (2 * pixelRatio), width / pixelRatio,
+          height / pixelRatio};
 }
 
 }  // namespace pag

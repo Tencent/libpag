@@ -38,12 +38,9 @@ class PAGXRenderer : public IContentRenderer {
   bool isReady() const override;
 
  private:
-  // Advances the playing timeline and scene by the wall-clock delta since the last flush, reports
-  // progress back to the main thread, and notifies playback-finished for non-looping animations.
-  // reseat is true on the flush that first observes a paused→playing transition or a content reload
-  // (generation bump), which re-arms the timeline (seek to the shown progress or rewind a finished
-  // one, then play).
   void advancePlayback(PAGXViewModel::RenderState& state, bool reseat);
+
+  bool advanceTimeline(PAGXViewModel::RenderState& state);
 
   // Handles the paused timeline: on a play-state transition or content reload it reports the
   // timeline's actual position so the UI catches up; in steady state it seeks to the requested

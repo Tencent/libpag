@@ -81,7 +81,11 @@ class PAGRunTimeDataModel : public QObject {
                             int64_t currentFrame);
 
   void setPAGFile(std::shared_ptr<PAGFile> pagFile);
-  void setPAGXDocument(std::shared_ptr<pagx::PAGXDocument> pagxDocument);
+  /**
+   * 更新 PAGX 性能信息，帧数和时间轴可定位性由内容 ViewModel 提供。
+   */
+  void setPAGXDocument(std::shared_ptr<pagx::PAGXDocument> pagxDocument, int64_t totalFrames,
+                       bool isSeekable);
 
  private:
   void updateChartData();

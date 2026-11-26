@@ -18,8 +18,8 @@
 
 #include "PAGRunTimeDataModel.h"
 #include <cmath>
-#include "base/utils/TimeUtil.h"
 #include "pag/pag.h"
+#include "rendering/ContentViewModel.h"
 
 namespace pag {
 
@@ -113,7 +113,7 @@ void PAGRunTimeDataModel::setPAGFile(std::shared_ptr<PAGFile> pagFile) {
     return;
   }
   frameModeEnabled = true;
-  totalFrame = TimeToFrame(pagFile->duration(), pagFile->frameRate());
+  totalFrame = ComputeFrameCount(pagFile->duration(), pagFile->frameRate());
   currentFrame = -1;
   lastUpdatedFrame = -1;
   chartDataModel.clearItems();
@@ -128,39 +128,10 @@ void PAGRunTimeDataModel::setPAGFile(std::shared_ptr<PAGFile> pagFile) {
   Q_EMIT dataChanged();
 }
 
-void PAGRunTimeDataModel::setPAGXDocument(std::shared_ptr<pagx::PAGXDocument> pagxDocument) {
-  if (pagxDocument != nullptr && !pagxDocument->animations.empty()) {
-    // The animations vector may contain Animation or StateMachine entries; only Animation exposes
-    // frameRate and duration fields.
-    auto* firstAnim = pagxDocument->animations[0];
-    if (firstAnim != nullptr && firstAnim->nodeType() == pagx::NodeType::Animation) {
-      auto* anim = static_cast<pagx::Animation*>(firstAnim);
-      // Derive totalFrame from the microsecond duration using the same two-step rounding as the
-      // render path (PAGTimeline::duration truncates frames→microseconds, then frames are recovered
-      // via round). Using anim->duration directly would diverge by up to one frame at non-integer
-      // frame rates, causing the render-side clamped last frame to be dropped by updateData's guard.
-      if (anim->frameRate > 0.0f && anim->duration > 0) {
-        auto durationUs = static_cast<int64_t>(static_cast<double>(anim->duration) * 1000000.0 /
-                                               static_cast<double>(anim->frameRate));
-        totalFrame = static_cast<int64_t>(std::round(
-            static_cast<double>(durationUs) * static_cast<double>(anim->frameRate) / 1000000.0));
-      } else {
-        totalFrame = 0;
-      }
-      if (totalFrame < 1) {
-        totalFrame = 1;
-      }
-    } else {
-      // A StateMachine-first document has no single duration/frameRate to derive a frame count
-      // from; fall back to a single frame so frame mode does not run with a stale/invalid value,
-      // matching PAGXViewModel::updateAnimationState()'s no-animation fallback.
-      totalFrame = 1;
-    }
-    frameModeEnabled = true;
-  } else {
-    totalFrame = pagxDocument ? 1 : 0;
-    frameModeEnabled = false;
-  }
+void PAGRunTimeDataModel::setPAGXDocument(std::shared_ptr<pagx::PAGXDocument> pagxDocument,
+                                          int64_t totalFrames, bool isSeekable) {
+  totalFrame = totalFrames;
+  frameModeEnabled = isSeekable;
   currentFrame = pagxDocument ? 0 : -1;
   lastUpdatedFrame = -1;
   chartDataModel.clearItems();
