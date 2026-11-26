@@ -372,13 +372,42 @@ export class VideoReader {
     // frame because of how the media timeline is rounded.
     const targetTime = Math.min((targetFrame + 0.5) / this.frameRate, video.duration);
     this.isSought = true;
+    // Pause before seeking: a playing video keeps presenting frames while the seek is in flight, so
+    // the uploaded picture may still be the previous one. coordinatePlayback() resumes playback
+    // afterwards, which also presents the seeked frame to the texture uploader.
+    if (!video.paused) video.pause();
     try {
-      if (!(await this.seek(operation, targetTime)) || !this.isActive(operation)) return;
+      // The seek skips waitUntilReady(): a video that already reached its end often stays below
+      // HAVE_FUTURE_DATA afterwards, so waiting for canplay would time out before the seek that
+      // brings the current frame back is issued.
+      const sought = await operation.wait(
+        this.registerTailSeek.bind(this, targetTime),
+        (1000 / this.frameRate) * VIDEO_DECODE_SEEK_TIMEOUT_FRAME,
+        'Seek operation timed out.',
+      );
+      if (!sought || !this.isActive(operation)) return;
       this.presentedTime = targetFrame / this.frameRate;
       await operation.wait(this.registerAnimationFrame.bind(this), VIDEO_WAIT_TIMEOUT, 'Video frame timed out.');
     } catch {
       // Keep the picture that is already on screen when the seek does not finish.
     }
+  }
+
+  private registerTailSeek(targetTime: number, complete: () => void, fail: (error: any) => void): () => void {
+    const video = this.videoEl!;
+    function onSeeked() {
+      // Accept any landing inside the last frame: Safari may snap the reported time to a nearby
+      // sample, and an exact match would leave the seek hanging until its timeout.
+      if (!video.seeking) complete();
+    }
+    const cleanup = this.registerVideoEvent('seeked', onSeeked, fail);
+    try {
+      video.currentTime = targetTime;
+    } catch (error) {
+      cleanup();
+      throw error;
+    }
+    return cleanup;
   }
 
   private registerFramePresented(targetFrame: number, complete: () => void): () => void {
