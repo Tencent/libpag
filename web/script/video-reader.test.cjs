@@ -62,6 +62,10 @@ class Video extends Events {
   playMode = 'ready';
   currentTimeValue = 1;
   playResult = null;
+  duration = NaN;
+  ended = false;
+  frameCallbacks = new Map();
+  nextFrameHandle = 0;
 
   get currentTime() {
     return this.currentTimeValue;
@@ -101,6 +105,23 @@ class Video extends Events {
 
   load() {
     this.loadCalls++;
+  }
+
+  requestVideoFrameCallback(callback) {
+    const handle = ++this.nextFrameHandle;
+    this.frameCallbacks.set(handle, callback);
+    return handle;
+  }
+
+  cancelVideoFrameCallback(handle) {
+    this.frameCallbacks.delete(handle);
+  }
+
+  presentFrame(mediaTime) {
+    for (const [handle, callback] of Array.from(this.frameCallbacks)) {
+      this.frameCallbacks.delete(handle);
+      callback(0, { mediaTime });
+    }
   }
 }
 
@@ -196,6 +217,7 @@ function createEnvironment(flags = {}) {
       VIDEO_DECODE_SEEK_TIMEOUT_FRAME: 12,
       VIDEO_PLAYBACK_RATE_MAX: 4,
       VIDEO_PLAYBACK_RATE_MIN: 0.25,
+      VIDEO_PRESENT_TIMEOUT_FRAME: 3,
     },
     '../utils/ua': { IPHONE: false, WECHAT: false, SAFARI_OR_IOS_WEBVIEW: false, ...flags },
     '../utils/video-listener': {
@@ -259,6 +281,7 @@ function assertClean(environment, video) {
   assert.equal(environment.clock.frames.size, 0);
   assert.equal(environment.document.count(), 0);
   assert.equal(video.count(), 0);
+  assert.equal(video.frameCallbacks.size, 0);
 }
 
 test('same-frame preparation follows the latest play intent and playback rate', async function () {
@@ -388,6 +411,75 @@ test('superseded prepare cannot commit or consume a stale seeked event', async f
   assert.equal(await second, true);
   assert.equal(reader.getCurrentFrame(), 90);
   assert.equal(video.playCalls, 1);
+  assertClean(environment, video);
+});
+
+test('the final frame waits until the video element presents it', async function () {
+  const environment = createEnvironment();
+  const video = new Video();
+  video.duration = 2;
+  video.currentTimeValue = 59 / 30;
+  video.paused = false;
+  const reader = makeReader(environment, video);
+  const pending = reader.prepare(59, 1);
+  await drainMicrotasks();
+  assert.equal(reader.getCurrentFrame(), -1);
+  assert.equal(video.frameCallbacks.size, 1);
+  video.presentFrame(58 / 30);
+  await drainMicrotasks();
+  assert.equal(reader.getCurrentFrame(), -1);
+  assert.equal(video.frameCallbacks.size, 1);
+  video.presentFrame(59 / 30);
+  assert.equal(await pending, true);
+  assert.equal(reader.getCurrentFrame(), 59);
+  assert.equal(reader.getError(), null);
+  assertClean(environment, video);
+});
+
+test('a missing final frame presentation keeps the current picture', async function () {
+  const environment = createEnvironment();
+  const video = new Video();
+  video.duration = 2;
+  video.currentTimeValue = 59 / 30;
+  video.paused = false;
+  const reader = makeReader(environment, video);
+  const pending = reader.prepare(59, 1);
+  await drainMicrotasks();
+  assert.equal(video.frameCallbacks.size, 1);
+  environment.clock.advance(100);
+  assert.equal(await pending, true);
+  assert.equal(reader.getCurrentFrame(), 59);
+  assert.equal(reader.getError(), null);
+  assertClean(environment, video);
+});
+
+test('a paused final frame is committed without waiting for presentation', async function () {
+  const environment = createEnvironment();
+  const video = new Video();
+  video.duration = 2;
+  video.currentTimeValue = 59 / 30;
+  const reader = makeReader(environment, video);
+  assert.equal(await reader.prepare(59, 1), true);
+  assert.equal(reader.getCurrentFrame(), 59);
+  assert.equal(video.frameCallbacks.size, 0);
+  assertClean(environment, video);
+});
+
+test('destroy during the final frame wait releases the frame callback', async function () {
+  const environment = createEnvironment();
+  const video = new Video();
+  video.duration = 2;
+  video.currentTimeValue = 59 / 30;
+  video.paused = false;
+  const owner = new Owner();
+  const reader = makeReader(environment, video, owner);
+  const pending = reader.prepare(59, 1);
+  await drainMicrotasks();
+  assert.equal(video.frameCallbacks.size, 1);
+  reader.onDestroy();
+  assert.equal(await pending, false);
+  assert.equal(reader.getCurrentFrame(), -1);
+  assert.equal(owner.readers.size, 0);
   assertClean(environment, video);
 });
 

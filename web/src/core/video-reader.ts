@@ -3,6 +3,7 @@ import {
   VIDEO_DECODE_SEEK_TIMEOUT_FRAME,
   VIDEO_PLAYBACK_RATE_MAX,
   VIDEO_PLAYBACK_RATE_MIN,
+  VIDEO_PRESENT_TIMEOUT_FRAME,
 } from '../constant';
 import { addListener, removeListener } from '../utils/video-listener';
 import { IPHONE, WECHAT, SAFARI_OR_IOS_WEBVIEW } from '../utils/ua';
@@ -280,9 +281,11 @@ export class VideoReader {
     const targetTime = targetFrame / this.frameRate;
     const currentTime = video.currentTime;
     const atTarget = !video.seeking && Math.round(currentTime * this.frameRate) === targetFrame;
-    if (atTarget && targetFrame === this.currentFrame) return true;
+    if (atTarget && targetFrame === this.currentFrame) {
+      return this.waitForLastFramePresentation(operation, targetFrame);
+    }
     if (!video.seeking && currentTime === 0 && targetTime === 0) return this.prepareFirstFrame(operation);
-    if (atTarget) return true;
+    if (atTarget) return this.waitForLastFramePresentation(operation, targetFrame);
     if (this.staticTimeRanges.contains(targetFrame)) return this.seek(operation, targetTime);
     if (
       video.seeking ||
@@ -292,7 +295,63 @@ export class VideoReader {
       this.isSought = true;
       return this.seek(operation, targetTime);
     }
-    return true;
+    return this.waitForLastFramePresentation(operation, targetFrame);
+  }
+
+  /**
+   * While playing, the video element presents frames slightly behind its currentTime, so the picture
+   * sampled here may still be the previous one. Every other frame is corrected by the following
+   * frame, but the last frame of the video has no later frame to correct it, which leaves the tail
+   * of a playback with a stale picture on Safari. Waits until the video element reports that frame
+   * as presented so the final picture is uploaded. Paused playback is excluded: it presents no new
+   * frame, so waiting would only run into the timeout on every prepare.
+   */
+  private async waitForLastFramePresentation(operation: VideoReaderOperation, targetFrame: number): Promise<boolean> {
+    const video = this.videoEl;
+    if (video === null || video.paused || video.ended || typeof video.requestVideoFrameCallback !== 'function') {
+      return true;
+    }
+    const lastFrame = this.lastFrame();
+    if (lastFrame < 0 || targetFrame < lastFrame) return true;
+    try {
+      await operation.wait(
+        this.registerFramePresented.bind(this, targetFrame),
+        (1000 / this.frameRate) * VIDEO_PRESENT_TIMEOUT_FRAME,
+        'Video presentation timed out.',
+      );
+    } catch {
+      // Keeping the picture that is already on screen is better than dropping the last frame.
+    }
+    return this.isActive(operation);
+  }
+
+  private lastFrame(): number {
+    const video = this.videoEl;
+    if (video === null || this.frameRate <= 0 || !isFinite(video.duration) || video.duration <= 0) {
+      return -1;
+    }
+    return Math.round(video.duration * this.frameRate) - 1;
+  }
+
+  private registerFramePresented(targetFrame: number, complete: () => void): () => void {
+    const video = this.videoEl!;
+    const frameRate = this.frameRate;
+    let handle = 0;
+    let finished = false;
+    function onFrame(_now: number, metadata: VideoFrameCallbackMetadata) {
+      if (finished) return;
+      if (Math.round(metadata.mediaTime * frameRate) >= targetFrame) {
+        complete();
+        return;
+      }
+      handle = video.requestVideoFrameCallback(onFrame);
+    }
+    handle = video.requestVideoFrameCallback(onFrame);
+    function cleanup() {
+      finished = true;
+      if (handle) video.cancelVideoFrameCallback(handle);
+    }
+    return cleanup;
   }
 
   private async prepareFirstFrame(operation: VideoReaderOperation): Promise<boolean> {
