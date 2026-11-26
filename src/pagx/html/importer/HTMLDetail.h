@@ -72,6 +72,13 @@ inline bool IsBlankText(const std::string& text) {
 // Split a CSS value list on top-level commas (commas inside parentheses are not split).
 std::vector<std::string> SplitTopLevelCommas(const std::string& s);
 
+/**
+ * Parses a bare number (integer or decimal) and rejects trailing units, so `1.5` succeeds while
+ * `1.5px` and `abc` fail. Shared by the transform parser and the style cascade so "is this a plain
+ * number?" has a single answer.
+ */
+bool ParseScalarFloat(const std::string& token, float& out);
+
 // Split a CSS value on whitespace runs while respecting parenthesised groups (so
 // "0 2px 6px rgba(0,0,0,0.2)" yields four tokens).
 std::vector<std::string> SplitTopLevelWhitespace(const std::string& s);
@@ -197,11 +204,21 @@ float CssDirectionToAngle(const std::string& kw);
 // "linear-gradient(a, b, c)" -> "a, b, c".
 std::string ExtractParenArgs(const std::string& value);
 
+// Locates the CSS function call that starts at `start` in `value`: the first '(' at or after
+// `start` opens it, and the paren balancing that one closes it, so an argument may carry parentheses
+// of its own (`translateX(calc(100% - 10px))`, `rotate3d(var(--x), 0, 0, 45deg)`). Returns false
+// when `start` is at or past the end, there is no '(', or the parentheses never balance. Everything
+// outside the parens is left to the caller: the transform-list splitter and the single-call parser
+// disagree on the name (case, spaces) and on what may follow the closing paren.
+bool LocateCssFunctionCall(const std::string& value, size_t start, size_t& outOpenParen,
+                           size_t& outCloseParen);
+
 // Parse a single-call CSS function expression. `trimmed` is expected to be already
 // whitespace-trimmed. On success `outName` receives the lower-cased function name and
-// `outArgs` receives the trimmed argument body. The parser is strict: it rejects compound
-// or nested calls (any `)` other than the final one, any non-whitespace content after the
-// closing `)`, or an empty function name).
+// `outArgs` receives the trimmed argument body. The closing paren is matched by depth, so an argument
+// may carry parentheses of its own (`translateX(calc(100% - 10px))`, `rotate3d(var(--x), 0, 0, 45deg)`);
+// the parser still rejects a compound chain (non-whitespace content after the closing `)`) and an
+// empty function name.
 bool ParseCssFunctionCall(const std::string& trimmed, std::string& outName, std::string& outArgs);
 
 // Strip trailing slashes so file path resolution doesn't pick up wrong directories.

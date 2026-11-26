@@ -60,6 +60,7 @@ enum class Backend {
   METAL,
   VULKAN,
   WEBGPU,
+  D3D12,
 };
 
 /**
@@ -127,6 +128,25 @@ struct MtlTextureInfo {
 };
 
 /**
+ * Non-owning description of an external typed 2D D3D12 texture. The caller must keep the
+ * resource valid until every object using it is released and its submitted GPU work completes.
+ * The resource must be a single-sample, single-plane 2D texture in
+ * D3D12_RESOURCE_STATE_COMMON with an unambiguous typed format. Typeless, array, multisampled and
+ * multi-plane resources are rejected. Rendering into the texture additionally requires
+ * D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET; sampling requires that
+ * D3D12_RESOURCE_FLAG_DENY_SHADER_RESOURCE is not set. Only R8_UNORM and RGBA8/BGRA8 (UNORM or
+ * SRGB) are accepted; A8_UNORM and R8G8_UNORM are currently rejected. The texture's native device
+ * must match the device of every surface that samples it.
+ */
+struct D3D12TextureInfo {
+  /**
+   * Pointer to a live ID3D12Resource. A null resource cannot be imported for sampling or rendering.
+   * BackendTexture::isValid() only checks the description's dimensions. PAG never releases it.
+   */
+  void* resource = nullptr;
+};
+
+/**
  * Types for interacting with Vulkan resources created externally to PAG. Holds the VkImage as a
  * void*.
  */
@@ -177,6 +197,15 @@ class PAG_API BackendTexture {
   BackendTexture(const MtlTextureInfo& mtlInfo, int width, int height);
 
   /**
+   * Creates a D3D12 backend texture. The native resource is not adopted; the caller keeps
+   * ownership and must keep it valid for the lifetime of every object that uses this description.
+   * @param d3d12Info the external texture description.
+   * @param width the logical width in pixels, greater than zero and no larger than the resource.
+   * @param height the logical height in pixels, greater than zero and no larger than the resource.
+   */
+  BackendTexture(const D3D12TextureInfo& d3d12Info, int width, int height);
+
+  /**
    * Creates a Vulkan backend texture.
    */
   BackendTexture(const VkImageInfo& vkInfo, int width, int height);
@@ -191,7 +220,8 @@ class PAG_API BackendTexture {
   BackendTexture& operator=(const BackendTexture& that);
 
   /**
-   * Returns true if the backend texture has been initialized.
+   * Returns true if the backend texture was created with positive dimensions. A null native
+   * resource is rejected when the texture is sampled or rendered into, not by this check.
    */
   bool isValid() const {
     return _width > 0 && _height > 0;
@@ -219,27 +249,42 @@ class PAG_API BackendTexture {
   }
 
   /**
-   * If the backend API is GL, copies a snapshot of the GLTextureInfo struct into the passed in
-   * pointer and returns true. Otherwise returns false if the backend API is not GL.
+   * Copies the OpenGL texture description into the output pointer.
+   * @param glTextureInfo the destination description, or nullptr to return false.
+   * @return true for an initialized OpenGL backend object with a non-null output pointer;
+   *         false otherwise.
    */
   bool getGLTextureInfo(GLTextureInfo* glTextureInfo) const;
 
   /**
-   * If the backend API is Metal, copies a snapshot of the GrMtlTextureInfo struct into the passed
-   * in pointer and returns true. Otherwise returns false if the backend API is not Metal.
+   * Copies the Metal texture description into the output pointer.
+   * @param mtlTextureInfo the destination description, or nullptr to return false.
+   * @return true for an initialized Metal backend object with a non-null output pointer;
+   *         false otherwise.
    */
   bool getMtlTextureInfo(MtlTextureInfo* mtlTextureInfo) const;
 
   /**
-   * If the backend API is Vulkan, copies a snapshot of the VkImageInfo struct into the passed
-   * in pointer and returns true. Otherwise, returns false if the backend API is not Vulkan.
+   * Copies the non-owning D3D12 description into the output pointer.
+   * @param d3d12TextureInfo the destination description, or nullptr to return false.
+   * @return true for an initialized D3D12 backend object with a non-null output pointer;
+   *         false otherwise.
+   */
+  bool getD3D12TextureInfo(D3D12TextureInfo* d3d12TextureInfo) const;
+
+  /**
+   * Copies the Vulkan image description into the output pointer.
+   * @param vkImageInfo the destination description, or nullptr to return false.
+   * @return true for an initialized Vulkan backend object with a non-null output pointer;
+   *         false otherwise.
    */
   bool getVkImageInfo(VkImageInfo* vkImageInfo) const;
 
   /**
-   * If the backend API is WebGPU, copies a snapshot of the WebGPUTextureInfo struct into the
-   * passed in pointer and returns true. Otherwise, returns false if the backend API is not
-   * WebGPU.
+   * Copies the WebGPU texture description into the output pointer.
+   * @param webGPUTextureInfo the destination description, or nullptr to return false.
+   * @return true for an initialized WebGPU backend object with a non-null output pointer;
+   *         false otherwise.
    */
   bool getWebGPUTextureInfo(WebGPUTextureInfo* webGPUTextureInfo) const;
 
@@ -253,6 +298,7 @@ class PAG_API BackendTexture {
     MtlTextureInfo mtlInfo;
     VkImageInfo vkInfo;
     WebGPUTextureInfo webGPUInfo;
+    D3D12TextureInfo d3d12Info;
   };
 };
 
@@ -275,6 +321,15 @@ class PAG_API BackendRenderTarget {
   BackendRenderTarget(const MtlTextureInfo& mtlInfo, int width, int height);
 
   /**
+   * Creates a D3D12 backend render target. The native resource is not adopted; the caller keeps
+   * ownership and must keep it valid for the lifetime of every object that uses this description.
+   * @param d3d12Info the external render target description.
+   * @param width the logical width in pixels, greater than zero and no larger than the resource.
+   * @param height the logical height in pixels, greater than zero and no larger than the resource.
+   */
+  BackendRenderTarget(const D3D12TextureInfo& d3d12Info, int width, int height);
+
+  /**
    * Creates a Vulkan backend render target.
    */
   BackendRenderTarget(const VkImageInfo& vkInfo, int width, int height);
@@ -284,7 +339,8 @@ class PAG_API BackendRenderTarget {
   BackendRenderTarget& operator=(const BackendRenderTarget&);
 
   /**
-   * Returns true if the backend texture has been initialized.
+   * Returns true if the render target description has positive dimensions. Native handles are
+   * validated when imported for rendering, not by this check.
    */
   bool isValid() const {
     return _width > 0 && _height > 0;
@@ -312,20 +368,34 @@ class PAG_API BackendRenderTarget {
   }
 
   /**
-   * If the backend API is GL, copies a snapshot of the GLFramebufferInfo struct into the passed
-   * in pointer and returns true. Otherwise returns false if the backend API is not GL.
+   * Copies the OpenGL framebuffer description into the output pointer.
+   * @param glFrameBufferInfo the destination description, or nullptr to return false.
+   * @return true for an initialized OpenGL backend object with a non-null output pointer;
+   *         false otherwise.
    */
   bool getGLFramebufferInfo(GLFrameBufferInfo* glFrameBufferInfo) const;
 
   /**
-   * If the backend API is Metal, copies a snapshot of the MtlTextureInfo struct into the passed
-   * in pointer and returns true. Otherwise returns false if the backend API is not Metal.
+   * Copies the Metal texture description into the output pointer.
+   * @param mtlTextureInfo the destination description, or nullptr to return false.
+   * @return true for an initialized Metal backend object with a non-null output pointer;
+   *         false otherwise.
    */
   bool getMtlTextureInfo(MtlTextureInfo* mtlTextureInfo) const;
 
   /**
-   * If the backend API is Vulkan, copies a snapshot of the VkImageInfo struct into the passed
-   * in pointer and returns true. Otherwise, returns false if the backend API is not Vulkan.
+   * Copies the non-owning D3D12 description into the output pointer.
+   * @param d3d12TextureInfo the destination description, or nullptr to return false.
+   * @return true for an initialized D3D12 backend object with a non-null output pointer;
+   *         false otherwise.
+   */
+  bool getD3D12TextureInfo(D3D12TextureInfo* d3d12TextureInfo) const;
+
+  /**
+   * Copies the Vulkan image description into the output pointer.
+   * @param vkImageInfo the destination description, or nullptr to return false.
+   * @return true for an initialized Vulkan backend object with a non-null output pointer;
+   *         false otherwise.
    */
   bool getVkImageInfo(VkImageInfo* vkImageInfo) const;
 
@@ -337,6 +407,7 @@ class PAG_API BackendRenderTarget {
     GLFrameBufferInfo glInfo;
     MtlTextureInfo mtlInfo;
     VkImageInfo vkInfo;
+    D3D12TextureInfo d3d12Info;
   };
 };
 

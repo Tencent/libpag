@@ -351,10 +351,10 @@ describe('pagxStopScalarSeries', () => {
     ];
     const series = pagxStopScalarSeries(stops);
     expect(series.opacity).toEqual([0, 1]);
-    // transform decomposes into the six affine components; a pure translate
-    // folds to [1,0,0,1,tx,ty], so m4/m5 carry the translation.
-    expect(series.m4).toEqual([0, 40]);
-    expect(series.m5).toEqual([0, 10]);
+    // transform decomposes into the sixteen column-major components; a pure translate is padded to
+    // the identity, so slots 12/13 carry the translation.
+    expect(series.m12).toEqual([0, 40]);
+    expect(series.m13).toEqual([0, 10]);
   });
   test('decomposes a filter drop-shadow into per-slot scalar glow channels', () => {
     const stops = [

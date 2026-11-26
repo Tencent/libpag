@@ -74,13 +74,14 @@ std::shared_ptr<PAGImage> PAGImage::FromTexture(const BackendTexture& texture, I
         "libpag build.");
     return nullptr;
   }
+  if (!Devices::ValidateExternalResource(tgfxTexture, ExternalResourceUsage::Sampled)) {
+    LOGE("PAGImage.FromTexture() The texture does not satisfy the sampling requirements.");
+    return nullptr;
+  }
   auto pagImage = std::shared_ptr<StillImage>(new StillImage(texture.width(), texture.height()));
-  // With a valid texture of the matching backend, Picture::MakeFrom() can only fail when the
-  // owning device identity could not be captured, which GL requires a current GPU context on the
-  // calling thread for (the native handle is used for the later share-compatibility check).
   auto picture = Picture::MakeFrom(pagImage->uniqueID(), tgfxTexture, ToTGFX(origin));
   if (!picture) {
-    LOGE("PAGImage.FromTexture() There is no current GPU context on the calling thread.");
+    LOGE("PAGImage.FromTexture() Failed to capture the texture's GPU device identity.");
     return nullptr;
   }
   pagImage->graphic = picture;

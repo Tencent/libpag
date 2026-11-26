@@ -181,7 +181,8 @@ Layer* HTMLTextFragmentBuilder::buildPAGXTextHost(const std::shared_ptr<DOMNode>
 }
 
 Layer* HTMLTextFragmentBuilder::convertPAGXTextHost(const std::shared_ptr<DOMNode>& element,
-                                                    const HTMLInheritedStyle& inherited) {
+                                                    const HTMLInheritedStyle& inherited,
+                                                    const HTMLBoxAttributes& containerBox) {
   // The generator emits glyph <span>s as direct children of the host container; the first one
   // carries the style (font size / colour) of the first rendered glyph.
   std::shared_ptr<DOMNode> firstSpan;
@@ -215,16 +216,17 @@ Layer* HTMLTextFragmentBuilder::convertPAGXTextHost(const std::shared_ptr<DOMNod
   // Child span offsets are relative to the positioned container; recover the absolute position
   // as container + first-child offset. Only left/top are honoured — per-glyph transforms
   // (rotation / scale / skew) belong to individual glyphs and cannot apply to the whole run.
-  HTMLBoxAttributes containerBox = _styleCascade.computeBoxAttributes(element);
+  // `containerBox` comes from the caller, which already resolved it: the host is converted without
+  // going through `convertElement`, and resolving the box a second time here would report every
+  // box-level diagnostic for the same element twice. The parent camera is attached outside this
+  // function, so the box itself carries no projection.
   HTMLBoxAttributes box = containerBox;
   if (firstSpan) {
-    HTMLBoxAttributes spanBox = _styleCascade.computeBoxAttributes(firstSpan);
-    float left = (std::isnan(containerBox.leftPx) ? 0.0f : containerBox.leftPx) +
-                 (std::isnan(spanBox.leftPx) ? 0.0f : spanBox.leftPx);
-    float top = (std::isnan(containerBox.topPx) ? 0.0f : containerBox.topPx) +
-                (std::isnan(spanBox.topPx) ? 0.0f : spanBox.topPx);
-    box.leftPx = left;
-    box.topPx = top;
+    const HTMLBoxAttributes spanBox = _styleCascade.computeBoxAttributes(firstSpan);
+    const float spanLeft = std::isnan(spanBox.leftPx) ? 0.0f : spanBox.leftPx;
+    const float spanTop = std::isnan(spanBox.topPx) ? 0.0f : spanBox.topPx;
+    box.leftPx = (std::isnan(containerBox.leftPx) ? 0.0f : containerBox.leftPx) + spanLeft;
+    box.topPx = (std::isnan(containerBox.topPx) ? 0.0f : containerBox.topPx) + spanTop;
   }
   box.rightPx = NAN;
   box.bottomPx = NAN;
@@ -567,7 +569,7 @@ Layer* HTMLTextFragmentBuilder::buildTextHostLayers(const std::shared_ptr<DOMNod
   if (shrinkWidth) outer->width = NAN;
   if (shrinkHeight) outer->height = NAN;
   _layerBuilder.applyLayerAttributes(outer, element, box);
-  _layerBuilder.applyBoxTransform(outer, box, element);
+  _layerBuilder.applyBoxTransform(outer, box, element->name);
 
   Layer* textHost = outer;
   if (hasBgVisuals) {

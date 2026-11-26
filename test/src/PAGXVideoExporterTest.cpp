@@ -42,18 +42,8 @@
 #include "rendering/gpu/Devices.h"
 #include "tgfx/core/Surface.h"
 #include "utils/DevicePool.h"
+#include "utils/GLHeaders.h"
 #include "utils/TestUtils.h"
-
-#ifdef TGFX_USE_OPENGL
-#if defined(PAG_USE_SWIFTSHADER) || defined(__EMSCRIPTEN__)
-#include <GLES3/gl3.h>
-#else
-#ifndef GL_SILENCE_DEPRECATION
-#define GL_SILENCE_DEPRECATION
-#endif
-#include <OpenGL/gl3.h>
-#endif
-#endif
 
 static_assert(!std::is_copy_constructible_v<pagx::VideoExporter>);
 static_assert(!std::is_copy_assignable_v<pagx::VideoExporter>);
@@ -342,7 +332,7 @@ PAGX_TEST(PAGXVideoExporterTest, MakeRejectsInvalidFrameRateRatios) {
   }
 }
 
-PAGX_TEST(PAGXVideoExporterTest, MakeSupportsFractionalFrameRate) {
+PAGX_TEST_PRIVATE(PAGXVideoExporterTest, MakeSupportsFractionalFrameRate) {
 #ifdef TGFX_USE_WEBGPU
   GTEST_SKIP() << "VideoExporter currently requires synchronous pixel readback";
 #endif
@@ -355,7 +345,7 @@ PAGX_TEST(PAGXVideoExporterTest, MakeSupportsFractionalFrameRate) {
   EXPECT_EQ(exporter->frameCount(), 30);
   ASSERT_TRUE(exporter->nextFrame());
   ASSERT_TRUE(exporter->nextFrame());
-  EXPECT_EQ(exporter->impl->previousFrameTimeUs, 33367);
+  PAG_PRIVATE_ACCESS(EXPECT_EQ(exporter->impl->previousFrameTimeUs, 33367);)
 }
 
 PAGX_TEST(PAGXVideoExporterTest, MakeExportsStaticDocumentAsSingleFrameByDefault) {
@@ -1263,15 +1253,19 @@ PAGX_TEST(PAGXVideoExporterTest, OutputDimensionsAreAllOrNothing) {
   EXPECT_EQ(height, 19);
 }
 
-PAGX_TEST(PAGXVideoExporterTest, NextFrameReportsDrawingFailure) {
-  auto exporter = pagx::VideoExporter::Make(MakeStaticDocument());
-  ASSERT_TRUE(exporter != nullptr);
-  exporter->impl->surface = nullptr;
-  std::string errorMsg = {};
-  EXPECT_FALSE(exporter->nextFrame(&errorMsg));
-  EXPECT_EQ(exporter->currentFrame(), 0);
-  EXPECT_EQ(exporter->errorCode(), pagx::VideoExportError::RenderFailed);
-  EXPECT_NE(errorMsg.find("failed to draw frame 0"), std::string::npos);
+PAGX_TEST_PRIVATE(PAGXVideoExporterTest, NextFrameReportsDrawingFailure) {
+  // clang-format off
+  PAG_PRIVATE_ACCESS(
+    auto exporter = pagx::VideoExporter::Make(MakeStaticDocument());
+    ASSERT_TRUE(exporter != nullptr);
+    exporter->impl->surface = nullptr;
+    std::string errorMsg = {};
+    EXPECT_FALSE(exporter->nextFrame(&errorMsg));
+    EXPECT_EQ(exporter->currentFrame(), 0);
+    EXPECT_EQ(exporter->errorCode(), pagx::VideoExportError::RenderFailed);
+    EXPECT_NE(errorMsg.find("failed to draw frame 0"), std::string::npos);
+  )
+  // clang-format on
 }
 
 PAGX_TEST(PAGXVideoExporterTest, NextFrameAdvancesSequentiallyAndStopsAtEnd) {

@@ -75,9 +75,12 @@ class HTMLLayerBuilder {
   bool applyBackgroundVisuals(Layer* layer, const HTMLBoxAttributes& box,
                               Fill* foregroundFill = nullptr);
 
-  /** Applies the resolved CSS `transform` (incl. `transform-origin`) onto `layer->matrix`. */
+  /** Applies the resolved CSS `transform` onto `layer->matrix` / `layer->matrix3D`, with
+   *  `transform-origin` written onto `layer->anchor` instead of being baked into the pose. The pivot
+   *  is resolved here through `ResolveElementAnchor`, whose size chain ends at this layer's final
+   *  size, so it matches the pivot the keyframe path writes. */
   void applyBoxTransform(Layer* layer, const HTMLBoxAttributes& box,
-                         const std::shared_ptr<DOMNode>& element);
+                         const std::string& elementName);
 
   /** Layer-level attributes that don't depend on background: opacity, blend mode, filter
    *  chain, overflow clip, data-* attributes. */

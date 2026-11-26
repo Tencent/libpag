@@ -387,7 +387,7 @@ static void LimitOutputToTextureSize(const PAGXDocument& document, VideoExportOp
   if (device == nullptr) {
     return;
   }
-  auto* context = device->lockContext();
+  auto* context = pag::Devices::LockContext(device);
   if (context == nullptr || context->gpu() == nullptr || context->gpu()->limits() == nullptr) {
     if (context != nullptr) {
       device->unlock();

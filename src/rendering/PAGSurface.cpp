@@ -30,6 +30,9 @@
 #include "tgfx/core/Clock.h"
 #include "tgfx/core/Pixmap.h"
 #include "tgfx/core/SurfaceReadback.h"
+#include "tgfx/gpu/CommandQueue.h"
+#include "tgfx/gpu/Context.h"
+#include "tgfx/gpu/GPU.h"
 
 namespace pag {
 
@@ -364,7 +367,8 @@ bool PAGSurface::draw(RenderCache* cache, std::shared_ptr<Graphic> graphic,
         break;
       case tgfx::Backend::Vulkan:
       case tgfx::Backend::D3D12:
-        LOGE("PAGSurface::draw() cannot forward a semaphore of this backend yet.");
+        // These backends have no BackendSemaphore ABI; the caller should use
+        // waitUntilCompleted() instead. Leaving the semaphore uninitialized is expected.
         break;
     }
   }
@@ -421,12 +425,33 @@ bool PAGSurface::hitTest(RenderCache* cache, std::shared_ptr<Graphic> graphic, f
   return result;
 }
 
+bool PAGSurface::waitUntilCompleted() {
+  LockGuard autoLock(rootLocker);
+  auto context = lockContext();
+  if (context == nullptr) {
+    return false;
+  }
+  // On D3D12 the queue wait may mark the context as lost. Reacquire the lock afterward so that
+  // loss is rejected; other backends only recheck the state supported by their device locks.
+  auto healthy = Devices::WaitForQueue(context);
+  unlockContext();
+  if (!healthy) {
+    return false;
+  }
+  auto relockedContext = lockContext();
+  if (relockedContext == nullptr) {
+    return false;
+  }
+  unlockContext();
+  return true;
+}
+
 tgfx::Context* PAGSurface::lockContext() {
   auto device = drawable->getDevice();
   if (device == nullptr) {
     return nullptr;
   }
-  auto context = device->lockContext();
+  auto context = pag::Devices::LockContext(device);
   if (context != nullptr && stateGuard != nullptr) {
     static_cast<ExternalStateGuard*>(stateGuard)->save(context);
   }

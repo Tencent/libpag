@@ -24,6 +24,7 @@ namespace pag {
 /**
  * 用例描述: 异步解码时候同步删除图层
  */
+#ifdef PAG_TEST_ACCESS_PRIVATE
 PAG_TEST(AsyncDecode, remove_ID79139135) {
   PAG_SETUP_WITH_PATH(TestPAGSurface, TestPAGPlayer, TestPAGFile,
                       "resources/apitest/AsyncDecodeTest.pag");
@@ -37,10 +38,12 @@ PAG_TEST(AsyncDecode, remove_ID79139135) {
   // 图像销毁时候，异步正在初始化的序列帧也应该被销毁
   EXPECT_EQ(static_cast<int>(TestPAGPlayer->renderCache->sequenceCaches.size()), 0);
 }
+#endif
 
 /**
  * 用例描述: 校验异步预测是否能正常命中和回收
  */
+#ifdef PAG_TEST_ACCESS_PRIVATE
 PAG_TEST(AsyncDecode, init_ID79139125) {
   PAG_SETUP_WITH_PATH(TestPAGSurface, TestPAGPlayer, TestPAGFile,
                       "resources/apitest/AsyncDecodeTest.pag");
@@ -79,10 +82,12 @@ PAG_TEST(AsyncDecode, init_ID79139125) {
     currentFrame++;
   }
 }
+#endif
 
 /**
  * 用例描述: 校验当视频图层不用以后是否能立马回收
  */
+#ifdef PAG_TEST_ACCESS_PRIVATE
 PAG_TEST(AsyncDecode, destory_ID79139125) {
   PAG_SETUP_WITH_PATH(TestPAGSurface, TestPAGPlayer, TestPAGFile,
                       "resources/apitest/AsyncDecodeTest.pag");
@@ -101,6 +106,7 @@ PAG_TEST(AsyncDecode, destory_ID79139125) {
     currentFrame++;
   }
 }
+#endif
 
 /**
  * 用例描述: 验证当触发异步加载以后，立马销毁资源场景
@@ -120,6 +126,7 @@ PAG_TEST(AsyncDecode, release_ID79427343) {
 /**
  * 用例描述: 位图序列帧异步解码校验
  */
+#ifdef PAG_TEST_ACCESS_PRIVATE
 PAG_TEST(AsyncDecode, bitmapCompDecodeTest) {
   PAG_SETUP_WITH_PATH(TestPAGSurface, TestPAGPlayer, TestPAGFile,
                       "resources/apitest/AsyncDecodeTest.pag");
@@ -158,10 +165,12 @@ PAG_TEST(AsyncDecode, bitmapCompDecodeTest) {
     currentFrame++;
   }
 }
+#endif
 
 /**
  * 用例描述: 图片异步解码校验
  */
+#ifdef PAG_TEST_ACCESS_PRIVATE
 PAG_TEST(AsyncDecode, imageDecodeTest) {
   PAG_SETUP_WITH_PATH(TestPAGSurface, TestPAGPlayer, TestPAGFile,
                       "resources/apitest/AsyncDecodeTest.pag");
@@ -212,4 +221,5 @@ PAG_TEST(AsyncDecode, imageDecodeTest) {
     currentFrame++;
   }
 }
+#endif
 }  // namespace pag

@@ -418,8 +418,32 @@ export function pagxExtractTranslate(
 // friendly compound-string branch only reaches here from the WAAPI / transition
 // path; there we still fold a non-identity linear part into a `matrix(...)` via
 // a temporary element so scale / rotate authored directly in keyframes is kept
-// too, and fall back to translate-only extraction when the value cannot be
-// resolved to a matrix (e.g. a 3D transform).
+// too. When the chain cannot be resolved (no temporary element, or no used box
+// to resolve its percentages against) the result is null: folding it to
+// `translate()` would only drop the depth / linear terms the probe was there to
+// recover, so the caller drops the channel rather than playing a wrong pose.
+// Projects a `matrix3d` onto its 2D affine components when it is really flat
+// (no depth translation, no Z linear terms, no projection row); returns null for
+// a pose that genuinely uses the third dimension.
+export function pagxMatrix3DFlat6(values: number[]): number[] | null {
+  if (values.length !== 16 || values.some((v) => isNaN(v))) return null;
+  const near = (value: number, target: number): boolean => Math.abs(value - target) < 1e-6;
+  if (!near(values[2], 0) || !near(values[3], 0) || !near(values[6], 0) || !near(values[7], 0) ||
+      !near(values[8], 0) || !near(values[9], 0) || !near(values[10], 1) || !near(values[11], 0) ||
+      !near(values[14], 0) || !near(values[15], 1)) {
+    return null;
+  }
+  return [values[0], values[1], values[4], values[5], values[12], values[13]];
+}
+
+export function pagxParseMatrix3D(value: string): number[] | null {
+  const m = (value || '').trim().match(/^matrix3d\(([^)]+)\)$/i);
+  if (!m) return null;
+  const parts = m[1].split(',').map((x) => parseFloat(x.trim()));
+  if (parts.length !== 16 || parts.some((v) => isNaN(v))) return null;
+  return parts;
+}
+
 export function pagxExtractTransform(
   transformStr: string,
   box?: { width: number; height: number } | null,
@@ -438,28 +462,58 @@ export function pagxExtractTransform(
     }
     return null;
   }
-  // matrix3d(...) has no 2D affine equivalent the runtime can play; keep only
-  // its translation (mirrors pagxExtractTranslate's matrix3d branch).
-  if (/^matrix3d\(/.test(s)) return pagxExtractTranslate(transformStr, box);
+  // `matrix3d(...)` carries depth or perspective, which the importer plays through the
+  // `matrix3D` channel, so the authored values are forwarded verbatim. A pose that is only
+  // pedantically 4x4 (flat affine) still collapses to `matrix(...)` / `translate(...)` so the
+  // common paths keep their compact, decimatable output.
+  const values3d = pagxParseMatrix3D(transformStr);
+  if (values3d) {
+    const flat = pagxMatrix3DFlat6(values3d);
+    if (!flat) return 'matrix3d(' + values3d.join(', ') + ')';
+    const linearIsIdentity =
+      Math.abs(flat[0] - 1) < 1e-6 && Math.abs(flat[1]) < 1e-6 &&
+      Math.abs(flat[2]) < 1e-6 && Math.abs(flat[3] - 1) < 1e-6;
+    if (linearIsIdentity) return 'translate(' + flat[4] + 'px, ' + flat[5] + 'px)';
+    return 'matrix(' + flat.join(', ') + ')';
+  }
   // Friendly compound string (WAAPI / transition keyframe author value): if it
   // is pure translate, reuse the percentage-resolving translate path; otherwise
   // resolve the whole chain to a matrix via a throwaway element so any scale /
-  // rotate / skew is preserved.
-  if (!/\b(scale|rotate|skew|matrix)/.test(s)) {
+  // rotate / skew is preserved. A chain that touches depth takes that same probe
+  // path: `translate(0) translateZ(300px)` projects to the 2D pair `translate(0, 0)`,
+  // so folding it would erase the whole Z track (and the projection peak it drives).
+  if (!/\b(scale|rotate|skew|matrix|translatez|translate3d|perspective)/.test(s)) {
     return pagxExtractTranslate(transformStr, box);
   }
+  // The probe has to carry the element's used box before its matrix is read: a percentage length
+  // resolves against the probe's own box, so an unsized probe resolves `translateX(-50%)` to 0 and
+  // the X offset is gone before the matrix exists (handing the box to the recursive call afterwards
+  // cannot recover it). A box that is absent or not a finite number leaves the chain unresolvable;
+  // guessing a size would silently author a different pose, and folding the chain to `translate()`
+  // would drop the depth / linear terms this branch exists to recover, so the stop is reported
+  // unresolved instead.
+  const widthPx = box && isFinite(box.width) ? box.width : null;
+  const heightPx = box && isFinite(box.height) ? box.height : null;
+  if (widthPx == null || heightPx == null) return null;
   try {
     const probe = document.createElement('div');
+    // Author box rules (`div { padding }`, `* { box-sizing: border-box }`, `min-width`, …) would
+    // move the box a percentage resolves against, so every property is reset to its initial value
+    // before the probe's own size is pinned.
+    probe.style.all = 'initial';
+    probe.style.display = 'block';
     probe.style.position = 'absolute';
+    probe.style.width = widthPx + 'px';
+    probe.style.height = heightPx + 'px';
     probe.style.transform = transformStr;
     (document.body || document.documentElement).appendChild(probe);
     const resolved = getComputedStyle(probe).transform;
     probe.remove();
     if (resolved && resolved !== 'none') return pagxExtractTransform(resolved, box);
   } catch (_) {
-    /* fall through to translate-only */
+    /* reported as unresolved below */
   }
-  return pagxExtractTranslate(transformStr, box);
+  return null;
 }
 
 // Resolve any tracked transform value the sampler / emitter produces
@@ -469,6 +523,27 @@ export function pagxExtractTransform(
 // the old `tx`/`ty` path for pure-translate animations (the constant linear
 // channels reduce to their endpoints), plus real scale / rotation curvature for
 // matrix keyframes. Returns null when the value is neither form.
+// Sampling vector for decimation: the full sixteen column-major components. Reducing a pose to its
+// six 2D coefficients erased motion that only lives in Z (or only in the projection row): a track such
+// as `translateZ(0) -> translateZ(300) -> translateZ(0)` projects to the same 2D matrix at every
+// sample, so every decimation channel looked flat and RDP dropped the peak. Padding a 2D pose to the
+// identity keeps one uniform channel set, so every sample of a track writes the same channels.
+export function pagxTransformToSample16(value: string): number[] | null {
+  const v = (value || '').trim();
+  if (!v) return null;
+  const values3d = pagxParseMatrix3D(v);
+  if (values3d) return values3d;
+  const m2 = v.match(/^matrix\(([^)]+)\)$/i);
+  if (m2) {
+    const parts = m2[1].split(',').map((x) => parseFloat(x.trim()));
+    if (parts.length !== 6 || parts.some((x) => isNaN(x))) return null;
+    return [parts[0], parts[1], 0, 0, parts[2], parts[3], 0, 0, 0, 0, 1, 0, parts[4], parts[5], 0, 1];
+  }
+  const t = pagxParseTranslateXY(v);
+  if (t) return [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, t[0], t[1], 0, 1];
+  return null;
+}
+
 export function pagxTransformToMatrix6(value: string): number[] | null {
   const v = (value || '').trim();
   if (!v) return null;
@@ -477,6 +552,14 @@ export function pagxTransformToMatrix6(value: string): number[] | null {
     const parts = mm[1].split(',').map((x) => parseFloat(x.trim()));
     if (parts.length === 6 && parts.every((x) => !isNaN(x))) return parts;
     return null;
+  }
+  const values3d = pagxParseMatrix3D(v);
+  if (values3d) {
+    // Decimation only needs a monotonic handle on the visible motion, so a 3D pose is reduced to
+    // its 2D projection; the emitted keyframe keeps the full matrix3d values.
+    const flat = pagxMatrix3DFlat6(values3d);
+    if (flat) return flat;
+    return [values3d[0], values3d[1], values3d[4], values3d[5], values3d[12], values3d[13]];
   }
   const t = pagxParseTranslateXY(v);
   if (t) return [1, 0, 0, 1, t[0], t[1]];
@@ -1201,14 +1284,11 @@ export function pagxStopScalarSeries(stops: PagxAnimStop[]): Record<string, numb
       // [1,0,0,1,tx,ty]: the constant linear channels collapse to endpoints and
       // m4/m5 behave exactly like the old tx/ty channels, so translate-only
       // output is unchanged while scale/rotate keyframes now survive.
-      const mtx = pagxTransformToMatrix6(p['transform']);
+      const mtx = pagxTransformToSample16(p['transform']);
       if (mtx) {
-        put('m0', i, mtx[0]);
-        put('m1', i, mtx[1]);
-        put('m2', i, mtx[2]);
-        put('m3', i, mtx[3]);
-        put('m4', i, mtx[4]);
-        put('m5', i, mtx[5]);
+        for (let k = 0; k < mtx.length; k++) {
+          put('m' + k, i, mtx[k]);
+        }
       }
     }
     if (p['color'] != null) {
@@ -1377,14 +1457,14 @@ export function pagxDecimateStops(stops: PagxAnimStop[], eps = 0.01): PagxAnimSt
   keep[stops.length - 1] = true;
   for (const key of Object.keys(series)) {
     const vals = series[key];
-    // Translation (matrix e/f = m4/m5), per-slot drop-shadow offset/blur
+    // Translation (matrix3d slots 12/13), per-slot drop-shadow offset/blur
     // (fd{k}x / fd{k}y / fd{k}b, and fblur), and clip-path coordinates (cp0, cp1,
     // …) are all measured in CSS pixels, so they get the absolute floor; every
     // other channel (colour, alpha, matrix scale/rotation) keeps the pure relative
     // tolerance. `/^fd\d+[xyb]$/` matches the offset/blur slots without catching
     // the colour channels fd{k}r / fd{k}g / fd{k}bl / fd{k}a.
     const absEps =
-      key === 'm4' || key === 'm5' ||
+      key === 'm12' || key === 'm13' ||
       /^fd\d+[xyb]$/.test(key) || key === 'fblur' ||
       (key[0] === 'c' && key[1] === 'p')
         ? ABS_FLOOR_PX
@@ -3558,8 +3638,11 @@ export function pagxAnimMain(opts: {
 // relies on for its HELPER_FNS bundle).
 const PAGX_ANIM_FNS = [
   pagxExtractTranslate,
+  pagxParseMatrix3D,
+  pagxMatrix3DFlat6,
   pagxExtractTransform,
   pagxTransformToMatrix6,
+  pagxTransformToSample16,
   pagxResolveCapturedTransformOrigin,
   pagxPickProp,
   pagxNormalizeProps,

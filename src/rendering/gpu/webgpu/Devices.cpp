@@ -32,6 +32,14 @@ bool Devices::SupportsBackend(tgfx::Backend backend) {
   return backend == tgfx::Backend::WebGPU;
 }
 
+bool Devices::ValidateExternalResource(const tgfx::BackendTexture& texture, ExternalResourceUsage) {
+  return SupportsBackend(texture.backend());
+}
+
+bool Devices::ValidateExternalResource(const tgfx::BackendRenderTarget& renderTarget) {
+  return SupportsBackend(renderTarget.backend());
+}
+
 std::shared_ptr<tgfx::Device> Devices::MakeForSharedContext(void*) {
   // WebGPU has no share-group concept keyed by an opaque context handle: all rendering on Web
   // goes through the single GPUDevice preinitialized on the JS side, so the caller's GL-shaped
@@ -79,6 +87,10 @@ std::shared_ptr<ExternalDeviceRef> Devices::CaptureFromTexture(const tgfx::Backe
 
 bool Devices::RequiresCapturedIdentity() {
   return false;
+}
+
+bool Devices::IsDeviceHealthy(tgfx::Context* context) {
+  return context != nullptr;
 }
 
 bool Devices::CanSampleFrom(tgfx::Context* context, const ExternalDeviceRef* deviceRef) {

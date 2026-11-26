@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ToTGFX.h"
-#include "tgfx/core/ColorSpace.h"
+#include "pagx/utils/ColorSpaceUtils.h"
 #include "tgfx/layers/DisplayList.h"
 #include "tgfx/layers/LayerMaskType.h"
 #include "tgfx/layers/LayerPaint.h"
@@ -63,25 +63,12 @@ tgfx::Point ToTGFX(const Point& point) {
   return tgfx::Point::Make(point.x, point.y);
 }
 
-static tgfx::ColorMatrix33 ComputeP3ToSRGBMatrix() {
-  tgfx::ColorMatrix33 matrix = {};
-  tgfx::ColorSpace::DisplayP3()->gamutTransformTo(tgfx::ColorSpace::SRGB().get(), &matrix);
-  return matrix;
-}
-
 tgfx::Color ToTGFX(const Color& c) {
   // tgfx::Color is always in sRGB color space. If source color is in Display P3,
   // we need to convert it to sRGB for correct rendering.
   if (c.colorSpace == ColorSpace::DisplayP3) {
-    static const tgfx::ColorMatrix33 p3ToSRGB = ComputeP3ToSRGBMatrix();
-
-    float r = c.red * p3ToSRGB.values[0][0] + c.green * p3ToSRGB.values[0][1] +
-              c.blue * p3ToSRGB.values[0][2];
-    float g = c.red * p3ToSRGB.values[1][0] + c.green * p3ToSRGB.values[1][1] +
-              c.blue * p3ToSRGB.values[1][2];
-    float b = c.red * p3ToSRGB.values[2][0] + c.green * p3ToSRGB.values[2][1] +
-              c.blue * p3ToSRGB.values[2][2];
-    return {r, g, b, c.alpha};
+    const auto converted = ConvertColorSpace(c, ColorSpace::SRGB);
+    return {converted.red, converted.green, converted.blue, converted.alpha};
   }
   return {c.red, c.green, c.blue, c.alpha};
 }

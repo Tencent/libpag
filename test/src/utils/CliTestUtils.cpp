@@ -45,6 +45,12 @@ std::string ReadTextFile(const std::string& path) {
   return {std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()};
 }
 
+std::string ReadBinaryTestFile(const std::string& path) {
+  // Text mode truncates ZIP/PPTX content at a Ctrl+Z byte on Windows.
+  std::ifstream in(path, std::ios::binary);
+  return {std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()};
+}
+
 tgfx::Bitmap RenderAnimatedTimelinesAt(const std::string& timeSeconds, bool opaqueBackground) {
   auto inputPath = TestResourcePath("render_animated_timelines.pagx");
   std::vector<std::string> args = {"render", "--time", timeSeconds};

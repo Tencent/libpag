@@ -4,6 +4,8 @@ const {
   PAGX_ANIM_PREFIX,
   pagxExtractTransform,
   pagxTransformToMatrix6,
+  pagxTransformToSample16,
+  pagxRdpKeep,
   pagxParseFilterChannels,
   pagxParseTranslateXY,
   pagxStopScalarSeries,
@@ -26,6 +28,32 @@ describe('pagxExtractTransform', () => {
     global.getComputedStyle = originalGetComputedStyle;
   });
 
+  // Reference box the probe is sized from; only its finiteness matters for the chains that carry
+  // absolute lengths.
+  const BOX = { width: 200, height: 100 };
+
+  // Stands in for the style engine instead of returning a canned matrix: a percentage
+  // `translateX` resolves against the probe's own used width (`auto` on the empty probe
+  // computes to 0) and `translateZ` lands in the depth slots, so the probe's size is what
+  // the authored value resolves against.
+  function makeTransformProbe() {
+    const probe = { style: {}, remove() {} };
+    global.document = {
+      createElement: () => probe,
+      body: { appendChild() {} },
+    };
+    global.getComputedStyle = () => {
+      const chain = String(probe.style.transform || '');
+      const width = parseFloat(String(probe.style.width || ''));
+      const percentX = /translatex\(\s*(-?[\d.]+)%\s*\)/i.exec(chain);
+      const pxZ = /translatez\(\s*(-?[\d.]+)px\s*\)/i.exec(chain);
+      const x = percentX ? (parseFloat(percentX[1]) / 100) * (isNaN(width) ? 0 : width) : 0;
+      const z = pxZ ? parseFloat(pxZ[1]) : 0;
+      return { transform: 'matrix3d(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, ' + x + ', 0, ' + z + ', 1)' };
+    };
+    return probe;
+  }
+
   test('an identity-linear matrix folds to a pure translate', () => {
     expect(pagxExtractTransform('matrix(1, 0, 0, 1, 12, 34)')).toBe('translate(12px, 34px)');
   });
@@ -34,10 +62,30 @@ describe('pagxExtractTransform', () => {
     expect(pagxExtractTransform('matrix(2, 0, 0, 2, 12, 34)')).toBe('matrix(2, 0, 0, 2, 12, 34)');
   });
 
-  test('matrix3d delegates to the translate-only extraction', () => {
+  test('a flat matrix3d collapses to its 2D affine', () => {
     expect(
       pagxExtractTransform('matrix3d(2, 0, 0, 0, 0, 2, 0, 0, 0, 0, 1, 0, 7, 8, 0, 1)'),
-    ).toBe('translate(7px, 8px)');
+    ).toBe('matrix(2, 0, 0, 2, 7, 8)');
+  });
+
+  test('a purely translated matrix3d folds to translate()', () => {
+    expect(
+      pagxExtractTransform('matrix3d(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 12, 34, 0, 1)'),
+    ).toBe('translate(12px, 34px)');
+  });
+
+  test('a 3D pose keeps every matrix3d value', () => {
+    // rotateY(30deg) with perspective(500px): the depth and projection terms must survive so the
+    // importer can route the keyframe to its `matrix3D` channel.
+    const pose =
+      'matrix3d(0.866025, 0, -0.5, 0.001, 0, 1, 0, 0, 0.5, 0, 0.866025, -0.001732, 0, 0, 0, 1)';
+    expect(pagxExtractTransform(pose)).toBe(pose);
+  });
+
+  test('matrix6 projects a 3D pose so decimation still sees the motion', () => {
+    const pose =
+      'matrix3d(0.866025, 0, -0.5, 0.001, 0, 1, 0, 0, 0.5, 0, 0.866025, -0.001732, 3, 4, 0, 1)';
+    expect(pagxTransformToMatrix6(pose)).toEqual([0.866025, 0, 0, 1, 3, 4]);
   });
 
   test('a friendly pure-translate string reuses the translate path', () => {
@@ -51,21 +99,81 @@ describe('pagxExtractTransform', () => {
       body: { appendChild() {} },
     };
     global.getComputedStyle = () => ({ transform: 'matrix(2, 0, 0, 2, 10, 20)' });
-    expect(pagxExtractTransform('translate(10px, 20px) scale(2)')).toBe('matrix(2, 0, 0, 2, 10, 20)');
+    expect(pagxExtractTransform('translate(10px, 20px) scale(2)', BOX)).toBe(
+      'matrix(2, 0, 0, 2, 10, 20)',
+    );
   });
 
-  test('a probe resolving to none falls through to translate-only', () => {
+  test('a probe resolving to none reports the chain as unresolved', () => {
     global.document = {
       createElement: () => ({ style: {}, remove() {} }),
       body: { appendChild() {} },
     };
     global.getComputedStyle = () => ({ transform: 'none' });
-    expect(pagxExtractTransform('translate(10px, 20px) scale(2)')).toBe('translate(10px, 20px)');
+    // The browser rejected the declaration, so there is no pose to fold. The old translate-only
+    // fallback authored `translate(10px, 20px)` and silently dropped the scale.
+    expect(pagxExtractTransform('translate(10px, 20px) scale(2)', BOX)).toBeNull();
   });
 
-  test('a throwing probe is caught and falls through to translate-only', () => {
+  test('a friendly chain carrying depth keeps its matrix3d form', () => {
+    // `translateZ` leaves no trace in the XY pair, so folding the chain to `translate(10px, 0px)`
+    // would erase the whole depth track (and the projection peak it drives). The probe resolves the
+    // chain to matrix3d, which the 16-component sampler then keeps.
+    global.document = {
+      createElement: () => ({ style: {}, remove() {} }),
+      body: { appendChild() {} },
+    };
+    global.getComputedStyle = () => ({
+      transform: 'matrix3d(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 10, 0, 300, 1)',
+    });
+    expect(pagxExtractTransform('translateX(10px) translateZ(300px)', BOX)).toBe(
+      'matrix3d(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 10, 0, 300, 1)',
+    );
+  });
+
+  test('a depth-free translate3d still collapses to the compact translate', () => {
+    // A zero Z carries no depth to lose, so the probe's flat matrix falls back to the exact same
+    // `translate()` form the pure-translate path produces.
+    global.document = {
+      createElement: () => ({ style: {}, remove() {} }),
+      body: { appendChild() {} },
+    };
+    global.getComputedStyle = () => ({
+      transform: 'matrix3d(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 10, 20, 0, 1)',
+    });
+    expect(pagxExtractTransform('translate3d(10px, 20px, 0)', BOX)).toBe('translate(10px, 20px)');
+  });
+
+  test('a throwing probe reports the chain as unresolved', () => {
     global.document = { createElement() { throw new Error('no dom'); } };
-    expect(pagxExtractTransform('translate(10px, 20px) rotate(45deg)')).toBe('translate(10px, 20px)');
+    expect(pagxExtractTransform('translate(10px, 20px) rotate(45deg)')).toBeNull();
+  });
+
+  test('a percentage translate resolves against the element box', () => {
+    const probe = makeTransformProbe();
+    expect(
+      pagxExtractTransform('translateX(-50%) translateZ(300px)', { width: 200, height: 100 }),
+    ).toBe('matrix3d(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, -100, 0, 300, 1)');
+    // The probe must carry the box: the width is what `-50%` resolves against.
+    expect(probe.style.width).toBe('200px');
+    expect(probe.style.height).toBe('100px');
+  });
+
+  test('a percentage chain without an element box is reported unresolved', () => {
+    const created = [];
+    global.document = {
+      createElement: () => {
+        const probe = { style: {}, remove() {} };
+        created.push(probe);
+        return probe;
+      },
+      body: { appendChild() {} },
+    };
+    global.getComputedStyle = () => ({ transform: 'matrix3d(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1)' });
+    // No box means no percentage basis: guessing one would author a different pose, so the chain is
+    // reported unresolved instead of folding to the depth-less `translate()` it used to emit.
+    expect(pagxExtractTransform('translateX(-50%) translateZ(300px)')).toBeNull();
+    expect(created).toHaveLength(0);
   });
 });
 
@@ -161,10 +269,12 @@ describe('pagxStopScalarSeries', () => {
     ];
     const series = pagxStopScalarSeries(stops);
     expect(series.opacity).toEqual([0.25, 0.75]);
+    // A 2D pose is padded up to sixteen column-major components, so the affine slots sit at the same
+    // indices as in a `matrix3d`; the padding stays constant and costs nothing in decimation.
     expect(series.m0).toEqual([2, 1]);
-    expect(series.m3).toEqual([3, 1]);
-    expect(series.m4).toEqual([10, 30]);
-    expect(series.m5).toEqual([20, 40]);
+    expect(series.m5).toEqual([3, 1]);
+    expect(series.m12).toEqual([10, 30]);
+    expect(series.m13).toEqual([20, 40]);
   });
 
   test('colour / background / fill / stroke / dashoffset each split into their channels', () => {
@@ -406,5 +516,28 @@ describe('pagxClipNormalizeD (shape branches)', () => {
   test('inset() with a round border-radius drops the rounding and keeps the rect', () => {
     expect(pagxClipNormalizeD('inset(10px 20px 30px 40px round 5px)', el))
       .toBe('M 40 10 L 80 10 L 80 70 L 40 70 Z');
+  });
+});
+
+describe('pagxTransformToSample16', () => {
+  test('pads a 2D pose to sixteen components so one channel set fits every sample', () => {
+    expect(pagxTransformToSample16('matrix(2, 0, 0, 3, 12, 34)')).toEqual([
+      2, 0, 0, 0, 0, 3, 0, 0, 0, 0, 1, 0, 12, 34, 0, 1,
+    ]);
+    expect(pagxTransformToSample16('translate(12px, -4px)')).toEqual([
+      1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 12, -4, 0, 1,
+    ]);
+  });
+
+  test('keeps the depth of a pure-Z track through decimation', () => {
+    // 0 -> 300 -> 0 in Z projects to the same 2D matrix at every sample, so the old six-term vector
+    // was flat and RDP dropped the peak. The full sixteen components keep the Z travel visible.
+    const samples = [
+      'matrix3d(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1)',
+      'matrix3d(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 300, 1)',
+      'matrix3d(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1)',
+    ].map(pagxTransformToSample16);
+    const keep = pagxRdpKeep([0, 0.5, 1], samples.map((s) => s[14]), 0.01, 0);
+    expect(keep).toEqual([true, true, true]);
   });
 });

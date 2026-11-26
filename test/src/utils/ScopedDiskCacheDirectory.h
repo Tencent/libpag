@@ -30,6 +30,8 @@ namespace pag {
  * Isolates disk cache tests in an exclusively created temporary directory and restores the
  * singleton without reading or modifying the original directory. Requires no open sequence files.
  */
+#ifdef PAG_TEST_ACCESS_PRIVATE
+
 class ScopedDiskCacheDirectory {
  public:
   std::string directory;
@@ -128,5 +130,7 @@ class ScopedDiskCacheDirectory {
   decltype(DiskCache::cachedFileInfos) originalCachedFileInfos;
   decltype(DiskCache::cachedFiles) originalCachedFiles;
 };
+
+#endif  // PAG_TEST_ACCESS_PRIVATE
 
 }  // namespace pag

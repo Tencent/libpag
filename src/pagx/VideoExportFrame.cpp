@@ -19,6 +19,7 @@
 #include "pagx/PAGSurface.h"
 #include "pagx/VideoExportFrameImpl.h"
 #include "pagx/runtime/Drawable.h"
+#include "rendering/gpu/Devices.h"
 #include "rendering/utils/AsyncReadback.h"
 #include "tgfx/core/Pixmap.h"
 
@@ -48,7 +49,7 @@ std::shared_ptr<VideoExportFrameImpl> VideoExportFrameImpl::MakeGPU(
     failure->set(VideoExportError::DeviceLost, "the export surface has no GPU device");
     return nullptr;
   }
-  auto* context = impl->device->lockContext();
+  auto* context = pag::Devices::LockContext(impl->device);
   if (context == nullptr) {
     failure->set(VideoExportError::DeviceLost, "failed to lock the export device");
     return nullptr;
@@ -100,7 +101,7 @@ tgfx::Context* VideoExportFrameImpl::lockReadbackSession() {
     fail(VideoExportError::ReadbackFailed, "the frame has no readback session");
     return nullptr;
   }
-  auto* context = device->lockContext();
+  auto* context = pag::Devices::LockContext(device);
   if (context == nullptr) {
     fail(VideoExportError::DeviceLost, "failed to lock the export device");
   }
