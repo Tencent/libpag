@@ -56,9 +56,9 @@ struct VideoFrameRate {
 
   /** Returns the numeric frame rate, or zero when the denominator is zero. */
   double framesPerSecond() const {
-    return frameRateDenominator == 0
-               ? 0.0
-               : static_cast<double>(frameRateNumerator) / static_cast<double>(frameRateDenominator);
+    return frameRateDenominator == 0 ? 0.0
+                                     : static_cast<double>(frameRateNumerator) /
+                                           static_cast<double>(frameRateDenominator);
   }
 
   /**
@@ -71,8 +71,7 @@ struct VideoFrameRate {
     }
     auto quotient = frameRateNumerator / frameRateDenominator;
     auto remainder = frameRateNumerator % frameRateDenominator;
-    return quotient >= minValue && quotient <= maxValue &&
-           (quotient != maxValue || remainder == 0);
+    return quotient >= minValue && quotient <= maxValue && (quotient != maxValue || remainder == 0);
   }
 
   /** Frame-rate numerator. Zero is the automatic sentinel only when the denominator is 1. */
@@ -175,15 +174,15 @@ class VideoExporter {
    * After Make() succeeds, the source document and all reachable external composition documents
    * must remain unmodified until the exporter is destroyed. Create a new exporter after changing
    * their contents, dimensions, frame rates, or timeline structure.
+   * Documents declaring targetLayer/outputBounds are not supported by this exporter.
    *
    * @param document the source document, which is retained for the lifetime of the returned
    *                 exporter. Must be non-null.
    * @param options sampling frame rate, duration, scale and background.
    * @param errorMsg optional pointer that receives a human-readable description on failure.
-   * Documents declaring targetLayer/outputBounds are not supported by this exporter.
    * @return a new exporter, or nullptr when the document declares a default output view, the
-   * document or options are invalid, an animation has
-   *         no duration and none was supplied, the computed frame range or dimensions overflow, or
+   *         document or options are invalid, an animation has no duration and none was supplied,
+   *         the computed frame range or dimensions overflow, or
    *         the offscreen surface cannot be created.
    */
   static std::shared_ptr<VideoExporter> Make(std::shared_ptr<PAGXDocument> document,
