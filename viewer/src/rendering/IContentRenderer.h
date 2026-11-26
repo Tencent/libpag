@@ -36,6 +36,9 @@ class IContentRenderer {
     int64_t imageDecodeTime = 0;
     // Frame index within the animation; -1 means not applicable (e.g. static PAGX content).
     int64_t currentFrame = -1;
+    // 当前成功渲染帧所使用的内容尺寸，与对应纹理同步交接。
+    int contentWidth = 0;
+    int contentHeight = 0;
     // True if rendering actually occurred; false if the frame was skipped.
     bool rendered = false;
     // True if the renderer expects the next frame to change the output. Views that re-flush on

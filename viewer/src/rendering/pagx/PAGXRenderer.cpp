@@ -106,10 +106,16 @@ IContentRenderer::RenderMetrics PAGXRenderer::flush() {
     playbackFinishNotified = false;
   }
 
-  if (state.isPlaying) {
-    metrics.wantsMoreFrames = advancePlayback(state, reseat);
-  } else if (state.animation != nullptr && state.animation->duration() > 0) {
-    seekPaused(state, reseat);
+  metrics.wantsMoreFrames = false;
+  if (state.isTimeBased()) {
+    if (state.isPlaying) {
+      advancePlayback(state, reseat);
+      metrics.wantsMoreFrames = !playbackFinishNotified;
+    } else {
+      seekPaused(state, reseat);
+    }
+  } else if (state.isPlaying) {
+    metrics.wantsMoreFrames = advanceTimeline(state);
   }
 
   metrics.currentFrame = computeProfileFrame(state);
@@ -137,15 +143,14 @@ IContentRenderer::RenderMetrics PAGXRenderer::flush() {
   drawable->present(context);
   metrics.presentTime = tgfx::Clock::Now() - presentStart;
 
+  metrics.contentWidth = state.contentWidth;
+  metrics.contentHeight = state.contentHeight;
   metrics.rendered = true;
   device->unlock();
   return metrics;
 }
 
-bool PAGXRenderer::advancePlayback(PAGXViewModel::RenderState& state, bool reseat) {
-  if (state.animation == nullptr || state.animation->duration() <= 0) {
-    return advanceTimeline(state);
-  }
+void PAGXRenderer::advancePlayback(PAGXViewModel::RenderState& state, bool reseat) {
   // On a fresh play request or content reload, re-seat the animation at the requested position.
   // PAGAnimation holds no play/pause state of its own (playback is gated by the owning
   // PAGComposition's pausedTimelineIds), so replaying only requires seeking to the target time and
@@ -198,9 +203,6 @@ bool PAGXRenderer::advancePlayback(PAGXViewModel::RenderState& state, bool resea
     playbackFinishNotified = true;
     viewModel->notifyPlaybackFinished(state.generation);
   }
-  // A time-based animation always produces a new frame, so the view keeps driving it until the
-  // playing state itself is cleared.
-  return true;
 }
 
 bool PAGXRenderer::advanceTimeline(PAGXViewModel::RenderState& state) {
@@ -277,31 +279,12 @@ void PAGXRenderer::seekPaused(PAGXViewModel::RenderState& state, bool reseat) {
 }
 
 int64_t PAGXRenderer::computeProfileFrame(const PAGXViewModel::RenderState& state) const {
-  if (state.animation == nullptr || state.animation->duration() <= 0) {
+  if (!state.isTimeBased()) {
     return -1;
   }
-  auto rate = state.animation->frameRate();
-  if (rate <= 0) {
-    return -1;
-  }
-  auto periodUs = state.animation->playbackPeriod();
-  if (periodUs <= 0) {
-    return -1;
-  }
-  auto positionUs = state.animation->playbackPosition();
-  auto totalFrames =
-      static_cast<int64_t>(std::round(static_cast<double>(periodUs) * rate / 1000000.0));
-  // Bucket by the same frame count and position ratio the ViewModel uses for the frame counter, so
-  // the sampled bucket and the displayed frame cannot disagree at frame boundaries.
-  auto frame = static_cast<int64_t>(
-      std::floor(static_cast<double>(positionUs) / static_cast<double>(periodUs) *
-                 static_cast<double>(totalFrames)));
-  // Clamp to the last valid frame index so an animation ending exactly on a frame boundary
-  // (integer fps) still records the final frame instead of overflowing totalFrame.
-  if (totalFrames > 0 && frame >= totalFrames) {
-    frame = totalFrames - 1;
-  }
-  return frame;
+  auto progress = static_cast<double>(state.animation->playbackPosition()) /
+                  static_cast<double>(state.animation->playbackPeriod());
+  return ComputeFrameIndex(progress, state.totalFrames);
 }
 
 void PAGXRenderer::applyDisplayTransform(PAGXViewModel::RenderState& state, int surfaceWidth,

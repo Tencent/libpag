@@ -161,10 +161,9 @@ int PAGXViewModel::getHeight() const {
 }
 
 bool PAGXViewModel::hasAnimation() const {
-  // A state machine plays continuously although it exposes no time base, while an animation only
-  // counts as animated when it actually spans time.
-  return isSeekable() || (defaultTimeline != nullptr &&
-                          defaultTimeline->type() == pagx::TimelineType::StateMachine);
+  return (isSeekable() && totalFrames > 1) ||
+         (defaultTimeline != nullptr &&
+          defaultTimeline->type() == pagx::TimelineType::StateMachine);
 }
 
 bool PAGXViewModel::isSeekable() const {
@@ -184,11 +183,7 @@ QString PAGXViewModel::getTotalFrame() const {
 }
 
 QString PAGXViewModel::getCurrentFrame() const {
-  auto currentFrame = static_cast<int64_t>(std::floor(progress * static_cast<double>(totalFrames)));
-  if (currentFrame >= totalFrames) {
-    currentFrame = totalFrames - 1;
-  }
-  return QString::number(currentFrame);
+  return QString::number(ComputeFrameIndex(progress, totalFrames));
 }
 
 QString PAGXViewModel::getDuration() const {
@@ -327,7 +322,8 @@ PAGXViewModel::RenderState PAGXViewModel::getRenderState() {
           progress,
           pendingSeek.exchange(false),
           playbackGeneration.load(),
-          getViewTransform()};
+          getViewTransform(),
+          totalFrames};
 }
 
 bool PAGXViewModel::hasContent() {
@@ -475,7 +471,7 @@ bool PAGXViewModel::loadFile(const QString& filePath) {
       updateAnimationState();
     }
     failLoad();
-    Q_EMIT pagxDocumentChanged(nullptr);
+    Q_EMIT pagxDocumentChanged(nullptr, 0, false);
     emitContentStateReset();
     return false;
   }
@@ -573,7 +569,7 @@ void PAGXViewModel::notifyDocumentReplaced() {
   // the render.
   Q_EMIT preferredSizeChanged();
   Q_EMIT contentSizeChanged();
-  Q_EMIT pagxDocumentChanged(pagxDocument);
+  Q_EMIT pagxDocumentChanged(pagxDocument, totalFrames, isSeekable());
 }
 
 void PAGXViewModel::failLoad() {
@@ -616,8 +612,7 @@ void PAGXViewModel::updateAnimationState() {
   auto periodUs = defaultAnimation == nullptr ? 0 : defaultAnimation->playbackPeriod();
   if (periodUs > 0) {
     auto rate = defaultAnimation->frameRate();
-    totalFrames =
-        static_cast<int64_t>(std::round(static_cast<double>(periodUs) * rate / 1000000.0));
+    totalFrames = ComputeFrameCount(periodUs, rate);
     if (totalFrames < 1) {
       totalFrames = 1;
     }

@@ -192,6 +192,14 @@ class PAGXViewModel : public ContentViewModel {
     bool seekRequested = false;
     uint64_t generation = 0;
     ViewTransform viewTransform = {};
+    int64_t totalFrames = 1;
+
+    /**
+     * 当前默认时间线是否提供有效的可定位播放周期。
+     */
+    bool isTimeBased() const {
+      return animation != nullptr && animation->playbackPeriod() > 0;
+    }
   };
 
   void setWindow(QQuickWindow* window);
@@ -227,7 +235,8 @@ class PAGXViewModel : public ContentViewModel {
    */
   void notifyPlaybackFinished(uint64_t generation);
 
-  Q_SIGNAL void pagxDocumentChanged(std::shared_ptr<pagx::PAGXDocument> pagxDocument);
+  Q_SIGNAL void pagxDocumentChanged(std::shared_ptr<pagx::PAGXDocument> pagxDocument,
+                                    int64_t totalFrames, bool isSeekable);
   Q_SIGNAL void documentXmlChanged();
   Q_SIGNAL void editorLoadFinished(double maxLineWidth);
   // Loading progress in the 0..1 range, emitted once per inserted chunk.

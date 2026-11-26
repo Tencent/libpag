@@ -32,16 +32,11 @@ ContentView::ContentView(QQuickItem* parent) : QQuickItem(parent) {
   setFlag(ItemHasContents, true);
   resizeTimer = std::make_unique<QTimer>();
   connect(resizeTimer.get(), &QTimer::timeout, this, &ContentView::sizeChangedDelayHandle);
-  contentResizeTimer = std::make_unique<QTimer>();
-  contentResizeTimer->setSingleShot(true);
-  contentResizeTimer->setInterval(ResizeDebounceMs);
-  connect(contentResizeTimer.get(), &QTimer::timeout, this, &ContentView::endContentResize);
   connect(this, &QQuickItem::windowChanged, this, &ContentView::onWindowChanged);
 }
 
 ContentView::~ContentView() {
   resizeTimer->stop();
-  contentResizeTimer->stop();
   releaseDrawable();
 }
 
@@ -106,17 +101,14 @@ void ContentView::sizeChangedDelayHandle() {
 }
 
 void ContentView::beginContentResize() {
-  // A dedicated single-shot timer ends the mode. Reusing resizeTimer would let every geometry
-  // change restart it, so a window drag started within the debounce interval of a content-driven
-  // resize would keep the mode alive for the whole drag and turn the debounced surface reallocation
-  // into a per-frame one. It also covers the case where the item already had the preferred size and
-  // no geometry change follows.
+  contentResizeGeneration++;
   contentResizing = true;
-  contentResizeTimer->start();
 }
 
-void ContentView::endContentResize() {
-  contentResizing = false;
+void ContentView::endContentResize(quint64 generation) {
+  if (generation == contentResizeGeneration.load()) {
+    contentResizing = false;
+  }
 }
 
 void ContentView::geometryChange(const QRectF& newGeometry, const QRectF& oldGeometry) {
@@ -161,6 +153,7 @@ void ContentView::triggerFlush() const {
 }
 
 QSGNode* ContentView::updateTextureNode(QSGNode* oldNode) {
+  std::lock_guard<std::mutex> lock(renderedFrameMutex);
   auto node = static_cast<QSGImageNode*>(oldNode);
   if (drawable != nullptr) {
     auto texture = drawable->getTexture();
@@ -193,14 +186,13 @@ QRectF ContentView::textureRect(QSGTexture* texture) const {
   auto pixelRatio = window() == nullptr ? 1.0 : window()->devicePixelRatio();
   auto targetWidth = std::ceil(rect.width() * pixelRatio);
   auto targetHeight = std::ceil(rect.height() * pixelRatio);
-  auto textureFit = std::min(textureWidth / contentWidth, textureHeight / contentHeight);
-  auto canvasFit = std::min(targetWidth / contentWidth, targetHeight / contentHeight);
-  if (textureFit <= 0) {
+  if (renderedContentSize.isEmpty()) {
     return rect;
   }
-  // Scale the previous canvas around its center so the same content point remains centered.
-  // Do not infer old frame placement from the current mutable user transform.
-  auto ratio = canvasFit / textureFit;
+  auto textureFit = ComputeContentFit(renderedContentSize.width(), renderedContentSize.height(),
+                                      textureWidth, textureHeight);
+  auto canvasFit = ComputeContentFit(contentWidth, contentHeight, targetWidth, targetHeight);
+  auto ratio = canvasFit.scale / textureFit.scale;
   auto width = textureWidth * ratio;
   auto height = textureHeight * ratio;
   return {rect.x() + (targetWidth - width) / (2 * pixelRatio),

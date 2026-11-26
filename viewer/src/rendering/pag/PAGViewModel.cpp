@@ -76,25 +76,12 @@ QString PAGViewModel::getTotalFrame() const {
   if (pagFile == nullptr) {
     return "0";
   }
-  int64_t totalFrames =
-      static_cast<int64_t>(std::round(getDuration().toLongLong() * pagFile->frameRate() / 1000.0));
-  if (totalFrames < 1) {
-    totalFrames = 0;
-  }
+  auto totalFrames = ComputeFrameCount(pagPlayer->duration(), pagFile->frameRate());
   return QString::number(totalFrames);
 }
 
 QString PAGViewModel::getCurrentFrame() const {
-  int64_t totalFrames = getTotalFrame().toLongLong();
-  if (totalFrames <= 0) {
-    return "0";
-  }
-  auto currentFrame =
-      static_cast<int64_t>(std::floor(getProgress() * static_cast<double>(totalFrames)));
-  if (currentFrame >= totalFrames) {
-    currentFrame = totalFrames - 1;
-  }
-  return QString::number(currentFrame);
+  return QString::number(ComputeFrameIndex(getProgress(), getTotalFrame().toLongLong()));
 }
 
 bool PAGViewModel::isPlaying() const {
@@ -255,6 +242,7 @@ bool PAGViewModel::loadFile(const QString& filePath) {
   Q_EMIT heightChanged(getHeight());
   Q_EMIT totalFrameChanged();
   Q_EMIT hasAnimationChanged(hasAnimation());
+  Q_EMIT isSeekableChanged();
   Q_EMIT preferredSizeChanged();
   Q_EMIT contentSizeChanged();
   audioPlayer->setVolume(1.0f);

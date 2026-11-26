@@ -22,6 +22,7 @@
 #include <QObject>
 #include <QSizeF>
 #include <QString>
+#include <cstdint>
 #include <memory>
 #include <mutex>
 
@@ -45,6 +46,16 @@ struct ContentFit {
  */
 ContentFit ComputeContentFit(double contentWidth, double contentHeight, double surfaceWidth,
                              double surfaceHeight);
+
+/**
+ * 将微秒周期换算为四舍五入后的帧数，非正周期或帧率返回零。
+ */
+int64_t ComputeFrameCount(int64_t periodUs, double frameRate);
+
+/**
+ * 将线性播放进度映射到有效帧索引，无有效帧时返回零。
+ */
+int64_t ComputeFrameIndex(double progress, int64_t totalFrames);
 
 /**
  * Abstract ViewModel base class for content views. Holds all playback and file state, exposing

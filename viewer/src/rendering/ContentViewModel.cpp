@@ -38,6 +38,21 @@ ContentFit ComputeContentFit(double contentWidth, double contentHeight, double s
   return fit;
 }
 
+int64_t ComputeFrameCount(int64_t periodUs, double frameRate) {
+  if (periodUs <= 0 || frameRate <= 0) {
+    return 0;
+  }
+  return static_cast<int64_t>(std::round(static_cast<double>(periodUs) * frameRate / 1000000.0));
+}
+
+int64_t ComputeFrameIndex(double progress, int64_t totalFrames) {
+  if (totalFrames <= 0) {
+    return 0;
+  }
+  auto frame = static_cast<int64_t>(std::floor(progress * static_cast<double>(totalFrames)));
+  return std::clamp(frame, int64_t{0}, totalFrames - 1);
+}
+
 double ContentViewModel::zoomScale() const {
   std::lock_guard<std::mutex> lock(viewTransformMutex);
   return viewTransform.zoomScale;

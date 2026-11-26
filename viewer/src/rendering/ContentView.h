@@ -76,9 +76,6 @@ class ContentView : public QQuickItem {
   /// of re-rendering identical pixels at the refresh rate.
   bool isRenderActive() const;
 
-  /// Records whether the renderer expects another frame. Called from the render thread.
-  void setRenderActive(bool active);
-
   friend class RenderThread;
 
  protected:
@@ -90,12 +87,8 @@ class ContentView : public QQuickItem {
   virtual void geometryChange(const QRectF& newGeometry, const QRectF& oldGeometry) override;
   void itemChange(ItemChange change, const ItemChangeData& value) override;
 
-  /// Marks the start of a content-driven resize, normally right before the view is resized to fit
-  /// newly loaded content. While such a resize is settling, every geometry change refreshes the
-  /// drawable surface size on the next flush instead of waiting for the resize debounce, so the
-  /// first frame is rendered at the new size rather than stretching the previous texture. The mode
-  /// ends a fixed interval after it starts, independently of later geometry changes, so a window
-  /// drag that begins right after a file is opened is still debounced normally.
+  /// 开始内容驱动的尺寸调整，在当前调整对应的首帧渲染完成后退出；之后的几何变化
+  /// 恢复普通窗口 resize 防抖。旧调整的渲染完成事件不会结束新的调整。
   void beginContentResize();
 
   // Called at the end of sizeChangedDelayHandle(). Subclasses may override to perform
@@ -106,17 +99,20 @@ class ContentView : public QQuickItem {
   std::shared_ptr<GPUDrawable> drawable = nullptr;
   std::unique_ptr<RenderThread> renderThread = nullptr;
   std::unique_ptr<QTimer> resizeTimer = nullptr;
-  // Owns the lifetime of the content resize mode; never restarted by geometry changes, unlike
-  // resizeTimer which exists only to debounce them.
-  std::unique_ptr<QTimer> contentResizeTimer = nullptr;
   std::atomic_bool sizeChanged = false;
   // Written by the render thread at the end of every flush, read by the view on the GUI thread.
   std::atomic_bool renderActive = true;
   bool contentResizing = false;
 
  private:
-  void endContentResize();
+  void setRenderActive(bool active);
+  Q_SLOT void endContentResize(quint64 generation);
   QRectF textureRect(QSGTexture* texture) const;
+
+  // 纹理发布与尺寸快照更新必须和 QSG 纹理读取互斥，避免新纹理搭配旧尺寸。
+  std::mutex renderedFrameMutex = {};
+  QSizeF renderedContentSize = {};
+  std::atomic<quint64> contentResizeGeneration = 0;
 };
 
 }  // namespace pag

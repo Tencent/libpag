@@ -89,14 +89,10 @@ IContentRenderer::RenderMetrics PAGRenderer::flush() {
   applyDisplayTransform();
   player->flush();
   double progress = file->getProgress();
-  auto totalFrames =
-      static_cast<int64_t>(std::round(player->duration() * file->frameRate() / 1000000.0));
-  if (totalFrames < 1) {
-    metrics.currentFrame = 0;
-  } else {
-    metrics.currentFrame =
-        static_cast<int64_t>(std::round(static_cast<double>(totalFrames - 1) * progress));
-  }
+  auto totalFrames = ComputeFrameCount(player->duration(), file->frameRate());
+  metrics.currentFrame = ComputeFrameIndex(progress, totalFrames);
+  metrics.contentWidth = file->width();
+  metrics.contentHeight = file->height();
   metrics.renderTime = player->renderingTime();
   metrics.presentTime = player->presentingTime();
   metrics.imageDecodeTime = player->imageDecodingTime();
