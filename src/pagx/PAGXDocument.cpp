@@ -21,6 +21,7 @@
 #include <unordered_set>
 #include "LayoutContext.h"
 #include "base/utils/Log.h"
+#include "pagx/DocumentAccess.h"
 #include "pagx/PAGScene.h"
 #include "pagx/PAGXImporter.h"
 #include "pagx/nodes/Composition.h"
@@ -921,6 +922,11 @@ const std::vector<const Layer*>& PAGXDocument::findLayersByImageFilePath(
     return empty;
   }
   return it->second;
+}
+
+void detail::DocumentAccess::RegisterNode(PAGXDocument& document, Node* node,
+                                          const std::string& id) {
+  document.registerNode(node, id);
 }
 
 }  // namespace pagx

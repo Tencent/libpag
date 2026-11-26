@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <cstddef>
 #include <vector>
 #include "pagx/nodes/PathData.h"
 #include "pagx/types/FillRule.h"

@@ -71,6 +71,14 @@ enum class OutputViewStatus {
  * it so post-build edits issued through notifyChange() can be broadcast to each scene. Use
  * PAGXImporter to load documents and PAGXExporter to save documents.
  */
+namespace detail {
+
+// Defined in src/pagx/DocumentAccess.h. Importers register addressable nodes while building a
+// document; the definition stays out of the public surface so nothing else can reach for it.
+struct DocumentAccess;
+
+}  // namespace detail
+
 class PAGXDocument : public Node {
  public:
   /**
@@ -422,6 +430,7 @@ class PAGXDocument : public Node {
   friend class PAGComposition;
   friend class LayerBuilderContext;
   friend class LayerBuilderSession;
+  friend struct detail::DocumentAccess;
 };
 
 }  // namespace pagx

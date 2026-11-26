@@ -16,13 +16,17 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include <cmath>
 #include "base/utils/TGFXCast.h"
 #include "base/utils/TimeUtil.h"
 #include "pag/file.h"
 #include "rendering/FileReporter.h"
 #include "rendering/caches/RenderCache.h"
 #include "rendering/drawables/Drawable.h"
+#include "rendering/filters/utils/Filter3DFactory.h"
+#include "rendering/graphics/Transform3DScene.h"
 #include "rendering/layers/PAGStage.h"
+#include "rendering/renderers/FilterRenderer.h"
 #include "rendering/utils/ApplyScaleMode.h"
 #include "rendering/utils/LockGuard.h"
 #include "rendering/utils/ScopedLock.h"
@@ -340,6 +344,13 @@ Rect PAGPlayer::getBounds(std::shared_ptr<PAGLayer> pagLayer) {
       contains = true;
       break;
     }
+    if (Has3DTransform(layer->layer)) {
+      auto filter = FilterModifier::Make(layer);
+      if (filter == nullptr) {
+        return Rect::MakeEmpty();
+      }
+      FilterRenderer::MeasureFilterBounds(&bounds, filter.get());
+    }
     auto layerMatrix = ToTGFX(layer->getTotalMatrixInternal());
     layerMatrix.mapRect(&bounds);
     if (layer->_parent == nullptr && layer->trackMatteOwner) {
@@ -365,9 +376,19 @@ bool PAGPlayer::hitTestPoint(std::shared_ptr<PAGLayer> pagLayer, float surfaceX,
   LockGuard autoLock(rootLocker);
   updateStageSize();
   auto local = pagLayer->globalToLocalPoint(surfaceX, surfaceY);
+  if (!std::isfinite(local.x) || !std::isfinite(local.y)) {
+    return false;
+  }
   if (!pixelHitTest) {
     tgfx::Rect bounds = {};
     pagLayer->measureBounds(&bounds);
+    if (Has3DTransform(pagLayer->layer)) {
+      auto filter = FilterModifier::Make(pagLayer.get());
+      if (filter == nullptr) {
+        return false;
+      }
+      FilterRenderer::MeasureFilterBounds(&bounds, filter.get());
+    }
     return bounds.contains(local.x, local.y);
   }
 
@@ -375,6 +396,25 @@ bool PAGPlayer::hitTestPoint(std::shared_ptr<PAGLayer> pagLayer, float surfaceX,
     return false;
   }
   Recorder recorder = {};
+  if (Has3DTransform(pagLayer->layer)) {
+    auto filter = FilterModifier::Make(pagLayer.get());
+    if (filter == nullptr || filter->transform3DContext == nullptr) {
+      return false;
+    }
+    tgfx::Point parentPoint = {local.x, local.y};
+    auto matrix = ToTGFX(pagLayer->getTotalMatrixInternal());
+    matrix.mapPoints(&parentPoint, 1);
+    if (!std::isfinite(parentPoint.x) || !std::isfinite(parentPoint.y)) {
+      return false;
+    }
+    PAGComposition::DrawChildLayer(&recorder, pagLayer.get(), filter);
+    auto frame = pagLayer->contentFrame + pagLayer->layer->startTime;
+    auto context = filter->transform3DContext;
+    Transform3DSceneBuilder scene(context->width, context->height);
+    scene.addLayer(recorder.makeGraphic(), pagLayer->layer, frame, context,
+                   ToTGFX(pagLayer->layerMatrix));
+    return pagSurface->hitTest(renderCache, scene.makeGraphic(), parentPoint.x, parentPoint.y);
+  }
   pagLayer->draw(&recorder);
   auto graphic = recorder.makeGraphic();
   return pagSurface->hitTest(renderCache, graphic, local.x, local.y);

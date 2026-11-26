@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TransformCache.h"
+#include "rendering/filters/utils/Filter3DFactory.h"
 #include "rendering/renderers/TransformRenderer.h"
 
 namespace pag {
@@ -46,6 +47,16 @@ TransformCache::TransformCache(Layer* layer)
 
 Transform* TransformCache::createCache(Frame layerFrame) {
   auto transform = new Transform();
+  if (Has3DTransform(layer)) {
+    if (layer->transform3D != nullptr) {
+      transform->alpha =
+          static_cast<float>(layer->transform3D->opacity->getValueAt(layerFrame)) / 255.0f;
+    } else if (layer->transform != nullptr) {
+      transform->alpha =
+          static_cast<float>(layer->transform->opacity->getValueAt(layerFrame)) / 255.0f;
+    }
+    return transform;
+  }
   if (layer->transform == nullptr) {
     return transform;
   }

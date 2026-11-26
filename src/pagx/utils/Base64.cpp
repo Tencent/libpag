@@ -86,19 +86,25 @@ std::shared_ptr<Data> Base64Decode(const std::string& encodedString) {
   return Data::MakeAdopt(output.release(), outputLength);
 }
 
-// Returns the offset of the base64 payload inside a `data:` URI, or std::string::npos when the
-// URI is not a base64-encoded one. The scheme is compared case-insensitively because RFC 3986
-// makes URI schemes case-insensitive, and a hand-authored `DATA:` reaches the same callers.
-static size_t Base64PayloadOffset(const std::string& dataURI) {
+bool IsDataUri(const std::string& uri) {
   static constexpr const char* DATA_SCHEME = "data:";
   static constexpr size_t DATA_SCHEME_LENGTH = 5;
-  if (dataURI.size() < DATA_SCHEME_LENGTH) {
-    return std::string::npos;
+  if (uri.size() < DATA_SCHEME_LENGTH) {
+    return false;
   }
   for (size_t i = 0; i < DATA_SCHEME_LENGTH; i++) {
-    if (std::tolower(static_cast<unsigned char>(dataURI[i])) != DATA_SCHEME[i]) {
-      return std::string::npos;
+    if (std::tolower(static_cast<unsigned char>(uri[i])) != DATA_SCHEME[i]) {
+      return false;
     }
+  }
+  return true;
+}
+
+// Returns the offset of the base64 payload inside a `data:` URI, or std::string::npos when the
+// URI is not a base64-encoded one.
+static size_t Base64PayloadOffset(const std::string& dataURI) {
+  if (!IsDataUri(dataURI)) {
+    return std::string::npos;
   }
   auto commaPos = dataURI.find(',');
   if (commaPos == std::string::npos) {
