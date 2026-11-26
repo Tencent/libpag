@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "pagx/PAGXNodeChannel.h"
+#include <climits>
 #include <cmath>
 #include <optional>
 #include <string_view>
@@ -231,12 +232,19 @@ static bool AccessFillStrokeColor(Node* node, KeyValue* getOut, const KeyValue* 
     return false;
   }
   auto* solid = static_cast<SolidColor*>(colorSource);
-  if (getOut == nullptr && setIn == nullptr) {
-    solid->color = Default<SolidColor>().color;
-    return true;
-  }
   if (getOut != nullptr) {
     *getOut = solid->color;
+    return true;
+  }
+  // A named SolidColor is a shared @id resource: writing it would recolour every layer referencing
+  // the same id, while a full reparse creates a fresh unnamed SolidColor for this one fill. Refuse
+  // both writes and resets so the caller falls back to a full reparse instead of mutating the
+  // shared node. An inline unnamed SolidColor is owned by this fill and stays writable.
+  if (!solid->id.empty()) {
+    return false;
+  }
+  if (setIn == nullptr) {
+    solid->color = Default<SolidColor>().color;
     return true;
   }
   const auto* value = std::get_if<Color>(setIn);
@@ -457,54 +465,63 @@ static bool AccessEnum(Node* node, KeyValue* getOut, const KeyValue* setIn) {
 }
 
 // Convenience macros that turn a (channel, member) pair into a ChannelDef row. They only build the
-// table entries; all access logic lives in the templated generators above.
+// table entries; all access logic lives in the templated generators above. Every row declares its
+// KeyValue alternative so raw-string writers never have to infer a type from the current value.
 #define FIELD_FLOAT(T, name, member, cls) \
-  { name, cls, &AccessFloat<T, &T::member> }
+  { name, cls, &AccessFloat<T, &T::member>, ChannelValueType::Float, nullptr }
 #define FIELD_SKEW(T, name, member, cls) \
-  { name, cls, &AccessSkewAngle<T, &T::member> }
+  { name, cls, &AccessSkewAngle<T, &T::member>, ChannelValueType::Float, nullptr }
 #define FIELD_PERSPECTIVE(T, name, member, cls) \
-  { name, cls, &AccessPerspectiveDistance<T, &T::member> }
+  { name, cls, &AccessPerspectiveDistance<T, &T::member>, ChannelValueType::Float, nullptr }
 #define FIELD_BOOL(T, name, member, cls) \
-  { name, cls, &AccessBool<T, &T::member> }
+  { name, cls, &AccessBool<T, &T::member>, ChannelValueType::Bool, nullptr }
 #define FIELD_INT(T, name, member, cls) \
-  { name, cls, &AccessInt<T, &T::member> }
+  { name, cls, &AccessInt<T, &T::member>, ChannelValueType::Int, nullptr }
 #define FIELD_STRING(T, name, member, cls) \
-  { name, cls, &AccessString<T, &T::member> }
+  { name, cls, &AccessString<T, &T::member>, ChannelValueType::String, nullptr }
 #define FIELD_COLOR(T, name, member, cls) \
-  { name, cls, &AccessColor<T, &T::member> }
+  { name, cls, &AccessColor<T, &T::member>, ChannelValueType::Color, nullptr }
 #define FIELD_MATRIX(T, name, member, cls) \
-  { name, cls, &AccessMatrix<T, &T::member> }
+  { name, cls, &AccessMatrix<T, &T::member>, ChannelValueType::Matrix, nullptr }
 #define FIELD_MATRIX3D(T, name, member, cls) \
-  { name, cls, &AccessMatrix3D<T, &T::member> }
+  { name, cls, &AccessMatrix3D<T, &T::member>, ChannelValueType::Matrix3D, nullptr }
 #define FIELD_POINT_X(T, name, member, cls) \
-  { name, cls, &AccessPointAxis<T, &T::member, true> }
+  { name, cls, &AccessPointAxis<T, &T::member, true>, ChannelValueType::Float, nullptr }
 #define FIELD_POINT_Y(T, name, member, cls) \
-  { name, cls, &AccessPointAxis<T, &T::member, false> }
+  { name, cls, &AccessPointAxis<T, &T::member, false>, ChannelValueType::Float, nullptr }
 #define FIELD_SIZE_W(T, name, member, cls) \
-  { name, cls, &AccessSizeAxis<T, &T::member, true> }
+  { name, cls, &AccessSizeAxis<T, &T::member, true>, ChannelValueType::Float, nullptr }
 #define FIELD_SIZE_H(T, name, member, cls) \
-  { name, cls, &AccessSizeAxis<T, &T::member, false> }
+  { name, cls, &AccessSizeAxis<T, &T::member, false>, ChannelValueType::Float, nullptr }
 #define FIELD_PADDING_L(T, name, member, cls) \
-  { name, cls, &AccessPaddingComp<T, &T::member, 0> }
+  { name, cls, &AccessPaddingComp<T, &T::member, 0>, ChannelValueType::Float, nullptr }
 #define FIELD_PADDING_T(T, name, member, cls) \
-  { name, cls, &AccessPaddingComp<T, &T::member, 1> }
+  { name, cls, &AccessPaddingComp<T, &T::member, 1>, ChannelValueType::Float, nullptr }
 #define FIELD_PADDING_R(T, name, member, cls) \
-  { name, cls, &AccessPaddingComp<T, &T::member, 2> }
+  { name, cls, &AccessPaddingComp<T, &T::member, 2>, ChannelValueType::Float, nullptr }
 #define FIELD_PADDING_B(T, name, member, cls) \
-  { name, cls, &AccessPaddingComp<T, &T::member, 3> }
+  { name, cls, &AccessPaddingComp<T, &T::member, 3>, ChannelValueType::Float, nullptr }
 #define FIELD_OPT_FLOAT(T, name, member, cls) \
-  { name, cls, &AccessOptionalFloat<T, &T::member> }
+  { name, cls, &AccessOptionalFloat<T, &T::member>, ChannelValueType::Float, nullptr }
 #define FIELD_OPT_COLOR(T, name, member, cls) \
-  { name, cls, &AccessOptionalColor<T, &T::member> }
+  { name, cls, &AccessOptionalColor<T, &T::member>, ChannelValueType::Color, nullptr }
 // The width/height dimension channels and their percent siblings. Both accessors cross-clear the
 // two members (see AccessDimensionAxis), so writing one clears the other: a stale percent would
-// keep overriding a freshly written absolute value, and vice versa.
-#define FIELD_DIMENSION(T, name, cls, WidthAxis) \
-  { name, cls, &AccessDimensionAxis<T, WidthAxis, false> }
+// keep overriding a freshly written absolute value, and vice versa. Only the absolute channel
+// declares the sibling; a raw "50%" write is routed there while keeping the XML syntax in one
+// place.
+#define FIELD_DIMENSION(T, name, cls, WidthAxis)                                   \
+  {                                                                                \
+    name, cls, &AccessDimensionAxis<T, WidthAxis, false>, ChannelValueType::Float, \
+        WidthAxis ? "percentWidth" : "percentHeight"                               \
+  }
 #define FIELD_PERCENT(T, name, cls, WidthAxis) \
-  { name, cls, &AccessDimensionAxis<T, WidthAxis, true> }
-#define FIELD_ENUM(T, name, member, cls, E) \
-  { name, cls, &AccessEnum<T, E, &T::member, E##ToString, E##FromString, IsValid##E##String> }
+  { name, cls, &AccessDimensionAxis<T, WidthAxis, true>, ChannelValueType::Float, nullptr }
+#define FIELD_ENUM(T, name, member, cls, E)                                                   \
+  {                                                                                           \
+    name, cls, &AccessEnum<T, E, &T::member, E##ToString, E##FromString, IsValid##E##String>, \
+        ChannelValueType::String, nullptr                                                     \
+  }
 
 // The shared LayoutNode constraint fields (layout inputs) appended to every LayoutNode-derived type.
 // T must derive from LayoutNode so the member pointers resolve through the base subobject.
@@ -645,7 +662,7 @@ static std::vector<ChannelDef> BuildTextFields() {
 
 static std::vector<ChannelDef> BuildFillFields() {
   return {
-      {"color", Anim, &AccessFillStrokeColor},
+      {"color", Anim, &AccessFillStrokeColor, ChannelValueType::Color, nullptr},
       FIELD_FLOAT(Fill, "alpha", alpha, Anim),
       FIELD_ENUM(Fill, "blendMode", blendMode, NoFlags, BlendMode),
       FIELD_ENUM(Fill, "fillRule", fillRule, NoFlags, FillRule),
@@ -655,7 +672,7 @@ static std::vector<ChannelDef> BuildFillFields() {
 
 static std::vector<ChannelDef> BuildStrokeFields() {
   return {
-      {"color", Anim, &AccessFillStrokeColor},
+      {"color", Anim, &AccessFillStrokeColor, ChannelValueType::Color, nullptr},
       FIELD_FLOAT(Stroke, "width", width, Anim),
       FIELD_FLOAT(Stroke, "alpha", alpha, Anim),
       FIELD_ENUM(Stroke, "blendMode", blendMode, NoFlags, BlendMode),
@@ -1239,6 +1256,105 @@ std::vector<std::string> ListChannels(NodeType type) {
     names.emplace_back(field.channel);
   }
   return names;
+}
+
+// Parses a raw attribute string into the KeyValue alternative the channel expects, matching the
+// importer's per-type parsing exactly so an incremental edit yields the same value a full reparse
+// would. Returns false (leaving out unset) when the string is not a valid value for that type.
+static bool ParseChannelValue(ChannelValueType type, const std::string& raw, KeyValue* out) {
+  switch (type) {
+    case ChannelValueType::Float: {
+      float value = 0;
+      if (!ParseStrictFloat(raw, &value)) {
+        return false;
+      }
+      *out = value;
+      return true;
+    }
+    case ChannelValueType::Int: {
+      int value = 0;
+      if (!ParseStrictInt(raw, &value)) {
+        return false;
+      }
+      *out = value;
+      return true;
+    }
+    case ChannelValueType::Bool: {
+      bool value = false;
+      if (!ParseStrictBool(raw, &value)) {
+        return false;
+      }
+      *out = value;
+      return true;
+    }
+    case ChannelValueType::Color: {
+      bool valid = false;
+      Color color = ParseColor(raw, &valid);
+      if (!valid) {
+        return false;
+      }
+      *out = color;
+      return true;
+    }
+    case ChannelValueType::String:
+      // Strings and enums are carried verbatim; enum validity is checked by the accessor.
+      *out = raw;
+      return true;
+    case ChannelValueType::ImageRef:
+    case ChannelValueType::Matrix:
+    case ChannelValueType::PAGImage:
+    case ChannelValueType::Matrix3D:
+      // Not addressable through a raw attribute string: ImageRef/PAGImage need a resolved image
+      // handle and the matrix types need a full transform structure.
+      return false;
+  }
+  return false;
+}
+
+bool SetNodeChannelFromString(Node* node, const std::string& channel, const std::string& raw) {
+  if (node == nullptr) {
+    return false;
+  }
+  const auto* field = FindChannel(node->nodeType(), channel);
+  if (field == nullptr) {
+    LOGE("SetNodeChannelFromString: unhandled channel '%s' for node type %d.", channel.c_str(),
+         static_cast<int>(node->nodeType()));
+    return false;
+  }
+  KeyValue value = {};
+  if (field->percentChannel != nullptr) {
+    // Dimension channels accept the XML syntax ("100" or "50%"). A percent value addresses the
+    // declared sibling channel; both accessors clear their counterpart member, so the result
+    // matches a full reparse (ReadDimension writes exactly one member and NaNs the other).
+    float absolute = NAN;
+    float percent = NAN;
+    if (!ParseDimension(raw, &absolute, &percent)) {
+      LOGE("SetNodeChannelFromString: cannot parse dimension value '%s' for channel '%s'.",
+           raw.c_str(), channel.c_str());
+      return false;
+    }
+    if (!std::isnan(percent)) {
+      field = FindChannel(node->nodeType(), field->percentChannel);
+      if (field == nullptr) {
+        LOGE("SetNodeChannelFromString: missing percent channel for '%s' on node type %d.",
+             channel.c_str(), static_cast<int>(node->nodeType()));
+        return false;
+      }
+      value = percent;
+    } else {
+      value = absolute;
+    }
+  } else if (!ParseChannelValue(field->valueType, raw, &value)) {
+    LOGE("SetNodeChannelFromString: cannot parse value '%s' for channel '%s' of type %d.",
+         raw.c_str(), channel.c_str(), static_cast<int>(field->valueType));
+    return false;
+  }
+  if (!field->access(node, nullptr, &value)) {
+    LOGE("SetNodeChannelFromString: failed to set channel '%s' for node type %d.", channel.c_str(),
+         static_cast<int>(node->nodeType()));
+    return false;
+  }
+  return true;
 }
 
 }  // namespace pagx

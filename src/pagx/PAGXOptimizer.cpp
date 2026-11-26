@@ -291,6 +291,7 @@ Group* WrapShellLayerAsGroup(PAGXDocument* doc, Layer* layer) {
   layer->customData.clear();
   if (group->sourceLine == -1) {
     group->sourceLine = layer->sourceLine;
+    group->endLine = layer->endLine;
   }
   return group;
 }
@@ -481,6 +482,7 @@ Element* TryCanonicalizePath(PAGXDocument* doc, Path* path,
     rect->position = {path->position.x + cx, path->position.y + cy};
     rect->size = {w, h};
     rect->sourceLine = path->sourceLine;
+    rect->endLine = path->endLine;
     return rect;
   }
   if (TryReadEllipse(path->data, cx, cy, w, h)) {
@@ -488,6 +490,7 @@ Element* TryCanonicalizePath(PAGXDocument* doc, Path* path,
     ellipse->position = {path->position.x + cx, path->position.y + cy};
     ellipse->size = {w, h};
     ellipse->sourceLine = path->sourceLine;
+    ellipse->endLine = path->endLine;
     return ellipse;
   }
   return path;
@@ -1100,6 +1103,7 @@ bool MergeAdjacentShellLayersInList(PAGXDocument* doc, std::vector<Layer*>& laye
     // Build a new wrapper layer containing one Group per source.
     auto* wrapper = doc->makeNode<Layer>();
     wrapper->sourceLine = layers[i]->sourceLine;
+    wrapper->endLine = layers[i]->endLine;
     for (size_t k = i; k < j; k++) {
       auto* src = layers[k];
       if (src->contents.empty() && src->customData.empty()) {

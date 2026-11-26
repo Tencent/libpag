@@ -121,4 +121,29 @@ bool ChannelExists(NodeType type, const std::string& channel);
  */
 std::vector<std::string> ListChannels(NodeType type);
 
+/**
+ * Writes a raw string value into the node field identified by channel, parsing it into the
+ * KeyValue alternative the channel expects. The string uses the exact PAGX XML attribute syntax.
+ * Dimension channels ("100" / "50%", where the percent form writes the declared sibling channel),
+ * bool, color ("#RGB"/"#RRGGBB"/"#RRGGBBAA"/"srgb(...)"/"p3(...)"), enum, and string channels are
+ * parsed with the same rules as document import, so an incremental edit produces the value a full
+ * reparse would. The grammar comes from the channel's declared value type rather than its current
+ * value, so optional channels can be written from an unset state. Float and int channels use the
+ * strict scalar parsers shared with keyframe import: the whole string must be consumed, values must
+ * be finite, and integers must fit in int without overflow. A false return for such inputs is not a
+ * document error — treat it as "cannot go incremental" and fall back to a full reparse. This is the
+ * convenience entry point for editors that hold the value as text (e.g. a source-editor attribute
+ * edit); prefer SetNodeChannel when the value is already typed. Edits are applied to the document;
+ * refresh any associated scene separately via PAGXDocument::notifyChange (use RequiresLayout to
+ * decide the layoutChanged flag).
+ * @param node  the node to write to; must not be null.
+ * @param channel  the channel name (see the encoding notes above).
+ * @param raw  the value in PAGX attribute string form.
+ * @return true on success; false if node is null, the channel is unknown for the node type, the
+ * string cannot be parsed into the channel's type, an enum string is invalid, or the channel is
+ * backed by a named SolidColor resolved from an @id reference. The last case must fall back to a
+ * full reparse because mutating a shared resource would recolour every other layer using that id.
+ */
+bool SetNodeChannelFromString(Node* node, const std::string& channel, const std::string& raw);
+
 }  // namespace pagx

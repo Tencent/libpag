@@ -22,7 +22,7 @@
 // load(); everything else - keyboard shortcuts, size responsiveness, playback UI - is owned by
 // the player.
 
-import type { PlayerModule, PlayerView } from './pagx-view-types';
+import type { HitTestResult, NodeBounds, NodeSourceEntry, PlayerModule, PlayerView } from './pagx-view-types';
 import type {
     BackgroundColor,
     EditorCallbacks,
@@ -32,14 +32,19 @@ import type {
     PAGXPlayerEventMap,
     PAGXPlayerLoadOptions,
     PAGXPlayerOptions,
+    SourceDiagnostic,
+    SourceDiagnosticProvider,
     StatusOptions,
     ToolbarSlot,
 } from './types';
 import { GestureManager, bindCanvasEvents } from './gesture-manager';
 import { PlaybackBar } from './playback-bar';
 import { buildToolbar, setToolbarVisible } from './toolbar';
-import { EditorPanel, EDITOR_STATUS_DURATION_MS } from './editor/index';
+import { EditorPanel, EDITOR_STATUS_DURATION_MS, type LineRange } from './editor/index';
+import { applyDraftLineChange, classifyEdits, findNodeIndexForLine, hasMatchingSpanBoundaries,
+    SourceMapIndex, type DraftLineChange } from './incremental-apply';
 import { ensureStylesInjected } from './styles';
+import { StatusPill } from './status-pill';
 
 /** Canvas element id assigned by the player. Kept stable so external CSS or debug tooling
  *  that targets '#pagx-canvas' keeps working on the (dominant) single-instance case. The
@@ -52,6 +57,102 @@ const CANVAS_ID = 'pagx-canvas';
  *  pagx documents with alpha. */
 const DEFAULT_BACKGROUND: BackgroundColor = { r: 0, g: 0, b: 0, a: 0 };
 
+/** Owns the document-side half of PAGXPlayer.load(): parse, host-supplied fonts and resources,
+ *  background / loop / playback-state restoration and the first draw. It is deliberately stateless
+ *  across loads — the generation guard stays in the caller, which owns load ordering and UI state —
+ *  so the phases can be tested or reordered without touching the player's DOM and event wiring. */
+class DocumentLoader {
+    /** Runs the full document pipeline against an already-initialized view. `isCurrent` is polled
+     *  after each await so a superseded load aborts before touching the view again. Returns false
+     *  when aborted, true when the document is built and the first frame drawn. */
+    static async load(view: PlayerView, pagxBytes: Uint8Array, options: PAGXPlayerLoadOptions,
+                      backgroundColor: BackgroundColor, isCurrent: () => boolean,
+                      resetTransform: () => void): Promise<boolean> {
+        const preservedTime = options.preserveCurrentTime
+            ? (view.durationMicros() > 0 ? view.currentTimeMicros() : 0)
+            : 0;
+        const wasPlaying = options.preserveCurrentTime && view.isPlaying();
+
+        view.parsePAGX(pagxBytes);
+
+        // The view resets font registration on each load, so host fonts must be re-registered
+        // before buildLayers().
+        if (options.registerFonts) {
+            await options.registerFonts(view);
+            if (!isCurrent()) return false;
+        }
+
+        // parsePAGX populates the resource path list; fetch concurrently but push in path order so
+        // duplicate paths stay deterministic.
+        if (options.resolveResource) {
+            const paths: string[] = view.getExternalFilePaths();
+            if (paths && paths.length > 0) {
+                const resolve = options.resolveResource;
+                const items = await Promise.all(
+                    paths.map(async (rel: string) => ({
+                        rel,
+                        buf: await resolve(rel),
+                    })),
+                );
+                if (!isCurrent()) return false;
+                for (const item of items) {
+                    if (item.buf) {
+                        view.loadFileData(item.rel, item.buf);
+                    }
+                }
+            }
+        }
+
+        view.buildLayers();
+
+        if (options.forceLoop !== false) {
+            view.setLoop(true);
+        }
+        const bg = backgroundColor;
+        const hex =
+            '#' +
+            bg.r.toString(16).padStart(2, '0') +
+            bg.g.toString(16).padStart(2, '0') +
+            bg.b.toString(16).padStart(2, '0');
+        view.setBackgroundColor(hex, bg.a);
+
+        if (options.preserveCurrentTime && preservedTime > 0) {
+            view.setCurrentTimeMicros(Math.min(preservedTime, view.durationMicros()));
+        }
+        // buildLayers leaves the view auto-playing; mirror the previous play state when asked, so a
+        // paused reload does not silently resume. A non-preserving load shows a different document,
+        // so reset the gesture transform unless the host asked to keep the viewport.
+        if (options.preserveCurrentTime) {
+            if (wasPlaying) {
+                view.play();
+            } else {
+                view.pause();
+            }
+        } else {
+            resetTransform();
+        }
+
+        // Force a synchronous first frame so the old document cannot ghost through when the canvas
+        // is unhidden in the caller.
+        view.draw();
+        return true;
+    }
+}
+
+/** Owns the selection-side half of PAGXPlayer.load(): rebuild the source map from the new document
+ *  and clear every handle that pointed into the previous runtime tree. State stays on the player so
+ *  the hover/select/overlay methods can keep using it; this class only sequences the reset. */
+class SelectionController {
+    static reset(view: PlayerView, editor: EditorPanel | null,
+                 setSourceMap: (map: readonly NodeSourceEntry[]) => void,
+                 clearSelection: () => void, refreshOverlay: () => void): void {
+        setSourceMap(view.getNodeSourceMap());
+        clearSelection();
+        editor?.clearHighlight();
+        refreshOverlay();
+    }
+}
+
 export class PAGXPlayer extends EventTarget {
     private readonly options: PAGXPlayerOptions;
     private readonly gesture: GestureManager;
@@ -61,17 +162,56 @@ export class PAGXPlayer extends EventTarget {
     private readonly toolbarRoot: HTMLDivElement;
     private readonly playbackBar: PlaybackBar;
     private readonly editor: EditorPanel | null = null;
-    private readonly statusEl: HTMLDivElement;
+    private readonly statusPill: StatusPill;
 
     private module: PlayerModule | null = null;
     private view: PlayerView | null = null;
     private detachCanvasEvents: (() => void) | null = null;
-    private statusHideTimer: number | null = null;
-    // Monotonically increasing id for each showStatus call; the caller can hold this token
-    // and pass it to hideStatus() to only clear the pill when their own message is still on
-    // screen. See showStatus / hideStatus for the full story.
-    private statusTokenSeq = 0;
-    private currentStatusToken = 0;
+
+    // --- Selection mode (phase 1: canvas<->editor highlighting) ---
+    private selectMode = false;
+    private hoverIndex = -1;
+    // Full hitTest result from the last canvas hover/select. Carries the reference node's span
+    // (so the editor highlights the <Layer composition="@X"> reference, not the internal
+    // definition) and the clicked instance's on-screen bounds (so the overlay outlines exactly
+    // what the user clicked, even when the same source node has multiple instances). Cleared by
+    // editor-direction selection (onEditorDblClick) sets selectedIndex via
+    // sourceMap line lookup and have no hitTest result to mirror.
+    private hoverHit: HitTestResult | null = null;
+    private selectHit: HitTestResult | null = null;
+    // Node index the editor is hovering (editor->canvas direction). Independent of selectMode:
+    // hovering an editor line always highlights the corresponding node on the canvas.
+    private editorHoverIndex = -1;
+    // The physical tag line highlighted in the editor. It is intentionally separate from the node's
+    // full source span so parents never swallow their children during source browsing.
+    private editorHoverLine = -1;
+    private selectedIndex = -1;
+    // Runtime spans are refreshed only by load(). Draft spans are a line-number projection used
+    // while unsaved source edits insert or remove lines, then reset from runtime spans on Apply/Discard.
+    private sourceMap: NodeSourceEntry[] = [];
+    private draftSourceMap: NodeSourceEntry[] = [];
+    // Lazy index over draftSourceMap. applyDraftLineChange mutates entries in place, so any line
+    // change invalidates the sorted spans and the index must be rebuilt; hover/select/overlay lookups
+    // reuse it between edits instead of scanning the map linearly each time.
+    private draftIndex: SourceMapIndex | null = null;
+    // Selection boxes painted over the canvas, one per runtime layer instance built from the
+    // bounds-bearing node — a source node referenced by N composition layers builds N instances,
+    // all of which get outlined. Kept as a reusable pool so the per-frame follow-loop only
+    // toggles styles instead of churning DOM nodes.
+    private overlayBoxes: HTMLDivElement[] = [];
+    // The bounds-bearing node the overlay currently paints (resolved from the hover/select target
+    // by climbing to the owning Layer for internal elements), and which visual state to render.
+    // Cached by refreshOverlay so the per-frame follow-loop skips the ancestry walk.
+    private overlayBoundsIndex = -1;
+    private overlayKind: 'hover' | 'select' = 'hover';
+    // Bounds queried on the previous overlay tick, one entry per instance. PAGXView.draw()
+    // double-buffers recordings, so during playback the canvas presents the frame recorded one
+    // tick earlier than the scene state getNodeBounds reads; presenting the previous tick's
+    // bounds keeps the outline on the pixels.
+    private overlayPreviousBounds: NodeBounds[] | null = null;
+    private overlayRaf = 0;
+    private hoverRaf = 0;
+    private detachHover: (() => void) | null = null;
 
     // Concurrency + lifetime guards. Every load() captures loadGeneration on entry and
     // re-reads it after each await; a mismatch means a newer load() (or destroy() / non-BFCache
@@ -140,9 +280,7 @@ export class PAGXPlayer extends EventTarget {
         // Status pill. Anchored above the canvas area; inherits the wrapper's shrink-with-editor
         // behavior automatically since it's a child of the same wrapper as the toolbar and
         // playback bar. Starts hidden so nothing shows until the host calls showStatus().
-        this.statusEl = document.createElement('div');
-        this.statusEl.className = 'pagx-player-status hidden';
-        this.root.appendChild(this.statusEl);
+        this.statusPill = new StatusPill(this.root);
 
         // Toolbar (before/after slots come from host; built-in Reset + Source Editor sit
         // between them so their relative order in options.extraMenuItems is preserved).
@@ -180,6 +318,14 @@ export class PAGXPlayer extends EventTarget {
                 parent: this.root,
                 canvasContainer: this.root,
                 callbacks: options.editorCallbacks!,
+                onToggleSelect: () => this.toggleSelectMode(),
+                onClose: () => {
+                    // Exit select mode whenever the editor closes (manual close, document switch,
+                    // hide) so the canvas stops driving highlights against a hidden editor.
+                    if (this.selectMode) {
+                        this.toggleSelectMode();
+                    }
+                },
                 notify: (message, kind, notifyOptions) => {
                     // Sticky messages ("Applying...", "Saving...") don't auto-hide; the editor
                     // will call notify() again with the resolved result and that replaces the
@@ -192,14 +338,32 @@ export class PAGXPlayer extends EventTarget {
                     });
                 },
                 dismiss: (token) => this.hideStatus(token),
+                diagnosticProviders: this.createDiagnosticProviders(options.diagnosticProviders ?? []),
+                incrementalApply: (oldXml, newXml) => this.tryIncrementalApply(oldXml, newXml),
             });
+        }
+        // Wire editor->canvas interactions. Hover highlights the node on the canvas + mirrors the
+        // grey highlight on the editor line; double-click unlocks the enclosing node's span for
+        // editing. Registered once here; EditorPanel re-applies both across editor rebuilds.
+        if (this.editor) {
+            this.editor.onHoverLine((line) => this.onEditorHover(line));
+            this.editor.onDblClickLine((line) => this.onEditorDblClick(line));
+            this.editor.onDraftLineChanges((changes) => this.onDraftLineChanges(changes));
+            this.editor.setTagSpanResolver((line) => this.resolveTagSpan(line));
         }
 
         // Gesture manager (view accessor closure keeps working across reloads)
         this.gesture = new GestureManager(() => this.view);
-        this.detachCanvasEvents = bindCanvasEvents(this.canvas, this.gesture, () => {
-            this.playbackBar.togglePlayback();
+        this.detachCanvasEvents = bindCanvasEvents(this.canvas, this.gesture, (x, y) => {
+            if (this.selectMode) {
+                this.confirmSelection(x, y);
+            } else {
+                this.playbackBar.togglePlayback();
+            }
         });
+        // Hover tracking for selection mode. Bound separately from bindCanvasEvents (which owns
+        // tap/drag/wheel) so select-mode hover never interferes with playback gestures.
+        this.detachHover = this.bindHover();
 
         // Lifecycle listeners
         this.onVisibilityChange = () => {
@@ -277,9 +441,43 @@ export class PAGXPlayer extends EventTarget {
         }
     }
 
-    /** Load a pagx from raw bytes. Handles the full pipeline: ensure wasm module, parse the
-     *  document, register fonts (via callback), resolve external resources (via callback),
-     *  build layers, first draw. Emits 'loaded' on success and 'loadError' on failure.
+    /** Creates the built-in importer provider followed by host-provided providers. The importer
+     *  validates only well-formed XML and never replaces the view's current document; the editor
+     *  handles XML syntax separately before invoking this provider. */
+    private createDiagnosticProviders(
+        providers: readonly SourceDiagnosticProvider[],
+    ): SourceDiagnosticProvider[] {
+        return [
+            {
+                id: 'pagx-importer',
+                validate: this.validateWithImporter.bind(this),
+            },
+            ...providers,
+        ];
+    }
+
+    /** Converts the WASM importer's line-based errors into generic source diagnostics. Importer
+     *  errors currently identify an entire element line rather than an attribute span, therefore
+     *  endColumn uses a large value that SourceEditor clamps to the end of that line. */
+    private validateWithImporter(xmlText: string): SourceDiagnostic[] {
+        if (this.view === null) {
+            return [];
+        }
+        return this.view.validatePAGX(new TextEncoder().encode(xmlText)).map((diagnostic) => ({
+            owner: 'pagx-importer',
+            severity: 'error',
+            message: diagnostic.message,
+            startLine: diagnostic.line,
+            startColumn: 1,
+            endLine: diagnostic.line,
+            endColumn: Number.MAX_SAFE_INTEGER,
+        }));
+    }
+
+    /** Load a pagx from raw bytes. Orchestrates DocumentLoader (parse + fonts + external resources
+     *  + playback restore + first draw), the editor sync, SelectionController (source map + cleared
+     *  handles) and the DOM/bar/event wiring; failure recovery stays here because it owns the UI.
+     *  Emits 'loaded' on success and 'loadError' on failure.
      *
      *  Concurrent load() calls, and destroy() during a load(), are safe: this call captures a
      *  generation token on entry and bails out silently after each await when a newer call
@@ -297,91 +495,17 @@ export class PAGXPlayer extends EventTarget {
             if (!this.isCurrentLoad(generation)) return;
             const view = this.view!;
 
-            const preservedTime = options.preserveCurrentTime
-                ? (view.durationMicros() > 0 ? view.currentTimeMicros() : 0)
-                : 0;
-            const wasPlaying = options.preserveCurrentTime && view.isPlaying();
-
-            view.parsePAGX(pagxBytes);
-
-            // Register fonts (host-supplied); the view resets font registration on each load
-            // so this must run before buildLayers.
-            if (options.registerFonts) {
-                await options.registerFonts(view);
-                if (!this.isCurrentLoad(generation)) return;
-            }
-
-            // External resource resolution: parsePAGX populates the resource path list; each
-            // path is fetched and pushed as file data before buildLayers can succeed. Fetch
-            // concurrently but push in order so a hypothetical duplicate path list stays
-            // deterministic.
-            if (options.resolveResource) {
-                const paths: string[] = view.getExternalFilePaths();
-                if (paths && paths.length > 0) {
-                    const resolve = options.resolveResource;
-                    const items = await Promise.all(
-                        paths.map(async (rel: string) => ({
-                            rel,
-                            buf: await resolve(rel),
-                        })),
-                    );
-                    if (!this.isCurrentLoad(generation)) return;
-                    for (const item of items) {
-                        if (item.buf) {
-                            view.loadFileData(item.rel, item.buf);
-                        }
-                    }
-                }
-            }
-
-            view.buildLayers();
-
-            if (options.forceLoop !== false) {
-                view.setLoop(true);
-            }
-
-            const bg = this.options.backgroundColor ?? DEFAULT_BACKGROUND;
-            // Compose an #RRGGBB hex from the numeric RGB channels so the setBackgroundColor
-            // string overload accepts it; alpha is passed separately as a 0..1 float per the
-            // pagx-viewer API contract.
-            const hex =
-                '#' +
-                bg.r.toString(16).padStart(2, '0') +
-                bg.g.toString(16).padStart(2, '0') +
-                bg.b.toString(16).padStart(2, '0');
-            view.setBackgroundColor(hex, bg.a);
-
-            if (options.preserveCurrentTime && preservedTime > 0) {
-                view.setCurrentTimeMicros(Math.min(preservedTime, view.durationMicros()));
-            }
-            // Fully mirror the previous play state when the host asked us to preserve it:
-            // buildLayers() leaves the view in the auto-play state by default, so a paused
-            // reload would otherwise silently start playing again after every SSE tick.
-            if (options.preserveCurrentTime) {
-                if (wasPlaying) {
-                    view.play();
-                } else {
-                    view.pause();
-                }
-            } else {
-                // A non-preserving load means the host is showing a different pagx document
-                // (open-new-file, sample switch), not a live-reload of the current one. Reset
-                // the zoom/pan transform so the new file lands centered at identity instead
-                // of inheriting the previous document's user gestures. When preserveCurrentTime
-                // is true we intentionally leave the transform alone: users mid-scrub during
-                // an SSE reload expect their viewport to stay put.
-                this.gesture.resetTransform();
-            }
-
-            // Force a synchronous first frame so the canvas reflects the newly built document
-            // before we unhide it below; without this the view is drawn one rAF later and the
-            // previous document's last frame briefly ghosts through when hidden -> visible.
-            view.draw();
+            const loaded = await DocumentLoader.load(
+                view, pagxBytes, options, this.options.backgroundColor ?? DEFAULT_BACKGROUND,
+                () => this.isCurrentLoad(generation), () => this.gesture.resetTransform(),
+            );
+            if (!loaded || !this.isCurrentLoad(generation)) return;
 
             this.canvas.classList.remove('hidden');
             setToolbarVisible(this.toolbarRoot, true);
-            const hasAnimation = view.durationMicros() > 0;
-            this.playbackBar.setVisible(hasAnimation);
+            // A document without a queryable duration still gets the bar in its greyed-out
+            // fallback mode, as long as it has a default timeline at all.
+            this.updatePlaybackBarMode();
 
             // Feed the editor with the freshly loaded XML. If the host pre-decoded it, we use
             // that; otherwise we decode the bytes so the editor always has something to show
@@ -392,10 +516,21 @@ export class PAGXPlayer extends EventTarget {
             }
             this.editor?.setDocumentXml(xmlText ?? null);
 
+            // A new document renumbers nodes, so rebuild the source map and drop every handle that
+            // pointed into the previous runtime tree.
+            SelectionController.reset(view, this.editor,
+                (map) => {
+                    this.sourceMap = map;
+                    this.draftSourceMap = this.cloneSourceMap(map);
+                    this.draftIndex = null;
+                },
+                () => this.clearSelectionState(),
+                () => this.refreshOverlay());
+
             const detail: LoadedEventDetail = {
                 duration: view.durationMicros(),
                 frameRate: view.frameRate(),
-                hasAnimation,
+                hasAnimation: view.hasTimeline(),
                 xmlText,
             };
             this.dispatchEvent(new CustomEvent('loaded', { detail }));
@@ -434,9 +569,7 @@ export class PAGXPlayer extends EventTarget {
     public show(): void {
         this.canvas.classList.remove('hidden');
         setToolbarVisible(this.toolbarRoot, true);
-        if (this.view && this.view.durationMicros() > 0) {
-            this.playbackBar.setVisible(true);
-        }
+        this.updatePlaybackBarMode();
     }
 
     /** Hide the player DOM subtree without destroying the view. Used by hosts that route
@@ -458,6 +591,469 @@ export class PAGXPlayer extends EventTarget {
     /** Restore identity transform (zoom 1.0, offset 0,0). Also fired by the toolbar Reset button. */
     public resetView(): void {
         this.gesture.resetTransform();
+    }
+
+    /** Toggle inspect (selection) mode. When on, canvas hover/click drive editor line
+     *  highlighting instead of toggling playback. Auto-opens the editor so the canvas<->XML
+     *  hover highlight is visible (DevTools-like). */
+    public toggleSelectMode(): void {
+        if (this.selectMode) {
+            this.exitSelectMode();
+        } else {
+            this.selectMode = true;
+            this.editor?.setSelectMode(true);
+            this.editor?.open();
+            this.canvas.style.cursor = 'crosshair';
+            this.refreshOverlay();
+        }
+    }
+
+    /** Leaves inspect mode: stops canvas-driven hover hit-testing and clears the transient grey
+     *  hover highlight. The blue selection (from a canvas click or editor double-click) and
+     *  editor-hover highlighting are independent and stay live. */
+    private exitSelectMode(): void {
+        if (!this.selectMode) {
+            return;
+        }
+        this.selectMode = false;
+        this.editor?.setSelectMode(false);
+        this.canvas.style.cursor = '';
+        this.hoverIndex = -1;
+        this.hoverHit = null;
+        this.syncEditorHighlight('hover');
+        this.refreshOverlay();
+    }
+
+    // --- Selection (phase 1) private helpers ---
+
+    /** Binds a mousemove listener (rAF-throttled) for select-mode hover hit-testing. Returns a
+     *  cleanup function. */
+    private bindHover(): () => void {
+        const handler = (event: MouseEvent) => {
+            if (!this.selectMode || this.gesture.isCurrentlyDragging()) {
+                return;
+            }
+            const cx = event.clientX;
+            const cy = event.clientY;
+            if (this.hoverRaf !== 0) {
+                cancelAnimationFrame(this.hoverRaf);
+            }
+            this.hoverRaf = requestAnimationFrame(() => {
+                this.hoverRaf = 0;
+                this.handleHover(cx, cy);
+            });
+        };
+        this.canvas.addEventListener('mousemove', handler);
+        return () => this.canvas.removeEventListener('mousemove', handler);
+    }
+
+    private handleHover(clientX: number, clientY: number): void {
+        if (!this.view || !this.selectMode) {
+            return;
+        }
+        const { surfaceX, surfaceY } = this.clientToSurface(clientX, clientY);
+        const hit = this.view.hitTest(surfaceX, surfaceY);
+        const idx = hit !== null ? hit.index : -1;
+        if (idx !== this.hoverIndex) {
+            this.hoverIndex = idx;
+            this.hoverHit = hit;
+            this.refreshOverlay();
+            this.syncEditorHighlight('hover', 'center');
+        }
+    }
+
+    /** Selects the node under the click point (inspect-mode click). Hit-tests the live click
+     *  coordinates rather than relying on the cached hover index, which may be stale or unset when
+     *  the pointer barely moved before the click (the rAF-throttled hover may not have run). */
+    private confirmSelection(clientX: number, clientY: number): void {
+        if (!this.view) {
+            return;
+        }
+        const { surfaceX, surfaceY } = this.clientToSurface(clientX, clientY);
+        const hit = this.view.hitTest(surfaceX, surfaceY);
+        // Missed the geometry (clicked empty canvas): keep the inspector armed so the user can
+        // try again rather than silently dropping out of inspect mode.
+        if (hit === null) {
+            return;
+        }
+        this.selectedIndex = hit.index;
+        this.selectHit = hit;
+        // DevTools-style: picking a layer deactivates the inspector. exitSelectMode() clears the
+        // transient hover and repaints the overlay from the now-set selection, so only the sticky
+        // blue outline remains; it stays highlighted on the canvas and mirrored in the editor
+        // until the user's next action.
+        this.exitSelectMode();
+        this.syncEditorHighlight('select', 'center');
+    }
+
+    /** Editor hover resolves only a physical XML tag line. The full node index remains available for
+     *  canvas overlay bounds, but the grey source decoration never expands to the node's children. */
+    private onEditorHover(line: number): void {
+        const tagLine = this.editor?.getDraftTagLine(line) ?? null;
+        const idx = tagLine === null ? -1 : findNodeIndexForLine(this.draftSourceMap, tagLine);
+        const nextLine = tagLine ?? -1;
+        if (idx === this.editorHoverIndex && nextLine === this.editorHoverLine) {
+            return;
+        }
+        this.editorHoverIndex = idx;
+        this.editorHoverLine = nextLine;
+        this.refreshOverlay();
+        this.syncEditorHighlight('hover');
+    }
+
+    /** Double-clicking any physical line unlocks the whole document for editing; the amber edit
+     *  decoration marks the double-clicked line itself. There is no "is this a valid tag" gate:
+     *  whether one can edit depends only on which line was clicked, never on that line's content
+     *  (a line whose tag markup was deleted mid-edit must still be re-enterable). The source map
+     *  lookup is a pure line-number query (not a content check) and only drives the canvas selection
+     *  sync; when the line falls outside every node's span (e.g. the XML declaration), it simply
+     *  returns -1 and no canvas node gets selected. */
+    private onEditorDblClick(line: number): void {
+        const idx = findNodeIndexForLine(this.draftSourceMap, line);
+        this.selectedIndex = idx;
+        // Editor-direction selection has no hitTest result, so updateOverlay falls back to the
+        // source-map node bounds when one exists. Lines with no runtime node clear the canvas box.
+        this.selectHit = null;
+        this.editor?.clearHover();
+        this.editor?.enterEditMode(line);
+        this.refreshOverlay();
+        this.syncEditorHighlight('select');
+    }
+
+    private cloneSourceMap(entries: readonly NodeSourceEntry[]): NodeSourceEntry[] {
+        return entries.map((entry) => ({ ...entry, channels: [...entry.channels] }));
+    }
+
+    /** Drops every hover/selection handle that pointed into the previous runtime tree. */
+    private clearSelectionState(): void {
+        this.hoverIndex = -1;
+        this.hoverHit = null;
+        this.selectHit = null;
+        this.editorHoverIndex = -1;
+        this.editorHoverLine = -1;
+        this.selectedIndex = -1;
+    }
+
+    /** Looks up a draft source entry by its native Node index. getNodeSourceMap skips mounted
+     *  composition wrappers, so the sourceMap array offset is not the node index and a positional
+     *  read would silently mis-target. Returns null when the index has no live entry. */
+    private draftEntryByIndex(index: number): NodeSourceEntry | null {
+        if (index < 0) {
+            return null;
+        }
+        return this.getDraftIndex().entryByIndex(index);
+    }
+
+    /** Returns the current draft index, rebuilding it when a line change has invalidated it. */
+    private getDraftIndex(): SourceMapIndex {
+        if (this.draftIndex === null) {
+            this.draftIndex = new SourceMapIndex(this.draftSourceMap);
+        }
+        return this.draftIndex;
+    }
+
+    /** Applies accepted draft line deltas to a projection of the runtime source map. Entries wholly
+     *  deleted or partially cut by a multi-line replacement become unavailable rather than pointing
+     *  at an unrelated surviving tag. Apply/Discard/reset restores a fresh projection. */
+    private onDraftLineChanges(
+        changes: readonly DraftLineChange[] | null,
+    ): void {
+        if (changes === null) {
+            this.draftSourceMap = this.cloneSourceMap(this.sourceMap);
+            this.draftIndex = null;
+            return;
+        }
+        for (const change of changes) {
+            applyDraftLineChange(this.draftSourceMap, change);
+        }
+        // applyDraftLineChange mutates entry spans in place, invalidating the sorted index.
+        this.draftIndex = null;
+        // The pointer may now refer to a shifted source line; wait for the next mouse move instead
+        // of leaving a stale editor-originated hover decoration behind.
+        this.editorHoverLine = -1;
+        this.editorHoverIndex = -1;
+    }
+
+    /** Resolves the line span of the innermost tag enclosing the given 1-based source line, for
+     *  the editor's tag-block copy/delete context menu actions. The last valid source map supplies
+     *  the structural span; only that node's own boundary tags are re-validated against the draft.
+     *  A malformed child therefore does not prevent deleting its intact parent, while a damaged
+     *  parent boundary still falls back safely to the current line. */
+    private resolveTagSpan(line: number): LineRange | null {
+        const index = findNodeIndexForLine(this.draftSourceMap, line);
+        if (index < 0 || this.editor === null) {
+            return null;
+        }
+        const entry = this.draftEntryByIndex(index);
+        if (entry === null) {
+            return null;
+        }
+        const start = entry.startLine;
+        if (start <= 0) {
+            return null;
+        }
+        const end = entry.endLine > 0 ? entry.endLine : start;
+        if (end > this.editor.getLineCount()) {
+            return null;
+        }
+        // Only the mapped span is read back. Splitting the whole document here would copy the
+        // entire text (hundreds of MB for a large PAGX with inline images) to check one tag block.
+        if (!hasMatchingSpanBoundaries(this.editor.getLines(start, end))) {
+            return null;
+        }
+        return { startLine: start, endLine: end };
+    }
+
+    /** Attempts to apply the edit from oldXml to newXml incrementally, in place, via setNodeChannel
+     *  instead of a full reparse+rebuild. Returns true only when the whole edit is a set of pure
+     *  attribute-value changes on incrementable channels; false otherwise, signalling the editor to
+     *  fall back to the full onApply pipeline. Failing part-way leaves channel writes applied until
+     *  that fallback replaces the runtime; the full apply is authoritative and load()'s failure
+     *  path clears the UI if it also fails. */
+    private tryIncrementalApply(oldXml: string, newXml: string): boolean {
+        if (!this.view || this.draftSourceMap.length === 0) {
+            return false;
+        }
+        const edits = classifyEdits(oldXml, newXml, this.draftSourceMap);
+        if (edits === null) {
+            return false;
+        }
+        if (edits.length === 0) {
+            return true;
+        }
+        for (const edit of edits) {
+            const ok = this.view.setNodeChannel(edit.index, edit.channel, edit.value);
+            if (!ok) {
+                // Let Apply fall through to the full onApply pipeline. Do not re-parse oldXml here:
+                // parsePAGX creates a fresh document and would drop the external resources that
+                // load() replays, plus the playback position, loop and background colour. The full
+                // apply is authoritative and restores all of that; on failure load() clears the UI.
+                return false;
+            }
+        }
+        this.view.draw();
+        return true;
+    }
+
+    /** The transient hover target: editor-hover wins over canvas-hover (mouse can only be in one). */
+    private hoverTarget(): number {
+        return this.editorHoverIndex >= 0 ? this.editorHoverIndex : this.hoverIndex;
+    }
+
+    /** Mirrors the hover or selection target onto the editor as a line highlight. Hover spans come
+     *  from the hitTest result (the <Layer composition="@X"> reference, not its internal definition)
+     *  unless the hover originated in the editor; selection uses the sticky selectedIndex. */
+    private syncEditorHighlight(target: 'hover' | 'select',
+                                align: 'none' | 'nearest' | 'start' | 'center' = 'none'): void {
+        const hover = target === 'hover';
+        if (hover && this.editorHoverLine > 0) {
+            this.editor?.highlightHover(this.editorHoverLine, this.editorHoverLine);
+            if (align !== 'none') {
+                this.editor?.scrollToLine(this.editorHoverLine, align);
+            }
+            return;
+        }
+        const hit = hover ? this.hoverHit : this.selectHit;
+        if (hit !== null) {
+            const projected = this.draftEntryByIndex(hit.index);
+            const start = projected !== null && projected.startLine > 0
+                ? projected.startLine
+                : hit.startLine;
+            if (hover) {
+                this.editor?.highlightHover(start, start);
+            } else {
+                this.editor?.highlightSelect(start, start);
+            }
+            if (align !== 'none') {
+                this.editor?.scrollToLine(start, align);
+            }
+            return;
+        }
+        const idx = hover ? this.hoverTarget() : this.selectedIndex;
+        const entry = this.draftEntryByIndex(idx);
+        if (entry === null || entry.startLine <= 0) {
+            if (hover) {
+                this.editor?.clearHover();
+            } else {
+                this.editor?.clearSelect();
+            }
+            return;
+        }
+        if (hover) {
+            this.editor?.highlightHover(entry.startLine, entry.startLine);
+        } else {
+            this.editor?.highlightSelect(entry.startLine, entry.startLine);
+        }
+        if (align !== 'none') {
+            this.editor?.scrollToLine(entry.startLine, align);
+        }
+    }
+
+    private clientToSurface(clientX: number, clientY: number): { surfaceX: number; surfaceY: number } {
+        const rect = this.canvas.getBoundingClientRect();
+        // hitTest takes surface (backing-store) coordinates; canvas.width is the backing width so
+        // this naturally absorbs DPR.
+        const scaleX = this.canvas.width / rect.width;
+        const scaleY = this.canvas.height / rect.height;
+        return {
+            surfaceX: (clientX - rect.left) * scaleX,
+            surfaceY: (clientY - rect.top) * scaleY,
+        };
+    }
+
+    /** Grows or shrinks the pool of selection boxes so updateOverlay can paint one per runtime
+     *  instance; surplus boxes are hidden but kept for reuse. */
+    private setOverlayBoxCount(count: number): void {
+        while (this.overlayBoxes.length < count) {
+            const overlay = document.createElement('div');
+            overlay.className = 'pagx-select-overlay';
+            overlay.style.pointerEvents = 'none';
+            this.root.appendChild(overlay);
+            this.overlayBoxes.push(overlay);
+        }
+        for (let i = count; i < this.overlayBoxes.length; i++) {
+            this.overlayBoxes[i].style.display = 'none';
+        }
+    }
+
+    /** Overlay target: a transient hover (grey) takes priority over the sticky selection (blue),
+     *  so hovering temporarily previews another node then reverts to the selection on mouse-out.
+     *  Returns the node index and which visual state to render. */
+    private currentOverlayTarget(): { index: number; kind: 'hover' | 'select' } {
+        const hover = this.hoverTarget();
+        if (hover >= 0) {
+            return { index: hover, kind: 'hover' };
+        }
+        return { index: this.selectedIndex, kind: 'select' };
+    }
+
+    /** Returns the index of the innermost source node that strictly encloses the given node's
+     *  span, or -1 if none. Used to climb from a Layer-internal element (Fill/Rectangle/... which
+     *  has no independent canvas outline) up to the Layer that owns it. */
+    private enclosingNodeIndex(index: number): number {
+        const child = this.draftEntryByIndex(index);
+        if (child === null || child.startLine <= 0) {
+            return -1;
+        }
+        const childStart = child.startLine;
+        const childEnd = child.endLine > 0 ? child.endLine : childStart;
+        let bestIndex = -1;
+        let bestSpan = Number.POSITIVE_INFINITY;
+        for (const entry of this.draftSourceMap) {
+            if (entry.index === index || entry.startLine <= 0) {
+                continue;
+            }
+            const start = entry.startLine;
+            const end = entry.endLine > 0 ? entry.endLine : start;
+            const encloses = start <= childStart && end >= childEnd && (start < childStart || end > childEnd);
+            if (!encloses) {
+                continue;
+            }
+            const span = end - start;
+            if (span < bestSpan) {
+                bestSpan = span;
+                bestIndex = entry.index;
+            }
+        }
+        return bestIndex;
+    }
+
+    /** Resolves the node whose bounds the overlay should paint. A node with its own bounds (a
+     *  Layer) resolves to itself; a Layer-internal element resolves to the nearest ancestor that
+     *  does have bounds - i.e. its owning Layer - so hovering/selecting an internal row still
+     *  outlines the visible Layer. Returns -1 when nothing in the ancestry has bounds. */
+    private resolveBoundsIndex(index: number): number {
+        if (index < 0 || !this.view) {
+            return -1;
+        }
+        let cursor = index;
+        let guard = 0;
+        while (cursor >= 0 && guard++ < 64) {
+            if (this.view.getNodeBounds(cursor) !== null) {
+                return cursor;
+            }
+            cursor = this.enclosingNodeIndex(cursor);
+        }
+        return -1;
+    }
+
+    /** Repaints the overlay and starts/stops the follow-loop based on whether any highlight target
+     *  exists. Decoupled from selectMode so editor-hover highlighting works with inspect off. The
+     *  bounds-bearing index is resolved once here (climbing to the owning Layer for internal
+     *  elements) and cached so the per-frame follow-loop doesn't repeat the ancestry walk. */
+    private refreshOverlay(): void {
+        const raw = this.currentOverlayTarget();
+        this.overlayBoundsIndex = raw.index >= 0 ? this.resolveBoundsIndex(raw.index) : -1;
+        this.overlayKind = raw.kind;
+        // The previous-tick bounds belong to the old target; carrying them over would flash the
+        // old outline for one frame when the target switches mid-playback.
+        this.overlayPreviousBounds = null;
+        if (this.overlayBoundsIndex >= 0) {
+            this.startOverlayLoop();
+        } else {
+            this.stopOverlayLoop();
+        }
+        this.updateOverlay();
+    }
+
+    private updateOverlay(): void {
+        if (this.overlayBoundsIndex < 0 || !this.view) {
+            this.setOverlayBoxCount(0);
+            return;
+        }
+        // Every frame queries getNodeBounds so the overlay tracks zoom and animation in real time.
+        // hitTest deliberately omits bounds: a point-in-time snapshot would not follow zoom or
+        // animation and caused the overlay to freeze and disappear. getNodeBounds returns one rect
+        // per runtime instance, so a source node referenced by several composition layers gets
+        // every instance outlined.
+        const bounds = this.view.getNodeBounds(this.overlayBoundsIndex);
+        if (bounds === null || bounds.length === 0) {
+            this.setOverlayBoxCount(0);
+            this.overlayPreviousBounds = null;
+            return;
+        }
+        // PAGXView.draw() double-buffers recordings: while the timeline is playing, the canvas
+        // presents the frame recorded one rAF earlier than the scene state getNodeBounds reads,
+        // so applying the current bounds would lead the pixels by one frame. Present the previous
+        // tick's bounds instead. Paused interactions (scrub/zoom/edit) set presentImmediately in
+        // draw(), which presents the current frame, so the current bounds are correct there.
+        const shown = this.view.isPlaying() && this.overlayPreviousBounds !== null
+            ? this.overlayPreviousBounds
+            : bounds;
+        this.overlayPreviousBounds = bounds;
+        const rect = this.canvas.getBoundingClientRect();
+        // Surface (backing) -> CSS pixels.
+        const scaleX = rect.width / this.canvas.width;
+        const scaleY = rect.height / this.canvas.height;
+        this.setOverlayBoxCount(shown.length);
+        for (let i = 0; i < shown.length; i++) {
+            const overlay = this.overlayBoxes[i];
+            overlay.style.display = 'block';
+            overlay.style.left = shown[i].x * scaleX + 'px';
+            overlay.style.top = shown[i].y * scaleY + 'px';
+            overlay.style.width = shown[i].w * scaleX + 'px';
+            overlay.style.height = shown[i].h * scaleY + 'px';
+            overlay.classList.toggle('is-selected', this.overlayKind === 'select');
+            overlay.classList.toggle('is-hover', this.overlayKind === 'hover');
+        }
+    }
+
+    private startOverlayLoop(): void {
+        if (this.overlayRaf !== 0) {
+            return;
+        }
+        const tick = () => {
+            this.updateOverlay();
+            this.overlayRaf = requestAnimationFrame(tick);
+        };
+        this.overlayRaf = requestAnimationFrame(tick);
+    }
+
+    private stopOverlayLoop(): void {
+        if (this.overlayRaf !== 0) {
+            cancelAnimationFrame(this.overlayRaf);
+            this.overlayRaf = 0;
+        }
     }
 
     public play(): void {
@@ -488,6 +1084,23 @@ export class PAGXPlayer extends EventTarget {
         this.playbackBar.togglePlayback();
     }
 
+    /** Single source of truth for the playback bar's mode after a load: a document with a
+     *  queryable duration gets the normal bar, other timelines keep the greyed untimed bar, and
+     *  static documents hide the bar. */
+    private updatePlaybackBarMode(): void {
+        const view = this.view;
+        if (!view) {
+            return;
+        }
+        if (view.durationMicros() > 0) {
+            this.playbackBar.setVisible(true);
+        } else if (view.hasTimeline()) {
+            this.playbackBar.showUntimed();
+        } else {
+            this.playbackBar.setVisible(false);
+        }
+    }
+
     public openEditor(): void {
         this.editor?.open();
     }
@@ -507,42 +1120,13 @@ export class PAGXPlayer extends EventTarget {
      *  (editor progress messages, external reload status, etc.) coexist without each other's
      *  cleanup racing to hide a message that isn't theirs anymore. */
     public showStatus(text: string, options: StatusOptions = {}): number {
-        if (this.statusHideTimer !== null) {
-            window.clearTimeout(this.statusHideTimer);
-            this.statusHideTimer = null;
-        }
-        const token = ++this.statusTokenSeq;
-        this.currentStatusToken = token;
-        this.statusEl.textContent = text;
-        this.statusEl.classList.toggle('success', options.kind === 'success');
-        this.statusEl.classList.toggle('error', options.kind === 'error');
-        this.statusEl.classList.remove('hidden');
-        const autoHideMs = options.autoHideMs ?? 0;
-        if (autoHideMs > 0) {
-            this.statusHideTimer = window.setTimeout(() => {
-                this.statusHideTimer = null;
-                // The timer only fires when no newer showStatus() has replaced the message
-                // (each showStatus clears the pending timer above), so we don't re-check the
-                // token here.
-                this.currentStatusToken = 0;
-                this.statusEl.classList.add('hidden');
-            }, autoHideMs);
-        }
-        return token;
+        return this.statusPill.show(text, options);
     }
 
     /** Hide the status pill. If `token` is provided, only clears when it still identifies the
      *  currently displayed message; otherwise clears unconditionally. */
     public hideStatus(token?: number): void {
-        if (token !== undefined && token !== this.currentStatusToken) {
-            return;
-        }
-        if (this.statusHideTimer !== null) {
-            window.clearTimeout(this.statusHideTimer);
-            this.statusHideTimer = null;
-        }
-        this.currentStatusToken = 0;
-        this.statusEl.classList.add('hidden');
+        this.statusPill.hide(token);
     }
 
     /** Escape hatch: exposes the underlying view for hosts that need low-level access
@@ -601,6 +1185,17 @@ export class PAGXPlayer extends EventTarget {
         this.loadGeneration++;
         this.detachCanvasEvents?.();
         this.detachCanvasEvents = null;
+        this.detachHover?.();
+        this.detachHover = null;
+        this.stopOverlayLoop();
+        if (this.hoverRaf !== 0) {
+            cancelAnimationFrame(this.hoverRaf);
+            this.hoverRaf = 0;
+        }
+        for (const overlay of this.overlayBoxes) {
+            overlay.remove();
+        }
+        this.overlayBoxes = [];
         this.resizeObserver?.disconnect();
         this.resizeObserver = null;
         document.removeEventListener('visibilitychange', this.onVisibilityChange);
@@ -609,10 +1204,7 @@ export class PAGXPlayer extends EventTarget {
         window.removeEventListener('beforeunload', this.onBeforeUnload);
         window.removeEventListener('pagehide', this.onPageHide);
         window.removeEventListener('pageshow', this.onPageShow);
-        if (this.statusHideTimer !== null) {
-            window.clearTimeout(this.statusHideTimer);
-            this.statusHideTimer = null;
-        }
+        this.statusPill.destroy();
         this.playbackBar.destroy();
         this.editor?.destroy();
         this.destroyView();
@@ -763,7 +1355,9 @@ export class PAGXPlayer extends EventTarget {
         // is null for elements whose computed display is none anywhere on the ancestor chain
         // (except the body, which the player is not).
         if (this.canvas.offsetParent === null) return;
-        if (!this.playbackBar.isVisible()) return;
+        if (!this.playbackBar.isVisible()) {
+            return;
+        }
         event.preventDefault();
         if (isPlayPause) {
             this.playbackBar.togglePlayback();
@@ -782,6 +1376,8 @@ export type {
     LoadErrorEventDetail,
     PAGXPlayerLoadOptions,
     PAGXPlayerOptions,
+    SourceDiagnostic,
+    SourceDiagnosticProvider,
     StatusOptions,
     ToolbarSlot,
 };

@@ -17328,6 +17328,460 @@ PAGX_TEST(PAGXTest, SMDataBindTypeMismatch) {
   EXPECT_EQ(smTimeline->getCurrentState("main"), "low");
 }
 
+/**
+ * Test case: resolving a click inside a <Layer composition="@X"> instance climbs from the top-most
+ * hit to the first Composition whose source node the document owns, so the referencing host layer is
+ * selected rather than the internal definition layer. The core supplies only the runtime primitives
+ * for this (getLayersUnderPoint / getParent / getNode / getTightGlobalBounds); the source-node to
+ * runtime-layer mapping is the host's, so this locks the primitives that mapping relies on.
+ */
+PAGX_TEST(PAGXTest, HitTestResolvesCompositionReference) {
+  const std::string xml = R"(<pagx version="1.0" width="200" height="200">
+  <Resources>
+    <Composition id="inner" width="40" height="40">
+      <Layer id="innerLayer" x="0" y="0" width="40" height="40">
+        <Rectangle width="40" height="40"/>
+        <Fill color="#3B82F6"/>
+      </Layer>
+    </Composition>
+  </Resources>
+  <Layer id="host" x="50" y="50" width="40" height="40" composition="@inner"/>
+</pagx>)";
+  auto doc = pagx::PAGXImporter::FromXML(xml);
+  ASSERT_NE(doc, nullptr);
+  EXPECT_TRUE(doc->errors.empty());
+  auto* host = doc->findNode<pagx::Layer>("host");
+  auto* innerLayer = doc->findNode<pagx::Layer>("innerLayer");
+  ASSERT_NE(host, nullptr);
+  ASSERT_NE(innerLayer, nullptr);
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_NE(scene, nullptr);
+
+  // The top-most hit is the internal definition layer, so the host has to climb to reach the
+  // referencing layer.
+  auto hits = scene->getLayersUnderPoint(70, 70);
+  ASSERT_FALSE(hits.empty());
+  EXPECT_EQ(hits[0]->getNode(), innerLayer);
+
+  auto target = hits[0];
+  for (auto walker = target; walker != nullptr; walker = walker->getParent()) {
+    const auto* node = walker->getNode();
+    if (walker->layerType() == pagx::LayerType::Composition && node != nullptr &&
+        doc->ownsNode(node)) {
+      target = walker;
+      break;
+    }
+  }
+  // The climb lands on the referencing host layer, not the internal definition layer.
+  EXPECT_EQ(target->getNode(), host);
+  EXPECT_NE(target->getNode(), innerLayer);
+  EXPECT_FALSE(scene->getTightGlobalBounds(target).isEmpty());
+
+  // A click in the empty area hits nothing.
+  EXPECT_TRUE(scene->getLayersUnderPoint(10, 10).empty());
+}
+
+/**
+ * Test case: a layer's scrollRect clip gates its whole subtree. A point inside the content's own
+ * bounds but outside the clip window yields no candidate at all, so no per-layer shape test is
+ * ever reached; inside the window the candidate also passes the shape test.
+ */
+PAGX_TEST(PAGXTest, HitTestRespectsScrollRectClip) {
+  const std::string xml = R"(<pagx version="1.0" width="200" height="200">
+  <Layer width="200" height="200" scrollRect="10,10,100,100" clipToBounds="true">
+    <Layer id="clipped" x="0" y="0" width="200" height="200">
+      <Rectangle width="200" height="200"/>
+      <Fill color="#3B82F6"/>
+    </Layer>
+  </Layer>
+</pagx>)";
+  auto doc = pagx::PAGXImporter::FromXML(xml);
+  ASSERT_NE(doc, nullptr);
+  EXPECT_TRUE(doc->errors.empty());
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_NE(scene, nullptr);
+
+  // Inside the clip window: the clipped layer is the top-most candidate and passes the shape test.
+  auto hits = scene->getLayersUnderPoint(50, 50);
+  ASSERT_FALSE(hits.empty());
+  EXPECT_EQ(hits[0]->getNode()->id, "clipped");
+  EXPECT_TRUE(hits[0]->hitTestPoint(50, 50, true));
+
+  // (150,150) is inside the content's own bounds but outside the clip window, so the clip - not
+  // the content's geometry - is what makes it miss.
+  EXPECT_TRUE(scene->getLayersUnderPoint(150, 150).empty());
+}
+
+/**
+ * Test case: notifyChange({owningLayer}, layoutChanged=true) after editing an element nested
+ * inside a Group re-runs layout over the whole document, so the nested element is re-measured
+ * through Group::elements and picks up the edited geometry.
+ */
+PAGX_TEST(PAGXTest, NotifyChangeRelayoutsNestedGroupContents) {
+  const std::string xml = R"(<pagx version="1.0" width="200" height="200">
+  <Layer id="host" x="10" y="10" width="180" height="180">
+    <Group>
+      <Rectangle id="r1" width="40" height="40"/>
+      <Fill color="#3B82F6"/>
+      <Group>
+        <Rectangle id="r2" width="30" height="30"/>
+        <Fill color="#10B981"/>
+      </Group>
+    </Group>
+  </Layer>
+</pagx>)";
+  auto doc = pagx::PAGXImporter::FromXML(xml);
+  ASSERT_NE(doc, nullptr);
+  doc->applyLayout();
+
+  auto* host = doc->findNode<pagx::Layer>("host");
+  auto* r2 = doc->findNode<pagx::Rectangle>("r2");
+  ASSERT_NE(host, nullptr);
+  ASSERT_NE(r2, nullptr);
+
+  // Edit an element nested inside the inner Group and report the owning Layer: notifyChange's
+  // documented "prefer passing the owning Layer" route.
+  r2->height = 90;
+  doc->notifyChange({host}, /*layoutChanged=*/true);
+
+  // Compare the nested element's own geometry, not the host layer's: the host has authored
+  // width/height, so Layer::onMeasure skips content measurement and its layoutBounds stays
+  // (10,10,180,180) regardless. r2 is re-measured by the re-layout and reflects the edit.
+  EXPECT_FLOAT_EQ(r2->layoutBounds().height, 90.0f);
+}
+
+/**
+ * Test case: SetNodeChannelFromString's dimension parsing produces the same width/percentWidth
+ * pair as a full reparse of the same attribute value, including the strtof-accepted scientific
+ * notation ("1e2" parses on both paths even though the XSD DimensionType pattern does not list
+ * it). Malformed values are rejected by both paths: the incremental write returns false and
+ * leaves the node untouched, the reparse reports an error and leaves both members NaN. A percent
+ * write clears the absolute member and vice versa, and ResetNodeChannel clears both.
+ */
+PAGX_TEST(PAGXTest, SetNodeChannelFromStringMatchesFullReparse) {
+  const std::string validValues[] = {"100", "50%", "1e2", "0.5", "12.5%"};
+  for (const auto& raw : validValues) {
+    auto incrementalDoc = pagx::PAGXDocument::Make(100, 100);
+    auto* layer = incrementalDoc->makeNode<pagx::Layer>();
+    ASSERT_TRUE(pagx::SetNodeChannelFromString(layer, "width", raw));
+
+    auto fullDoc = pagx::PAGXImporter::FromXML(
+        "<pagx version=\"1.0\" width=\"100\" height=\"100\">\n  <Layer width=\"" + raw +
+        "\"/>\n</pagx>");
+    ASSERT_NE(fullDoc, nullptr);
+    EXPECT_TRUE(fullDoc->errors.empty()) << "raw: " << raw;
+    ASSERT_EQ(fullDoc->layers.size(), 1u);
+    auto* parsed = fullDoc->layers[0];
+
+    EXPECT_EQ(std::isnan(layer->width), std::isnan(parsed->width)) << "raw: " << raw;
+    EXPECT_EQ(std::isnan(layer->percentWidth), std::isnan(parsed->percentWidth)) << "raw: " << raw;
+    if (!std::isnan(layer->width) && !std::isnan(parsed->width)) {
+      EXPECT_FLOAT_EQ(layer->width, parsed->width) << "raw: " << raw;
+    }
+    if (!std::isnan(layer->percentWidth) && !std::isnan(parsed->percentWidth)) {
+      EXPECT_FLOAT_EQ(layer->percentWidth, parsed->percentWidth) << "raw: " << raw;
+    }
+  }
+
+  const std::string invalidValues[] = {"+5", "-3", "0x10", "50 %", " 10", "abc", "50%%"};
+  for (const auto& raw : invalidValues) {
+    // Incremental: rejected, and the previously written value survives untouched.
+    auto incrementalDoc = pagx::PAGXDocument::Make(100, 100);
+    auto* layer = incrementalDoc->makeNode<pagx::Layer>();
+    ASSERT_TRUE(pagx::SetNodeChannelFromString(layer, "width", "100"));
+    EXPECT_FALSE(pagx::SetNodeChannelFromString(layer, "width", raw)) << "raw: " << raw;
+    EXPECT_FLOAT_EQ(layer->width, 100.0f) << "raw: " << raw;
+    EXPECT_TRUE(std::isnan(layer->percentWidth)) << "raw: " << raw;
+
+    // Full reparse of the same raw value: error reported, both members stay NaN.
+    auto fullDoc = pagx::PAGXImporter::FromXML(
+        "<pagx version=\"1.0\" width=\"100\" height=\"100\">\n  <Layer width=\"" + raw +
+        "\"/>\n</pagx>");
+    ASSERT_NE(fullDoc, nullptr);
+    EXPECT_FALSE(fullDoc->errors.empty()) << "raw: " << raw;
+    ASSERT_EQ(fullDoc->layers.size(), 1u);
+    EXPECT_TRUE(std::isnan(fullDoc->layers[0]->width)) << "raw: " << raw;
+    EXPECT_TRUE(std::isnan(fullDoc->layers[0]->percentWidth)) << "raw: " << raw;
+  }
+
+  // The empty string is the one asymmetry: the reparse treats an empty attribute as absent
+  // (no error, both members NaN) while the incremental write rejects it — an editor pushing an
+  // empty field must not silently clear the node.
+  auto emptyDoc = pagx::PAGXImporter::FromXML(
+      "<pagx version=\"1.0\" width=\"100\" height=\"100\">\n  <Layer width=\"\"/>\n</pagx>");
+  ASSERT_NE(emptyDoc, nullptr);
+  EXPECT_TRUE(emptyDoc->errors.empty());
+  ASSERT_EQ(emptyDoc->layers.size(), 1u);
+  EXPECT_TRUE(std::isnan(emptyDoc->layers[0]->width));
+  EXPECT_TRUE(std::isnan(emptyDoc->layers[0]->percentWidth));
+
+  // Dimension writes clear the sibling member, matching ReadDimension's exactly-one-member rule.
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  ASSERT_TRUE(pagx::SetNodeChannelFromString(layer, "width", "100"));
+  EXPECT_FLOAT_EQ(layer->width, 100.0f);
+  EXPECT_TRUE(std::isnan(layer->percentWidth));
+  ASSERT_TRUE(pagx::SetNodeChannelFromString(layer, "width", "50%"));
+  EXPECT_TRUE(std::isnan(layer->width));
+  EXPECT_FLOAT_EQ(layer->percentWidth, 50.0f);
+
+  // ResetNodeChannel on a dimension channel clears both members to the "unspecified" default.
+  ASSERT_TRUE(pagx::ResetNodeChannel(layer, "width"));
+  EXPECT_TRUE(std::isnan(layer->width));
+  EXPECT_TRUE(std::isnan(layer->percentWidth));
+}
+
+/**
+ * Test case: a Fill color backed by a named SolidColor is a shared @id resource. String writes and
+ * resets must refuse it so the editor falls back to a full reparse: mutating in place would recolour
+ * every other layer referencing the same id and leave the source text disagreeing with the canvas.
+ * Reading the shared value stays available, and an inline unnamed SolidColor remains writable.
+ */
+PAGX_TEST(PAGXTest, SetNodeChannelFromStringRefusesSharedSolidColor) {
+  const std::string xml = R"(<pagx version="1.0" width="100" height="100">
+  <Resources>
+    <SolidColor id="red" color="#FF0000"/>
+  </Resources>
+  <Layer id="first">
+    <Rectangle width="20" height="20"/>
+    <Fill color="@red"/>
+  </Layer>
+  <Layer id="second">
+    <Rectangle width="20" height="20"/>
+    <Fill color="@red"/>
+  </Layer>
+</pagx>)";
+  auto doc = pagx::PAGXImporter::FromXML(xml);
+  ASSERT_NE(doc, nullptr);
+  ASSERT_TRUE(doc->errors.empty());
+  auto* first = doc->findNode<pagx::Layer>("first");
+  auto* second = doc->findNode<pagx::Layer>("second");
+  auto* shared = doc->findNode<pagx::SolidColor>("red");
+  ASSERT_NE(first, nullptr);
+  ASSERT_NE(second, nullptr);
+  ASSERT_NE(shared, nullptr);
+  pagx::Fill* firstFill = nullptr;
+  for (auto* content : first->contents) {
+    if (content->nodeType() == pagx::NodeType::Fill) {
+      firstFill = static_cast<pagx::Fill*>(content);
+      break;
+    }
+  }
+  pagx::Fill* secondFill = nullptr;
+  for (auto* content : second->contents) {
+    if (content->nodeType() == pagx::NodeType::Fill) {
+      secondFill = static_cast<pagx::Fill*>(content);
+      break;
+    }
+  }
+  ASSERT_NE(firstFill, nullptr);
+  ASSERT_NE(secondFill, nullptr);
+  EXPECT_EQ(firstFill->color, shared);
+  EXPECT_EQ(secondFill->color, shared);
+
+  pagx::KeyValue current = {};
+  ASSERT_TRUE(pagx::GetNodeChannel(firstFill, "color", &current));
+  EXPECT_EQ(std::get<pagx::Color>(current), shared->color);
+
+  EXPECT_FALSE(pagx::SetNodeChannelFromString(firstFill, "color", "#00FF00"));
+  EXPECT_EQ(shared->color, (pagx::Color{1, 0, 0, 1}));
+  EXPECT_EQ(secondFill->color, shared);
+  EXPECT_FALSE(pagx::ResetNodeChannel(firstFill, "color"));
+  EXPECT_EQ(shared->color, (pagx::Color{1, 0, 0, 1}));
+
+  auto inlineDoc = pagx::PAGXImporter::FromXML(R"(<pagx version="1.0" width="100" height="100">
+  <Layer><Rectangle width="20" height="20"/><Fill color="#FF0000"/></Layer>
+</pagx>)");
+  ASSERT_NE(inlineDoc, nullptr);
+  ASSERT_EQ(inlineDoc->layers.size(), 1u);
+  pagx::Fill* inlineFill = nullptr;
+  for (auto* content : inlineDoc->layers[0]->contents) {
+    if (content->nodeType() == pagx::NodeType::Fill) {
+      inlineFill = static_cast<pagx::Fill*>(content);
+      break;
+    }
+  }
+  ASSERT_NE(inlineFill, nullptr);
+  auto* inlineSolid = static_cast<pagx::SolidColor*>(inlineFill->color);
+  ASSERT_NE(inlineSolid, nullptr);
+  EXPECT_TRUE(inlineSolid->id.empty());
+  EXPECT_TRUE(pagx::SetNodeChannelFromString(inlineFill, "color", "#00FF00"));
+  EXPECT_EQ(inlineSolid->color, (pagx::Color{0, 1, 0, 1}));
+}
+
+/**
+ * Test case: optional channels can be written from an unset state. The grammar is taken from the
+ * channel declaration rather than the current value, so a TextModifier whose fillColor,
+ * strokeColor and strokeWidth are all absent accepts the same strings a full reparse would.
+ */
+PAGX_TEST(PAGXTest, SetNodeChannelFromStringWritesUnsetOptionalChannels) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto* modifier = doc->makeNode<pagx::TextModifier>();
+  ASSERT_FALSE(modifier->fillColor.has_value());
+  ASSERT_FALSE(modifier->strokeColor.has_value());
+  ASSERT_FALSE(modifier->strokeWidth.has_value());
+
+  ASSERT_TRUE(pagx::SetNodeChannelFromString(modifier, "fillColor", "#FF0000"));
+  ASSERT_TRUE(modifier->fillColor.has_value());
+  EXPECT_EQ(*modifier->fillColor, (pagx::Color{1, 0, 0, 1}));
+  ASSERT_TRUE(pagx::SetNodeChannelFromString(modifier, "strokeColor", "#0000FF"));
+  ASSERT_TRUE(modifier->strokeColor.has_value());
+  EXPECT_EQ(*modifier->strokeColor, (pagx::Color{0, 0, 1, 1}));
+  ASSERT_TRUE(pagx::SetNodeChannelFromString(modifier, "strokeWidth", "3"));
+  ASSERT_TRUE(modifier->strokeWidth.has_value());
+  EXPECT_FLOAT_EQ(*modifier->strokeWidth, 3.0f);
+}
+
+/**
+ * Test case: an integer string outside the int range is rejected on every platform, including
+ * LLP64 where long is 32 bits and strtol alone saturates to LONG_MAX. A failed write leaves the
+ * previous value untouched so the caller can fall back to a full reparse.
+ */
+PAGX_TEST(PAGXTest, SetNodeChannelFromStringRejectsOutOfRangeInt) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto* selector = doc->makeNode<pagx::RangeSelector>();
+  ASSERT_TRUE(pagx::SetNodeChannelFromString(selector, "randomSeed", "5"));
+  EXPECT_FALSE(pagx::SetNodeChannelFromString(selector, "randomSeed", "3000000000"));
+  EXPECT_EQ(selector->randomSeed, 5);
+  EXPECT_FALSE(pagx::SetNodeChannelFromString(selector, "randomSeed", "10px"));
+  EXPECT_EQ(selector->randomSeed, 5);
+}
+
+/**
+ * Test case: the root composition spawns no timelines itself, so a scene-level query has to walk
+ * the runtime tree. A document with no <Timelines> reports false on both the root and the scene,
+ * while a composition instance whose owner layer carries a playing Animation reports true.
+ */
+PAGX_TEST(PAGXTest, SceneHasSpawnedTimelines) {
+  auto staticDoc = pagx::PAGXImporter::FromXML(
+      R"(<pagx version="1.0" width="100" height="100"><Layer width="10" height="10"/></pagx>)");
+  ASSERT_NE(staticDoc, nullptr);
+  auto staticScene = pagx::PAGScene::Make(staticDoc);
+  ASSERT_NE(staticScene, nullptr);
+  EXPECT_FALSE(staticScene->hasSpawnedTimelines());
+  ASSERT_NE(staticScene->rootComposition(), nullptr);
+  EXPECT_FALSE(staticScene->rootComposition()->hasTimelines());
+
+  const std::string xml = R"(<pagx version="1.0" width="100" height="100">
+  <Resources>
+    <Composition id="inner" width="40" height="40">
+      <Layer id="innerLayer" width="40" height="40">
+        <Rectangle width="40" height="40"/>
+        <Fill color="#FF0000"/>
+      </Layer>
+    </Composition>
+  </Resources>
+  <Layer composition="@inner">
+    <Timelines>
+      <Animation ref="@anim" playing="true"/>
+    </Timelines>
+  </Layer>
+  <Animations>
+    <Animation id="anim" duration="60" frameRate="60">
+      <Object target="innerLayer">
+        <Channel name="x" type="float">
+          <Key time="0" value="0"/>
+          <Key time="60" value="10"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>)";
+  auto doc = pagx::PAGXImporter::FromXML(xml);
+  ASSERT_NE(doc, nullptr);
+  EXPECT_TRUE(doc->errors.empty());
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_NE(scene, nullptr);
+  EXPECT_TRUE(scene->hasSpawnedTimelines());
+}
+
+/**
+ * Test case: getNodeSourceMap() describes every node in document order — index, type, and
+ * channel list align with the node vector, parsed nodes carry a 1-based source span, and the
+ * line -> index lookup an editor selection needs resolves to the owning node. A composition
+ * referenced by multiple host layers appears once in the map (one source definition), while the
+ * hosts are distinct entries. Programmatically created nodes have a valid index but no span.
+ */
+PAGX_TEST(PAGXTest, GetNodeSourceMapMultiInstanceComposition) {
+  const std::string xml = R"(<pagx version="1.0" width="200" height="100">
+  <Resources>
+    <Composition id="inner" width="40" height="40">
+      <Layer id="innerLayer" x="0" y="0" width="40" height="40">
+        <Rectangle width="40" height="40"/>
+        <Fill color="#3B82F6"/>
+      </Layer>
+    </Composition>
+  </Resources>
+  <Layer id="hostA" x="0" y="30" width="40" height="40" composition="@inner"/>
+  <Layer id="hostB" x="60" y="30" width="40" height="40" composition="@inner"/>
+</pagx>)";
+  auto doc = pagx::PAGXImporter::FromXML(xml);
+  ASSERT_NE(doc, nullptr);
+  EXPECT_TRUE(doc->errors.empty());
+
+  auto* hostA = doc->findNode<pagx::Layer>("hostA");
+  auto* hostB = doc->findNode<pagx::Layer>("hostB");
+  auto* innerComp = doc->findNode<pagx::Composition>("inner");
+  auto* innerLayer = doc->findNode<pagx::Layer>("innerLayer");
+  ASSERT_NE(hostA, nullptr);
+  ASSERT_NE(hostB, nullptr);
+  ASSERT_NE(innerComp, nullptr);
+  ASSERT_NE(innerLayer, nullptr);
+
+  auto map = doc->getNodeSourceMap();
+  ASSERT_EQ(map.size(), doc->nodes.size());
+
+  // Entries follow document order: entry i describes nodes[i] with a matching index, type, and
+  // channel list. Nodes with an XML element of their own carry a 1-based source span; nodes the
+  // importer derives implicitly from an attribute (e.g. the SolidColor behind a Fill's
+  // color="#..." shorthand) have no element, so their span stays -1 while their index is valid.
+  for (size_t i = 0; i < map.size(); i++) {
+    EXPECT_EQ(map[i].index, static_cast<int>(i));
+    EXPECT_EQ(map[i].nodeType, doc->nodes[i]->nodeType());
+    EXPECT_EQ(map[i].channels, pagx::ListChannels(doc->nodes[i]->nodeType()));
+    EXPECT_TRUE(map[i].startLine == -1 || map[i].startLine >= 1);
+    if (map[i].startLine != -1) {
+      EXPECT_GE(map[i].endLine, map[i].startLine);
+    }
+  }
+
+  // The two hosts are distinct entries with distinct indices and source lines; the referenced
+  // definition subtree appears exactly once no matter how many instances reference it.
+  EXPECT_NE(hostA->index, hostB->index);
+  EXPECT_NE(map[hostA->index].startLine, map[hostB->index].startLine);
+  EXPECT_EQ(map[hostA->index].nodeType, pagx::NodeType::Layer);
+  EXPECT_EQ(map[hostB->index].nodeType, pagx::NodeType::Layer);
+  EXPECT_EQ(map[innerComp->index].nodeType, pagx::NodeType::Composition);
+  EXPECT_EQ(map[innerLayer->index].startLine, innerLayer->sourceLine);
+
+  // The line -> index lookup an editor selection performs. Spans nest (the Composition's span
+  // contains its inner layers' spans), so a line inside innerLayer matches both the composition
+  // and the layer; the innermost matching span is the node the editor selected.
+  int line = innerLayer->sourceLine;
+  int lookupIndex = -1;
+  int lookupSpan = -1;
+  for (const auto& entry : map) {
+    if (entry.startLine == -1) {
+      continue;
+    }
+    if (entry.startLine <= line && line <= entry.endLine &&
+        (lookupSpan == -1 || entry.endLine - entry.startLine < lookupSpan)) {
+      lookupIndex = entry.index;
+      lookupSpan = entry.endLine - entry.startLine;
+    }
+  }
+  EXPECT_EQ(lookupIndex, innerLayer->index);
+  EXPECT_NE(lookupIndex, innerComp->index);
+
+  // A programmatically created node joins the map with a valid trailing index but no span.
+  auto* added = doc->makeNode<pagx::Layer>();
+  map = doc->getNodeSourceMap();
+  ASSERT_EQ(map.size(), doc->nodes.size());
+  ASSERT_EQ(map.back().index, added->index);
+  EXPECT_EQ(map.back().startLine, -1);
+  EXPECT_EQ(map.back().endLine, -1);
+}
+
 // Verifies the demo pagx's animation and viewmodel both reshape text through the runtime holder:
 // after advancing the default timeline past the second keyframe, the animated Text's blob width
 // changes to the "Animated" glyph extent; after driving the ViewModel's "title" property, the

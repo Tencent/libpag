@@ -55,11 +55,16 @@ inline constexpr bool HasFlag(ChannelFlags value, ChannelFlags flag) {
 // string, or a Matrix3D value that is not finite and invertible.
 using ChannelAccessor = bool (*)(Node* node, KeyValue* getOut, const KeyValue* setIn);
 
-// One reflective channel of a node type, addressed by channel name.
+// One reflective channel of a node type, addressed by channel name. valueType is the declared
+// KeyValue alternative the accessor reads and writes, so a writer can parse a raw attribute string
+// without depending on the node's current value (an optional channel may be unset). percentChannel
+// names the sibling channel carrying a percentage dimension, or is null for every other channel.
 struct ChannelDef {
   const char* channel;
   ChannelFlags flags;
   ChannelAccessor access;
+  ChannelValueType valueType;
+  const char* percentChannel;
 };
 
 // Returns the channel table for the given node type, or an empty table if the type has no

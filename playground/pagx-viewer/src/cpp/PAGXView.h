@@ -20,6 +20,7 @@
 
 #include <emscripten/bind.h>
 #include <deque>
+#include <unordered_map>
 #include "pag/gpu.h"
 #include "pagx/FontConfig.h"
 #include "pagx/PAGAnimation.h"
@@ -86,17 +87,64 @@ class PAGXView {
   int64_t currentTimeMicros() const;
   int64_t durationMicros() const;
   float frameRate() const;
+  // Returns true when the loaded document has a default timeline at all — even one without a
+  // queryable duration (e.g. a state machine). The playback bar uses this to stay visible in a
+  // greyed-out fallback mode instead of hiding entirely.
+  bool hasTimeline() const;
   void setCurrentTimeMicros(int64_t micros);
   void setLoop(bool loop);
   bool isLoop() const;
+
+  // --- Selection (phase 1, read-only canvas<->editor queries) ---
+
+  // Returns the hit-test result for the top-most layer under the surface point, or a null val if
+  // none. The result carries the source span (1-based lines) of the *reference* node — i.e. when
+  // the click lands inside a <Layer composition="@X"> instance, the span points at that <Layer>
+  // reference rather than at the internal definition node inside <Composition id>. Bounds are
+  // deliberately omitted; getNodeBounds() is the dedicated call for on-screen rects.
+  emscripten::val hitTest(float surfaceX, float surfaceY);
+
+  // One-shot export of every node's source span and incrementable channel list, for the editor
+  // to map lines<->index and (phase 2) decide which attr edits can go incremental. Call after
+  // buildLayers(); rebuild on full reload.
+  emscripten::val getNodeSourceMap() const;
+
+  // Returns the current-frame surface bounds {x,y,w,h} of every runtime layer instance built from
+  // nodes[index] — one array entry per instance when the node is referenced by several composition
+  // layers — or null if index is out of range or has no runtime layer. For overlay box drawing.
+  emscripten::val getNodeBounds(int index);
+
+  // --- Source-editor validation and incremental edit ---
+
+  /**
+   * Validates a PAGX XML byte buffer without modifying the view's loaded document or scene.
+   *
+   * The browser-side XML parser reports well-formedness. This method reports importer/schema
+   * errors (unknown elements, invalid attribute values, unresolved references, etc.) as an array
+   * of {message, line} objects for Monaco diagnostics.
+   * @param pagxData UTF-8 encoded PAGX XML bytes.
+   * @return JavaScript array of schema diagnostic objects.
+   */
+  emscripten::val validatePAGX(const emscripten::val& pagxData) const;
+
+  // Sets the given channel on nodes[index] from its raw PAGX attribute string and refreshes the
+  // scene in place (reusing Layer handles; layout re-run only when the channel requires it). This
+  // is the fast path for a pure attribute-value edit; structural edits fall back to a full reload.
+  // Returns false when the index is invalid or names a synthesized mount wrapper, the channel is
+  // unknown for the node type, or the string cannot be parsed into the channel's type (caller
+  // should then do a full reparse).
+  bool setNodeChannel(int index, const std::string& channel, const std::string& value);
 
  private:
   void updateContentTransform();
   void applyDisplayTransform();
   void applySceneDisplayOptions();
+  void advanceAnimationUnit(const std::shared_ptr<PAGAnimation>& animation, int64_t deltaUs);
   bool ensureWindow();
   void syncSurfaceSize(int canvasWidth, int canvasHeight);
   void advanceTimelines(double frameStartMs);
+  void advanceFallbackTimeline(int64_t deltaUs);
+  void invalidateLayerInstances();
   void onZoomEnd();
   void updatePerformanceState(double frameDurationMs);
   void updateAdaptiveTileRefinement();
@@ -113,6 +161,11 @@ class PAGXView {
   // PAGTimeline base, so they are routed through this pointer. Null when there is no default
   // timeline or it is not an animation.
   std::shared_ptr<PAGAnimation> defaultAnimation = nullptr;
+  // Virtual clock for a default timeline without a queryable duration (e.g. a state machine):
+  // accumulated from frame deltas while playing and moved by seek-equivalent relative steps, so
+  // the playback bar can offer play/pause and frame stepping even though no total duration or
+  // absolute seek exists.
+  int64_t fallbackClockUs = 0;
   // Playback state maintained by the view itself. The timeline API no longer carries play/pause
   // state, and PAGComposition::pauseTimeline cannot gate the top-level timeline driven here, so the
   // view gates advancement on this flag.
@@ -136,6 +189,12 @@ class PAGXView {
   float userOffsetY = 0.0f;
   FontConfig fontConfig = {};
   std::shared_ptr<PAGXDocument> document = nullptr;
+  // Runtime layer instances grouped by their source Layer node. Rebuilt lazily by getNodeBounds()
+  // instead of walking the whole runtime tree once per hover rAF; invalidated whenever the tree may
+  // have been rebuilt or the document replaced. Bounds are still queried per frame, so animation
+  // and zoom remain live.
+  std::unordered_map<const Node*, std::vector<std::shared_ptr<PAGLayer>>> layerInstances = {};
+  bool layerInstancesCached = false;
 
   bool useCustomBackgroundColor = false;
   Color customBackgroundColor = {};

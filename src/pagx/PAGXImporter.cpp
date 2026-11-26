@@ -300,12 +300,14 @@ static T* makeNodeFromXML(const DOMNode* xmlNode, PAGXDocument* doc) {
   if (existing) {
     ParseCustomData(xmlNode, existing);
     existing->sourceLine = xmlNode->line;
+    existing->endLine = xmlNode->endLine;
     return static_cast<T*>(existing);
   }
   auto* node = doc->makeNode<T>(id);
   if (node) {
     ParseCustomData(xmlNode, node);
     node->sourceLine = xmlNode->line;
+    node->endLine = xmlNode->endLine;
   }
   return node;
 }
@@ -1763,9 +1765,8 @@ static T ParseTypedValue(const std::string&, PAGXDocument*, const DOMNode*) {
 
 template <>
 float ParseTypedValue<float>(const std::string& value, PAGXDocument* doc, const DOMNode* node) {
-  char* endPtr = nullptr;
-  float result = strtof(value.c_str(), &endPtr);
-  if (endPtr == value.c_str() || *endPtr != '\0' || !std::isfinite(result)) {
+  float result = 0;
+  if (!ParseStrictFloat(value, &result)) {
     ReportError(doc, node, "Invalid float keyframe value '" + value + "'.");
     return 0.0f;
   }
@@ -1774,29 +1775,22 @@ float ParseTypedValue<float>(const std::string& value, PAGXDocument* doc, const 
 
 template <>
 bool ParseTypedValue<bool>(const std::string& value, PAGXDocument* doc, const DOMNode* node) {
-  if (value == "true" || value == "1") {
-    return true;
-  }
-  if (value == "false" || value == "0") {
+  bool result = false;
+  if (!ParseStrictBool(value, &result)) {
+    ReportError(doc, node, "Invalid bool keyframe value '" + value + "'.");
     return false;
   }
-  ReportError(doc, node, "Invalid bool keyframe value '" + value + "'.");
-  return false;
+  return result;
 }
 
 template <>
 int ParseTypedValue<int>(const std::string& value, PAGXDocument* doc, const DOMNode* node) {
-  char* endPtr = nullptr;
-  long result = std::strtol(value.c_str(), &endPtr, 10);
-  if (endPtr == value.c_str() || *endPtr != '\0') {
+  int result = 0;
+  if (!ParseStrictInt(value, &result)) {
     ReportError(doc, node, "Invalid int keyframe value '" + value + "'.");
     return 0;
   }
-  if (result < INT_MIN || result > INT_MAX) {
-    ReportError(doc, node, "Int keyframe value '" + value + "' out of range.");
-    return 0;
-  }
-  return static_cast<int>(result);
+  return result;
 }
 
 template <>
@@ -2745,14 +2739,15 @@ static int GetIntAttribute(const DOMNode* node, const std::string& name, int def
     return defaultValue;
   }
   char* endPtr = nullptr;
-  long value = strtol(str->c_str(), &endPtr, 10);
+  errno = 0;
+  long long value = strtoll(str->c_str(), &endPtr, 10);
   if (endPtr == str->c_str()) {
     if (doc) {
       ReportError(doc, node, "Invalid value '" + *str + "' for '" + name + "' attribute.");
     }
     return defaultValue;
   }
-  if (value < INT_MIN || value > INT_MAX) {
+  if (errno == ERANGE || value < INT_MIN || value > INT_MAX) {
     if (doc) {
       ReportError(doc, node, "Value out of range for '" + name + "' attribute.");
     }

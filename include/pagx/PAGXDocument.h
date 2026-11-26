@@ -41,6 +41,44 @@ class Image;
 class ImagePattern;
 
 /**
+ * One entry of the document's source-node map: the runtime index and source span of a node, its
+ * type, and the reflectable channel names available on it. Used by editor selection (line<->index
+ * mapping) and by hosts deciding which attribute edits can go incremental.
+ *
+ * startLine / endLine may be -1 independently of index: a node returned in getNodeSourceMap()
+ * always has index >= 0, but its source span can still be unknown when the node was created
+ * programmatically or by an importer that did not carry line information.
+ */
+struct NodeSourceEntry {
+  /**
+   * Index of the node in PAGXDocument::nodes. See Node::index for the caching caveats on this
+   * value.
+   */
+  int index = -1;
+
+  /**
+   * 1-based start line of the node in the PAGX XML, or -1 when the source span is unavailable.
+   */
+  int startLine = -1;
+
+  /**
+   * 1-based end line of the node in the PAGX XML, or -1 when the source span is unavailable.
+   */
+  int endLine = -1;
+
+  /**
+   * The node type.
+   */
+  NodeType nodeType = NodeType::Document;
+
+  /**
+   * Reflectable channel names of the node, from ListChannels(nodeType). Empty for node types that
+   * expose no channels.
+   */
+  std::vector<std::string> channels = {};
+};
+
+/**
  * PAGXDocument is the root container for a PAGX document. It owns the resources, layers, and font
  * configuration of a parsed/authored document, and tracks the live PAGScene instances created from
  * it so post-build edits issued through notifyChange() can be broadcast to each scene. Use
@@ -117,6 +155,7 @@ class PAGXDocument : public Node {
   T* makeNode(const std::string& id = "") {
     auto node = std::unique_ptr<T>(new T());
     auto* result = node.get();
+    result->index = static_cast<int>(nodes.size());
     registerNode(result, id);
     nodeSet.insert(result);
     nodes.push_back(std::move(node));
@@ -146,7 +185,7 @@ class PAGXDocument : public Node {
   /**
    * All nodes in the document (owned by the document). Do not push into this vector directly:
    * use makeNode() for new nodes and adoptNodes() to take over nodes from another document — a
-   * direct push leaves the node invisible to ownsNode().
+   * direct push leaves the node's index stale and invisible to ownsNode().
    *
    * Some entries are synthesized wrappers for mounted imports (see isMountedComposition()):
    * they are runtime adapters, not authored resources, and must be skipped when enumerating
@@ -168,6 +207,19 @@ class PAGXDocument : public Node {
    * @param other the source document; drained only after a successful transfer.
    */
   void adoptNodes(PAGXDocument& other);
+
+  /**
+   * Returns one entry per authored node in PAGXDocument::nodes, in node vector order, carrying the
+   * node's runtime index, source span (1-based lines), type, and reflectable channel names. The
+   * vector order matches document order for imported files, but optimizer-synthesized nodes are
+   * appended rather than inserted at their source position, so callers must use the span lines —
+   * not the entry order — when mapping a source line back to a node. Use this map for editor
+   * selection and to decide which attribute edits can go incremental (a channel edit that fails
+   * can fall back to a full reparse). Synthesized wrappers for mounted imports (see
+   * isMountedComposition()) have no source span and are skipped. Entries reference the current node
+   * indexing; a structural document change renumbers nodes, so rebuild the map after such edits.
+   */
+  std::vector<NodeSourceEntry> getNodeSourceMap() const;
 
   /**
    * Errors collected during parsing. Non-empty errors indicate structural issues in the source
