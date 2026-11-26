@@ -1902,6 +1902,8 @@ PAGX_TEST(PAGXRuntimeTest, OutputViewValidationReusesForRenderOnlyLeafEdits) {
 
   auto scene = pagx::PAGScene::Make(doc);
   ASSERT_NE(scene, nullptr);
+  // Make() resolves the declaration once; the initial tree build only captures the snapshot.
+  EXPECT_EQ(scene->outputViewValidationRuns, 1u);
   auto surface = pagx::PAGSurface::MakeOffscreen(20, 20);
   ASSERT_NE(surface, nullptr);
   ASSERT_TRUE(scene->draw(surface));
