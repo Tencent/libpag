@@ -476,6 +476,28 @@ test('a paused final frame is forced by seeking to the middle of the frame', asy
   assertClean(environment, video);
 });
 
+test('an ended video is forced back to the last frame instead of restarting playback', async function () {
+  const environment = createEnvironment();
+  const video = new Video();
+  video.duration = 2;
+  video.currentTimeValue = 2;
+  video.paused = true;
+  video.ended = true;
+  const reader = makeReader(environment, video, new Owner(true));
+  video.presentFrame(59 / 30);
+  const pending = reader.prepare(59, 1);
+  await drainMicrotasks();
+  assert.equal(video.seeking, true);
+  assert.equal(video.currentTimeValue, 59.5 / 30);
+  video.finishSeek();
+  await drainMicrotasks();
+  environment.clock.renderFrame();
+  assert.equal(await pending, true);
+  assert.equal(reader.getCurrentFrame(), 59);
+  assert.equal(video.playCalls, 1);
+  assertClean(environment, video);
+});
+
 test('destroy during the final frame wait releases the frame callbacks', async function () {
   const environment = createEnvironment();
   const video = new Video();

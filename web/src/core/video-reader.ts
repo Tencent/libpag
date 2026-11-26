@@ -309,10 +309,14 @@ export class VideoReader {
    * follows, but the last frame has no next frame, so it would keep a stale picture. Waits for the
    * live presentation first, then forces the frame with a mid-frame seek when playback stops on the
    * wrong picture instead of waiting for the next frame.
+   *
+   * An ended video already presented the last frame, but it still cannot skip the seek:
+   * coordinatePlayback() resumes playback, and play() rewinds ended media to its beginning, so the
+   * tail would be replaced by the first frame. Seeking back clears the ended state first.
    */
   private async prepareLastFrame(operation: VideoReaderOperation, targetFrame: number): Promise<boolean> {
     const video = this.videoEl!;
-    if (this.presentedFrame() >= targetFrame) return true;
+    if (!video.ended && this.presentedFrame() >= targetFrame) return true;
     if (!video.paused && !video.ended && typeof video.requestVideoFrameCallback === 'function') {
       try {
         const presented = await operation.wait(
