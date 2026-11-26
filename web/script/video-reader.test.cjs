@@ -476,6 +476,22 @@ test('a paused final frame is forced by seeking to the middle of the frame', asy
   assertClean(environment, video);
 });
 
+test('a failed forced tail seek reports an error and keeps the frame uncommitted', async function () {
+  const environment = createEnvironment();
+  const video = new Video();
+  video.duration = 2;
+  video.currentTimeValue = 59 / 30;
+  const reader = makeReader(environment, video);
+  const pending = reader.prepare(59, 1);
+  await drainMicrotasks();
+  assert.equal(video.seeking, true);
+  environment.clock.advance(400);
+  assert.equal(await pending, false);
+  assert.equal(reader.getCurrentFrame(), -1);
+  assert.match(String(reader.getError()), /timed out/);
+  assertClean(environment, video);
+});
+
 test('an ended video is forced back to the last frame instead of restarting playback', async function () {
   const environment = createEnvironment();
   const video = new Video();

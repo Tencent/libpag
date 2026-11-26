@@ -330,8 +330,7 @@ export class VideoReader {
         // Fall back to the seek below instead of keeping a stale picture.
       }
     }
-    await this.seekToLastFrame(operation, targetFrame);
-    return this.isActive(operation);
+    return this.seekToLastFrame(operation, targetFrame);
   }
 
   private lastFrame(): number {
@@ -369,9 +368,9 @@ export class VideoReader {
     this.presentedTime = -1;
   }
 
-  private async seekToLastFrame(operation: VideoReaderOperation, targetFrame: number): Promise<void> {
+  private async seekToLastFrame(operation: VideoReaderOperation, targetFrame: number): Promise<boolean> {
     const video = this.videoEl;
-    if (video === null) return;
+    if (video === null) return false;
     // Aim at the middle of the frame: seeking to the frame start makes Safari present the previous
     // frame because of how the media timeline is rounded.
     const targetTime = Math.min((targetFrame + 0.5) / this.frameRate, video.duration);
@@ -380,21 +379,19 @@ export class VideoReader {
     // the uploaded picture may still be the previous one. coordinatePlayback() resumes playback
     // afterwards, which also presents the seeked frame to the texture uploader.
     if (!video.paused) video.pause();
-    try {
-      // The seek skips waitUntilReady(): a video that already reached its end often stays below
-      // HAVE_FUTURE_DATA afterwards, so waiting for canplay would time out before the seek that
-      // brings the current frame back is issued.
-      const sought = await operation.wait(
-        this.registerTailSeek.bind(this, targetTime),
-        (1000 / this.frameRate) * VIDEO_DECODE_SEEK_TIMEOUT_FRAME,
-        'Seek operation timed out.',
-      );
-      if (!sought || !this.isActive(operation)) return;
-      this.presentedTime = targetFrame / this.frameRate;
-      await operation.wait(this.registerAnimationFrame.bind(this), VIDEO_WAIT_TIMEOUT, 'Video frame timed out.');
-    } catch {
-      // Keep the picture that is already on screen when the seek does not finish.
-    }
+    // The seek skips waitUntilReady(): a video that already reached its end often stays below
+    // HAVE_FUTURE_DATA afterwards, so waiting for canplay would time out before the seek that
+    // brings the current frame back is issued.
+    const sought = await operation.wait(
+      this.registerTailSeek.bind(this, targetTime),
+      (1000 / this.frameRate) * VIDEO_DECODE_SEEK_TIMEOUT_FRAME,
+      'Seek operation timed out.',
+    );
+    if (!sought || !this.isActive(operation)) return false;
+    this.presentedTime = targetFrame / this.frameRate;
+    // Timeouts reject instead of reporting success: the caller must record the error and keep the
+    // frame uncommitted, otherwise the stale picture is cached as the requested frame.
+    return operation.wait(this.registerAnimationFrame.bind(this), VIDEO_WAIT_TIMEOUT, 'Video frame timed out.');
   }
 
   private registerTailSeek(targetTime: number, complete: () => void, fail: (error: any) => void): () => void {
