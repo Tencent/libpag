@@ -5,7 +5,7 @@ rem Refresh the selected backend's local baseline cache on Windows.
 rem
 rem Usage:
 rem   update_baseline.bat [USE_OPENGL^|USE_OPENGL_SWIFTSHADER^|USE_D3D12^|USE_D3D12_WARP^|USE_VULKAN]
-rem                       [--skip-images] [--no-checkout] [--no-fetch]
+rem                       [--skip-images] [--no-checkout] [--no-fetch] [--clang-cl]
 rem
 rem By default the script mirrors update_baseline.sh: it stashes local changes, checks out the
 rem origin/main commit, builds and runs UpdateBaseline_<Backend>, then restores the original branch
@@ -17,6 +17,11 @@ rem
 rem The cache is written to test\baseline\.cache\<backend>, where <backend> is opengl,
 rem opengl-swiftshader, d3d12, d3d12-warp or vulkan. Running the script regenerates the local md5
 rem cache; it never commits anything.
+rem
+rem --clang-cl builds with clang-cl instead of MSVC so private-access test cases are compiled in.
+rem The cache is keyed by backend only, not by compiler, so refresh it with the same compiler you
+rem pass to autotest.bat. A clang-cl refresh always rebuilds, because an existing cache cannot
+rem prove that the private-access cases are present.
 
 cd /d "%~dp0"
 set "WORKSPACE=%CD%"
@@ -29,12 +34,14 @@ set "BACKEND="
 set "SKIP_IMAGES=0"
 set "NO_CHECKOUT=0"
 set "NO_FETCH=0"
+set "USE_CLANG_CL=0"
 
 :parse_args
 if "%~1"=="" goto :args_done
 if /i "%~1"=="--skip-images" goto :arg_skip_images
 if /i "%~1"=="--no-checkout" goto :arg_no_checkout
 if /i "%~1"=="--no-fetch" goto :arg_no_fetch
+if /i "%~1"=="--clang-cl" goto :arg_clang_cl
 if /i "%~1"=="-h" goto :usage
 if /i "%~1"=="--help" goto :usage
 if defined BACKEND goto :too_many_backends
@@ -54,6 +61,11 @@ goto :parse_args
 
 :arg_no_fetch
 set "NO_FETCH=1"
+shift
+goto :parse_args
+
+:arg_clang_cl
+set "USE_CLANG_CL=1"
 shift
 goto :parse_args
 
@@ -94,6 +106,29 @@ where node >nul 2>nul
 if errorlevel 1 (
   call :Fail "Node.js was not found."
   goto :cleanup
+)
+
+set "CMAKE_COMPILER_ARGS="
+set "COMPILER_LABEL=MSVC"
+if "%USE_CLANG_CL%"=="1" (
+  set "COMPILER_LABEL=clang-cl"
+  if defined VS_DIR if exist "%VS_DIR%\VC\Tools\Llvm\x64\bin" set "PATH=%VS_DIR%\VC\Tools\Llvm\x64\bin;%PATH%"
+  where clang-cl >nul 2>nul
+  if errorlevel 1 (
+    call :Fail "clang-cl was not found. Install the C++ Clang tools for Windows component."
+    goto :cleanup
+  )
+  python -c "import sys; sys.exit(0 if sys.version_info[0] == 3 else 1)" >nul 2>nul
+  if not errorlevel 1 (
+    set "CMAKE_COMPILER_ARGS=-DCMAKE_C_COMPILER=clang-cl -DCMAKE_CXX_COMPILER=clang-cl -DCMAKE_C_COMPILER_LAUNCHER="python;%WORKSPACE%\win\tools\filter_clang.py" -DCMAKE_CXX_COMPILER_LAUNCHER="python;%WORKSPACE%\win\tools\filter_clang.py""
+  ) else (
+    py -3 -c "import sys; sys.exit(0 if sys.version_info[0] == 3 else 1)" >nul 2>nul
+    if errorlevel 1 (
+      call :Fail "Python 3 through python or py -3 is required by the clang-cl compiler launcher."
+      goto :cleanup
+    )
+    set "CMAKE_COMPILER_ARGS=-DCMAKE_C_COMPILER=clang-cl -DCMAKE_CXX_COMPILER=clang-cl -DCMAKE_C_COMPILER_LAUNCHER="py;-3;%WORKSPACE%\win\tools\filter_clang.py" -DCMAKE_CXX_COMPILER_LAUNCHER="py;-3;%WORKSPACE%\win\tools\filter_clang.py""
+  )
 )
 
 if "%NO_CHECKOUT%"=="1" goto :skip_checkout
@@ -139,6 +174,9 @@ if errorlevel 1 (
 )
 rem Both files must exist: a failed refresh deletes md5.json before regenerating it, so a lone
 rem version.json can belong to a broken cache. This mirrors update_baseline.sh's `-f` checks.
+rem A clang-cl refresh must not reuse the cache: the md5 file does not record which compiler built
+rem it, and only a clang-cl build proves the private-access cases ran.
+if "%USE_CLANG_CL%"=="1" goto :skip_cache_check
 if exist "%CACHE_DIR%\version.json" if exist "%CACHE_DIR%\md5.json" (
   git diff --no-index --quiet --ignore-cr-at-eol -- "%TEMP%\pag_main_version.json" "%CACHE_DIR%\version.json" >nul 2>nul
   if not errorlevel 1 (
@@ -147,6 +185,7 @@ if exist "%CACHE_DIR%\version.json" if exist "%CACHE_DIR%\md5.json" (
     exit /b 0
   )
 )
+:skip_cache_check
 del "%TEMP%\pag_main_version.json" >nul 2>nul
 
 set "CURRENT_BRANCH="
@@ -208,8 +247,8 @@ if errorlevel 1 (
 if exist "%BUILD_DIR%" rmdir /s /q "%BUILD_DIR%"
 set "CMAKE_IMAGE_ARGS=-DPAG_SKIP_GENERATE_BASELINE_IMAGES=OFF"
 if "%SKIP_IMAGES%"=="1" set "CMAKE_IMAGE_ARGS=-DPAG_SKIP_GENERATE_BASELINE_IMAGES=ON"
-echo Building UpdateBaseline_%TARGET_SUFFIX% for '%BACKEND_NAME%'...
-cmake -G Ninja -S "%WORKSPACE%" -B "%BUILD_DIR%" %CMAKE_BACKEND_ARGS% %CMAKE_IMAGE_ARGS% -DPAG_BUILD_TESTS=ON -DPAG_SKIP_BASELINE_CHECK=ON -DCMAKE_BUILD_TYPE=Debug
+echo Building UpdateBaseline_%TARGET_SUFFIX% for '%BACKEND_NAME%' with %COMPILER_LABEL%...
+cmake -G Ninja -S "%WORKSPACE%" -B "%BUILD_DIR%" %CMAKE_BACKEND_ARGS% %CMAKE_COMPILER_ARGS% %CMAKE_IMAGE_ARGS% -DPAG_BUILD_TESTS=ON -DPAG_SKIP_BASELINE_CHECK=ON -DCMAKE_BUILD_TYPE=Debug
 if errorlevel 1 (
   call :Fail "CMake configuration failed."
   goto :cleanup
@@ -288,7 +327,7 @@ set "STATUS=0"
 goto :cleanup
 
 :usage
-echo Usage: update_baseline.bat [USE_OPENGL^|USE_OPENGL_SWIFTSHADER^|USE_D3D12^|USE_D3D12_WARP^|USE_VULKAN] [--skip-images] [--no-checkout] [--no-fetch]
+echo Usage: update_baseline.bat [USE_OPENGL^|USE_OPENGL_SWIFTSHADER^|USE_D3D12^|USE_D3D12_WARP^|USE_VULKAN] [--skip-images] [--no-checkout] [--no-fetch] [--clang-cl]
 echo.
 echo   USE_OPENGL             OpenGL (default backend).
 echo   USE_OPENGL_SWIFTSHADER OpenGL on SwiftShader.
@@ -299,11 +338,14 @@ echo.
 echo   --skip-images          Only refresh md5.json; do not generate _base.webp images.
 echo   --no-checkout          Build the current working tree instead of origin/main.
 echo   --no-fetch             Skip git fetch and use the locally known origin/main.
+echo   --clang-cl             Build with clang-cl so private-access tests are compiled in.
 echo.
 echo By default the script stashes local changes and checks out origin/main, then restores the
 echo original branch and changes. Any stash created by this run is applied by exact OID and retained.
 echo Existing recovery details block a new run. Interruptions require manual recovery using that file.
 echo Run one backend at a time; test\out and version.json are shared.
+echo The md5 cache is keyed by backend, not by compiler, so refresh it with the compiler you intend
+echo to test with. A clang-cl refresh always rebuilds instead of reusing an existing cache.
 exit /b 0
 
 :Fail
