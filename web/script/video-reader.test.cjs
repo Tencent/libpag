@@ -62,6 +62,10 @@ class Video extends Events {
   playMode = 'ready';
   currentTimeValue = 1;
   playResult = null;
+  duration = NaN;
+  ended = false;
+  frameCallbacks = new Map();
+  nextFrameHandle = 0;
 
   get currentTime() {
     return this.currentTimeValue;
@@ -101,6 +105,23 @@ class Video extends Events {
 
   load() {
     this.loadCalls++;
+  }
+
+  requestVideoFrameCallback(callback) {
+    const handle = ++this.nextFrameHandle;
+    this.frameCallbacks.set(handle, callback);
+    return handle;
+  }
+
+  cancelVideoFrameCallback(handle) {
+    this.frameCallbacks.delete(handle);
+  }
+
+  presentFrame(mediaTime) {
+    for (const [handle, callback] of Array.from(this.frameCallbacks)) {
+      this.frameCallbacks.delete(handle);
+      callback(0, { mediaTime });
+    }
   }
 }
 
@@ -196,6 +217,7 @@ function createEnvironment(flags = {}) {
       VIDEO_DECODE_SEEK_TIMEOUT_FRAME: 12,
       VIDEO_PLAYBACK_RATE_MAX: 4,
       VIDEO_PLAYBACK_RATE_MIN: 0.25,
+      VIDEO_PRESENT_TIMEOUT_FRAME: 3,
     },
     '../utils/ua': { IPHONE: false, WECHAT: false, SAFARI_OR_IOS_WEBVIEW: false, ...flags },
     '../utils/video-listener': {
@@ -391,6 +413,126 @@ test('superseded prepare cannot commit or consume a stale seeked event', async f
   assertClean(environment, video);
 });
 
+test('the final frame waits until the video element presents it', async function () {
+  const environment = createEnvironment();
+  const video = new Video();
+  video.duration = 2;
+  video.currentTimeValue = 59 / 30;
+  video.paused = false;
+  const reader = makeReader(environment, video);
+  const pending = reader.prepare(59, 1);
+  await drainMicrotasks();
+  assert.equal(reader.getCurrentFrame(), -1);
+  assert.equal(video.frameCallbacks.size, 2);
+  video.presentFrame(58 / 30);
+  await drainMicrotasks();
+  assert.equal(reader.getCurrentFrame(), -1);
+  assert.equal(video.frameCallbacks.size, 2);
+  video.presentFrame(59 / 30);
+  assert.equal(await pending, true);
+  assert.equal(reader.getCurrentFrame(), 59);
+  assert.equal(reader.getError(), null);
+  assert.equal(video.frameCallbacks.size, 1);
+  assertClean(environment, video);
+});
+
+test('a missing final frame presentation falls back to a forced seek', async function () {
+  const environment = createEnvironment();
+  const video = new Video();
+  video.duration = 2;
+  video.currentTimeValue = 59 / 30;
+  video.paused = false;
+  const reader = makeReader(environment, video);
+  const pending = reader.prepare(59, 1);
+  await drainMicrotasks();
+  environment.clock.advance(100);
+  await drainMicrotasks();
+  assert.equal(video.seeking, true);
+  assert.equal(video.currentTimeValue, 59.5 / 30);
+  video.finishSeek();
+  await drainMicrotasks();
+  environment.clock.renderFrame();
+  assert.equal(await pending, true);
+  assert.equal(reader.getCurrentFrame(), 59);
+  assert.equal(reader.getError(), null);
+  assertClean(environment, video);
+});
+
+test('a paused final frame is forced by seeking to the middle of the frame', async function () {
+  const environment = createEnvironment();
+  const video = new Video();
+  video.duration = 2;
+  video.currentTimeValue = 59 / 30;
+  const reader = makeReader(environment, video);
+  const pending = reader.prepare(59, 1);
+  await drainMicrotasks();
+  assert.equal(video.seeking, true);
+  assert.equal(video.currentTimeValue, 59.5 / 30);
+  video.finishSeek();
+  await drainMicrotasks();
+  environment.clock.renderFrame();
+  assert.equal(await pending, true);
+  assert.equal(reader.getCurrentFrame(), 59);
+  assertClean(environment, video);
+});
+
+test('a failed forced tail seek reports an error and keeps the frame uncommitted', async function () {
+  const environment = createEnvironment();
+  const video = new Video();
+  video.duration = 2;
+  video.currentTimeValue = 59 / 30;
+  const reader = makeReader(environment, video);
+  const pending = reader.prepare(59, 1);
+  await drainMicrotasks();
+  assert.equal(video.seeking, true);
+  environment.clock.advance(400);
+  assert.equal(await pending, false);
+  assert.equal(reader.getCurrentFrame(), -1);
+  assert.match(String(reader.getError()), /timed out/);
+  assertClean(environment, video);
+});
+
+test('an ended video is forced back to the last frame instead of restarting playback', async function () {
+  const environment = createEnvironment();
+  const video = new Video();
+  video.duration = 2;
+  video.currentTimeValue = 2;
+  video.paused = true;
+  video.ended = true;
+  const reader = makeReader(environment, video, new Owner(true));
+  video.presentFrame(59 / 30);
+  const pending = reader.prepare(59, 1);
+  await drainMicrotasks();
+  assert.equal(video.seeking, true);
+  assert.equal(video.currentTimeValue, 59.5 / 30);
+  video.finishSeek();
+  await drainMicrotasks();
+  environment.clock.renderFrame();
+  assert.equal(await pending, true);
+  assert.equal(reader.getCurrentFrame(), 59);
+  assert.equal(video.playCalls, 1);
+  assertClean(environment, video);
+});
+
+test('destroy during the final frame wait releases the frame callbacks', async function () {
+  const environment = createEnvironment();
+  const video = new Video();
+  video.duration = 2;
+  video.currentTimeValue = 59 / 30;
+  video.paused = false;
+  const owner = new Owner();
+  const reader = makeReader(environment, video, owner);
+  const pending = reader.prepare(59, 1);
+  await drainMicrotasks();
+  assert.equal(video.frameCallbacks.size, 2);
+  reader.onDestroy();
+  assert.equal(await pending, false);
+  assert.equal(reader.getCurrentFrame(), -1);
+  assert.equal(video.frameCallbacks.size, 0);
+  assert.equal(owner.readers.size, 0);
+  assertClean(environment, video);
+});
+
 test('Safari first-frame warmup preserves the latest playing intent', async function () {
   for (const playing of [false, true]) {
     const environment = createEnvironment({ SAFARI_OR_IOS_WEBVIEW: true });
@@ -467,6 +609,7 @@ test('destroy settles each outstanding wait and late callbacks cannot use the vi
     assert.equal(reader.getVideo(), null);
     assert.equal(reader.getCurrentFrame(), -1);
     assert.equal(owner.readers.size, 0);
+    assert.equal(video.frameCallbacks.size, 0);
     assertClean(environment, video);
     const playCalls = video.playCalls;
     const pauseCalls = video.pauseCalls;
@@ -499,11 +642,13 @@ test('reader ownership is explicit and external media resources are not revoked'
   assert.equal(environment.wrongOwner.readers.size, 0);
   first.onDestroy();
   assert.equal(external.src, 'https://example.test/external.mp4');
+  assert.equal(external.frameCallbacks.size, 0);
   assert.equal(environment.revokedURLs.length, 0);
   assert.equal(secondOwner.readers.has(second), true);
   second.onDestroy();
   assert.deepEqual(environment.revokedURLs, ['blob:owned-1']);
   assert.equal(environment.videos[0].src, '');
+  assert.equal(environment.videos[0].frameCallbacks.size, 0);
   second.onDestroy();
   assert.equal(environment.revokedURLs.length, 1);
 });
@@ -528,6 +673,7 @@ test('partial video initialization rolls back the owned URL and reader registrat
     assert.equal(owner.readers.size, 0);
     assert.deepEqual(environment.revokedURLs, ['blob:owned-1']);
     assert.equal(environment.videos[0].src, '');
+    assert.equal(environment.videos[0].frameCallbacks.size, 0);
     assertClean(environment, environment.videos[0]);
   }
 });

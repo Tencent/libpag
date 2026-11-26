@@ -7,6 +7,10 @@ export const VIDEO_DECODE_WAIT_FRAME = 1;
  */
 export const VIDEO_DECODE_SEEK_TIMEOUT_FRAME = 12;
 /**
+ * Max frame num to wait for the video element to present a frame.
+ */
+export const VIDEO_PRESENT_TIMEOUT_FRAME = 3;
+/**
  * NAL unit length. [ 0, 0, 0, 1 ]
  */
 export const NALU_HEADER_LENGTH = 4;
