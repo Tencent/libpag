@@ -7585,4 +7585,90 @@ PAGX_TEST(PAGXSVGTest, SVGImport_StdDeviationKeepsPerChannelBase) {
   EXPECT_NEAR(blurY->keyframes.back().value, 5.0f, 1e-4f);
 }
 
+
+static pagx::Layer* FindLayerWithFilters(pagx::Layer* layer) {
+  if (layer == nullptr) {
+    return nullptr;
+  }
+  if (!layer->filters.empty()) {
+    return layer;
+  }
+  for (auto* child : layer->children) {
+    auto* found = FindLayerWithFilters(child);
+    if (found != nullptr) {
+      return found;
+    }
+  }
+  return nullptr;
+}
+
+/**
+ * Figma can emit one filter containing an outer drop shadow, an inner shadow and a final
+ * foreground blur. The inner shadow chain uses feComposite operator="arithmetic" after the blur;
+ * the foreground blur follows a feBlend whose "in" is omitted (implicit SourceGraphic).
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_FigmaDropShadowInnerShadowForegroundBlur) {
+  std::string svg =
+      "<svg width=\"364\" height=\"364\" viewBox=\"0 0 364 364\" fill=\"none\">"
+      "<g filter=\"url(#f)\">"
+      "<rect x=\"30\" y=\"30\" width=\"300\" height=\"300\" fill=\"#E4E4E4\"/>"
+      "<rect x=\"30.5\" y=\"30.5\" width=\"299\" height=\"299\" stroke=\"black\"/>"
+      "</g>"
+      "<defs><filter id=\"f\" x=\"0\" y=\"0\" width=\"364\" height=\"364\" "
+      "filterUnits=\"userSpaceOnUse\" color-interpolation-filters=\"sRGB\">"
+      "<feFlood flood-opacity=\"0\" result=\"BackgroundImageFix\"/>"
+      "<feColorMatrix in=\"SourceAlpha\" type=\"matrix\" "
+      "values=\"0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0\" result=\"hardAlpha\"/>"
+      "<feOffset dx=\"30\" dy=\"30\"/><feGaussianBlur stdDeviation=\"2\"/>"
+      "<feComposite in2=\"hardAlpha\" operator=\"out\"/>"
+      "<feColorMatrix type=\"matrix\" "
+      "values=\"0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 1 0\"/>"
+      "<feBlend mode=\"normal\" in2=\"BackgroundImageFix\" result=\"effect1_dropShadow\"/>"
+      "<feBlend mode=\"normal\" in=\"SourceGraphic\" in2=\"effect1_dropShadow\" result=\"shape\"/>"
+      "<feColorMatrix in=\"SourceAlpha\" type=\"matrix\" "
+      "values=\"0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0\" result=\"hardAlpha\"/>"
+      "<feOffset dx=\"30\" dy=\"30\"/><feGaussianBlur stdDeviation=\"2\"/>"
+      "<feComposite in2=\"hardAlpha\" operator=\"arithmetic\" k2=\"-1\" k3=\"1\"/>"
+      "<feColorMatrix type=\"matrix\" "
+      "values=\"0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0\"/>"
+      "<feBlend mode=\"normal\" in2=\"shape\" result=\"effect2_innerShadow\"/>"
+      "<feGaussianBlur stdDeviation=\"15\" result=\"effect3_foregroundBlur\"/>"
+      "</filter></defs></svg>";
+  auto doc = pagx::SVGImporter::ParseString(svg);
+  ASSERT_NE(doc, nullptr);
+
+  pagx::Layer* filtered = nullptr;
+  for (auto* root : doc->layers) {
+    filtered = FindLayerWithFilters(root);
+    if (filtered != nullptr) {
+      break;
+    }
+  }
+  ASSERT_NE(filtered, nullptr);
+  ASSERT_EQ(filtered->filters.size(), 3u);
+
+  auto* drop = static_cast<pagx::DropShadowFilter*>(filtered->filters[0]);
+  ASSERT_EQ(drop->nodeType(), pagx::NodeType::DropShadowFilter);
+  EXPECT_FLOAT_EQ(drop->offsetX, 30.0f);
+  EXPECT_FLOAT_EQ(drop->offsetY, 30.0f);
+  EXPECT_FLOAT_EQ(drop->blurX, 2.0f);
+  EXPECT_FLOAT_EQ(drop->blurY, 2.0f);
+  EXPECT_FLOAT_EQ(drop->color.green, 1.0f);
+  EXPECT_FLOAT_EQ(drop->color.red, 0.0f);
+
+  auto* inner = static_cast<pagx::InnerShadowFilter*>(filtered->filters[1]);
+  ASSERT_EQ(inner->nodeType(), pagx::NodeType::InnerShadowFilter);
+  EXPECT_FLOAT_EQ(inner->offsetX, 30.0f);
+  EXPECT_FLOAT_EQ(inner->offsetY, 30.0f);
+  EXPECT_FLOAT_EQ(inner->blurX, 2.0f);
+  EXPECT_FLOAT_EQ(inner->blurY, 2.0f);
+  EXPECT_FLOAT_EQ(inner->color.red, 1.0f);
+  EXPECT_FLOAT_EQ(inner->color.green, 0.0f);
+
+  auto* blur = static_cast<pagx::BlurFilter*>(filtered->filters[2]);
+  ASSERT_EQ(blur->nodeType(), pagx::NodeType::BlurFilter);
+  EXPECT_FLOAT_EQ(blur->blurX, 15.0f);
+  EXPECT_FLOAT_EQ(blur->blurY, 15.0f);
+}
+
 }  // namespace pag

@@ -2153,10 +2153,24 @@ bool SVGParserContext::convertFilterElement(const std::shared_ptr<DOMNode>& filt
         auto [offsetX, offsetY] = parseFilterOffset(primitives[i + 1]);
         auto [blurX, blurY] = parseFilterBlur(primitives[i + 2]);
         auto shadowColor = parseFilterColorMatrix(primitives[i + 4]);
+        const bool isInnerShadow =
+            getAttribute(primitives[i + 3], "operator") == "arithmetic";
 
-        auto* filter = createDropShadow(offsetX, offsetY, blurX, blurY, shadowColor, shadowOnly);
-        registerFilterAnimationTarget(filter, primitives[i + 2], primitives[i + 1]);
-        filters.push_back(filter);
+        if (isInnerShadow) {
+          auto* innerShadow = _document->makeNode<InnerShadowFilter>();
+          innerShadow->offsetX = offsetX;
+          innerShadow->offsetY = offsetY;
+          innerShadow->blurX = blurX;
+          innerShadow->blurY = blurY;
+          innerShadow->color = shadowColor;
+          innerShadow->shadowOnly = shadowOnly;
+          registerFilterAnimationTarget(innerShadow, primitives[i + 2], primitives[i + 1]);
+          filters.push_back(innerShadow);
+        } else {
+          auto* filter = createDropShadow(offsetX, offsetY, blurX, blurY, shadowColor, shadowOnly);
+          registerFilterAnimationTarget(filter, primitives[i + 2], primitives[i + 1]);
+          filters.push_back(filter);
+        }
 
         // Skip the consumed primitives (5 elements) plus the feBlend that follows.
         i += 5;
@@ -2352,8 +2366,9 @@ bool SVGParserContext::convertFilterElement(const std::shared_ptr<DOMNode>& filt
       // Check for Figma foreground blur pattern: feFlood → feBlend(in=SourceGraphic) → feGaussianBlur.
       if (!isSourceGraphic && i >= 2) {
         auto& prevNode = primitives[i - 1];
-        if (prevNode->name == "feBlend" && getAttribute(prevNode, "in") == "SourceGraphic") {
-          // This blur follows a blend with SourceGraphic, treat it as foreground blur.
+        const std::string prevIn = prevNode->name == "feBlend" ? getAttribute(prevNode, "in") : "";
+        if (prevNode->name == "feBlend" && (prevIn.empty() || prevIn == "SourceGraphic")) {
+          // feBlend 缺省 in 即 SourceGraphic；Figma 前景模糊就挂在这类 blend 之后。
           isSourceGraphic = true;
         }
       }
