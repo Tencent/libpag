@@ -13,6 +13,8 @@ rem be corrupted or deleted mid-run. The same restriction applies to tgfx/autote
 rem
 rem The script fails fast when the md5 cache for the selected backend is missing or does not match
 rem test\baseline\version.json, because the tests would otherwise skip every pixel comparison.
+rem Runs build Release by default. The md5 cache is keyed by backend only, so refresh it with
+rem update_baseline.bat using the same compiler and build type.
 rem
 
 cd /d "%~dp0"
@@ -133,7 +135,7 @@ if errorlevel 1 (
 
 if exist "%BUILD_DIR%" rmdir /s /q "%BUILD_DIR%"
 echo Building PAGFullTest_%TARGET_SUFFIX% for '%BACKEND_NAME%'...
-cmake -G Ninja -S "%WORKSPACE%" -B "%BUILD_DIR%" %CMAKE_BACKEND_ARGS% %CMAKE_COMPILER_ARGS% -DPAG_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Debug
+cmake -G Ninja -S "%WORKSPACE%" -B "%BUILD_DIR%" %CMAKE_BACKEND_ARGS% %CMAKE_COMPILER_ARGS% -DPAG_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Release
 if errorlevel 1 (
   echo Error: CMake configuration failed.
   exit /b 1

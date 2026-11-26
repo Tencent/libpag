@@ -19,9 +19,10 @@ rem opengl-swiftshader, d3d12, d3d12-warp or vulkan. Running the script regenera
 rem cache; it never commits anything.
 rem
 rem --clang-cl builds with clang-cl instead of MSVC so private-access test cases are compiled in.
-rem The cache is keyed by backend only, not by compiler, so refresh it with the same compiler you
-rem pass to autotest.bat. A clang-cl refresh always rebuilds, because an existing cache cannot
-rem prove that the private-access cases are present.
+rem Both scripts build Release by default. The cache is keyed by backend only, not by compiler or
+rem build type, so refresh it with the same compiler and build type you pass to autotest.bat. A
+rem clang-cl refresh always rebuilds, because an existing cache cannot prove that the
+rem private-access cases are present.
 
 cd /d "%~dp0"
 set "WORKSPACE=%CD%"
@@ -248,7 +249,7 @@ if exist "%BUILD_DIR%" rmdir /s /q "%BUILD_DIR%"
 set "CMAKE_IMAGE_ARGS=-DPAG_SKIP_GENERATE_BASELINE_IMAGES=OFF"
 if "%SKIP_IMAGES%"=="1" set "CMAKE_IMAGE_ARGS=-DPAG_SKIP_GENERATE_BASELINE_IMAGES=ON"
 echo Building UpdateBaseline_%TARGET_SUFFIX% for '%BACKEND_NAME%' with %COMPILER_LABEL%...
-cmake -G Ninja -S "%WORKSPACE%" -B "%BUILD_DIR%" %CMAKE_BACKEND_ARGS% %CMAKE_COMPILER_ARGS% %CMAKE_IMAGE_ARGS% -DPAG_BUILD_TESTS=ON -DPAG_SKIP_BASELINE_CHECK=ON -DCMAKE_BUILD_TYPE=Debug
+cmake -G Ninja -S "%WORKSPACE%" -B "%BUILD_DIR%" %CMAKE_BACKEND_ARGS% %CMAKE_COMPILER_ARGS% %CMAKE_IMAGE_ARGS% -DPAG_BUILD_TESTS=ON -DPAG_SKIP_BASELINE_CHECK=ON -DCMAKE_BUILD_TYPE=Release
 if errorlevel 1 (
   call :Fail "CMake configuration failed."
   goto :cleanup
@@ -350,8 +351,9 @@ echo By default the script stashes local changes and checks out origin/main, the
 echo original branch and changes. Any stash created by this run is applied by exact OID and retained.
 echo Existing recovery details block a new run. Interruptions require manual recovery using that file.
 echo Run one backend at a time; test\out and version.json are shared.
-echo The md5 cache is keyed by backend, not by compiler, so refresh it with the compiler you intend
-echo to test with. A clang-cl refresh always rebuilds instead of reusing an existing cache.
+echo Both scripts build Release by default. The md5 cache is keyed by backend, not by compiler or
+echo build type, so refresh it with the compiler and build type you intend to test with. A clang-cl
+echo refresh always rebuilds instead of reusing an existing cache.
 exit /b 0
 
 :Fail
