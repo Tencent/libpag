@@ -6,7 +6,7 @@
 
 ## 简介
 
-PAGX Playground 是一个基于 Web 的交互式演示项目，使用 [pagx-viewer](./pagx-viewer) SDK 在浏览器中渲染和预览 PAGX 文件。
+PAGX Playground 是一个基于 Web 的交互式演示项目，使用 [pagx-viewer](../pagx-viewer) SDK 在浏览器中渲染和预览 PAGX 文件。
 它提供了可视化界面，用于加载 PAGX 文件、浏览示例文件，以及查看 PAGX 规范文档。
 
 ## 功能特性
