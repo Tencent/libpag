@@ -6,7 +6,7 @@ An interactive web demo for viewing and testing PAGX files in the browser.
 
 ## Introduction
 
-PAGX Playground is a web-based interactive demo that uses the [pagx-viewer](./pagx-viewer) SDK to render
+PAGX Playground is a web-based interactive demo that uses the [pagx-viewer](../pagx-viewer) SDK to render
 and preview PAGX files. It provides a visual interface for loading PAGX files, viewing samples, and
 browsing the PAGX specification documentation.
 
