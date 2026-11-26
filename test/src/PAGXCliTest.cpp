@@ -498,6 +498,30 @@ CLI_TEST(PAGXCliTest, Export_TargetViewRejectedByWriters) {
   }
 }
 
+CLI_TEST(PAGXCliTest, Export_OutputBoundsRoundTripPassesVerify) {
+  auto doc = pagx::PAGXImporter::FromXML(
+      "<pagx width=\"100\" height=\"100\" targetLayer=\"@target\" "
+      "outputBounds=\"0,0,0.00001,0.00002\"><Layer id=\"target\">"
+      "<Rectangle position=\"0,0\" size=\"10,10\"/><Fill color=\"#FF0000\"/>"
+      "</Layer></pagx>");
+  ASSERT_NE(doc, nullptr);
+  ASSERT_TRUE(doc->errors.empty());
+  auto xml = pagx::PAGXExporter::ToXML(*doc);
+  auto attribute = xml.find("outputBounds=\"");
+  ASSERT_NE(attribute, std::string::npos);
+  auto valueStart = attribute + std::strlen("outputBounds=\"");
+  auto valueEnd = xml.find('"', valueStart);
+  ASSERT_NE(valueEnd, std::string::npos);
+  auto value = xml.substr(valueStart, valueEnd - valueStart);
+  // The exported text must stay inside the schema's decimal grammar; scientific notation would
+  // fail `pagx verify` even though it imported fine.
+  EXPECT_EQ(value.find_first_of("eE"), std::string::npos) << value;
+
+  auto path = WriteTempRenderFile("export_output_bounds_roundtrip.pagx", xml);
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", path});
+  EXPECT_EQ(ret, 0);
+}
+
 CLI_TEST(PAGXCliTest, Render_TargetViewRejectsTimeAndInvalidFields) {
   auto path = WriteTempRenderFile(
       "render_target_view_time.pagx",

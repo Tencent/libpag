@@ -3120,13 +3120,40 @@ std::shared_ptr<PAGXDocument> PAGXImporter::FromXML(const uint8_t* data, size_t 
   return doc;
 }
 
-// Strictly parses four comma-separated numbers so missing separators and trailing junk are
-// rejected instead of silently producing a window that later renders the wrong region. Only the
-// text format is checked here; the numeric rule lives in IsValidOutputBounds().
+// Matches one number token of the XSD RectType pattern `-?[0-9]*\.?[0-9]+`: an optional minus,
+// digits with an optional fractional part, and no exponent, hex prefix, plus sign or whitespace.
+// Returns the end of the token, or nullptr when the text at ptr is not such a number.
+static const char* ScanRectTypeNumber(const char* ptr, const char* end) {
+  if (ptr < end && *ptr == '-') {
+    ++ptr;
+  }
+  const char* integerStart = ptr;
+  while (ptr < end && *ptr >= '0' && *ptr <= '9') {
+    ++ptr;
+  }
+  bool hasIntegerDigits = ptr > integerStart;
+  if (ptr < end && *ptr == '.') {
+    ++ptr;
+    const char* fractionStart = ptr;
+    while (ptr < end && *ptr >= '0' && *ptr <= '9') {
+      ++ptr;
+    }
+    if (ptr == fractionStart) {
+      return nullptr;
+    }
+  } else if (!hasIntegerDigits) {
+    return nullptr;
+  }
+  return ptr;
+}
+
+// Strictly parses four comma-separated numbers, accepting exactly the lexical space of the XSD
+// RectType. strtof alone is wider than the schema (it also takes exponents, hex floats and leading
+// whitespace), which would render a document that `pagx verify` rejects. Only the text format is
+// checked here; the numeric rule lives in IsValidOutputBounds().
 static bool ParseOutputBounds(const std::string& str, Rect* rect) {
   const char* ptr = str.c_str();
   const char* end = ptr + str.size();
-  char* endPtr = nullptr;
   float* fields[] = {&rect->x, &rect->y, &rect->width, &rect->height};
   for (auto* field : fields) {
     if (field != fields[0]) {
@@ -3135,19 +3162,18 @@ static bool ParseOutputBounds(const std::string& str, Rect* rect) {
       }
       ++ptr;
     }
-    *field = strtof(ptr, &endPtr);
-    if (endPtr <= ptr) {
+    const char* tokenStart = ptr;
+    ptr = ScanRectTypeNumber(ptr, end);
+    if (ptr == nullptr) {
       return false;
     }
-    ptr = endPtr;
-    while (ptr < end && std::isspace(static_cast<unsigned char>(*ptr))) {
-      ++ptr;
+    char* endPtr = nullptr;
+    *field = strtof(tokenStart, &endPtr);
+    if (endPtr != ptr) {
+      return false;
     }
   }
-  if (ptr != end) {
-    return false;
-  }
-  return true;
+  return ptr == end;
 }
 
 // Parses the paired root attributes that declare the document's default static output view. An

@@ -196,7 +196,8 @@ PAGX_TEST(PAGXImporterValidationTest, OutputViewRoundTrip) {
 PAGX_TEST(PAGXImporterValidationTest, OutputViewTinyBoundsRoundTrip) {
   auto doc = pagx::PAGXImporter::FromXML(
       "<pagx width=\"100\" height=\"100\" targetLayer=\"@target\" "
-      "outputBounds=\"-1e-20,2e-20,1e-10,3e-30\"><Layer id=\"target\"/></pagx>");
+      "outputBounds=\"-0.00000000000000000001,0.00000000000000000002,"
+      "0.0000000001,0.000000000000000000000000000003\"><Layer id=\"target\"/></pagx>");
   ASSERT_NE(doc, nullptr);
   EXPECT_TRUE(doc->errors.empty());
   ASSERT_TRUE(doc->outputBounds.has_value());
@@ -261,19 +262,32 @@ PAGX_TEST(PAGXImporterValidationTest, OutputViewInvalidBoundsRejected) {
 }
 
 /**
- * Test case: whitespace around commas and signed scientific notation remain valid bounds.
+ * Test case: the bounds text parser accepts exactly the schema's RectType lexical space. Exponents,
+ * hex floats, a leading '+', whitespace and a trailing '.' parse through strtof but fail
+ * `pagx verify`, so they are rejected here instead of producing a document only one entry point
+ * accepts.
  */
-PAGX_TEST(PAGXImporterValidationTest, OutputViewBoundsAcceptWhitespaceAndExponents) {
-  auto doc = pagx::PAGXImporter::FromXML(
-      "<pagx width=\"100\" height=\"100\" targetLayer=\"@target\" "
-      "outputBounds=\" -1e+1 , +2E1 , 3e1 , 4E+1 \"><Layer id=\"target\"/></pagx>");
-  ASSERT_NE(doc, nullptr);
-  EXPECT_TRUE(doc->errors.empty());
-  ASSERT_TRUE(doc->outputBounds.has_value());
-  EXPECT_EQ(doc->outputBounds->x, -10.0f);
-  EXPECT_EQ(doc->outputBounds->y, 20.0f);
-  EXPECT_EQ(doc->outputBounds->width, 30.0f);
-  EXPECT_EQ(doc->outputBounds->height, 40.0f);
+PAGX_TEST(PAGXImporterValidationTest, OutputViewBoundsFollowRectTypeLexicalSpace) {
+  const char* accepted[] = {".5,.5,10,20", "-.5,-.5,10.0,20", "000,0.0,10,20"};
+  for (const auto* value : accepted) {
+    std::string xml = "<pagx width=\"100\" height=\"100\" targetLayer=\"@target\" outputBounds=\"" +
+                      std::string(value) + "\"><Layer id=\"target\"/></pagx>";
+    auto doc = pagx::PAGXImporter::FromXML(xml);
+    ASSERT_NE(doc, nullptr) << value;
+    EXPECT_TRUE(doc->errors.empty()) << value;
+    EXPECT_TRUE(doc->outputBounds.has_value()) << value;
+  }
+
+  const char* rejected[] = {"1e2,0,10,20", "1, 2, 3, 4", "0x10,0,1,1", "+1,2,3,4",
+                            " 0,0,10,10",  "0,0,10,10 ", "0,0,12.,20"};
+  for (const auto* value : rejected) {
+    std::string xml = "<pagx width=\"100\" height=\"100\" targetLayer=\"@target\" outputBounds=\"" +
+                      std::string(value) + "\"><Layer id=\"target\"/></pagx>";
+    auto doc = pagx::PAGXImporter::FromXML(xml);
+    ASSERT_NE(doc, nullptr) << value;
+    EXPECT_TRUE(HasError(doc, "Invalid value")) << value;
+    EXPECT_FALSE(doc->outputBounds.has_value()) << value;
+  }
 }
 
 /**
@@ -289,16 +303,15 @@ PAGX_TEST(PAGXImporterValidationTest, OutputViewBoundsValidationIsShared) {
   const BoundsCase cases[] = {
       {"0,0,10,20", pagx::Rect::MakeXYWH(0, 0, 10, 20), true},
       {"-10,-20,30,40", pagx::Rect::MakeXYWH(-10, -20, 30, 40), true},
-      {"0,0,1e-10,3e-30", pagx::Rect::MakeXYWH(0, 0, 1e-10f, 3e-30f), true},
-      {"0,0,1e-45,1e-45", pagx::Rect::MakeXYWH(0, 0, 1e-45f, 1e-45f), true},
-      {"0,0,0,40", pagx::Rect::MakeXYWH(0, 0, 0, 40), false},
       {"0,0,-0,40", pagx::Rect::MakeXYWH(0, 0, -0.0f, 40), false},
       {"0,0,80,-1", pagx::Rect::MakeXYWH(0, 0, 80, -1), false},
-      {"0,0,inf,40", pagx::Rect::MakeXYWH(0, 0, std::numeric_limits<float>::infinity(), 40), false},
-      {"0,0,nan,40", pagx::Rect::MakeXYWH(0, 0, std::numeric_limits<float>::quiet_NaN(), 40),
-       false},
-      {"3.4e38,0,3.4e38,40", pagx::Rect::MakeXYWH(3.4e38f, 0, 3.4e38f, 40), false},
-      {"0,3.4e38,40,3.4e38", pagx::Rect::MakeXYWH(0, 3.4e38f, 40, 3.4e38f), false},
+      {nullptr, pagx::Rect::MakeXYWH(0, 0, 1e-10f, 3e-30f), true},
+      {nullptr, pagx::Rect::MakeXYWH(0, 0, 1e-45f, 1e-45f), true},
+      {nullptr, pagx::Rect::MakeXYWH(0, 0, 0, 40), false},
+      {nullptr, pagx::Rect::MakeXYWH(0, 0, std::numeric_limits<float>::infinity(), 40), false},
+      {nullptr, pagx::Rect::MakeXYWH(0, 0, std::numeric_limits<float>::quiet_NaN(), 40), false},
+      {nullptr, pagx::Rect::MakeXYWH(3.4e38f, 0, 3.4e38f, 40), false},
+      {nullptr, pagx::Rect::MakeXYWH(0, 3.4e38f, 40, 3.4e38f), false},
   };
   auto programmatic = pagx::PAGXImporter::FromXML(
       "<pagx width=\"100\" height=\"100\" targetLayer=\"@target\" "
@@ -306,16 +319,19 @@ PAGX_TEST(PAGXImporterValidationTest, OutputViewBoundsValidationIsShared) {
   ASSERT_NE(programmatic, nullptr);
   ASSERT_TRUE(programmatic->errors.empty());
   for (const auto& testCase : cases) {
-    std::string xml = "<pagx width=\"100\" height=\"100\" targetLayer=\"@target\" outputBounds=\"" +
-                      std::string(testCase.text) + "\"><Layer id=\"target\"/></pagx>";
-    auto imported = pagx::PAGXImporter::FromXML(xml);
-    ASSERT_NE(imported, nullptr) << testCase.text;
-    EXPECT_EQ(imported->errors.empty(), testCase.valid) << testCase.text;
+    if (testCase.text != nullptr) {
+      std::string xml =
+          "<pagx width=\"100\" height=\"100\" targetLayer=\"@target\" outputBounds=\"" +
+          std::string(testCase.text) + "\"><Layer id=\"target\"/></pagx>";
+      auto imported = pagx::PAGXImporter::FromXML(xml);
+      ASSERT_NE(imported, nullptr) << testCase.text;
+      EXPECT_EQ(imported->errors.empty(), testCase.valid) << testCase.text;
+    }
 
     programmatic->outputBounds = testCase.bounds;
     auto status = pagx::ResolveOutputView(programmatic.get(), nullptr, nullptr);
-    EXPECT_EQ(status == pagx::OutputViewStatus::Valid, testCase.valid) << testCase.text;
-    EXPECT_EQ(pagx::IsValidOutputBounds(testCase.bounds), testCase.valid) << testCase.text;
+    EXPECT_EQ(status == pagx::OutputViewStatus::Valid, testCase.valid);
+    EXPECT_EQ(pagx::IsValidOutputBounds(testCase.bounds), testCase.valid);
   }
 }
 
