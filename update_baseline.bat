@@ -280,13 +280,19 @@ if not exist "%BUILD_DIR%\%BASELINE_TARGET%.exe" (
   call :Fail "%BASELINE_TARGET%.exe was not produced."
   goto :cleanup
 )
+rem A stale baseline-out left by an aborted run must not be renamed in as this run's output.
+if exist "%WORKSPACE%\test\baseline-out" rmdir /s /q "%WORKSPACE%\test\baseline-out"
 "%BUILD_DIR%\%BASELINE_TARGET%.exe"
-if errorlevel 1 (
+set "BASELINE_EXIT=%ERRORLEVEL%"
+rem A crashed test binary returns a negative exit code, which `if errorlevel 1` misses because cmd
+rem compares it as a signed value. Compare the captured code so abnormal termination is reported
+rem as a failure instead of a missing md5.json.
+if not "%BASELINE_EXIT%"=="0" (
   if exist "%WORKSPACE%\test\out" (
     if not exist "%WORKSPACE%\result" mkdir "%WORKSPACE%\result"
     xcopy "%WORKSPACE%\test\out" "%WORKSPACE%\result\out\" /E /I /Y /Q >nul
   )
-  call :Fail "Baseline cache refresh for '%BACKEND_NAME%' failed."
+  call :Fail "Baseline cache refresh for '%BACKEND_NAME%' failed (exit code %BASELINE_EXIT%)."
   goto :cleanup
 )
 
