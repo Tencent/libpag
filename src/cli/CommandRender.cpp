@@ -585,8 +585,11 @@ static tgfx::Bitmap RenderCore(const RenderOptions& options) {
   if (targetTgfxLayer != nullptr) {
     auto canvas = surface->getCanvas();
     canvas->clear(displayList.backgroundColor());
-    canvas->scale(options.scale, options.scale);
-    canvas->translate(-offsetX, -offsetY);
+    // The CLI owns the whole output surface, so it always clears and does not need the clip that
+    // PAGScene applies when a host sizes a larger surface.
+    pagx::ApplyOutputViewTransform(
+        canvas, pagx::Rect::MakeXYWH(offsetX, offsetY, sourceWidth, sourceHeight), options.scale,
+        tgfx::Point());
     if (!pagx::DrawOutputTarget(canvas, rootLayer, targetTgfxLayer)) {
       device->unlock();
       std::cerr << "pagx render: failed to prepare target layer for rendering\n";

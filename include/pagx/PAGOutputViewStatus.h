@@ -21,23 +21,23 @@
 namespace pagx {
 
 /**
- * Status of the default static output view declared by the paired `targetLayer` / `outputBounds`
+ * Status of the output view declared by the paired `targetLayer` / `outputBounds`
  * root attributes. PAGScene::getOutputViewStatus() reports the status of a built scene; an invalid
  * declaration makes PAGScene::Make() return nullptr instead of rendering the whole canvas.
  */
 enum class OutputViewStatus {
   /**
-   * The document does not declare a target view; it renders the whole canvas.
+   * The document does not declare an output view; it renders the whole canvas.
    */
   None,
 
   /**
-   * The document declares a valid target view.
+   * The document declares a valid output view.
    */
   Valid,
 
   /**
-   * The document declares invalid target view fields. PAGScene::Make() rejects the document.
+   * The document declares invalid output view fields. PAGScene::Make() rejects the document.
    */
   Invalid,
 };

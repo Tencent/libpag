@@ -97,7 +97,7 @@ function Hash(image) {
 }
 
 function ExpectTransparent(image, x, y) {
-  assert.equal(Pixel(image, x, y)[3], 0, `(${x},${y}) 应透明，实际 RGBA=${Pixel(image, x, y)}，内容尺寸=${image.contentWidth}×${image.contentHeight}`);
+  assert.equal(Pixel(image, x, y)[3], 0, `(${x},${y}) should be transparent, actual RGBA=${Pixel(image, x, y)}, content size=${image.contentWidth}x${image.contentHeight}`);
 }
 
 async function Render(page, xml, options = {}) {
@@ -140,19 +140,19 @@ try {
   }
   if (recordPath) {
     await writeFile(recordPath, JSON.stringify(controls, null, 2));
-    console.log(`已记录 ${Object.keys(controls).length} 个无字段像素参考：${recordPath}`);
+    console.log(`Recorded ${Object.keys(controls).length} no-field pixel references: ${recordPath}`);
   } else {
     if (referencePath) {
-      assert.deepEqual(controls, JSON.parse(await readFile(referencePath, 'utf8')), '无字段文档渲染必须逐像素不变');
+      assert.deepEqual(controls, JSON.parse(await readFile(referencePath, 'utf8')), 'A document without output fields must render pixel-identically');
       passed += Object.keys(controls).length;
     }
-    assert.notEqual(controls['animation-start'].hash, controls['animation-seek'].hash, '普通动画仍可 seek');
+    assert.notEqual(controls['animation-start'].hash, controls['animation-seek'].hash, 'Plain animations can still seek');
     passed++;
     const target = Layer('target', 100, 120, 80, 40, '#FF0000', '', 8);
     const surrounding = Layer('bg', 0, 0, 1000, 1000, '#0000FF') + target + Layer('later', 100, 120, 80, 40, '#00FF00');
     const base = await Render(page, Document(surrounding));
     if (args.includes('--diagnose')) {
-      console.log('输出视图诊断', await page.evaluate(() => gl.getContextAttributes()),
+      console.log('Output view diagnostics', await page.evaluate(() => gl.getContextAttributes()),
         [Pixel(base, 10, 40), Pixel(base, 150, 10), Pixel(base, 150, 120), Pixel(base, 31, 61)]);
     }
     assert.equal(base.contentWidth, 100);
@@ -164,9 +164,9 @@ try {
     passed++;
 
     const negative = await Render(page, Document(Layer('target', -40, -30, 80, 40, '#FF0000', '', 8), '-50,-40,100,60'));
-    assert.equal(Hash(negative), Hash(base), '负原点映射应与正原点一致');
+    assert.equal(Hash(negative), Hash(base), 'A negative origin must map the same as a positive origin');
     const nested = await Render(page, Document(`<Layer x="-100" y="-100"><Layer x="60" y="70">${Layer('target', 0, 0, 80, 40, '#FF0000', '', 8)}</Layer></Layer>`, '-50,-40,100,60'));
-    assert.equal(Hash(nested), Hash(base), '祖先坐标应仅应用一次');
+    assert.equal(Hash(nested), Hash(base), 'Ancestor coordinates must be applied exactly once');
     passed += 2;
 
     const large = Document(Layer('target', 50, 70, 180, 160, '#FF0000'));
@@ -191,25 +191,25 @@ try {
       for (let i = 0; i < 20; i++) view.draw();
       return gpuCalls - before;
     });
-    assert.equal(idleCalls, 0, '静态视图空闲时不应持续提交 GPU');
+    assert.equal(idleCalls, 0, 'An idle static view must not keep submitting GPU work');
     const repeat = await page.evaluate(() => {
       view.updateZoomScaleAndOffset(2, -100, -250);
       view.draw();
       return capture();
     });
-    assert.equal(Hash(repeat), Hash(zoomed), '重复刷新不应累积矩阵');
+    assert.equal(Hash(repeat), Hash(zoomed), 'Repeated draws must not accumulate the matrix');
     passed += 2;
 
     const alpha = await Render(page, Document(Layer('target', 100, 120, 80, 40, '#FF0000', '', 0, 'alpha="0.5"')));
-    assert.ok(Math.abs(Pixel(alpha, 150, 120)[3] - 128) <= 1, '目标 alpha 恰好应用一次');
+    assert.ok(Math.abs(Pixel(alpha, 150, 120)[3] - 128) <= 1, 'Target alpha must be applied exactly once');
     const hidden = await Render(page, Document(Layer('target', 100, 120, 80, 40, '#FF0000', '', 0, 'visible="false"')));
-    assert.ok(hidden.pixels.every((value, index) => index % 4 !== 3 || value === 0), '合法隐藏目标保持透明');
+    assert.ok(hidden.pixels.every((value, index) => index % 4 !== 3 || value === 0), 'A valid hidden target stays transparent');
     const matte = await Render(page, Document(target), { background: '#00FF00' });
     assert.deepEqual(Pixel(matte, 10, 10), [0, 255, 0, 255]);
     const cleared = await page.evaluate(() => { view.clearBackgroundColor(); view.clear(); return capture(); });
     assert.equal(cleared.contentWidth, 0);
     assert.equal(cleared.contentHeight, 0);
-    assert.ok(cleared.pixels.every((value, index) => index % 4 !== 3 || value === 0), 'clear 不能残留旧图');
+    assert.ok(cleared.pixels.every((value, index) => index % 4 !== 3 || value === 0), 'clear must not leave the previous frame');
     passed += 4;
 
     const invalid = [
@@ -230,14 +230,14 @@ try {
           } catch (failure) { error = String(failure); }
           return { error, image: capture() };
         }, { xml, split });
-        assert.ok(result.error, `非法输入 ${index} 必须诊断失败`);
+        assert.ok(result.error, `Invalid input ${index} must fail with a diagnostic`);
         assert.equal(result.image.contentWidth, 0);
-        assert.ok(result.image.pixels.every((value, offset) => offset % 4 !== 3 || value === 0), '失败不能显示旧图或整页');
+        assert.ok(result.image.pixels.every((value, offset) => offset % 4 !== 3 || value === 0), 'A failure must not show the previous frame or the whole canvas');
         passed++;
       }
     }
     const after = await Render(page, plain);
-    assert.equal(Hash(after), controls.plain.hash, '切回无字段文档恢复原渲染');
+    assert.equal(Hash(after), controls.plain.hash, 'Switching back to a document without output fields restores the original render');
     passed++;
 
     // Replacing an external image must repaint through the scene's own dirty state, without a
@@ -295,15 +295,15 @@ try {
       return {first, second, third, idle};
     });
     assert.ok(CloseColor(refresh.first, [255, 0, 0, 255]),
-              `首次绘制应为红色，实际=${refresh.first}`);
+              `The first draw should be red, actual=${refresh.first}`);
     assert.ok(CloseColor(refresh.second, [0, 0, 255, 255]),
-              `替换图片后应重绘为蓝色，实际=${refresh.second}`);
-    assert.equal(refresh.idle, 0, '资源替换后的空闲帧不应继续提交 GPU');
+              `Replacing the image should repaint blue, actual=${refresh.second}`);
+    assert.equal(refresh.idle, 0, 'An idle frame after a resource swap must not keep submitting GPU work');
     assert.ok(CloseColor(refresh.third, [0, 255, 0, 255]),
-              `连续替换应再次刷新，实际=${refresh.third}`);
+              `A second replacement should repaint again, actual=${refresh.third}`);
     passed += 4;
 
-    console.log(`输出视图浏览器回归：${passed} 项通过，WebGL2 / Chromium。`);
+    console.log(`Output view browser regression: ${passed} checks passed, WebGL2 / Chromium.`);
   }
 } finally {
   if (browser) await browser.close();

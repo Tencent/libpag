@@ -137,7 +137,9 @@ export class PAGXView {
   public loadPAGX(data: Uint8Array): void {
     if (!this.nativeView._loadPAGX(data)) {
       this.nativeView._draw();
-      throw new Error('PAGXView: 文档解析失败，或默认输出视图无效、不受支持。');
+      throw new Error(
+        'PAGXView: failed to load the document, or its output view is invalid or unsupported.'
+      );
     }
   }
 
@@ -194,7 +196,9 @@ export class PAGXView {
   public buildLayers(): void {
     if (!this.nativeView._buildLayers()) {
       this.nativeView._draw();
-      throw new Error('PAGXView: 场景创建失败，或默认输出视图无效、不受支持。');
+      throw new Error(
+        'PAGXView: failed to build the scene, or its output view is invalid or unsupported.'
+      );
     }
   }
 

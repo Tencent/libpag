@@ -658,20 +658,20 @@ std::string FloatToString(float value) {
   // FLT_DECIMAL_DIG significant digits: every distinct float round-trips through the text form.
   snprintf(buf, sizeof(buf), "%.9g", value);
   std::string s(buf);
-  // %g may pick scientific notation for very large or very small magnitudes. Re-emit those
-  // in fixed form so the result always matches the schema's decimal patterns. We deliberately
-  // do NOT snap small magnitudes to zero here: even sub-pixel residuals (e.g. sin/cos of an
-  // angle that almost lines up with a multiple of pi/2) still round-trip through XML losslessly
-  // and changing them would alter rendered output for baseline-sensitive callers.
+  // %g may pick scientific notation for very large or very small magnitudes. Re-emit those in
+  // fixed form so the result always matches the schema's decimal patterns. Small magnitudes are
+  // deliberately not snapped to zero: turning even a sub-pixel residual into zero would alter
+  // rendered output for baseline-sensitive callers.
   if (s.find('e') != std::string::npos || s.find('E') != std::string::npos) {
-    // Use 9 fractional digits, which covers every magnitude down to 1e-9 with enough digits to
-    // round-trip. Trailing zeros are stripped below so typical values stay short.
+    // Nine fractional digits keep typical values short. Magnitudes below 1 do not always keep
+    // FLT_DECIMAL_DIG significant digits in this form, so their text is deterministic and
+    // schema-valid but not an exact round-trip. Values that collapse to zero are re-emitted below.
     snprintf(buf, sizeof(buf), "%.9f", value);
     s = buf;
     if (s.find_first_not_of("-0.") == std::string::npos) {
       // Nine fractional digits collapse smaller non-zero magnitudes (e.g. 1e-30f) onto zero, which
       // would turn a positive dimension into an invalid zero. Re-emit with the fractional-digit
-      // count that keeps FLT_DECIMAL_DIG significant digits instead.
+      // count that keeps FLT_DECIMAL_DIG significant digits so the value round-trips instead.
       snprintf(buf, sizeof(buf), "%.9e", value);
       std::string scientific(buf);
       auto exponentPos = scientific.find('e');

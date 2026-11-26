@@ -91,9 +91,9 @@ class PAGXDocument : public Node {
   std::optional<Rect> outputBounds = std::nullopt;
 
   /**
-   * Removes the document's default static output view declaration, including authored attribute
-   * text that failed to parse. After this call the document renders the whole canvas again. Call
-   * notifyChange() so live scenes pick up the change.
+   * Removes the document's output view declaration, including authored attribute text that failed
+   * to parse. After this call the document renders the whole canvas again. Live scenes are notified
+   * automatically; no separate notifyChange() call is required.
    */
   void clearOutputView();
 

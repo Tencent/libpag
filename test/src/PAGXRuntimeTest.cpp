@@ -1667,7 +1667,7 @@ PAGX_TEST(PAGXRuntimeTest, TargetViewMaskOwnershipKeepsBoundsStable) {
     EXPECT_EQ(otherScene->rootComposition()->getBounds(), otherBounds);
   }
   doc->clearOutputView();
-  doc->notifyChange({doc.get()}, false);
+  // clearOutputView() notifies live scenes itself.
   EXPECT_EQ(scene->getOutputViewStatus(), pagx::OutputViewStatus::None);
   EXPECT_EQ(scene->rootComposition()->getBounds(), rootBounds);
 }

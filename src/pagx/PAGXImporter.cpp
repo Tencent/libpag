@@ -2840,6 +2840,10 @@ static Size ParseSize(const std::string& str, bool* outValid) {
   return {width, height};
 }
 
+// Legacy lenient rect parser used by scrollRect: whitespace or comma separators are both accepted,
+// the numbers go through strtof (so exponents and hex floats are allowed), and trailing text is
+// ignored. outputBounds deliberately does not use this parser because its text must match the XSD
+// RectType lexical space exactly; see ParseOutputBounds().
 static Rect ParseRect(const std::string& str, bool* outValid) {
   Rect rect = {};
   const char* ptr = str.c_str();

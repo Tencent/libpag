@@ -60,7 +60,7 @@ struct OutputViewValidationSnapshot;
 struct RuntimeBinding;
 
 /**
- * Snapshot of a scene's default static output view state, returned by
+ * Snapshot of a scene's output view state, returned by
  * PAGScene::getOutputViewInfo().
  */
 struct OutputViewInfo {
@@ -71,9 +71,9 @@ struct OutputViewInfo {
   OutputViewStatus status = OutputViewStatus::None;
 
   /**
-   * The output window in document-root coordinates when status is Valid, otherwise std::nullopt.
-   * It reflects the document's current bounds, so it is std::nullopt when a host cleared
-   * outputBounds without notifying the scene.
+   * The output view bounds in document-root coordinates when status is Valid, otherwise
+   * std::nullopt. It reflects the document's current bounds, so it is std::nullopt when a host
+   * cleared outputBounds without notifying the scene.
    */
   std::optional<Rect> bounds = std::nullopt;
 
@@ -108,7 +108,7 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
    * @param document the source document. Must be non-null. Make() applies layout automatically if
    * it has not already been applied.
    * @return a shared_ptr to the new PAGScene, or nullptr if the document is null or declares an
-   * invalid default static output view (the paired `targetLayer` / `outputBounds` attributes).
+   * invalid output view (the paired `targetLayer` / `outputBounds` attributes).
    */
   static std::shared_ptr<PAGScene> Make(std::shared_ptr<PAGXDocument> document);
 
@@ -163,7 +163,7 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
   /**
    * Renders the current content of this scene into the given surface. Does not advance animations;
    * callers must advance the scene (or its timelines) beforehand. When the document declares a
-   * default target view, only the target layer is rendered into the outputBounds rectangle. Use
+   * default output view, only the target layer is rendered into the outputBounds rectangle. Use
    * getOutputBounds() together with the effective display zoom and content offset to size and
    * position the output on the surface.
    * This method manages the surface device's context lock internally. Callers must not already
@@ -189,7 +189,7 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
 
   /**
    * Returns the output rectangle, in document-root coordinates, that draw() renders when the
-   * document declares a valid default static output view (the paired `targetLayer` / `outputBounds`
+   * document declares a valid output view (the paired `targetLayer` / `outputBounds`
    * root attributes). The scene subtracts this window's origin exactly once; hosts use its width
    * and height for fitting and must not subtract the origin again in their content offset.
    * After setting zoom and precision, read getDisplayOptions()->getZoomScale() for the effective
@@ -199,23 +199,23 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
    * scale cannot produce a drawable output. For a panned or centered viewport, also account for
    * getDisplayOptions()->getContentOffset(): surfacePoint = offset + effectiveScale *
    * (rootPoint - bounds.origin). width() and height() still report the original document canvas.
-   * draw() clips content to the output window; uncovered surface pixels retain the configured
+   * draw() clips content to the output view bounds; uncovered surface pixels retain the configured
    * background when clearing, so they are transparent only when that background is transparent.
-   * @return the output rectangle, or std::nullopt when the document has no target view and draw()
+   * @return the output rectangle, or std::nullopt when the document has no output view and draw()
    *         renders the whole canvas, or when the declaration is invalid. Use getOutputViewInfo()
    *         to read the status, bounds and diagnostic in one call.
    */
   std::optional<Rect> getOutputBounds() const;
 
   /**
-   * Returns the scene's default static output view state in a single query. The status tells None
+   * Returns the scene's output view state in a single query. The status tells None
    * from Valid and Invalid, bounds is set only when the view is valid, and error is set only when
    * it is invalid.
    */
   OutputViewInfo getOutputViewInfo() const;
 
   /**
-   * Returns the state of the document's default static output view. None means the document renders
+   * Returns the state of the document's output view. None means the document renders
    * the whole canvas; Valid means draw() renders only the target layer into getOutputBounds();
    * Invalid means the declaration cannot be honored and draw() fails until the declaration is fixed
    * or cleared. The state is refreshed when the document notifies the scene of a change.
@@ -223,7 +223,7 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
   OutputViewStatus getOutputViewStatus() const;
 
   /**
-   * Returns a copy of the diagnostic for an invalid default static output view, or an empty string
+   * Returns a copy of the diagnostic for an invalid output view, or an empty string
    * when the view is absent or valid. The copy stays valid after the scene changes.
    */
   std::string getOutputViewError() const;
@@ -231,7 +231,7 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
   /**
    * Returns the display options used when drawing this PAGScene. The returned object is owned by
    * this PAGScene and remains valid until the PAGScene is destroyed. When the document renders a
-   * default static output view, only the zoom scale, content offset and background color affect the
+   * output view, only the zoom scale, content offset and background color affect the
    * output; the render mode, tile options and subtree cache do not, because the target layer is
    * drawn directly instead of through the display list.
    */
@@ -261,9 +261,9 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
    * under the point, the last is the bottom-most. Returns an empty array if nothing is hit. Hit
    * testing does not require a prior draw(). Accepts surface coordinates (with zoom and content
    * offset applied) instead of the composition's local coordinates.
-   * When the document declares a default static output view, only the target layer and its
-   * descendants are searched, and the point must map inside the declared output window. A
-   * declaration that cannot be honored returns an empty array.
+   * When the document declares an output view, only the target layer and its descendants are
+   * searched, and the point must map inside the declared output view bounds. A declaration that
+   * cannot be honored returns an empty array.
    * @param surfaceX the x coordinate in surface (device) space.
    * @param surfaceY the y coordinate in surface (device) space.
    */
@@ -299,11 +299,16 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
 
   // Builds or rebuilds the runtime layer tree and binding from the document, detaching any previous
   // tree first. Used at creation and when an embedded external document changes (an external
-  // composition is built into the tree once and cannot be patched in place).
-  void buildRuntimeTree();
+  // composition is built into the tree once and cannot be patched in place). preResolvedOutputView
+  // is set when the caller already stored the resolution in the output view fields, so the tree
+  // build only captures the validation snapshot instead of resolving the declaration again.
+  void buildRuntimeTree(bool preResolvedOutputView);
   // Resolves and caches the document's default output view state and target layer after a tree
   // build or edit. Cached so renderTo() does not walk the authored layer tree on every frame.
   void resolveOutputTarget();
+  // Captures the snapshot used by canReuseOutputViewValidation() from the currently cached status
+  // and target. Counts as one full resolver run.
+  void captureOutputViewValidation();
   // Returns true when the notification cannot change the output view declaration, so the cached
   // Valid status and target are reused instead of running ResolveOutputView() again.
   bool canReuseOutputViewValidation(const std::vector<Node*>& reportedDirty,
@@ -334,30 +339,30 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
   bool renderTo(const std::shared_ptr<PAGSurface>& surface, tgfx::Context* context, bool autoClear);
 
   // Converts a surface-space point to the layer tree's root coordinate space using the display
-  // list's zoomScale and contentOffset, plus the output window origin when a target view is
+  // list's zoomScale and contentOffset, plus the output view bounds origin when an output view is
   // active. Returns false if the surface point cannot be mapped (zoom scale is zero). Used by
   // PAGLayer::hitTestPoint so handles can hit-test in surface coordinates.
   bool surfaceToRoot(float surfaceX, float surfaceY, float* rootX, float* rootY) const;
 
   // Writes the root-to-surface transform (zoomScale then contentOffset, shifted by the output
-  // window origin when a target view is active) into out and returns true. Returns false if out is
+  // window origin when an output view is active) into out and returns true. Returns false if out is
   // null. Used by PAGLayer::getGlobalMatrix to build the local-to-surface matrix. Returned as a
   // pagx Matrix to keep tgfx out of this header.
   bool rootToSurfaceMatrix(Matrix* out) const;
 
-  // Returns the root-space origin of the output window that draw() subtracts for a target view, or
-  // (0, 0) when the scene renders the whole canvas. Query helpers apply the same shift so bounds,
-  // matrices and hit testing stay in the surface space the caller actually sees.
+  // Returns the root-space origin of the output view bounds that draw() subtracts for an output
+  // view, or (0, 0) when the scene renders the whole canvas. Query helpers apply the same shift so
+  // bounds, matrices and hit testing stay in the surface space the caller actually sees.
   Point outputViewOrigin() const;
 
   // Resolves the runtime search root and the root-space point for a hit test. Returns false when
-  // the scene cannot answer: an invalid output view, a point outside the declared output window, a
-  // zero zoom scale, or a missing runtime tree. A valid output view searches only the target layer,
-  // so hits outside the rendered subtree are never reached.
+  // the scene cannot answer: an invalid output view, a point outside the declared output view
+  // bounds, a zero zoom scale, or a missing runtime tree. A valid output view searches only the
+  // target layer, so hits outside the rendered subtree are never reached.
   bool prepareHitTest(float surfaceX, float surfaceY, Point* rootPoint,
                       std::shared_ptr<tgfx::Layer>* hitRoot) const;
 
-  // Hit tests one layer handle against a surface point. Honors the output view window and target
+  // Hit tests one layer handle against a surface point. Honors the output view bounds and target
   // subtree when the document declares one.
   bool hitTestLayer(const PAGLayer* layer, float surfaceX, float surfaceY, bool pixelHitTest) const;
 
@@ -393,7 +398,7 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
   uint64_t outputViewValidationRuns = 0;
   uint64_t outputViewValidationReuses = 0;
 
-  // Reusable identity wrapper for the target view. Prepared on the first successful draw and
+  // Reusable identity wrapper for the output view. Prepared on the first successful draw and
   // released before any tree rebuild, node edit or image refresh. Ordinary targets keep the
   // wrapper across frames; external mask targets restore their hookup after every draw so public
   // aggregate bounds queries keep their original semantics.

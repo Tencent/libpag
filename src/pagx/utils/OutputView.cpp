@@ -23,6 +23,7 @@
 #include "pagx/PAGXDocument.h"
 #include "pagx/nodes/Composition.h"
 #include "tgfx/core/Canvas.h"
+#include "tgfx/core/Point.h"
 #include "tgfx/layers/Layer.h"
 
 namespace pagx {
@@ -474,6 +475,16 @@ void OutputTargetState::reset() {
   root = nullptr;
   target = nullptr;
   scopedParenting = false;
+}
+
+void ApplyOutputViewTransform(tgfx::Canvas* canvas, const Rect& bounds, float zoom,
+                              const tgfx::Point& contentOffset) {
+  if (canvas == nullptr) {
+    return;
+  }
+  canvas->translate(contentOffset.x, contentOffset.y);
+  canvas->scale(zoom, zoom);
+  canvas->translate(-bounds.x, -bounds.y);
 }
 
 bool DrawOutputTarget(tgfx::Canvas* canvas, const std::shared_ptr<tgfx::Layer>& root,

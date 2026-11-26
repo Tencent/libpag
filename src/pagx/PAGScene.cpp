@@ -90,21 +90,26 @@ std::shared_ptr<PAGScene> PAGScene::Make(std::shared_ptr<PAGXDocument> document)
   // canvas: the output would silently include ancestor and surrounding content.
   const Layer* outputTarget = nullptr;
   std::string outputViewError;
-  if (ResolveOutputView(document.get(), &outputTarget, &outputViewError) ==
-      OutputViewStatus::Invalid) {
+  auto outputViewStatus = ResolveOutputView(document.get(), &outputTarget, &outputViewError);
+  if (outputViewStatus == OutputViewStatus::Invalid) {
     LOGE("PAGScene::Make() aborted: %s", outputViewError.c_str());
     return nullptr;
   }
   auto scene = std::shared_ptr<PAGScene>(new PAGScene());
   scene->document = document;
+  // The runtime tree build captures the validation snapshot from these fields instead of resolving
+  // the same declaration a second time.
+  scene->outputViewStatus = outputViewStatus;
+  scene->outputTargetNode = outputTarget;
+  scene->outputViewError = std::move(outputViewError);
   scene->displayList = std::make_unique<tgfx::DisplayList>();
   scene->displayOptions = std::unique_ptr<PAGDisplayOptions>(new PAGDisplayOptions(scene.get()));
-  scene->buildRuntimeTree();
+  scene->buildRuntimeTree(true);
   document->registerLiveScene(scene);
   return scene;
 }
 
-void PAGScene::buildRuntimeTree() {
+void PAGScene::buildRuntimeTree(bool preResolvedOutputView) {
   // A rebuild destroys the runtime tree the wrapper was inserted into. Restore the original tree
   // and drop the prepared state before removing the old root or replacing the binding.
   outputTargetState.reset();
@@ -155,15 +160,24 @@ void PAGScene::buildRuntimeTree() {
   // instead of walking the composition tree every frame.
   collectTextHolders();
   outputViewDirty = true;
-  resolveOutputTarget();
+  if (preResolvedOutputView) {
+    captureOutputViewValidation();
+  } else {
+    resolveOutputTarget();
+  }
 }
 
 void PAGScene::resolveOutputTarget() {
   outputTargetNode = nullptr;
   outputViewError.clear();
   outputViewStatus = ResolveOutputView(document.get(), &outputTargetNode, &outputViewError);
+  captureOutputViewValidation();
+}
+
+void PAGScene::captureOutputViewValidation() {
   ++outputViewValidationRuns;
-  if (outputViewStatus != OutputViewStatus::Valid || document == nullptr) {
+  if (outputViewStatus != OutputViewStatus::Valid || document == nullptr ||
+      outputTargetNode == nullptr) {
     outputViewValidation.reset();
     return;
   }
@@ -652,9 +666,7 @@ bool PAGScene::renderTo(const std::shared_ptr<PAGSurface>& surface, tgfx::Contex
       return false;
     }
     const auto& bounds = *outputBounds;
-    canvas->translate(contentOffset.x, contentOffset.y);
-    canvas->scale(zoomScale, zoomScale);
-    canvas->translate(-bounds.x, -bounds.y);
+    ApplyOutputViewTransform(canvas, bounds, zoomScale, contentOffset);
     // The output window is the only visible area. A host that keeps sizing its surface from
     // width()/height() must not see target content painted outside the declared rectangle, and
     // the extra pixel that ceil(bounds * scale) adds for fractional bounds must stay transparent.
@@ -1000,7 +1012,7 @@ void PAGScene::onNodesChanged(const std::vector<Node*>& dirtyNodes,
     }
   }
   if (foreign) {
-    buildRuntimeTree();
+    buildRuntimeTree(false);
     return;
   }
   // The document node itself (NodeType::Document) triggers a full rebuild so changes to
@@ -1009,7 +1021,7 @@ void PAGScene::onNodesChanged(const std::vector<Node*>& dirtyNodes,
   // the foreign rebuild branch.
   for (auto* node : dirtyNodes) {
     if (node != nullptr && node->nodeType() == NodeType::Document) {
-      buildRuntimeTree();
+      buildRuntimeTree(false);
       return;
     }
   }

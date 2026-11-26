@@ -29,6 +29,7 @@
 namespace tgfx {
 class Canvas;
 class Layer;
+struct Point;
 }  // namespace tgfx
 
 namespace pagx {
@@ -224,6 +225,20 @@ class OutputTargetState {
   std::shared_ptr<tgfx::Layer> target = nullptr;
   bool scopedParenting = false;
 };
+
+/**
+ * Applies the default output view transform to a canvas: the content offset in surface pixels, then
+ * the zoom scale, then the window origin, so a root point maps to
+ * contentOffset + zoom * (rootPoint - bounds.origin). Shared by PAGScene and the CLI so the
+ * translate order and bounds handling stay in one place. Callers keep their own background and
+ * clipping policy because the two pipelines differ there.
+ * @param canvas the destination canvas in surface coordinates.
+ * @param bounds the output window in document-root coordinates.
+ * @param zoom the scale from root units to surface pixels. Must be positive.
+ * @param contentOffset the surface-space offset applied before scaling.
+ */
+void ApplyOutputViewTransform(tgfx::Canvas* canvas, const Rect& bounds, float zoom,
+                              const tgfx::Point& contentOffset);
 
 /**
  * Draws only the given target layer onto the canvas in a single scoped preparation. The layer's

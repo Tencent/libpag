@@ -376,10 +376,15 @@ static bool LayersHaveImports(const std::vector<Layer*>& layers) {
 }
 
 void PAGXDocument::clearOutputView() {
+  bool hadDeclaration = !targetLayerId.empty() || outputBounds.has_value() ||
+                        declaredTargetLayer.has_value() || declaredOutputBounds.has_value();
   targetLayerId.clear();
   outputBounds = std::nullopt;
   declaredTargetLayer = std::nullopt;
   declaredOutputBounds = std::nullopt;
+  if (hadDeclaration) {
+    notifyChange({this}, false);
+  }
 }
 
 bool PAGXDocument::hasUnresolvedImports() const {
