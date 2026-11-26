@@ -1393,6 +1393,18 @@ if (PAG_BUILD_TESTS)
     target_compile_options(PAGFullTest_${TEST_TARGET_SUFFIX} PUBLIC ${PAG_TEST_COMPILE_OPTIONS})
     target_link_libraries(PAGFullTest_${TEST_TARGET_SUFFIX} ${PAG_TEST_LIBS})
 
+    # Windows gives the main thread a 1 MB stack by default, while macOS and Linux test processes
+    # get 8 MB. The HTML importer intentionally recurses up to MAX_HTML_RECURSION_DEPTH (128) and a
+    # Debug frame in that path costs about 9 KB, so the limit is reached only after the default
+    # stack is exhausted. Raise the test stack instead of lowering the importer limit, which would
+    # change the imported output on every platform.
+    if (WIN32 AND MSVC)
+        foreach (TEST_TARGET UpdateBaseline_${TEST_TARGET_SUFFIX}
+                PAGUnitTest_${TEST_TARGET_SUFFIX} PAGFullTest_${TEST_TARGET_SUFFIX})
+            target_link_options(${TEST_TARGET} PRIVATE "/STACK:8388608")
+        endforeach ()
+    endif ()
+
     # Compile the public C API headers with a real C compiler in every test build. When the C API
     # is enabled, also link the D3D12 entry points so their ABI cannot regress silently.
     add_library(pag-c-api-check OBJECT test/c/CApiCheck.c)
