@@ -19,6 +19,8 @@
 #include "StringParser.h"
 #include <algorithm>
 #include <cctype>
+#include <cerrno>
+#include <climits>
 #include <cmath>
 #include <cstdlib>
 #include <unordered_map>
@@ -330,6 +332,41 @@ const char* SkipWhitespaceAndComma(const char* ptr, const char* end) {
     ++ptr;
   }
   return ptr;
+}
+
+bool ParseStrictFloat(const std::string& text, float* outValue) {
+  const char* start = text.c_str();
+  char* endPtr = nullptr;
+  float value = strtof(start, &endPtr);
+  if (endPtr == start || *endPtr != '\0' || !std::isfinite(value)) {
+    return false;
+  }
+  *outValue = value;
+  return true;
+}
+
+bool ParseStrictInt(const std::string& text, int* outValue) {
+  const char* start = text.c_str();
+  char* endPtr = nullptr;
+  errno = 0;
+  long long value = strtoll(start, &endPtr, 10);
+  if (endPtr == start || *endPtr != '\0' || errno == ERANGE || value < INT_MIN || value > INT_MAX) {
+    return false;
+  }
+  *outValue = static_cast<int>(value);
+  return true;
+}
+
+bool ParseStrictBool(const std::string& text, bool* outValue) {
+  if (text == "true" || text == "1") {
+    *outValue = true;
+    return true;
+  }
+  if (text == "false" || text == "0") {
+    *outValue = false;
+    return true;
+  }
+  return false;
 }
 
 Color ParseColor(const std::string& str, bool* outValid) {

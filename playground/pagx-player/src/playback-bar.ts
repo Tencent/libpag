@@ -96,11 +96,6 @@ export class PlaybackBar {
         return !this.root.classList.contains('hidden');
     }
 
-    /** Normal mode shows a fully interactive bar; fallback mode (a default timeline without a
-     *  queryable duration) keeps the bar visible but greyed out, disabling scrubbing and the
-     *  loop toggle while play/pause and frame stepping keep working. */
-    /** Normal mode shows a fully interactive bar; fallback mode (untimed) keeps the bar visible
-     *  but greyed out. Private: hosts use setVisible / showUntimed. */
     private setTimelineEnabled(enabled: boolean): void {
         this.untimed = !enabled;
         this.root.classList.remove('hidden');

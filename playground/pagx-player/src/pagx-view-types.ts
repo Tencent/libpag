@@ -88,14 +88,12 @@ export interface NodeBounds {
 
 /** Hit-test result returned by hitTest. The span points at the *reference* node — when the click
  *  lands inside a <Layer composition="@X"> instance, startLine/endLine refer to that <Layer>
- *  reference rather than the internal definition node. bounds is the on-screen rect of the clicked
- *  instance itself, so the overlay outlines exactly what the user clicked. bounds is null when the
- *  resolved layer has no measurable on-screen rect (e.g. empty bounds). */
+ *  reference rather than the internal definition node. Bounds are omitted; getNodeBounds() is the
+ *  dedicated call for on-screen rects. */
 export interface HitTestResult {
     index: number;
     startLine: number;
     endLine: number;
-    bounds: NodeBounds | null;
 }
 
 /** A schema-level PAGX diagnostic exported by the WASM importer. XML well-formedness diagnostics
@@ -104,7 +102,6 @@ export interface HitTestResult {
 export interface PagxSchemaDiagnostic {
     message: string;
     line: number;
-    column: number;
 }
 
 /** Static shape of the wasm module returned by the host-supplied `moduleFactory`. The player

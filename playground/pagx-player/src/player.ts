@@ -41,9 +41,10 @@ import { GestureManager, bindCanvasEvents } from './gesture-manager';
 import { PlaybackBar } from './playback-bar';
 import { buildToolbar, setToolbarVisible } from './toolbar';
 import { EditorPanel, EDITOR_STATUS_DURATION_MS, type LineRange } from './editor/index';
-import type { DraftLineChange } from './editor/SourceEditor';
-import { classifyEdits, findNodeIndexForLine, hasMatchingSpanBoundaries } from './incremental-apply';
+import { applyDraftLineChange, classifyEdits, findNodeIndexForLine, hasMatchingSpanBoundaries,
+    SourceMapIndex, type DraftLineChange } from './incremental-apply';
 import { ensureStylesInjected } from './styles';
+import { StatusPill } from './status-pill';
 
 /** Canvas element id assigned by the player. Kept stable so external CSS or debug tooling
  *  that targets '#pagx-canvas' keeps working on the (dominant) single-instance case. The
@@ -56,6 +57,102 @@ const CANVAS_ID = 'pagx-canvas';
  *  pagx documents with alpha. */
 const DEFAULT_BACKGROUND: BackgroundColor = { r: 0, g: 0, b: 0, a: 0 };
 
+/** Owns the document-side half of PAGXPlayer.load(): parse, host-supplied fonts and resources,
+ *  background / loop / playback-state restoration and the first draw. It is deliberately stateless
+ *  across loads — the generation guard stays in the caller, which owns load ordering and UI state —
+ *  so the phases can be tested or reordered without touching the player's DOM and event wiring. */
+class DocumentLoader {
+    /** Runs the full document pipeline against an already-initialized view. `isCurrent` is polled
+     *  after each await so a superseded load aborts before touching the view again. Returns false
+     *  when aborted, true when the document is built and the first frame drawn. */
+    static async load(view: PlayerView, pagxBytes: Uint8Array, options: PAGXPlayerLoadOptions,
+                      backgroundColor: BackgroundColor, isCurrent: () => boolean,
+                      resetTransform: () => void): Promise<boolean> {
+        const preservedTime = options.preserveCurrentTime
+            ? (view.durationMicros() > 0 ? view.currentTimeMicros() : 0)
+            : 0;
+        const wasPlaying = options.preserveCurrentTime && view.isPlaying();
+
+        view.parsePAGX(pagxBytes);
+
+        // The view resets font registration on each load, so host fonts must be re-registered
+        // before buildLayers().
+        if (options.registerFonts) {
+            await options.registerFonts(view);
+            if (!isCurrent()) return false;
+        }
+
+        // parsePAGX populates the resource path list; fetch concurrently but push in path order so
+        // duplicate paths stay deterministic.
+        if (options.resolveResource) {
+            const paths: string[] = view.getExternalFilePaths();
+            if (paths && paths.length > 0) {
+                const resolve = options.resolveResource;
+                const items = await Promise.all(
+                    paths.map(async (rel: string) => ({
+                        rel,
+                        buf: await resolve(rel),
+                    })),
+                );
+                if (!isCurrent()) return false;
+                for (const item of items) {
+                    if (item.buf) {
+                        view.loadFileData(item.rel, item.buf);
+                    }
+                }
+            }
+        }
+
+        view.buildLayers();
+
+        if (options.forceLoop !== false) {
+            view.setLoop(true);
+        }
+        const bg = backgroundColor;
+        const hex =
+            '#' +
+            bg.r.toString(16).padStart(2, '0') +
+            bg.g.toString(16).padStart(2, '0') +
+            bg.b.toString(16).padStart(2, '0');
+        view.setBackgroundColor(hex, bg.a);
+
+        if (options.preserveCurrentTime && preservedTime > 0) {
+            view.setCurrentTimeMicros(Math.min(preservedTime, view.durationMicros()));
+        }
+        // buildLayers leaves the view auto-playing; mirror the previous play state when asked, so a
+        // paused reload does not silently resume. A non-preserving load shows a different document,
+        // so reset the gesture transform unless the host asked to keep the viewport.
+        if (options.preserveCurrentTime) {
+            if (wasPlaying) {
+                view.play();
+            } else {
+                view.pause();
+            }
+        } else {
+            resetTransform();
+        }
+
+        // Force a synchronous first frame so the old document cannot ghost through when the canvas
+        // is unhidden in the caller.
+        view.draw();
+        return true;
+    }
+}
+
+/** Owns the selection-side half of PAGXPlayer.load(): rebuild the source map from the new document
+ *  and clear every handle that pointed into the previous runtime tree. State stays on the player so
+ *  the hover/select/overlay methods can keep using it; this class only sequences the reset. */
+class SelectionController {
+    static reset(view: PlayerView, editor: EditorPanel | null,
+                 setSourceMap: (map: readonly NodeSourceEntry[]) => void,
+                 clearSelection: () => void, refreshOverlay: () => void): void {
+        setSourceMap(view.getNodeSourceMap());
+        clearSelection();
+        editor?.clearHighlight();
+        refreshOverlay();
+    }
+}
+
 export class PAGXPlayer extends EventTarget {
     private readonly options: PAGXPlayerOptions;
     private readonly gesture: GestureManager;
@@ -65,17 +162,11 @@ export class PAGXPlayer extends EventTarget {
     private readonly toolbarRoot: HTMLDivElement;
     private readonly playbackBar: PlaybackBar;
     private readonly editor: EditorPanel | null = null;
-    private readonly statusEl: HTMLDivElement;
+    private readonly statusPill: StatusPill;
 
     private module: PlayerModule | null = null;
     private view: PlayerView | null = null;
     private detachCanvasEvents: (() => void) | null = null;
-    private statusHideTimer: number | null = null;
-    // Monotonically increasing id for each showStatus call; the caller can hold this token
-    // and pass it to hideStatus() to only clear the pill when their own message is still on
-    // screen. See showStatus / hideStatus for the full story.
-    private statusTokenSeq = 0;
-    private currentStatusToken = 0;
 
     // --- Selection mode (phase 1: canvas<->editor highlighting) ---
     private selectMode = false;
@@ -99,6 +190,10 @@ export class PAGXPlayer extends EventTarget {
     // while unsaved source edits insert or remove lines, then reset from runtime spans on Apply/Discard.
     private sourceMap: NodeSourceEntry[] = [];
     private draftSourceMap: NodeSourceEntry[] = [];
+    // Lazy index over draftSourceMap. applyDraftLineChange mutates entries in place, so any line
+    // change invalidates the sorted spans and the index must be rebuilt; hover/select/overlay lookups
+    // reuse it between edits instead of scanning the map linearly each time.
+    private draftIndex: SourceMapIndex | null = null;
     // Selection boxes painted over the canvas, one per runtime layer instance built from the
     // bounds-bearing node — a source node referenced by N composition layers builds N instances,
     // all of which get outlined. Kept as a reusable pool so the per-frame follow-loop only
@@ -185,9 +280,7 @@ export class PAGXPlayer extends EventTarget {
         // Status pill. Anchored above the canvas area; inherits the wrapper's shrink-with-editor
         // behavior automatically since it's a child of the same wrapper as the toolbar and
         // playback bar. Starts hidden so nothing shows until the host calls showStatus().
-        this.statusEl = document.createElement('div');
-        this.statusEl.className = 'pagx-player-status hidden';
-        this.root.appendChild(this.statusEl);
+        this.statusPill = new StatusPill(this.root);
 
         // Toolbar (before/after slots come from host; built-in Reset + Source Editor sit
         // between them so their relative order in options.extraMenuItems is preserved).
@@ -381,9 +474,10 @@ export class PAGXPlayer extends EventTarget {
         }));
     }
 
-    /** Load a pagx from raw bytes. Handles the full pipeline: ensure wasm module, parse the
-     *  document, register fonts (via callback), resolve external resources (via callback),
-     *  build layers, first draw. Emits 'loaded' on success and 'loadError' on failure.
+    /** Load a pagx from raw bytes. Orchestrates DocumentLoader (parse + fonts + external resources
+     *  + playback restore + first draw), the editor sync, SelectionController (source map + cleared
+     *  handles) and the DOM/bar/event wiring; failure recovery stays here because it owns the UI.
+     *  Emits 'loaded' on success and 'loadError' on failure.
      *
      *  Concurrent load() calls, and destroy() during a load(), are safe: this call captures a
      *  generation token on entry and bails out silently after each await when a newer call
@@ -401,86 +495,11 @@ export class PAGXPlayer extends EventTarget {
             if (!this.isCurrentLoad(generation)) return;
             const view = this.view!;
 
-            const preservedTime = options.preserveCurrentTime
-                ? (view.durationMicros() > 0 ? view.currentTimeMicros() : 0)
-                : 0;
-            const wasPlaying = options.preserveCurrentTime && view.isPlaying();
-
-            view.parsePAGX(pagxBytes);
-
-            // Register fonts (host-supplied); the view resets font registration on each load
-            // so this must run before buildLayers.
-            if (options.registerFonts) {
-                await options.registerFonts(view);
-                if (!this.isCurrentLoad(generation)) return;
-            }
-
-            // External resource resolution: parsePAGX populates the resource path list; each
-            // path is fetched and pushed as file data before buildLayers can succeed. Fetch
-            // concurrently but push in order so a hypothetical duplicate path list stays
-            // deterministic.
-            if (options.resolveResource) {
-                const paths: string[] = view.getExternalFilePaths();
-                if (paths && paths.length > 0) {
-                    const resolve = options.resolveResource;
-                    const items = await Promise.all(
-                        paths.map(async (rel: string) => ({
-                            rel,
-                            buf: await resolve(rel),
-                        })),
-                    );
-                    if (!this.isCurrentLoad(generation)) return;
-                    for (const item of items) {
-                        if (item.buf) {
-                            view.loadFileData(item.rel, item.buf);
-                        }
-                    }
-                }
-            }
-
-            view.buildLayers();
-
-            if (options.forceLoop !== false) {
-                view.setLoop(true);
-            }
-
-            const bg = this.options.backgroundColor ?? DEFAULT_BACKGROUND;
-            // Compose an #RRGGBB hex from the numeric RGB channels so the setBackgroundColor
-            // string overload accepts it; alpha is passed separately as a 0..1 float per the
-            // pagx-viewer API contract.
-            const hex =
-                '#' +
-                bg.r.toString(16).padStart(2, '0') +
-                bg.g.toString(16).padStart(2, '0') +
-                bg.b.toString(16).padStart(2, '0');
-            view.setBackgroundColor(hex, bg.a);
-
-            if (options.preserveCurrentTime && preservedTime > 0) {
-                view.setCurrentTimeMicros(Math.min(preservedTime, view.durationMicros()));
-            }
-            // Fully mirror the previous play state when the host asked us to preserve it:
-            // buildLayers() leaves the view in the auto-play state by default, so a paused
-            // reload would otherwise silently start playing again after every SSE tick.
-            if (options.preserveCurrentTime) {
-                if (wasPlaying) {
-                    view.play();
-                } else {
-                    view.pause();
-                }
-            } else {
-                // A non-preserving load means the host is showing a different pagx document
-                // (open-new-file, sample switch), not a live-reload of the current one. Reset
-                // the zoom/pan transform so the new file lands centered at identity instead
-                // of inheriting the previous document's user gestures. When preserveCurrentTime
-                // is true we intentionally leave the transform alone: users mid-scrub during
-                // an SSE reload expect their viewport to stay put.
-                this.gesture.resetTransform();
-            }
-
-            // Force a synchronous first frame so the canvas reflects the newly built document
-            // before we unhide it below; without this the view is drawn one rAF later and the
-            // previous document's last frame briefly ghosts through when hidden -> visible.
-            view.draw();
+            const loaded = await DocumentLoader.load(
+                view, pagxBytes, options, this.options.backgroundColor ?? DEFAULT_BACKGROUND,
+                () => this.isCurrentLoad(generation), () => this.gesture.resetTransform(),
+            );
+            if (!loaded || !this.isCurrentLoad(generation)) return;
 
             this.canvas.classList.remove('hidden');
             setToolbarVisible(this.toolbarRoot, true);
@@ -497,18 +516,16 @@ export class PAGXPlayer extends EventTarget {
             }
             this.editor?.setDocumentXml(xmlText ?? null);
 
-            // Refresh the source map (node index -> source span) for selection highlighting.
-            // Rebuilt on every load since a new document renumbers nodes.
-            this.sourceMap = view.getNodeSourceMap();
-            this.draftSourceMap = this.cloneSourceMap(this.sourceMap);
-            this.hoverIndex = -1;
-            this.hoverHit = null;
-            this.selectHit = null;
-            this.editorHoverIndex = -1;
-            this.editorHoverLine = -1;
-            this.selectedIndex = -1;
-            this.editor?.clearHighlight();
-            this.refreshOverlay();
+            // A new document renumbers nodes, so rebuild the source map and drop every handle that
+            // pointed into the previous runtime tree.
+            SelectionController.reset(view, this.editor,
+                (map) => {
+                    this.sourceMap = map;
+                    this.draftSourceMap = this.cloneSourceMap(map);
+                    this.draftIndex = null;
+                },
+                () => this.clearSelectionState(),
+                () => this.refreshOverlay());
 
             const detail: LoadedEventDetail = {
                 duration: view.durationMicros(),
@@ -603,7 +620,7 @@ export class PAGXPlayer extends EventTarget {
         this.canvas.style.cursor = '';
         this.hoverIndex = -1;
         this.hoverHit = null;
-        this.syncEditorHover();
+        this.syncEditorHighlight('hover');
         this.refreshOverlay();
     }
 
@@ -641,7 +658,7 @@ export class PAGXPlayer extends EventTarget {
             this.hoverIndex = idx;
             this.hoverHit = hit;
             this.refreshOverlay();
-            this.syncEditorHover('center');
+            this.syncEditorHighlight('hover', 'center');
         }
     }
 
@@ -666,7 +683,7 @@ export class PAGXPlayer extends EventTarget {
         // blue outline remains; it stays highlighted on the canvas and mirrored in the editor
         // until the user's next action.
         this.exitSelectMode();
-        this.syncEditorSelect('center');
+        this.syncEditorHighlight('select', 'center');
     }
 
     /** Editor hover resolves only a physical XML tag line. The full node index remains available for
@@ -681,16 +698,16 @@ export class PAGXPlayer extends EventTarget {
         this.editorHoverIndex = idx;
         this.editorHoverLine = nextLine;
         this.refreshOverlay();
-        this.syncEditorHover();
+        this.syncEditorHighlight('hover');
     }
 
     /** Double-clicking any physical line unlocks the whole document for editing; the amber edit
      *  decoration marks the double-clicked line itself. There is no "is this a valid tag" gate:
      *  whether one can edit depends only on which line was clicked, never on that line's content
-     *  (a line whose tag markup was deleted mid-edit must still be re-enterable). findNodeIndexForLine
-     *  is a pure line-number lookup against draftSourceMap (not a content check) and only drives the
-     *  canvas selection sync; when the line falls outside every node's span (e.g. the XML
-     *  declaration), it simply returns -1 and no canvas node gets selected. */
+     *  (a line whose tag markup was deleted mid-edit must still be re-enterable). The source map
+     *  lookup is a pure line-number query (not a content check) and only drives the canvas selection
+     *  sync; when the line falls outside every node's span (e.g. the XML declaration), it simply
+     *  returns -1 and no canvas node gets selected. */
     private onEditorDblClick(line: number): void {
         const idx = findNodeIndexForLine(this.draftSourceMap, line);
         this.selectedIndex = idx;
@@ -700,27 +717,39 @@ export class PAGXPlayer extends EventTarget {
         this.editor?.clearHover();
         this.editor?.enterEditMode(line);
         this.refreshOverlay();
-        this.syncEditorSelect();
+        this.syncEditorHighlight('select');
     }
 
     private cloneSourceMap(entries: readonly NodeSourceEntry[]): NodeSourceEntry[] {
         return entries.map((entry) => ({ ...entry, channels: [...entry.channels] }));
     }
 
-    /** Looks up a draft source entry by its native Node index. The runtime currently keeps
-     *  Node::index equal to the sourceMap array position, but callers must not depend on that:
-     *  a future getNodeSourceMap that skips entries (e.g. programmatic nodes) would silently
-     *  mis-target a positional read. Returns null when the index has no live entry. */
+    /** Drops every hover/selection handle that pointed into the previous runtime tree. */
+    private clearSelectionState(): void {
+        this.hoverIndex = -1;
+        this.hoverHit = null;
+        this.selectHit = null;
+        this.editorHoverIndex = -1;
+        this.editorHoverLine = -1;
+        this.selectedIndex = -1;
+    }
+
+    /** Looks up a draft source entry by its native Node index. getNodeSourceMap skips mounted
+     *  composition wrappers, so the sourceMap array offset is not the node index and a positional
+     *  read would silently mis-target. Returns null when the index has no live entry. */
     private draftEntryByIndex(index: number): NodeSourceEntry | null {
         if (index < 0) {
             return null;
         }
-        for (const entry of this.draftSourceMap) {
-            if (entry.index === index) {
-                return entry;
-            }
+        return this.getDraftIndex().entryByIndex(index);
+    }
+
+    /** Returns the current draft index, rebuilding it when a line change has invalidated it. */
+    private getDraftIndex(): SourceMapIndex {
+        if (this.draftIndex === null) {
+            this.draftIndex = new SourceMapIndex(this.draftSourceMap);
         }
-        return null;
+        return this.draftIndex;
     }
 
     /** Applies accepted draft line deltas to a projection of the runtime source map. Entries wholly
@@ -731,55 +760,18 @@ export class PAGXPlayer extends EventTarget {
     ): void {
         if (changes === null) {
             this.draftSourceMap = this.cloneSourceMap(this.sourceMap);
+            this.draftIndex = null;
             return;
         }
         for (const change of changes) {
-            this.applyDraftLineChange(change);
+            applyDraftLineChange(this.draftSourceMap, change);
         }
+        // applyDraftLineChange mutates entry spans in place, invalidating the sorted index.
+        this.draftIndex = null;
         // The pointer may now refer to a shifted source line; wait for the next mouse move instead
         // of leaving a stale editor-originated hover decoration behind.
         this.editorHoverLine = -1;
         this.editorHoverIndex = -1;
-    }
-
-    private applyDraftLineChange(change: DraftLineChange): void {
-        const removedLineCount = change.endLine - change.startLine;
-        const lineDelta = change.insertedLineCount - removedLineCount;
-        if (lineDelta === 0) {
-            return;
-        }
-        for (const entry of this.draftSourceMap) {
-            if (entry.startLine <= 0) {
-                continue;
-            }
-            const endLine = entry.endLine > 0 ? entry.endLine : entry.startLine;
-            if (endLine < change.startLine) {
-                continue;
-            }
-            if (entry.startLine > change.endLine) {
-                entry.startLine += lineDelta;
-                if (entry.endLine > 0) {
-                    entry.endLine += lineDelta;
-                }
-                continue;
-            }
-            if (removedLineCount > 0 && entry.startLine >= change.startLine &&
-                endLine <= change.endLine) {
-                entry.startLine = -1;
-                entry.endLine = -1;
-                continue;
-            }
-            if (entry.startLine <= change.startLine && endLine >= change.endLine) {
-                if (entry.endLine > 0) {
-                    entry.endLine += lineDelta;
-                }
-                continue;
-            }
-            // A range boundary was cut but the node was not wholly removed. It has no reliable
-            // textual identity until Apply rebuilds the runtime map, so never map it incorrectly.
-            entry.startLine = -1;
-            entry.endLine = -1;
-        }
     }
 
     /** Resolves the line span of the innermost tag enclosing the given 1-based source line, for
@@ -815,9 +807,9 @@ export class PAGXPlayer extends EventTarget {
     /** Attempts to apply the edit from oldXml to newXml incrementally, in place, via setNodeChannel
      *  instead of a full reparse+rebuild. Returns true only when the whole edit is a set of pure
      *  attribute-value changes on incrementable channels; false otherwise, signalling the editor to
-     *  fall back to the full onApply pipeline. Failing (even part-way) is safe: the fallback reparse
-     *  of newXml is the authoritative final state regardless of any channel writes already applied
-     *  here. */
+     *  fall back to the full onApply pipeline. Failing part-way leaves channel writes applied until
+     *  that fallback replaces the runtime; the full apply is authoritative and load()'s failure
+     *  path clears the UI if it also fails. */
     private tryIncrementalApply(oldXml: string, newXml: string): boolean {
         if (!this.view || this.draftSourceMap.length === 0) {
             return false;
@@ -832,12 +824,10 @@ export class PAGXPlayer extends EventTarget {
         for (const edit of edits) {
             const ok = this.view.setNodeChannel(edit.index, edit.channel, edit.value);
             if (!ok) {
-                // Roll back the writes that already landed: the full-reparse fallback below can
-                // itself fail on the same invalid value (an importer rejects it too), which
-                // would leave the runtime showing a partial edit the editor text no longer
-                // matches. Re-parse the pre-edit baseline so canvas and editor stay in sync;
-                // the user sees the error toast and can retry or Discard.
-                this.rollbackRuntimeToBaseline(oldXml);
+                // Let Apply fall through to the full onApply pipeline. Do not re-parse oldXml here:
+                // parsePAGX creates a fresh document and would drop the external resources that
+                // load() replays, plus the playback position, loop and background colour. The full
+                // apply is authoritative and restores all of that; on failure load() clears the UI.
                 return false;
             }
         }
@@ -845,85 +835,55 @@ export class PAGXPlayer extends EventTarget {
         return true;
     }
 
-    /** Best-effort restore of the runtime to the pre-edit baseline after a failed incremental
-     *  apply. Synchronous and heavy (full reparse); only used on the error path, where keeping
-     *  a half-applied document is worse than re-parsing a known-good one. */
-    private rollbackRuntimeToBaseline(oldXml: string): void {
-        const view = this.view;
-        if (!view) {
-            return;
-        }
-        try {
-            view.parsePAGX(new TextEncoder().encode(oldXml));
-            view.buildLayers();
-            view.draw();
-        } catch {
-            // Best-effort: on failure the partial writes stay visible (pre-fix behavior); the
-            // editor still reports the apply error so the user can retry or Discard.
-        }
-    }
-
     /** The transient hover target: editor-hover wins over canvas-hover (mouse can only be in one). */
     private hoverTarget(): number {
         return this.editorHoverIndex >= 0 ? this.editorHoverIndex : this.hoverIndex;
     }
 
-    /** Mirrors the transient hover target onto the editor as the grey hover line highlight.
-     *  Span source: canvas-originating hover uses the hitTest result's span (which points at the
-     *  <Layer composition="@X"> reference, not the internal definition); editor-originating hover
-     *  (editorHoverIndex) falls back to sourceMap since no hitTest ran. */
-    private syncEditorHover(align: 'none' | 'nearest' | 'start' | 'center' = 'none'): void {
-        if (this.editorHoverLine > 0) {
+    /** Mirrors the hover or selection target onto the editor as a line highlight. Hover spans come
+     *  from the hitTest result (the <Layer composition="@X"> reference, not its internal definition)
+     *  unless the hover originated in the editor; selection uses the sticky selectedIndex. */
+    private syncEditorHighlight(target: 'hover' | 'select',
+                                align: 'none' | 'nearest' | 'start' | 'center' = 'none'): void {
+        const hover = target === 'hover';
+        if (hover && this.editorHoverLine > 0) {
             this.editor?.highlightHover(this.editorHoverLine, this.editorHoverLine);
             if (align !== 'none') {
                 this.editor?.scrollToLine(this.editorHoverLine, align);
             }
             return;
         }
-        const idx = this.hoverTarget();
-        if (this.hoverHit !== null) {
-            const projected = this.draftEntryByIndex(this.hoverHit.index);
+        const hit = hover ? this.hoverHit : this.selectHit;
+        if (hit !== null) {
+            const projected = this.draftEntryByIndex(hit.index);
             const start = projected !== null && projected.startLine > 0
                 ? projected.startLine
-                : this.hoverHit.startLine;
-            this.editor?.highlightHover(start, start);
+                : hit.startLine;
+            if (hover) {
+                this.editor?.highlightHover(start, start);
+            } else {
+                this.editor?.highlightSelect(start, start);
+            }
             if (align !== 'none') {
                 this.editor?.scrollToLine(start, align);
             }
             return;
         }
-        const hoverEntry = this.draftEntryByIndex(idx);
-        if (hoverEntry === null || hoverEntry.startLine <= 0) {
-            this.editor?.clearHover();
-            return;
-        }
-        const start = hoverEntry.startLine;
-        this.editor?.highlightHover(start, start);
-        if (align !== 'none') {
-            this.editor?.scrollToLine(start, align);
-        }
-    }
-
-    /** Mirrors the sticky selection onto the editor as the blue opening-tag line highlight. */
-    private syncEditorSelect(align: 'none' | 'nearest' | 'start' | 'center' = 'none'): void {
-        const idx = this.selectedIndex;
-        if (this.selectHit !== null) {
-            const projected = this.draftEntryByIndex(this.selectHit.index);
-            const start = projected !== null && projected.startLine > 0
-                ? projected.startLine
-                : this.selectHit.startLine;
-            this.editor?.highlightSelect(start, start);
-            if (align !== 'none') {
-                this.editor?.scrollToLine(start, align);
-            }
-            return;
-        }
+        const idx = hover ? this.hoverTarget() : this.selectedIndex;
         const entry = this.draftEntryByIndex(idx);
         if (entry === null || entry.startLine <= 0) {
-            this.editor?.clearSelect();
+            if (hover) {
+                this.editor?.clearHover();
+            } else {
+                this.editor?.clearSelect();
+            }
             return;
         }
-        this.editor?.highlightSelect(entry.startLine, entry.startLine);
+        if (hover) {
+            this.editor?.highlightHover(entry.startLine, entry.startLine);
+        } else {
+            this.editor?.highlightSelect(entry.startLine, entry.startLine);
+        }
         if (align !== 'none') {
             this.editor?.scrollToLine(entry.startLine, align);
         }
@@ -1042,10 +1002,10 @@ export class PAGXPlayer extends EventTarget {
             return;
         }
         // Every frame queries getNodeBounds so the overlay tracks zoom and animation in real time.
-        // The hitTest snapshot bounds (hoverHit/selectHit) are NOT used here because they are a
-        // point-in-time snapshot that would not follow zoom/animation; using them caused the overlay
-        // to freeze and disappear during zoom. getNodeBounds returns one rect per runtime instance,
-        // so a source node referenced by several composition layers gets every instance outlined.
+        // hitTest deliberately omits bounds: a point-in-time snapshot would not follow zoom or
+        // animation and caused the overlay to freeze and disappear. getNodeBounds returns one rect
+        // per runtime instance, so a source node referenced by several composition layers gets
+        // every instance outlined.
         const bounds = this.view.getNodeBounds(this.overlayBoundsIndex);
         if (bounds === null || bounds.length === 0) {
             this.setOverlayBoxCount(0);
@@ -1160,42 +1120,13 @@ export class PAGXPlayer extends EventTarget {
      *  (editor progress messages, external reload status, etc.) coexist without each other's
      *  cleanup racing to hide a message that isn't theirs anymore. */
     public showStatus(text: string, options: StatusOptions = {}): number {
-        if (this.statusHideTimer !== null) {
-            window.clearTimeout(this.statusHideTimer);
-            this.statusHideTimer = null;
-        }
-        const token = ++this.statusTokenSeq;
-        this.currentStatusToken = token;
-        this.statusEl.textContent = text;
-        this.statusEl.classList.toggle('success', options.kind === 'success');
-        this.statusEl.classList.toggle('error', options.kind === 'error');
-        this.statusEl.classList.remove('hidden');
-        const autoHideMs = options.autoHideMs ?? 0;
-        if (autoHideMs > 0) {
-            this.statusHideTimer = window.setTimeout(() => {
-                this.statusHideTimer = null;
-                // The timer only fires when no newer showStatus() has replaced the message
-                // (each showStatus clears the pending timer above), so we don't re-check the
-                // token here.
-                this.currentStatusToken = 0;
-                this.statusEl.classList.add('hidden');
-            }, autoHideMs);
-        }
-        return token;
+        return this.statusPill.show(text, options);
     }
 
     /** Hide the status pill. If `token` is provided, only clears when it still identifies the
      *  currently displayed message; otherwise clears unconditionally. */
     public hideStatus(token?: number): void {
-        if (token !== undefined && token !== this.currentStatusToken) {
-            return;
-        }
-        if (this.statusHideTimer !== null) {
-            window.clearTimeout(this.statusHideTimer);
-            this.statusHideTimer = null;
-        }
-        this.currentStatusToken = 0;
-        this.statusEl.classList.add('hidden');
+        this.statusPill.hide(token);
     }
 
     /** Escape hatch: exposes the underlying view for hosts that need low-level access
@@ -1273,10 +1204,7 @@ export class PAGXPlayer extends EventTarget {
         window.removeEventListener('beforeunload', this.onBeforeUnload);
         window.removeEventListener('pagehide', this.onPageHide);
         window.removeEventListener('pageshow', this.onPageShow);
-        if (this.statusHideTimer !== null) {
-            window.clearTimeout(this.statusHideTimer);
-            this.statusHideTimer = null;
-        }
+        this.statusPill.destroy();
         this.playbackBar.destroy();
         this.editor?.destroy();
         this.destroyView();

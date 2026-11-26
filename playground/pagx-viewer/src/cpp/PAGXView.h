@@ -20,6 +20,7 @@
 
 #include <emscripten/bind.h>
 #include <deque>
+#include <unordered_map>
 #include "pag/gpu.h"
 #include "pagx/FontConfig.h"
 #include "pagx/PAGAnimation.h"
@@ -97,11 +98,10 @@ class PAGXView {
   // --- Selection (phase 1, read-only canvas<->editor queries) ---
 
   // Returns the hit-test result for the top-most layer under the surface point, or a null val if
-  // none. The result carries the source span (1-based lines) and surface bounds of the *reference*
-  // node — i.e. when the click lands inside a <Layer composition="@X"> instance, the span points
-  // at that <Layer> reference rather than at the internal definition node inside <Composition id>.
-  // bounds is the on-screen rect of the clicked instance itself (not the whole reference span),
-  // so the canvas overlay outlines exactly what the user clicked.
+  // none. The result carries the source span (1-based lines) of the *reference* node — i.e. when
+  // the click lands inside a <Layer composition="@X"> instance, the span points at that <Layer>
+  // reference rather than at the internal definition node inside <Composition id>. Bounds are
+  // deliberately omitted; getNodeBounds() is the dedicated call for on-screen rects.
   emscripten::val hitTest(float surfaceX, float surfaceY);
 
   // One-shot export of every node's source span and incrementable channel list, for the editor
@@ -112,7 +112,7 @@ class PAGXView {
   // Returns the current-frame surface bounds {x,y,w,h} of every runtime layer instance built from
   // nodes[index] — one array entry per instance when the node is referenced by several composition
   // layers — or null if index is out of range or has no runtime layer. For overlay box drawing.
-  emscripten::val getNodeBounds(int index) const;
+  emscripten::val getNodeBounds(int index);
 
   // --- Source-editor validation and incremental edit ---
 
@@ -121,7 +121,7 @@ class PAGXView {
    *
    * The browser-side XML parser reports well-formedness. This method reports importer/schema
    * errors (unknown elements, invalid attribute values, unresolved references, etc.) as an array
-   * of {message, line, column} objects for Monaco diagnostics.
+   * of {message, line} objects for Monaco diagnostics.
    * @param pagxData UTF-8 encoded PAGX XML bytes.
    * @return JavaScript array of schema diagnostic objects.
    */
@@ -144,6 +144,7 @@ class PAGXView {
   void syncSurfaceSize(int canvasWidth, int canvasHeight);
   void advanceTimelines(double frameStartMs);
   void advanceFallbackTimeline(int64_t deltaUs);
+  void invalidateLayerInstances();
   void onZoomEnd();
   void updatePerformanceState(double frameDurationMs);
   void updateAdaptiveTileRefinement();
@@ -188,6 +189,12 @@ class PAGXView {
   float userOffsetY = 0.0f;
   FontConfig fontConfig = {};
   std::shared_ptr<PAGXDocument> document = nullptr;
+  // Runtime layer instances grouped by their source Layer node. Rebuilt lazily by getNodeBounds()
+  // instead of walking the whole runtime tree once per hover rAF; invalidated whenever the tree may
+  // have been rebuilt or the document replaced. Bounds are still queried per frame, so animation
+  // and zoom remain live.
+  std::unordered_map<const Node*, std::vector<std::shared_ptr<PAGLayer>>> layerInstances = {};
+  bool layerInstancesCached = false;
 
   bool useCustomBackgroundColor = false;
   Color customBackgroundColor = {};

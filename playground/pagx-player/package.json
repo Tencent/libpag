@@ -20,7 +20,8 @@
   "scripts": {
     "clean": "rimraf lib",
     "build": "rollup -c ./scripts/rollup.config.mjs",
-    "build:release": "BUILD_MODE=release rollup -c ./scripts/rollup.config.mjs"
+    "build:release": "BUILD_MODE=release rollup -c ./scripts/rollup.config.mjs",
+    "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
     "@rollup/plugin-commonjs": "~28.0.3",

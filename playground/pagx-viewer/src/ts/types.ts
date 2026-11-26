@@ -51,21 +51,18 @@ export interface NodeBounds {
 }
 
 /**
- * The result of a hit test: the source node under a surface point with its source span and
- * on-screen bounds. startLine/endLine point at the reference node: when the hit lands inside a
- * <Layer composition="@X"> instance they refer to that reference rather than the internal
- * definition node. bounds is the hit instance's surface rect, or null when the resolved layer
- * has no measurable on-screen rect.
+ * The result of a hit test: the source node under a surface point with its source span.
+ * startLine/endLine point at the reference node: when the hit lands inside a <Layer
+ * composition="@X"> instance they refer to that reference rather than the internal definition
+ * node. Bounds are deliberately omitted; getNodeBounds() is the dedicated call for on-screen rects.
  */
 export interface HitTestResult {
-  /** Index of the source node in the main document's node list. A hit resolving inside an
-   *  embedded external document reports -1 (its index would number the external node list). */
+  /** Index of the source node in the main document's node list. */
   index: number;
   /** 1-based source line of the node's start tag; -1 when unavailable. */
   startLine: number;
   /** 1-based source line of the node's end tag; -1 when unavailable. */
   endLine: number;
-  bounds: NodeBounds | null;
 }
 
 /**
@@ -91,7 +88,6 @@ export interface NodeSourceEntry {
 export interface PagxSchemaDiagnostic {
   message: string;
   line: number;
-  column: number;
 }
 
 /**
@@ -261,7 +257,7 @@ export interface _PAGXView {
 
   /**
    * Validates UTF-8 PAGX XML without replacing the currently loaded document. Returns a plain JS
-   * array of { message, line, column } schema diagnostics.
+   * array of { message, line } schema diagnostics.
    */
   _validatePAGX(data: Uint8Array): PagxSchemaDiagnostic[];
 

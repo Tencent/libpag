@@ -28,7 +28,8 @@
 // `setDocumentXml()` calls driven by the player.
 
 import type { EditorCallbacks, SourceDiagnosticProvider } from '../types';
-import { SourceEditor, type DraftLineChange, type LineRange } from './SourceEditor';
+import type { DraftLineChange } from '../incremental-apply';
+import { SourceEditor, type LineRange } from './SourceEditor';
 import { EDITOR_STYLES } from './styles';
 
 export type { LineRange };
@@ -422,7 +423,7 @@ export class EditorPanel {
 
     /** Returns the model version, which changes on every content edit (-1 when the editor instance
      *  is not created). Cheaper than getContent() for callers that only compare text identity. */
-    public getContentVersion(): number {
+    private getContentVersion(): number {
         return this.editor?.getContentVersion() ?? -1;
     }
 
@@ -690,70 +691,68 @@ export class EditorPanel {
             this.report(validationError, 'error');
             return;
         }
-        // Incremental fast path: a pure attribute-value edit is applied in place (setNodeChannel)
-        // and skips the full reparse/rebuild entirely. Structural or non-incrementable edits return
-        // false and fall through to the full onApply pipeline below. The update is synchronous and
-        // instant, so there is no "Applying..." pill or busy window; on success the edited text
-        // becomes the new baseline just like a full apply.
-        if (
-            this.incrementalApply !== null &&
-            this.currentXmlText !== null &&
-            this.currentXmlText !== xmlText
-        ) {
-            let handled = false;
-            try {
-                handled = this.incrementalApply(this.currentXmlText, xmlText);
-            } catch {
-                // Falling back to the full Apply below is the intended recovery.
-                handled = false;
-            }
-            if (handled) {
-                this.currentXmlText = xmlText;
-                this.editor.markApplied();
-                this.report('Changes applied', 'success');
-                return;
-            }
+        if (this.applyIncremental(xmlText)) {
+            return;
         }
-        // Sticky "Applying..." keeps showing until the host promise settles - a long parse +
-        // build on a big pagx (seconds) would otherwise leave the pill blank. The button row
-        // is disabled for the same window so users can't fire a second apply against the
-        // same in-flight pipeline. The returned token lets us dismiss *this* Apply's own
-        // sticky pill if a mid-flight document swap makes its result irrelevant, without
-        // disturbing whatever newer message the swapping producer put up in the same slot.
+        await this.applyFull(xmlText, applyDocGen);
+    }
+
+    /** Promotes applied text to the undo baseline so Discard / setDocumentXml cannot revert the
+     *  editor to pre-Apply text while the canvas already shows the new content. */
+    private promoteBaseline(xmlText: string): void {
+        this.currentXmlText = xmlText;
+        this.editor?.markApplied();
+    }
+
+    /** Applies a pure attribute-value edit in place via setNodeChannel, skipping the full reparse.
+     *  Structural or non-incrementable edits return false and fall through to applyFull(). */
+    private applyIncremental(xmlText: string): boolean {
+        if (this.incrementalApply === null || this.currentXmlText === null ||
+            this.currentXmlText === xmlText) {
+            return false;
+        }
+        let handled = false;
+        try {
+            handled = this.incrementalApply(this.currentXmlText, xmlText);
+        } catch {
+            // Falling back to the full Apply is the intended recovery.
+            return false;
+        }
+        if (!handled) {
+            return false;
+        }
+        this.promoteBaseline(xmlText);
+        this.report('Changes applied', 'success');
+        return true;
+    }
+
+    /** Invokes the host's full Apply pipeline with sticky status, generation guards and cleanup.
+     *  applyDocGen was snapshotted before the validation await; a document swap or panel destroy
+     *  during that window or the host callback makes this Apply's result irrelevant. */
+    private async applyFull(xmlText: string, applyDocGen: number): Promise<void> {
+        // Sticky "Applying..." keeps showing until the host promise settles - a long parse + build
+        // on a big pagx would otherwise leave the pill blank. The button row is disabled for the
+        // same window so users can't fire a second apply against the same in-flight pipeline. The
+        // token lets us dismiss *this* Apply's pill without disturbing a newer swapping producer.
         this.setBusy(true);
         const applyingToken = this.report('Applying...', 'info', { sticky: true });
-        // applyDocGen was snapshotted before the validation await (see above). A panel destroy
-        // also invalidates the pipeline (markApplied on a destroyed editor would dereference
-        // null and surface as a misleading error toast), so it counts as a swap here.
         // Advertise the XML the host is about to receive so setDocumentXml can recognize its
-        // loopback (host.load -> player.load -> editor.setDocumentXml with this same content)
-        // and skip the generation bump. See pendingApplyXml field comment for the full story.
+        // loopback (host.load -> player.load -> editor.setDocumentXml with this same content) and
+        // skip the generation bump. See pendingApplyXml field comment for the full story.
         this.pendingApplyXml = xmlText;
-        // Yield to the browser before invoking the host's onApply callback. onApply typically
-        // enters player.load() which runs synchronous wasm work (parsePAGX / buildLayers)
-        // long enough to block the paint queue; without this yield the sticky "Applying..."
-        // pill and the disabled apply/discard/save buttons would only reach the screen once
-        // the load resolves, i.e. they would never be visible to the user during a fast load
-        // and only flash briefly during a slow one.
+        // Yield to the browser before invoking onApply: it enters player.load() with synchronous
+        // wasm work long enough to block the paint queue, so without this yield the sticky pill and
+        // disabled buttons would only reach the screen after the load resolves.
         await yieldToBrowser();
         try {
             const error = await this.callbacks.onApply(xmlText);
-            const documentSwapped =
-                this.documentGeneration !== applyDocGen || this.editor === null;
-            if (documentSwapped) {
-                // A fresher document already took over: leave currentXmlText / status alone
-                // so the newer content stays authoritative. The sticky "Applying..." pill is
-                // dismissed unconditionally in finally, so we don't need to touch it here.
+            if (this.documentGeneration !== applyDocGen || this.editor === null) {
+                // A fresher document already took over: leave currentXmlText / status alone so the
+                // newer content stays authoritative. finally still dismisses the sticky pill.
                 return;
             }
-            // Promote the applied XML to the new baseline immediately on success: a
-            // subsequent Discard, panel close/reopen, or setDocumentXml no-op on the same
-            // content would otherwise revert the editor to the pre-Apply text even though
-            // the canvas already reflects the new one. Failure keeps the old baseline so
-            // Discard still restores a known-good state.
             if (error === '') {
-                this.currentXmlText = xmlText;
-                this.editor.markApplied();
+                this.promoteBaseline(xmlText);
                 this.report('Changes applied', 'success');
             } else {
                 this.report(error, 'error');
@@ -762,12 +761,8 @@ export class EditorPanel {
             if (this.documentGeneration === applyDocGen) {
                 this.report(err instanceof Error ? err.message : String(err), 'error');
             }
-            // A reject during a document swap used to leak the sticky "Applying..." pill
-            // (no report ran here, and load doesn't touch the status slot itself), so it
-            // stayed pinned until the next showStatus call. The unconditional dismiss in
-            // finally covers this case; it's a safe no-op on the non-swap paths because
-            // report() above already replaced the pill via a fresh token, which makes
-            // dismiss(applyingToken) mismatch and skip.
+            // Unconditional dismiss in finally also covers a reject during a document swap, which
+            // used to leave the sticky pill pinned until the next showStatus call.
         } finally {
             this.pendingApplyXml = null;
             this.setBusy(false);
@@ -811,6 +806,11 @@ export class EditorPanel {
         await yieldToBrowser();
         try {
             const error = await this.callbacks.onSave(xmlText);
+            // The host callback may have reloaded a different document while we awaited. A stale
+            // "File saved" status would then overwrite the newer document's status.
+            if (this.documentGeneration !== saveDocGen) {
+                return;
+            }
             if (error === '') {
                 this.report('File saved', 'success');
             } else {

@@ -1277,12 +1277,15 @@ void detail::DocumentAccess::RegisterNode(PAGXDocument& document, Node* node,
 std::vector<NodeSourceEntry> PAGXDocument::getNodeSourceMap() const {
   std::vector<NodeSourceEntry> result = {};
   result.reserve(nodes.size());
-  for (const auto& node : nodes) {
+  for (size_t i = 0; i < nodes.size(); i++) {
+    const auto& node = nodes[i];
     if (isMountedComposition(node.get())) {
       continue;
     }
     NodeSourceEntry entry = {};
-    entry.index = node->index;
+    // Derive the index from the authoritative node position: skipping mounted wrappers means the
+    // result's own offset is not the node index.
+    entry.index = static_cast<int>(i);
     entry.startLine = node->sourceLine;
     entry.endLine = node->endLine;
     entry.nodeType = node->nodeType();

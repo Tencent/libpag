@@ -17530,6 +17530,170 @@ PAGX_TEST(PAGXTest, SetNodeChannelFromStringMatchesFullReparse) {
 }
 
 /**
+ * Test case: a Fill color backed by a named SolidColor is a shared @id resource. String writes and
+ * resets must refuse it so the editor falls back to a full reparse: mutating in place would recolour
+ * every other layer referencing the same id and leave the source text disagreeing with the canvas.
+ * Reading the shared value stays available, and an inline unnamed SolidColor remains writable.
+ */
+PAGX_TEST(PAGXTest, SetNodeChannelFromStringRefusesSharedSolidColor) {
+  const std::string xml = R"(<pagx version="1.0" width="100" height="100">
+  <Resources>
+    <SolidColor id="red" color="#FF0000"/>
+  </Resources>
+  <Layer id="first">
+    <Rectangle width="20" height="20"/>
+    <Fill color="@red"/>
+  </Layer>
+  <Layer id="second">
+    <Rectangle width="20" height="20"/>
+    <Fill color="@red"/>
+  </Layer>
+</pagx>)";
+  auto doc = pagx::PAGXImporter::FromXML(xml);
+  ASSERT_NE(doc, nullptr);
+  ASSERT_TRUE(doc->errors.empty());
+  auto* first = doc->findNode<pagx::Layer>("first");
+  auto* second = doc->findNode<pagx::Layer>("second");
+  auto* shared = doc->findNode<pagx::SolidColor>("red");
+  ASSERT_NE(first, nullptr);
+  ASSERT_NE(second, nullptr);
+  ASSERT_NE(shared, nullptr);
+  pagx::Fill* firstFill = nullptr;
+  for (auto* content : first->contents) {
+    if (content->nodeType() == pagx::NodeType::Fill) {
+      firstFill = static_cast<pagx::Fill*>(content);
+      break;
+    }
+  }
+  pagx::Fill* secondFill = nullptr;
+  for (auto* content : second->contents) {
+    if (content->nodeType() == pagx::NodeType::Fill) {
+      secondFill = static_cast<pagx::Fill*>(content);
+      break;
+    }
+  }
+  ASSERT_NE(firstFill, nullptr);
+  ASSERT_NE(secondFill, nullptr);
+  EXPECT_EQ(firstFill->color, shared);
+  EXPECT_EQ(secondFill->color, shared);
+
+  pagx::KeyValue current = {};
+  ASSERT_TRUE(pagx::GetNodeChannel(firstFill, "color", &current));
+  EXPECT_EQ(std::get<pagx::Color>(current), shared->color);
+
+  EXPECT_FALSE(pagx::SetNodeChannelFromString(firstFill, "color", "#00FF00"));
+  EXPECT_EQ(shared->color, (pagx::Color{1, 0, 0, 1}));
+  EXPECT_EQ(secondFill->color, shared);
+  EXPECT_FALSE(pagx::ResetNodeChannel(firstFill, "color"));
+  EXPECT_EQ(shared->color, (pagx::Color{1, 0, 0, 1}));
+
+  auto inlineDoc = pagx::PAGXImporter::FromXML(R"(<pagx version="1.0" width="100" height="100">
+  <Layer><Rectangle width="20" height="20"/><Fill color="#FF0000"/></Layer>
+</pagx>)");
+  ASSERT_NE(inlineDoc, nullptr);
+  ASSERT_EQ(inlineDoc->layers.size(), 1u);
+  pagx::Fill* inlineFill = nullptr;
+  for (auto* content : inlineDoc->layers[0]->contents) {
+    if (content->nodeType() == pagx::NodeType::Fill) {
+      inlineFill = static_cast<pagx::Fill*>(content);
+      break;
+    }
+  }
+  ASSERT_NE(inlineFill, nullptr);
+  auto* inlineSolid = static_cast<pagx::SolidColor*>(inlineFill->color);
+  ASSERT_NE(inlineSolid, nullptr);
+  EXPECT_TRUE(inlineSolid->id.empty());
+  EXPECT_TRUE(pagx::SetNodeChannelFromString(inlineFill, "color", "#00FF00"));
+  EXPECT_EQ(inlineSolid->color, (pagx::Color{0, 1, 0, 1}));
+}
+
+/**
+ * Test case: optional channels can be written from an unset state. The grammar is taken from the
+ * channel declaration rather than the current value, so a TextModifier whose fillColor,
+ * strokeColor and strokeWidth are all absent accepts the same strings a full reparse would.
+ */
+PAGX_TEST(PAGXTest, SetNodeChannelFromStringWritesUnsetOptionalChannels) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto* modifier = doc->makeNode<pagx::TextModifier>();
+  ASSERT_FALSE(modifier->fillColor.has_value());
+  ASSERT_FALSE(modifier->strokeColor.has_value());
+  ASSERT_FALSE(modifier->strokeWidth.has_value());
+
+  ASSERT_TRUE(pagx::SetNodeChannelFromString(modifier, "fillColor", "#FF0000"));
+  ASSERT_TRUE(modifier->fillColor.has_value());
+  EXPECT_EQ(*modifier->fillColor, (pagx::Color{1, 0, 0, 1}));
+  ASSERT_TRUE(pagx::SetNodeChannelFromString(modifier, "strokeColor", "#0000FF"));
+  ASSERT_TRUE(modifier->strokeColor.has_value());
+  EXPECT_EQ(*modifier->strokeColor, (pagx::Color{0, 0, 1, 1}));
+  ASSERT_TRUE(pagx::SetNodeChannelFromString(modifier, "strokeWidth", "3"));
+  ASSERT_TRUE(modifier->strokeWidth.has_value());
+  EXPECT_FLOAT_EQ(*modifier->strokeWidth, 3.0f);
+}
+
+/**
+ * Test case: an integer string outside the int range is rejected on every platform, including
+ * LLP64 where long is 32 bits and strtol alone saturates to LONG_MAX. A failed write leaves the
+ * previous value untouched so the caller can fall back to a full reparse.
+ */
+PAGX_TEST(PAGXTest, SetNodeChannelFromStringRejectsOutOfRangeInt) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto* selector = doc->makeNode<pagx::RangeSelector>();
+  ASSERT_TRUE(pagx::SetNodeChannelFromString(selector, "randomSeed", "5"));
+  EXPECT_FALSE(pagx::SetNodeChannelFromString(selector, "randomSeed", "3000000000"));
+  EXPECT_EQ(selector->randomSeed, 5);
+  EXPECT_FALSE(pagx::SetNodeChannelFromString(selector, "randomSeed", "10px"));
+  EXPECT_EQ(selector->randomSeed, 5);
+}
+
+/**
+ * Test case: the root composition spawns no timelines itself, so a scene-level query has to walk
+ * the runtime tree. A document with no <Timelines> reports false on both the root and the scene,
+ * while a composition instance whose owner layer carries a playing Animation reports true.
+ */
+PAGX_TEST(PAGXTest, SceneHasSpawnedTimelines) {
+  auto staticDoc = pagx::PAGXImporter::FromXML(
+      R"(<pagx version="1.0" width="100" height="100"><Layer width="10" height="10"/></pagx>)");
+  ASSERT_NE(staticDoc, nullptr);
+  auto staticScene = pagx::PAGScene::Make(staticDoc);
+  ASSERT_NE(staticScene, nullptr);
+  EXPECT_FALSE(staticScene->hasSpawnedTimelines());
+  ASSERT_NE(staticScene->rootComposition(), nullptr);
+  EXPECT_FALSE(staticScene->rootComposition()->hasTimelines());
+
+  const std::string xml = R"(<pagx version="1.0" width="100" height="100">
+  <Resources>
+    <Composition id="inner" width="40" height="40">
+      <Layer id="innerLayer" width="40" height="40">
+        <Rectangle width="40" height="40"/>
+        <Fill color="#FF0000"/>
+      </Layer>
+    </Composition>
+  </Resources>
+  <Layer composition="@inner">
+    <Timelines>
+      <Animation ref="@anim" playing="true"/>
+    </Timelines>
+  </Layer>
+  <Animations>
+    <Animation id="anim" duration="60" frameRate="60">
+      <Object target="innerLayer">
+        <Channel name="x" type="float">
+          <Key time="0" value="0"/>
+          <Key time="60" value="10"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>)";
+  auto doc = pagx::PAGXImporter::FromXML(xml);
+  ASSERT_NE(doc, nullptr);
+  EXPECT_TRUE(doc->errors.empty());
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_NE(scene, nullptr);
+  EXPECT_TRUE(scene->hasSpawnedTimelines());
+}
+
+/**
  * Test case: getNodeSourceMap() describes every node in document order — index, type, and
  * channel list align with the node vector, parsed nodes carry a 1-based source span, and the
  * line -> index lookup an editor selection needs resolves to the owning node. A composition

@@ -25,7 +25,6 @@
 #include <cstdlib>
 #include <string>
 #include <unordered_map>
-#include <unordered_set>
 #include <utility>
 #include <vector>
 #include "pagx/PAGComposition.h"
@@ -125,6 +124,7 @@ void PAGXView::loadPAGX(const val& pagxData) {
 }
 
 void PAGXView::parsePAGX(const val& pagxData) {
+  invalidateLayerInstances();
   document = nullptr;
   scene = nullptr;
   defaultTimeline = nullptr;
@@ -162,12 +162,12 @@ emscripten::val PAGXView::validatePAGX(const val& pagxData) const {
   }
   auto validationDocument = PAGXImporter::FromXML(data->bytes(), data->size());
   if (!validationDocument) {
-    // XML well-formedness is diagnosed by the browser-side DOMParser. Reaching here with valid
-    // XML means the document root is not PAGX, which is a schema error at the root element.
+    // The importer returns null both for a DOM parse failure and for a non-pagx root. The browser
+    // DOMParser catches most well-formedness errors, but the two parsers do not accept identical
+    // inputs (entities, invalid code points), so the exact cause is not available here.
     auto diagnostic = val::object();
-    diagnostic.set("message", "Root element must be 'pagx'.");
+    diagnostic.set("message", "Unable to parse document.");
     diagnostic.set("line", 1);
-    diagnostic.set("column", 1);
     diagnostics.call<void>("push", diagnostic);
     return diagnostics;
   }
@@ -196,7 +196,6 @@ emscripten::val PAGXView::validatePAGX(const val& pagxData) const {
     auto diagnostic = val::object();
     diagnostic.set("message", message);
     diagnostic.set("line", keptDiagnostics[i].first);
-    diagnostic.set("column", 1);
     diagnostics.call<void>("push", diagnostic);
   }
   return diagnostics;
@@ -416,23 +415,13 @@ emscripten::val PAGXView::hitTest(float surfaceX, float surfaceY) {
     return emscripten::val::null();
   }
   // The host owns the source document, so the source-side fields come from the node the runtime
-  // layer points at; the runtime itself only supplies the handle and its on-screen rect.
+  // layer points at. Bounds are deliberately not included: getNodeBounds() is the dedicated call,
+  // and the hover path discards per-hover tight bounds computed here.
   const auto* node = target->getNode();
-  auto bounds = scene->getTightGlobalBounds(target);
   auto obj = emscripten::val::object();
   obj.set("index", node->index);
   obj.set("startLine", node->sourceLine);
   obj.set("endLine", node->endLine);
-  if (bounds.isEmpty()) {
-    obj.set("bounds", emscripten::val::null());
-  } else {
-    auto boundsObj = emscripten::val::object();
-    boundsObj.set("x", bounds.x);
-    boundsObj.set("y", bounds.y);
-    boundsObj.set("w", bounds.width);
-    boundsObj.set("h", bounds.height);
-    obj.set("bounds", boundsObj);
-  }
   return obj;
 }
 
@@ -462,20 +451,27 @@ emscripten::val PAGXView::getNodeSourceMap() const {
 // map, so the host (which holds the source document) owns the node-to-runtime correspondence.
 // A pre-order walk matches the tree's construction order, so instances come back in the same
 // order the runtime tree declares them.
-static void CollectLayersForNode(const std::shared_ptr<PAGLayer>& layer, const Layer* node,
-                                 std::vector<std::shared_ptr<PAGLayer>>& out) {
+static void CollectLayerInstances(
+    const std::shared_ptr<PAGLayer>& layer,
+    std::unordered_map<const Node*, std::vector<std::shared_ptr<PAGLayer>>>& out) {
   if (layer == nullptr) {
     return;
   }
-  if (layer->getNode() == node) {
-    out.push_back(layer);
+  const auto* node = layer->getNode();
+  if (node != nullptr && node->nodeType() == NodeType::Layer) {
+    out[node].push_back(layer);
   }
   for (const auto& child : layer->getChildren()) {
-    CollectLayersForNode(child, node, out);
+    CollectLayerInstances(child, out);
   }
 }
 
-emscripten::val PAGXView::getNodeBounds(int index) const {
+void PAGXView::invalidateLayerInstances() {
+  layerInstances.clear();
+  layerInstancesCached = false;
+}
+
+emscripten::val PAGXView::getNodeBounds(int index) {
   if (document == nullptr || index < 0 || index >= static_cast<int>(document->nodes.size())) {
     return emscripten::val::null();
   }
@@ -492,8 +488,14 @@ emscripten::val PAGXView::getNodeBounds(int index) const {
     return emscripten::val::null();
   }
   auto* layerNode = static_cast<Layer*>(n);
-  std::vector<std::shared_ptr<PAGLayer>> instances = {};
-  CollectLayersForNode(root, layerNode, instances);
+  if (!layerInstancesCached) {
+    layerInstances.clear();
+    CollectLayerInstances(root, layerInstances);
+    layerInstancesCached = true;
+  }
+  const std::vector<std::shared_ptr<PAGLayer>> emptyInstances = {};
+  const auto& instances =
+      layerInstances.count(layerNode) > 0 ? layerInstances.at(layerNode) : emptyInstances;
   // Selection-outline slack for FreeType's anti-aliasing overshoot: per-glyph tight bounds stop
   // at the geometric baseline while the rasterizer paints slightly below it, visually clipping
   // the last row of ink. Extending the bottom by 5% of the layer height covers the overshoot,
@@ -504,7 +506,7 @@ emscripten::val PAGXView::getNodeBounds(int index) const {
   float zoom = contentScale * userZoom;
   auto array = emscripten::val::array();
   size_t visibleCount = 0;
-  for (auto& layer : instances) {
+  for (const auto& layer : instances) {
     auto rect = scene->getTightGlobalBounds(layer);
     if (rect.isEmpty()) {
       continue;
@@ -542,6 +544,7 @@ bool PAGXView::setNodeChannel(int index, const std::string& channel, const std::
   // (layoutChanged=false) is the cheap path for edits that cannot move geometry (alpha/color/...).
   bool layoutChanged = RequiresLayout(node->nodeType(), channel);
   document->notifyChange({node}, layoutChanged);
+  invalidateLayerInstances();
   presentImmediately = true;
   return true;
 }
@@ -561,6 +564,7 @@ void PAGXView::buildLayers() {
   if (!document) {
     return;
   }
+  invalidateLayerInstances();
   document->applyLayout(&fontConfig);
   scene = PAGScene::Make(document);
   if (scene == nullptr) {
@@ -983,25 +987,8 @@ float PAGXView::frameRate() const {
 // Returns true when any composition in the runtime subtree has spawned timelines, i.e. there is
 // animated content even without a top-level default timeline (all animations are
 // composition-scoped and driven purely through <Timelines> references).
-static bool HasAnySpawnedTimeline(const std::shared_ptr<PAGLayer>& layer) {
-  if (layer == nullptr) {
-    return false;
-  }
-  if (layer->layerType() == LayerType::Composition &&
-      static_cast<PAGComposition*>(layer.get())->hasTimelines()) {
-    return true;
-  }
-  for (const auto& child : layer->getChildren()) {
-    if (HasAnySpawnedTimeline(child)) {
-      return true;
-    }
-  }
-  return false;
-}
-
 bool PAGXView::hasTimeline() const {
-  return defaultTimeline != nullptr ||
-         (scene != nullptr && HasAnySpawnedTimeline(scene->rootComposition()));
+  return defaultTimeline != nullptr || (scene != nullptr && scene->hasSpawnedTimelines());
 }
 
 // Known limitation: seek only repositions the default (top-level) animation. Nested

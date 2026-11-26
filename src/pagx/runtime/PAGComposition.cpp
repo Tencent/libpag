@@ -411,6 +411,7 @@ void PAGComposition::syncChildren(const std::vector<Layer*>& sourceLayers,
       slot->removeFromParent();
     }
     binding->remove(child->node);
+    child->parent.reset();
   }
   children = std::move(newChildren);
   // Existing children may carry a stale parent (e.g. a plain-layer container whose parent was
@@ -480,6 +481,7 @@ void PAGComposition::refreshPlainContainerChildren(
           slot->removeFromParent();
         }
         binding->remove(oldChild->node);
+        oldChild->parent.reset();
       }
       container->children = std::move(newChildren);
       for (auto& child : container->children) {

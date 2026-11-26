@@ -209,13 +209,15 @@ class PAGXDocument : public Node {
   void adoptNodes(PAGXDocument& other);
 
   /**
-   * Returns one entry per authored node in PAGXDocument::nodes, in document order, carrying the
-   * node's runtime index, source span (1-based lines), type, and reflectable channel names. Use it
-   * to map source lines to node indexes for editor selection, and to decide which attribute edits
-   * can go incremental (a channel edit that fails can fall back to a full reparse). Synthesized
-   * wrappers for mounted imports (see isMountedComposition()) have no source span and are skipped.
-   * Entries reference the current node indexing; a structural document change renumbers nodes, so
-   * rebuild the map after such edits.
+   * Returns one entry per authored node in PAGXDocument::nodes, in node vector order, carrying the
+   * node's runtime index, source span (1-based lines), type, and reflectable channel names. The
+   * vector order matches document order for imported files, but optimizer-synthesized nodes are
+   * appended rather than inserted at their source position, so callers must use the span lines —
+   * not the entry order — when mapping a source line back to a node. Use this map for editor
+   * selection and to decide which attribute edits can go incremental (a channel edit that fails
+   * can fall back to a full reparse). Synthesized wrappers for mounted imports (see
+   * isMountedComposition()) have no source span and are skipped. Entries reference the current node
+   * indexing; a structural document change renumbers nodes, so rebuild the map after such edits.
    */
   std::vector<NodeSourceEntry> getNodeSourceMap() const;
 

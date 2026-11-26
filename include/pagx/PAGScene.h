@@ -104,6 +104,14 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
   std::shared_ptr<PAGTimeline> getDefaultTimeline();
 
   /**
+   * Returns true when any composition in this scene's runtime layer tree has spawned a timeline
+   * through its owner layer's <Timelines>. The root composition spawns none itself, so checking only
+   * the root is not enough; hosts use this instead of walking the tree on their own. This query does
+   * not include the scene's default timeline.
+   */
+  bool hasSpawnedTimelines() const;
+
+  /**
    * Returns the ids of all top-level state machines in the source document, preserving declaration
    * order.
    */
@@ -188,7 +196,10 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
    * (instead of the font-wide envelope of getGlobalBounds), clipped to the layer's own scrollRect
    * window, so selection outlines hug the visible content. The layer's full on-screen transform
    * (including animation and the display zoom/offset) is applied. Returns an empty rectangle if
-   * the layer is null or does not belong to this scene.
+   * the layer is null, belongs to another scene, or has a non-finite or extremely large extent that
+   * the rasterized-bounds helper rejects. The membership check uses the scene recorded at layer
+   * construction and cannot detect a layer detached by a later structural rebuild, so callers must
+   * re-resolve handles after buildLayers() or notifyChange() rebuilds the tree.
    * @param pagLayer a layer handle obtained from this scene (e.g. via getLayersUnderPoint).
    */
   Rect getTightGlobalBounds(const std::shared_ptr<PAGLayer>& pagLayer) const;
@@ -196,8 +207,10 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
   /**
    * Returns the displaying bounds of the given layer in surface coordinates, with the layer's full
    * on-screen transform (including animation and the display zoom/offset) applied. Returns an empty
-   * rectangle if the layer is null or does not belong to this scene. For the layer's untransformed
-   * local bounds, use PAGLayer::getBounds.
+   * rectangle if the layer is null or belongs to another scene. The membership check uses the scene
+   * recorded at layer construction and cannot detect a layer detached by a later structural rebuild,
+   * so callers must re-resolve handles after buildLayers() or notifyChange() rebuilds the tree. For
+   * the layer's untransformed local bounds, use PAGLayer::getBounds.
    * @param pagLayer a layer handle obtained from this scene (e.g. via getLayersUnderPoint).
    */
   Rect getGlobalBounds(const std::shared_ptr<PAGLayer>& pagLayer) const;
@@ -255,6 +268,12 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
   // Returns false if out is null. Used by PAGLayer::getGlobalMatrix to build the local-to-surface
   // matrix. Returned as a pagx Matrix to keep tgfx out of this header.
   bool rootToSurfaceMatrix(Matrix* out) const;
+
+  // Shared implementation of getGlobalBounds and getTightGlobalBounds. Picks the conservative
+  // layer bounds or the scrollRect-clipped rasterized bounds, then applies the root-to-surface
+  // transform. Returns an empty rect when the layer is null, belongs to another scene, or the
+  // tight path rejects a non-finite or oversized extent.
+  Rect boundsInSurface(const std::shared_ptr<PAGLayer>& pagLayer, bool tight) const;
 
   std::shared_ptr<PAGXDocument> document = nullptr;
   std::shared_ptr<PAGComposition> _rootComposition = nullptr;

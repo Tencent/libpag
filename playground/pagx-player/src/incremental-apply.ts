@@ -32,6 +32,56 @@ export interface ChannelEdit {
     value: string;
 }
 
+/** A model replacement expressed in pre-change physical line coordinates. */
+export interface DraftLineChange {
+    startLine: number;
+    endLine: number;
+    insertedLineCount: number;
+}
+
+/** Projects an accepted draft line replacement onto a source map. Entries wholly deleted or cut by
+ *  a multi-line replacement become unavailable instead of pointing at an unrelated surviving tag.
+ *  The caller owns rebuilding the projection from the authoritative runtime map. */
+export function applyDraftLineChange(entries: NodeSourceEntry[], change: DraftLineChange): void {
+    const removedLineCount = change.endLine - change.startLine;
+    const lineDelta = change.insertedLineCount - removedLineCount;
+    if (lineDelta === 0) {
+        return;
+    }
+    for (const entry of entries) {
+        if (entry.startLine <= 0) {
+            continue;
+        }
+        const endLine = entry.endLine > 0 ? entry.endLine : entry.startLine;
+        if (endLine < change.startLine) {
+            continue;
+        }
+        if (entry.startLine > change.endLine) {
+            entry.startLine += lineDelta;
+            if (entry.endLine > 0) {
+                entry.endLine += lineDelta;
+            }
+            continue;
+        }
+        if (removedLineCount > 0 && entry.startLine >= change.startLine &&
+            endLine <= change.endLine) {
+            entry.startLine = -1;
+            entry.endLine = -1;
+            continue;
+        }
+        if (entry.startLine <= change.startLine && endLine >= change.endLine) {
+            if (entry.endLine > 0) {
+                entry.endLine += lineDelta;
+            }
+            continue;
+        }
+        // A range boundary was cut but the node was not wholly removed. It has no reliable textual
+        // identity until Apply rebuilds the runtime map, so never map it incorrectly.
+        entry.startLine = -1;
+        entry.endLine = -1;
+    }
+}
+
 /** Documents above this many characters skip the incremental path: the classifier has to split
  *  both texts to diff them line by line, which on a large PAGX (hundreds of MB of inline images)
  *  copies the whole document twice to save a reparse that is comparable in cost. */
@@ -342,6 +392,24 @@ export function findNodeIndexForLine(sourceMap: readonly NodeSourceEntry[], line
     return bestIndex;
 }
 
+/** Hash index over a source map for the native-index -> entry lookup. getNodeSourceMap skips
+ *  mounted wrappers, so the array offset is not the node index and a positional read would target
+ *  the wrong node. Built with a single O(n) pass and no sort: the line/ancestry queries stay on the
+ *  original linear scans, which are cheaper than paying O(n log n) sorting on every draft change. */
+export class SourceMapIndex {
+    private readonly byIndex = new Map<number, NodeSourceEntry>();
+
+    constructor(entries: readonly NodeSourceEntry[]) {
+        for (const entry of entries) {
+            this.byIndex.set(entry.index, entry);
+        }
+    }
+
+    entryByIndex(index: number): NodeSourceEntry | null {
+        return this.byIndex.get(index) ?? null;
+    }
+}
+
 /** Classifies a text edit into a flat list of incremental channel writes, or null when it
  *  cannot go incremental. First-version constraints (each a null-return): the line count
  *  changed (would shift the cached source spans), a changed line lies outside any node, or a
@@ -360,9 +428,9 @@ export function classifyEdits(
     if (oldLines.length !== newLines.length) {
         return null;
     }
-    // Look up entries by their native index rather than the array position: the runtime
-    // guarantees Node::index equals the sourceMap array offset today, but a future getNodeSourceMap
-    // that filters entries (e.g. programmatic nodes) would break a positional access silently.
+    // Look up entries by their native index rather than the array position: getNodeSourceMap skips
+    // mounted composition wrappers, so the array offset is not the node index and a positional
+    // access would silently target the wrong node.
     const entryByIndex = new Map<number, NodeSourceEntry>();
     for (const entry of sourceMap) {
         entryByIndex.set(entry.index, entry);

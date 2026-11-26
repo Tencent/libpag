@@ -21,6 +21,7 @@
 #include "pagx/DataBindRuntime.h"
 #include "pagx/DataContext.h"
 #include "pagx/PAGAnimation.h"
+#include "pagx/PAGComposition.h"
 #include "pagx/PAGImage.h"
 #include "pagx/PAGLayer.h"
 #include "pagx/PAGStateMachine.h"
@@ -861,19 +862,7 @@ std::vector<std::shared_ptr<PAGLayer>> PAGScene::getLayersUnderPoint(float surfa
 }
 
 Rect PAGScene::getGlobalBounds(const std::shared_ptr<PAGLayer>& pagLayer) const {
-  if (pagLayer == nullptr || pagLayer->runtimeLayer == nullptr) {
-    return {};
-  }
-  auto scene = pagLayer->rootScene.lock();
-  if (scene.get() != this) {
-    return {};
-  }
-  auto* rootLayer = _rootComposition != nullptr ? _rootComposition->runtimeLayer.get() : nullptr;
-  auto rootBounds = pagLayer->runtimeLayer->getBounds(rootLayer);
-  Matrix rootToSurface = {};
-  rootToSurfaceMatrix(&rootToSurface);
-  auto surfaceBounds = ToTGFX(rootToSurface).mapRect(rootBounds);
-  return FromTGFX(surfaceBounds);
+  return boundsInSurface(pagLayer, false);
 }
 
 bool PAGScene::surfaceToRoot(float surfaceX, float surfaceY, float* rootX, float* rootY) const {
@@ -1059,11 +1048,12 @@ std::unique_ptr<tgfx::Recording> Record(tgfx::Context* context,
   return recording;
 }
 
-Rect PAGScene::getTightGlobalBounds(const std::shared_ptr<PAGLayer>& pagLayer) const {
+Rect PAGScene::boundsInSurface(const std::shared_ptr<PAGLayer>& pagLayer, bool tight) const {
   // getGlobalBounds' conservative envelope semantics are part of its published contract (existing
   // callers such as the wechat view's LRU eviction scoring and getImageBounds binding rely on it),
   // while editor-selection rects want tight bounds that hug the visible content. The two variants
-  // must stay separate so improving selection outlines never changes what existing hosts observe.
+  // share the prologue but not the bounds source, so improving selection outlines never changes
+  // what existing hosts observe.
   if (pagLayer == nullptr || pagLayer->runtimeLayer == nullptr) {
     return {};
   }
@@ -1072,14 +1062,46 @@ Rect PAGScene::getTightGlobalBounds(const std::shared_ptr<PAGLayer>& pagLayer) c
     return {};
   }
   auto* rootLayer = _rootComposition != nullptr ? _rootComposition->runtimeLayer.get() : nullptr;
-  // Tight bounds clipped to the layer's own scrollRect window, so selection outlines hug the
-  // visible content (per-glyph extents for text) instead of the conservative content envelope
-  // that Layer::getBounds returns by default.
-  auto rootBounds = ComputeRasterizedLayerBoundsInSpace(pagLayer->runtimeLayer, rootLayer);
+  tgfx::Rect rootBounds = {};
+  if (tight) {
+    // Tight bounds clipped to the layer's own scrollRect window, so selection outlines hug the
+    // visible content (per-glyph extents for text) instead of the conservative content envelope.
+    // The raster-bound helper rejects non-finite or oversized extents with an empty rect.
+    rootBounds = ComputeRasterizedLayerBoundsInSpace(pagLayer->runtimeLayer, rootLayer);
+  } else {
+    rootBounds = pagLayer->runtimeLayer->getBounds(rootLayer);
+  }
   Matrix rootToSurface = {};
   rootToSurfaceMatrix(&rootToSurface);
   auto surfaceBounds = ToTGFX(rootToSurface).mapRect(rootBounds);
   return FromTGFX(surfaceBounds);
+}
+
+Rect PAGScene::getTightGlobalBounds(const std::shared_ptr<PAGLayer>& pagLayer) const {
+  return boundsInSurface(pagLayer, true);
+}
+
+bool PAGScene::hasSpawnedTimelines() const {
+  if (_rootComposition == nullptr) {
+    return false;
+  }
+  // The root spawns no timelines itself, and compositions can be nested under plain layers, so the
+  // whole runtime tree has to be visited rather than just the root's direct children.
+  std::vector<std::shared_ptr<PAGLayer>> pending = {_rootComposition};
+  while (!pending.empty()) {
+    auto layer = pending.back();
+    pending.pop_back();
+    if (layer == nullptr) {
+      continue;
+    }
+    if (layer->layerType() == LayerType::Composition &&
+        static_cast<PAGComposition*>(layer.get())->hasTimelines()) {
+      return true;
+    }
+    const auto& children = layer->getChildren();
+    pending.insert(pending.end(), children.begin(), children.end());
+  }
+  return false;
 }
 
 }  // namespace pagx

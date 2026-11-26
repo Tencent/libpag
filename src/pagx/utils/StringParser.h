@@ -229,6 +229,16 @@ bool IsValidSelectorModeString(const std::string& str);
 std::string ColorToHexString(const Color& color, bool withAlpha = false);
 
 /**
+ * Parses a strict PAGX scalar: the entire string must be consumed, integers must fit in int without
+ * strtoll overflow, floats must be finite, and bools accept only the XML spellings. Returns false
+ * and leaves *outValue untouched on malformed input. Document import and incremental channel writes
+ * share these functions so the two paths cannot accept different grammars.
+ */
+bool ParseStrictFloat(const std::string& text, float* outValue);
+bool ParseStrictInt(const std::string& text, int* outValue);
+bool ParseStrictBool(const std::string& text, bool* outValue);
+
+/**
  * Parses a PAGX color attribute string into a Color. Accepts the three formats permitted by the
  * PAGX schema: hex (`#RGB`, `#RRGGBB`, `#RRGGBBAA`, sRGB), functional sRGB (`srgb(r, g, b[, a])`),
  * and Display P3 (`p3(r, g, b[, a])`). On success returns the parsed color and sets `*outValid` to
@@ -244,10 +254,9 @@ Color ParseColor(const std::string& str, bool* outValid = nullptr);
  * leading whitespace, a leading sign, a hex prefix, non-finite and negative values, and any
  * trailing characters (including whitespace around "%").
  *
- * Reserved here as the single XSD grammar for a future incremental channel writer, so an
- * incremental edit cannot accept input a full reparse would reject. The importer is currently the
- * only caller. Returns false on malformed input with both outputs NaN. The caller owns the
- * diagnostic.
+ * This is the single XSD grammar shared by the importer and the incremental channel writer, so an
+ * incremental edit cannot accept input a full reparse would reject. Returns false on malformed
+ * input with both outputs NaN. The caller owns the diagnostic.
  */
 bool ParseDimension(const std::string& raw, float* outAbsolute, float* outPercent);
 
