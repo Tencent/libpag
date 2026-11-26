@@ -1449,10 +1449,14 @@ PAG_TEST(PAGXHTML3DTest, CameraWrapperKeepsTwoEdgeConstraintsEquivalent) {
   EXPECT_TRUE(std::isnan(fill->centerY));
 
   doc->applyLayout();
-  EXPECT_FLOAT_EQ(fill->layoutWidth, 200.0f)
-      << "the two-edge span must keep the parent's width, not grow to 300px";
-  EXPECT_FLOAT_EQ(fill->layoutHeight, 100.0f)
-      << "the two-edge span must keep the parent's height, not grow to 150px";
+  // clang-format off
+  PAG_PRIVATE_ACCESS(
+    EXPECT_FLOAT_EQ(fill->layoutWidth, 200.0f)
+        << "the two-edge span must keep the parent's width, not grow to 300px";
+    EXPECT_FLOAT_EQ(fill->layoutHeight, 100.0f)
+        << "the two-edge span must keep the parent's height, not grow to 150px";
+  )
+  // clang-format on
   // Wrapper space -> parent space: the pinned rect still covers the parent box exactly.
   EXPECT_TRUE(NearlyEqual(wrapper->renderPosition().x + fill->renderPosition().x, 0.0f, 1e-4f));
   EXPECT_TRUE(NearlyEqual(wrapper->renderPosition().y + fill->renderPosition().y, 0.0f, 1e-4f));
@@ -3404,11 +3408,12 @@ PAG_TEST(PAGXHTML3DTest, LayerSizeRescuesAnUnresolvablePercentageOrigin) {
       << "no reference box and no layer: nothing to resolve against";
   EXPECT_TRUE(withoutLayer.valid) << "the declaration itself is legal";
 
-  pagx::Layer layer = {};
-  layer.width = 100.0f;
-  layer.height = 60.0f;
+  auto document = pagx::PAGXDocument::Make(canvasWidth, canvasHeight);
+  auto* layer = document->makeNode<pagx::Layer>();
+  layer->width = 100.0f;
+  layer->height = 60.0f;
   const pagx::HTMLElementAnchor withLayer =
-      pagx::ResolveElementAnchor("50% 50%", unknown, &layer, parser);
+      pagx::ResolveElementAnchor("50% 50%", unknown, layer, parser);
   ASSERT_TRUE(withLayer.resolved) << "the layer size is the last step of the fallback chain";
   EXPECT_TRUE(NearlyEqual(withLayer.point.x, 50.0f, 0.001f));
   EXPECT_TRUE(NearlyEqual(withLayer.point.y, 30.0f, 0.001f));
