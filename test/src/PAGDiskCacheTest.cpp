@@ -97,8 +97,6 @@ namespace pag {
 
 #ifdef PAG_TEST_ACCESS_PRIVATE
 namespace {
-static constexpr size_t InitialSequenceDiskSize = 568915u;
-
 static void ClearDiskCacheAndWait() {
   auto worker = DiskIOWorker::GetInstance();
   worker->waitAll();
@@ -132,6 +130,12 @@ static void ResetDiskCacheFixture(const std::string& cacheDir, size_t maxDiskSiz
   }
   DiskIOWorker::GetInstance()->waitAll();
 }
+
+#ifdef __APPLE__
+// The committed fixture under resources/disk/libpag was produced with the Apple system LZ4
+// (COMPRESSION_LZ4), which the other platforms' decoders cannot read, so this golden-size case
+// only runs where the fixture can be loaded.
+static constexpr size_t InitialSequenceDiskSize = 568915u;
 
 struct SequenceFileState {
   std::shared_ptr<PAGFile> pagFile = nullptr;
@@ -287,6 +291,7 @@ static void CheckSequenceFileReuseAndRelease(SequenceFileState& state,
   DiskIOWorker::GetInstance()->waitAll();
   EXPECT_FALSE(std::filesystem::exists(cacheDir + "/files/4.bin"));
 }
+#endif
 
 static void CheckSequenceFilePixels(const std::shared_ptr<SequenceFile>& sequenceFile,
                                     const tgfx::ImageInfo& info, int frameCount) {
@@ -307,6 +312,7 @@ static void CheckSequenceFilePixels(const std::shared_ptr<SequenceFile>& sequenc
 }
 }  // namespace
 
+#ifdef __APPLE__
 /**
  * 用例描述: 测试 SequenceFile 的磁盘缓存功能。
  */
@@ -323,6 +329,7 @@ PAG_PIXEL_TEST(PAGDiskCacheTest, SequenceFile) {
   ASSERT_NO_FATAL_FAILURE(CheckSequenceFileEviction(state, cacheDir));
   ASSERT_NO_FATAL_FAILURE(CheckSequenceFileReuseAndRelease(state, cacheDir));
 }
+#endif
 
 /**
  * 用例描述: 同一 key 在上一次的异步关闭任务尚未执行时被重新打开。重开的文件必须能看到已写入

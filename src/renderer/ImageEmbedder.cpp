@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "renderer/ImageEmbedder.h"
+#include <cctype>
 #include <fstream>
 #include <unordered_map>
 #include <vector>
@@ -27,6 +28,18 @@
 namespace pagx {
 
 static constexpr size_t MaxFileSize = 256 * 1024 * 1024;
+
+static bool IsUrlPath(const std::string& path) {
+  auto colon = path.find(':');
+  if (colon == std::string::npos) {
+    return false;
+  }
+  // A Windows drive letter ("C:\..." or "C:/...") is a local path, not a URL scheme.
+  if (colon == 1 && std::isalpha(static_cast<unsigned char>(path[0])) != 0) {
+    return false;
+  }
+  return true;
+}
 
 static std::shared_ptr<pagx::Data> ReadFileToData(const std::string& path) {
   std::ifstream in(path, std::ios::binary | std::ios::ate);
@@ -60,7 +73,7 @@ bool ImageEmbedder::embed(PAGXDocument* document) {
     }
     auto* image = static_cast<Image*>(node.get());
     const auto& path = image->filePath;
-    if (image->data != nullptr || path.empty() || path.find(':') != std::string::npos) {
+    if (image->data != nullptr || path.empty() || IsUrlPath(path)) {
       continue;
     }
     images.push_back(image);
