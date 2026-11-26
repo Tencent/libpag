@@ -26,7 +26,7 @@ Normal bugfix or feature request should be submitted to `main` branch.
 
 
 ### Make Pull Requests
-The code team will monitor all pull request, we run some code check and test on it. After all tests passed, we will accecpt this PR. 
+The code team will monitor all pull request, we run some code check and test on it. After all tests passed, we will accept this PR. 
 
 Before submitting a pull request, please make sure the followings are done:
 
