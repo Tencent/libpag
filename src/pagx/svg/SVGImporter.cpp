@@ -2425,9 +2425,9 @@ bool SVGParserContext::convertFilterElement(const std::shared_ptr<DOMNode>& filt
       }
     }
 
-    // Skia/Figma style shadow without SourceAlpha: feOffset (implicit input or
-    // SourceGraphic) -> feGaussianBlur -> [feColorMatrix]. The first primitive has no
-    // "in", so it offsets the source graphic itself instead of its alpha channel.
+    // Shadow chain without SourceAlpha: feOffset (implicit input or SourceGraphic) ->
+    // feGaussianBlur -> [feColorMatrix]. The first primitive has no "in", so it offsets the
+    // source graphic itself instead of its alpha channel.
     if (node->name == "feOffset") {
       const std::string offsetIn = getAttribute(node, "in");
       const bool offsetsSource = offsetIn.empty() || offsetIn == "SourceGraphic";
@@ -2470,7 +2470,7 @@ bool SVGParserContext::convertFilterElement(const std::shared_ptr<DOMNode>& filt
         auto& prevNode = primitives[i - 1];
         const std::string prevIn = prevNode->name == "feBlend" ? getAttribute(prevNode, "in") : "";
         if (prevNode->name == "feBlend" && (prevIn.empty() || prevIn == "SourceGraphic")) {
-          // feBlend 缺省 in 即 SourceGraphic；Figma 前景模糊就挂在这类 blend 之后。
+          // feBlend 缺省 in 即 SourceGraphic；前景模糊就挂在这类 blend 之后。
           isSourceGraphic = true;
         }
       }

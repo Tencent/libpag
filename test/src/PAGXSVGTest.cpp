@@ -7604,11 +7604,11 @@ static pagx::Layer* FindLayerWithFilters(pagx::Layer* layer) {
 }
 
 /**
- * Figma can emit one filter containing an outer drop shadow, an inner shadow and a final
- * foreground blur. The inner shadow chain uses feComposite operator="arithmetic" after the blur;
+ * One SVG filter can combine an outer drop shadow, an inner shadow and a final foreground
+ * blur. The inner shadow chain uses feComposite operator="arithmetic" after the blur;
  * the foreground blur follows a feBlend whose "in" is omitted (implicit SourceGraphic).
  */
-PAGX_TEST(PAGXSVGTest, SVGImport_FigmaDropShadowInnerShadowForegroundBlur) {
+PAGX_TEST(PAGXSVGTest, SVGImport_DropShadowInnerShadowForegroundBlur) {
   std::string svg =
       "<svg width=\"364\" height=\"364\" viewBox=\"0 0 364 364\" fill=\"none\">"
       "<g filter=\"url(#f)\">"
@@ -7674,10 +7674,10 @@ PAGX_TEST(PAGXSVGTest, SVGImport_FigmaDropShadowInnerShadowForegroundBlur) {
 
 
 /**
- * Figma Duo noise: feTurbulence -> two thresholded alpha bands filled with two flood colors and
+ * Duo noise: feTurbulence -> two thresholded alpha bands filled with two flood colors and
  * merged over the shape. Maps to NoiseFilter mode=Duo.
  */
-PAGX_TEST(PAGXSVGTest, SVGImport_FigmaDuoNoise) {
+PAGX_TEST(PAGXSVGTest, SVGImport_DuoNoise) {
   std::string svg =
       "<svg width=\"50\" height=\"50\"><g filter=\"url(#n)\">"
       "<rect width=\"50\" height=\"50\" fill=\"#D9D9D9\"/></g>"
@@ -7719,10 +7719,10 @@ PAGX_TEST(PAGXSVGTest, SVGImport_FigmaDuoNoise) {
 }
 
 /**
- * Figma Multi noise: feTurbulence RGB with contrast, discrete alpha band, final alpha table that
+ * Multi noise: feTurbulence RGB with contrast, discrete alpha band, final alpha table that
  * sets the noise opacity. Maps to NoiseFilter mode=Multi with the table's second value as opacity.
  */
-PAGX_TEST(PAGXSVGTest, SVGImport_FigmaMultiNoise) {
+PAGX_TEST(PAGXSVGTest, SVGImport_MultiNoise) {
   std::string svg =
       "<svg width=\"50\" height=\"50\"><g filter=\"url(#n)\">"
       "<rect width=\"50\" height=\"50\" fill=\"#D9D9D9\"/></g>"

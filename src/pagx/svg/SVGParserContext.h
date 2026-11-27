@@ -212,8 +212,8 @@ class SVGParserContext {
   std::pair<float, float> parseFilterBlur(const std::shared_ptr<DOMNode>& node);
   Color parseFilterColorMatrix(const std::shared_ptr<DOMNode>& node);
 
-  // Converts a Figma/exporter-style feTurbulence noise filter. Returns true when the filter is
-  // fully represented by one NoiseFilter and the remaining primitives should not be parsed again.
+  // Converts an feTurbulence-based noise filter (noise bands plus optional flood colors).
+  // Returns true when the filter is fully represented by one NoiseFilter.
   bool convertNoiseFilter(const std::vector<std::shared_ptr<DOMNode>>& primitives,
                           std::vector<LayerFilter*>& filters);
 
