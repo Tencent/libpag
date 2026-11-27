@@ -34,12 +34,6 @@ std::string GetUriScheme(const std::string& path);
 bool HasUriScheme(const std::string& path);
 
 /**
- * Returns true when `path` is a `data:` URI. The scheme name is compared case-insensitively, as
- * required by RFC 3986.
- */
-bool IsDataUri(const std::string& path);
-
-/**
  * Returns true for paths that can be joined to a base directory: non-empty, no URI scheme, not
  * rooted (POSIX, UNC or Windows drive), and without a Windows drive prefix.
  */

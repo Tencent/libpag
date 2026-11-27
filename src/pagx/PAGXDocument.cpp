@@ -42,6 +42,7 @@
 #include "pagx/nodes/Text.h"
 #include "pagx/nodes/TextBox.h"
 #include "pagx/nodes/TextPath.h"
+#include "pagx/utils/Base64.h"
 #include "pagx/utils/ImportFormat.h"
 #include "pagx/utils/ImportResources.h"
 #include "pagx/utils/ResourcePath.h"

@@ -23,6 +23,7 @@
 #include <system_error>
 #include <vector>
 #include "pagx/nodes/Image.h"
+#include "pagx/utils/Base64.h"
 #include "pagx/utils/ResourcePath.h"
 
 namespace pagx::cli {

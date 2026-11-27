@@ -42,6 +42,7 @@
 #include "pagx/runtime/Matrix3DDecompose.h"
 #include "pagx/svg/SVGFeatureProbe.h"
 #include "pagx/svg/SVGPathParser.h"
+#include "pagx/utils/Base64.h"
 #include "pagx/utils/ExporterUtils.h"
 #include "pagx/utils/ImageFormatUtils.h"
 #include "pagx/utils/ImageMime.h"

@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "pagx/utils/ResourcePath.h"
-#include "pagx/utils/StringUtils.h"
 
 namespace pagx {
 namespace {
@@ -62,10 +61,6 @@ std::string GetUriScheme(const std::string& path) {
 
 bool HasUriScheme(const std::string& path) {
   return !GetUriScheme(path).empty();
-}
-
-bool IsDataUri(const std::string& path) {
-  return ToLowerAscii(GetUriScheme(path)) == "data";
 }
 
 bool IsRelativeFilePath(const std::string& path) {
