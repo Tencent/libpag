@@ -23,6 +23,8 @@
 #include "tgfx/core/ImageBuffer.h"
 
 namespace pag {
+struct FrameRead;
+
 class VideoDecoder {
  public:
   virtual ~VideoDecoder();
@@ -60,6 +62,12 @@ class VideoDecoder {
    * Returns decoded video frame to render.
    */
   virtual std::shared_ptr<tgfx::ImageBuffer> onRenderFrame() = 0;
+
+  /** Returns optional read constraints and delivery metadata for the last rendered buffer. A null
+   * result means that the decoder does not expose deferred texture delivery through ImageReader. */
+  virtual std::shared_ptr<FrameRead> getFrameRead() {
+    return nullptr;
+  }
 
   /**
    * Returns current presentation time.

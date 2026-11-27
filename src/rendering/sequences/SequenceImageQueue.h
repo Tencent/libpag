@@ -30,7 +30,7 @@ class SequenceImageQueue {
                                                       PAGLayer* pagLayer, bool useDiskCache);
 
   /**
-   * Prepares the image of the next frame.
+   * Prepares the next frame only after the current request delivered valid content.
    */
   void prepareNextImage();
 
@@ -48,9 +48,11 @@ class SequenceImageQueue {
   /**
    * Returns the last cached Image without triggering any decoding. This is used while the sequence
    * is in a retry cooldown, so the last decoded frame (which may be a fallback frame from a failed
-   * decode) can stay on screen instead of flashing a transparent frame.
+   * decode) can stay on screen instead of flashing a transparent frame. Pending, expired, failed,
+   * or generation-invalid images are not usable cached deliveries.
    */
-  std::shared_ptr<tgfx::Image> getCachedImage(Frame targetFrame);
+  std::shared_ptr<tgfx::Image> getCachedImage(
+      Frame targetFrame, std::shared_ptr<SequenceReadResult>* result = nullptr);
 
   void invalidateFailedRequest(uint64_t requestID, Frame targetFrame);
 

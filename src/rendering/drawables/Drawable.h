@@ -41,6 +41,12 @@ class Drawable {
 
   virtual void setTimeStamp(int64_t timestamp);
 
+  /** Returns whether accepted pixels need a separate GPU copy before presentation. */
+  virtual bool needsPresentationCopy() const;
+
+  /** Prepares accepted pixels for presentation without submitting any GPU commands. */
+  virtual bool preparePresent(tgfx::Context* context);
+
   virtual void present(tgfx::Context* context);
 
   virtual void updateSize();

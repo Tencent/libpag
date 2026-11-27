@@ -65,6 +65,9 @@ class StaticSequenceGenerator : public tgfx::ImageGenerator {
                           int height, bool useDiskCache, std::shared_ptr<SequenceReadResult> result)
       : tgfx::ImageGenerator(width, height), file(std::move(file)), info(info),
         useDiskCache(useDiskCache), result(std::move(result)) {
+    if (info->isVideo()) {
+      reader = info->makeReader(this->file, nullptr, useDiskCache);
+    }
   }
 
   bool isAlphaOnly() const override {
@@ -79,19 +82,24 @@ class StaticSequenceGenerator : public tgfx::ImageGenerator {
 
  protected:
   std::shared_ptr<tgfx::ImageBuffer> onMakeBuffer(bool) const override {
-    auto reader = info->makeReader(file, nullptr, useDiskCache);
-    if (reader == nullptr) {
+    auto sourceReader = reader;
+    if (!info->isVideo()) {
+      sourceReader = info->makeReader(file, nullptr, useDiskCache);
+    }
+    if (sourceReader == nullptr) {
       if (result != nullptr) {
         result->status.store(SequenceReadStatus::Failed, std::memory_order_release);
       }
       return nullptr;
     }
-    return reader->readBuffer(0, result);
+    return sourceReader->readBuffer(0, result);
   }
 
  private:
   std::shared_ptr<File> file = nullptr;
   std::shared_ptr<SequenceInfo> info = nullptr;
+  // Deferred video delivery must retain its source until the generator is released.
+  std::shared_ptr<SequenceReader> reader = nullptr;
   bool useDiskCache = false;
   std::shared_ptr<SequenceReadResult> result = nullptr;
 };

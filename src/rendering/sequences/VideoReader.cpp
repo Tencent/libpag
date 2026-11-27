@@ -69,24 +69,62 @@ std::shared_ptr<tgfx::ImageBuffer> VideoReader::onMakeBuffer(
   // example while an iOS app is inactive, where hardware decoding fast-fails until the app
   // becomes active again.
   auto fallbackBuffer = lastBuffer;
+  auto fallbackFrameRead = lastFrameRead;
+  auto targetTime = FrameToTime(targetFrame, frameRate);
+  auto sampleTime = demuxer->getSampleTimeAt(targetTime);
+  if (fallbackFrameRead != nullptr && fallbackFrameRead->options->targetTimestamp >= 0 &&
+      sampleTime != currentRenderedTime) {
+    // A previous acquisition validates its own sample, not a failed request for another sample.
+    // Leave the original credential untouched and withhold verification from this fallback.
+    auto mismatchedRead = std::make_shared<FrameRead>();
+    mismatchedRead->buffer = fallbackFrameRead->buffer;
+    mismatchedRead->sourceGeneration = fallbackFrameRead->sourceGeneration;
+    mismatchedRead->generation = fallbackFrameRead->generation;
+    mismatchedRead->options->targetTimestamp = fallbackFrameRead->options->targetTimestamp;
+    fallbackFrameRead = std::move(mismatchedRead);
+  }
   if (tgfx::Clock::Now() >= deadline) {
-    return keepFallbackBuffer(std::move(fallbackBuffer), result);
+    return keepFallbackBuffer(std::move(fallbackBuffer), fallbackFrameRead, result);
   }
   if (fallbackPending) {
     destroyVideoDecoder();
     factoryIndex++;
     fallbackPending = false;
   }
-  auto targetTime = FrameToTime(targetFrame, frameRate);
-  auto sampleTime = demuxer->getSampleTimeAt(targetTime);
   if (sampleTime == currentRenderedTime) {
-    return lastBuffer;
+    if (lastFrameRead != nullptr && !lastFrameRead->isCurrent()) {
+      currentDecodedTime = INT64_MIN;
+    } else if (lastFrameRead != nullptr && lastBuffer != nullptr) {
+      auto frameStatus = lastBuffer->status();
+      if (lastBuffer->expired() || frameStatus == tgfx::ImageBufferStatus::Expired ||
+          frameStatus == tgfx::ImageBufferStatus::Timeout ||
+          frameStatus == tgfx::ImageBufferStatus::Failed ||
+          (frameStatus == tgfx::ImageBufferStatus::Ready && !lastFrameRead->matchesTarget())) {
+        // The codec output has already been released. A new buffer allows another native read
+        // without releasing the output twice or decoding the same sample again.
+        if (renderFrame(result) != nullptr) {
+          return lastBuffer;
+        }
+      } else if (frameStatus == tgfx::ImageBufferStatus::Pending ||
+                 lastFrameRead->matchesTarget()) {
+        if (result != nullptr) {
+          result->setFrameRead(lastFrameRead);
+        }
+        return lastBuffer;
+      }
+      currentDecodedTime = INT64_MIN;
+    } else if (lastBuffer != nullptr && lastBuffer->status() == tgfx::ImageBufferStatus::Ready &&
+               !lastBuffer->expired()) {
+      return lastBuffer;
+    } else {
+      currentDecodedTime = INT64_MIN;
+    }
   }
   lastBuffer = nullptr;
   currentRenderedTime = INT64_MIN;
   if (tgfx::Clock::Now() >= deadline || !checkVideoDecoder(deadline) ||
       tgfx::Clock::Now() >= deadline) {
-    return keepFallbackBuffer(std::move(fallbackBuffer), result);
+    return keepFallbackBuffer(std::move(fallbackBuffer), fallbackFrameRead, result);
   }
   auto status = decodeFrame(sampleTime, deadline);
   if (status == DecodeStatus::Error && tgfx::Clock::Now() < deadline) {
@@ -103,7 +141,7 @@ std::shared_ptr<tgfx::ImageBuffer> VideoReader::onMakeBuffer(
   }
   if (status == DecodeStatus::Stalled) {
     fallbackPending = true;
-    return keepFallbackBuffer(std::move(fallbackBuffer), result);
+    return keepFallbackBuffer(std::move(fallbackBuffer), fallbackFrameRead, result);
   }
   if (status != DecodeStatus::Success) {
     // A platform call may return an error only after crossing the deadline. Defer fallback to the
@@ -112,34 +150,56 @@ std::shared_ptr<tgfx::ImageBuffer> VideoReader::onMakeBuffer(
       fallbackPending = true;
     }
     LOGE("VideoDecoder: Error on decoding frame.\n");
-    return keepFallbackBuffer(std::move(fallbackBuffer), result);
+    return keepFallbackBuffer(std::move(fallbackBuffer), fallbackFrameRead, result);
   }
   if (!outputEndOfStream) {
     if (tgfx::Clock::Now() >= deadline) {
       fallbackPending = true;
-      return keepFallbackBuffer(std::move(fallbackBuffer), result);
+      return keepFallbackBuffer(std::move(fallbackBuffer), fallbackFrameRead, result);
     }
-    lastBuffer = videoDecoder->onRenderFrame();
+    renderFrame(result);
     if (lastBuffer) {
       currentRenderedTime = currentDecodedTime;
     } else {
       fallbackPending = true;
-      return keepFallbackBuffer(std::move(fallbackBuffer), result);
+      return keepFallbackBuffer(std::move(fallbackBuffer), fallbackFrameRead, result);
     }
   }
   if (lastBuffer == nullptr) {
-    return keepFallbackBuffer(std::move(fallbackBuffer), result);
+    return keepFallbackBuffer(std::move(fallbackBuffer), fallbackFrameRead, result);
+  }
+  return lastBuffer;
+}
+
+std::shared_ptr<tgfx::ImageBuffer> VideoReader::renderFrame(
+    const std::shared_ptr<SequenceReadResult>& result) {
+  lastBuffer = videoDecoder->onRenderFrame();
+  lastFrameRead = videoDecoder->getFrameRead();
+  if (lastFrameRead == nullptr) {
+    lastFrameRead = std::make_shared<FrameRead>();
+    lastFrameRead->buffer = lastBuffer;
+  }
+  if (result != nullptr) {
+    result->setFrameRead(lastFrameRead);
   }
   return lastBuffer;
 }
 
 std::shared_ptr<tgfx::ImageBuffer> VideoReader::keepFallbackBuffer(
-    std::shared_ptr<tgfx::ImageBuffer> fallbackBuffer,
+    std::shared_ptr<tgfx::ImageBuffer> fallbackBuffer, std::shared_ptr<FrameRead> fallbackFrameRead,
     const std::shared_ptr<SequenceReadResult>& result) {
-  // Store the fallback buffer back so consecutive failing requests keep returning the last
-  // visible frame until decoding succeeds again.
+  if (fallbackBuffer == nullptr || fallbackBuffer->status() != tgfx::ImageBufferStatus::Ready ||
+      fallbackBuffer->expired() ||
+      (fallbackFrameRead != nullptr && !fallbackFrameRead->isCurrent())) {
+    lastBuffer = nullptr;
+    lastFrameRead = nullptr;
+    return nullptr;
+  }
+  // Only a delivered, current buffer can preserve the last visible frame across decode failures.
   lastBuffer = std::move(fallbackBuffer);
-  if (lastBuffer != nullptr && result != nullptr) {
+  lastFrameRead = std::move(fallbackFrameRead);
+  if (result != nullptr) {
+    result->setFrameRead(lastFrameRead);
     // The buffer holds a previously decoded frame instead of the requested one. Report it as a
     // fallback so consumers (the disk sequence cache, the retry throttling and the same-frame
     // cache) don't treat this read as a real decode success.
@@ -260,6 +320,7 @@ void VideoReader::destroyVideoDecoder() {
   delete videoDecoder;
   videoDecoder = nullptr;
   lastBuffer = nullptr;
+  lastFrameRead = nullptr;
   currentRenderedTime = INT64_MIN;
   resetParams();
 }

@@ -48,6 +48,9 @@ class CompositionReader {
 
   bool readFrame(double progress, std::shared_ptr<BitmapBuffer> bitmap);
 
+  /** Returns whether the last read is waiting for a video texture rather than a decode retry. */
+  bool hasPendingFrame();
+
  private:
   std::mutex locker = {};
   PAGPlayer* pagPlayer = nullptr;

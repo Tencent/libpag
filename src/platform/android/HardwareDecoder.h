@@ -23,6 +23,7 @@
 #include "android/native_window_jni.h"
 #include "media/NdkMediaCodec.h"
 #include "media/NdkMediaFormat.h"
+#include "platform/android/CodecTimeline.h"
 #include "platform/android/JVideoSurface.h"
 #include "rendering/video/VideoDecoder.h"
 #include "tgfx/platform/android/SurfaceTextureReader.h"
@@ -44,10 +45,15 @@ class HardwareDecoder : public VideoDecoder {
 
   std::shared_ptr<tgfx::ImageBuffer> onRenderFrame() override;
 
+  std::shared_ptr<FrameRead> getFrameRead() override;
+
   bool releaseOutputBuffer(bool render);
 
  private:
   bool isValid = false;
+  CodecTimeline timeline;
+  int64_t outputPresentationTime = 0;
+  bool outputEndPending = false;
 
   // AMediaCodec_start(原decoder.start)
   // AMediaCodec_flush(原decoder.flush)
@@ -56,6 +62,7 @@ class HardwareDecoder : public VideoDecoder {
   bool disableFlush = true;
 
   std::shared_ptr<tgfx::SurfaceTextureReader> imageReader = nullptr;
+  std::shared_ptr<FrameRead> frameRead = nullptr;
   Global<jobject> videoSurface = {};
   AMediaCodec* videoDecoder = nullptr;
   ANativeWindow* nativeWindow = nullptr;

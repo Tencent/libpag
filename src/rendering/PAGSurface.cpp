@@ -36,6 +36,47 @@
 
 namespace pag {
 
+static std::unique_ptr<tgfx::Recording> Flush(tgfx::Context* context,
+                                              BackendSemaphore* signalSemaphore) {
+  if (signalSemaphore == nullptr) {
+    return context->flush();
+  }
+  tgfx::BackendSemaphore semaphore = {};
+  auto recording = context->flush(&semaphore);
+  // The context hands back a semaphore for whichever backend it was built on. Every tgfx
+  // backend enum is listed explicitly (no default), so adding a new tgfx backend without
+  // handling it here fails -Wswitch at compile time instead of silently dropping the semaphore.
+  switch (semaphore.backend()) {
+    case tgfx::Backend::OpenGL: {
+      tgfx::GLSyncInfo glInfo = {};
+      if (semaphore.getGLSync(&glInfo)) {
+        signalSemaphore->initGL(glInfo.sync);
+      }
+      break;
+    }
+    case tgfx::Backend::Metal:
+      // BackendSemaphore currently only wraps GL sync objects, so a Metal semaphore cannot be
+      // forwarded through the public API yet. The caller's semaphore stays uninitialized.
+      break;
+    case tgfx::Backend::Unknown:
+      // The flush produced nothing to synchronize on, so the context left the semaphore
+      // default-constructed. The caller's semaphore simply stays uninitialized — not an error,
+      // and logging it would fire on every frame.
+      break;
+    case tgfx::Backend::WebGPU:
+      // WebGPU has no cross-queue synchronization objects (WebGPUSyncInfo is empty); the
+      // queue's submission order already provides the ordering a semaphore would express,
+      // so there is nothing to forward.
+      break;
+    case tgfx::Backend::Vulkan:
+    case tgfx::Backend::D3D12:
+      // These backends have no BackendSemaphore ABI; the caller should use
+      // waitUntilCompleted() instead. Leaving the semaphore uninitialized is expected.
+      break;
+  }
+  return recording;
+}
+
 static ReadbackStatus ToPAGReadbackStatus(tgfx::ReadbackStatus status) {
   switch (status) {
     case tgfx::ReadbackStatus::Ready:
@@ -174,8 +215,15 @@ bool PAGSurface::clearAll() {
   contentVersion = 0;  // 清空画布后 contentVersion 还原为初始值 0.
   auto canvas = surface->getCanvas();
   canvas->clear();
-  context->flush();
+  context->flushAndSubmit();
   drawable->setTimeStamp(0);
+  if (!drawable->preparePresent(context)) {
+    unlockContext();
+    return false;
+  }
+  if (drawable->needsPresentationCopy()) {
+    context->flushAndSubmit();
+  }
   drawable->present(context);
   unlockContext();
   return true;
@@ -326,7 +374,6 @@ bool PAGSurface::draw(RenderCache* cache, std::shared_ptr<Graphic> graphic,
     unlockContext();
     return false;
   }
-  contentVersion = cache->getContentVersion();
   cache->clearSequenceCacheInvalidation();
   cache->attachToContext(context);
   auto canvas = surface->getCanvas();
@@ -334,49 +381,30 @@ bool PAGSurface::draw(RenderCache* cache, std::shared_ptr<Graphic> graphic,
     canvas->clear();
   }
   onDraw(graphic, surface, cache);
-  std::unique_ptr<tgfx::Recording> recording = nullptr;
-  if (signalSemaphore == nullptr) {
-    recording = context->flush();
-  } else {
-    tgfx::BackendSemaphore semaphore = {};
-    recording = context->flush(&semaphore);
-    // The context hands back a semaphore for whichever backend it was built on. Every tgfx
-    // backend enum is listed explicitly (no default), so adding a new tgfx backend without
-    // handling it here fails -Wswitch at compile time instead of silently dropping the semaphore.
-    switch (semaphore.backend()) {
-      case tgfx::Backend::OpenGL: {
-        tgfx::GLSyncInfo glInfo = {};
-        if (semaphore.getGLSync(&glInfo)) {
-          signalSemaphore->initGL(glInfo.sync);
-        }
-        break;
-      }
-      case tgfx::Backend::Metal:
-        // BackendSemaphore currently only wraps GL sync objects, so a Metal semaphore cannot be
-        // forwarded through the public API yet. The caller's semaphore stays uninitialized.
-        break;
-      case tgfx::Backend::Unknown:
-        // The flush produced nothing to synchronize on, so the context left the semaphore
-        // default-constructed. The caller's semaphore simply stays uninitialized — not an error,
-        // and logging it would fire on every frame.
-        break;
-      case tgfx::Backend::WebGPU:
-        // WebGPU has no cross-queue synchronization objects (WebGPUSyncInfo is empty); the
-        // queue's submission order already provides the ordering a semaphore would express,
-        // so there is nothing to forward.
-        break;
-      case tgfx::Backend::Vulkan:
-      case tgfx::Backend::D3D12:
-        // These backends have no BackendSemaphore ABI; the caller should use
-        // waitUntilCompleted() instead. Leaving the semaphore uninitialized is expected.
-        break;
-    }
-  }
+  auto needsPresentationCopy = drawable->needsPresentationCopy();
+  auto recording = Flush(context, needsPresentationCopy ? nullptr : signalSemaphore);
   cache->detachFromContext();
+  cache->prepareSequenceFrameReads();
   context->submit(std::move(recording));
-  cache->prepareNextFrame();
+  cache->checkSequenceDecodeFailure();
+  if (cache->hasSequenceFramePending() || cache->hasSequenceFrameUnavailable() ||
+      (cache->waitsForSequenceFrames() && cache->hasSequenceDecodeFailure())) {
+    unlockContext();
+    return false;
+  }
   drawable->setTimeStamp(pagPlayer->getTimeStampInternal());
+  if (!drawable->preparePresent(context)) {
+    contentVersion = 0;
+    unlockContext();
+    return false;
+  }
+  if (needsPresentationCopy) {
+    // Create the caller-owned semaphore only for an accepted window-copy submission.
+    context->submit(Flush(context, signalSemaphore));
+  }
+  contentVersion = cache->getContentVersion();
   drawable->present(context);
+  cache->prepareNextFrame();
   unlockContext();
   return true;
 }

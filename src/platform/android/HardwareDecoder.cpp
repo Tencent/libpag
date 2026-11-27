@@ -18,18 +18,20 @@
 
 #include "HardwareDecoder.h"
 #include "base/utils/Log.h"
+#include "rendering/video/FrameRead.h"
 #include "tgfx/core/Buffer.h"
-#include "tgfx/core/Task.h"
 
 namespace pag {
 
 static const int TIMEOUT_US = 1000;
 
-HardwareDecoder::HardwareDecoder(const VideoFormat& format) {
-  isValid = initDecoder(format);
+HardwareDecoder::HardwareDecoder(const VideoFormat& format) : timeline(format.duration) {
+  isValid = timeline.isValid() && initDecoder(format);
 }
 
 HardwareDecoder::~HardwareDecoder() {
+  timeline.invalidate();
+  frameRead = nullptr;
   releaseOutputBuffer(false);
   if (videoDecoder != nullptr) {
     media_status_t status;
@@ -175,6 +177,10 @@ bool HardwareDecoder::initDecoder(const VideoFormat& format) {
 }
 
 DecodingResult HardwareDecoder::onSendBytes(void* bytes, size_t length, int64_t time) {
+  int64_t codecTime = 0;
+  if (!isValid || !timeline.encode(time, &codecTime)) {
+    return DecodingResult::Error;
+  }
   ssize_t inputBufferIndex = AMediaCodec_dequeueInputBuffer(videoDecoder, TIMEOUT_US);
   size_t outsize;
   if (inputBufferIndex >= 0) {
@@ -184,7 +190,7 @@ DecodingResult HardwareDecoder::onSendBytes(void* bytes, size_t length, int64_t 
       return pag::DecodingResult::Error;
     }
     memcpy(inputBuffer, bytes, length);
-    if (AMediaCodec_queueInputBuffer(videoDecoder, inputBufferIndex, 0, length, time, 0) !=
+    if (AMediaCodec_queueInputBuffer(videoDecoder, inputBufferIndex, 0, length, codecTime, 0) !=
         AMEDIA_OK) {
       LOGE("HardwareDecoder: Error on queuing input buffer in onSendBytes.\n");
       return pag::DecodingResult::Error;
@@ -196,41 +202,59 @@ DecodingResult HardwareDecoder::onSendBytes(void* bytes, size_t length, int64_t 
 }
 
 DecodingResult HardwareDecoder::onDecodeFrame() {
+  if (!isValid) {
+    return DecodingResult::Error;
+  }
   releaseOutputBuffer(false);
+  if (outputEndPending) {
+    return DecodingResult::EndOfStream;
+  }
   ssize_t outputBufferIndex = AMediaCodec_dequeueOutputBuffer(videoDecoder, bufferInfo, TIMEOUT_US);
-  if ((bufferInfo->flags & AMEDIACODEC_BUFFER_FLAG_END_OF_STREAM) != 0) {
-    if (outputBufferIndex >= 0) {
-      lastOutputBufferIndex = outputBufferIndex;
-    }
-    return pag::DecodingResult::EndOfStream;
+  if (outputBufferIndex < 0) {
+    return DecodingResult::TryAgainLater;
   }
-  if (outputBufferIndex >= 0) {
-    lastOutputBufferIndex = outputBufferIndex;
+  lastOutputBufferIndex = outputBufferIndex;
+  auto endOfStream = (bufferInfo->flags & AMEDIACODEC_BUFFER_FLAG_END_OF_STREAM) != 0;
+  if (!CodecTimeline::hasImage(endOfStream, bufferInfo->size)) {
+    releaseOutputBuffer(false);
+    return DecodingResult::EndOfStream;
   }
-
-  return lastOutputBufferIndex != -1 ? pag::DecodingResult::Success
-                                     : pag::DecodingResult::TryAgainLater;
+  if (!timeline.decode(bufferInfo->presentationTimeUs, &outputPresentationTime)) {
+    releaseOutputBuffer(false);
+    return DecodingResult::TryAgainLater;
+  }
+  outputEndPending = endOfStream;
+  return DecodingResult::Success;
 }
 
 void HardwareDecoder::onFlush() {
   if (disableFlush) {
     return;
   }
+  frameRead = nullptr;
+  if (!timeline.restart()) {
+    isValid = false;
+  }
   if (AMediaCodec_flush(videoDecoder) != AMEDIA_OK) {
+    timeline.invalidate();
+    isValid = false;
     LOGE("HardwareDecoder: Error on Decoder Flush.");
   }
-
   bufferInfo->flags = 0;
   bufferInfo->presentationTimeUs = 0;
-
+  outputPresentationTime = 0;
+  outputEndPending = false;
   lastOutputBufferIndex = -1;
 }
 
 int64_t HardwareDecoder::presentationTime() {
-  return bufferInfo->presentationTimeUs;
+  return outputPresentationTime;
 }
 
 DecodingResult HardwareDecoder::onEndOfStream() {
+  if (!isValid) {
+    return DecodingResult::Error;
+  }
   ssize_t inputBufferIndex = AMediaCodec_dequeueInputBuffer(videoDecoder, TIMEOUT_US);
   if (inputBufferIndex >= 0) {
     if (AMediaCodec_queueInputBuffer(videoDecoder, inputBufferIndex, 0, 0, 0,
@@ -245,11 +269,31 @@ DecodingResult HardwareDecoder::onEndOfStream() {
 }
 
 std::shared_ptr<tgfx::ImageBuffer> HardwareDecoder::onRenderFrame() {
-  bool result = releaseOutputBuffer(true);
-  if (!result) {
+  if (!isValid) {
     return nullptr;
   }
-  return imageReader->acquireNextBuffer();
+  auto previousRead = frameRead;
+  auto hasOutput = lastOutputBufferIndex != -1;
+  if (!hasOutput && (previousRead == nullptr || !previousRead->isCurrent())) {
+    return nullptr;
+  }
+  auto timestamp =
+      hasOutput ? bufferInfo->presentationTimeUs * 1000 : previousRead->options->targetTimestamp;
+  if (hasOutput && !releaseOutputBuffer(true)) {
+    frameRead = nullptr;
+    return nullptr;
+  }
+  frameRead = std::make_shared<FrameRead>();
+  frameRead->sourceGeneration = timeline.generation;
+  frameRead->generation = timeline.generation->load(std::memory_order_acquire);
+  frameRead->options->targetTimestamp = timestamp;
+  frameRead->verifiedTargetTimestamp = timestamp;
+  frameRead->buffer = imageReader->acquireNextBuffer(timestamp);
+  return frameRead->buffer;
+}
+
+std::shared_ptr<FrameRead> HardwareDecoder::getFrameRead() {
+  return frameRead;
 }
 
 bool HardwareDecoder::releaseOutputBuffer(bool render) {

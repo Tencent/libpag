@@ -43,6 +43,9 @@ class DiskIOWorker {
  public:
   static DiskIOWorker* GetInstance();
 
+  /** Separate serial worker for bounded frame compression. Never executes submitted work inline. */
+  static DiskIOWorker* GetFrameCacheInstance();
+
   ~DiskIOWorker();
 
   /**

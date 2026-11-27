@@ -71,6 +71,7 @@ class VideoReader : public SequenceReader {
   VideoDecoder* videoDecoder = nullptr;
   VideoSample videoSample = {};
   std::shared_ptr<tgfx::ImageBuffer> lastBuffer = nullptr;
+  std::shared_ptr<FrameRead> lastFrameRead = nullptr;
   bool outputEndOfStream = false;
   bool inputEndOfStream = false;
   int64_t currentDecodedTime = INT64_MIN;
@@ -89,8 +90,11 @@ class VideoReader : public SequenceReader {
 
   DecodeStatus decodeFrame(int64_t sampleTime, int64_t deadline);
 
+  std::shared_ptr<tgfx::ImageBuffer> renderFrame(const std::shared_ptr<SequenceReadResult>& result);
+
   std::shared_ptr<tgfx::ImageBuffer> keepFallbackBuffer(
       std::shared_ptr<tgfx::ImageBuffer> fallbackBuffer,
+      std::shared_ptr<FrameRead> fallbackFrameRead,
       const std::shared_ptr<SequenceReadResult>& result);
 
   std::unique_ptr<VideoDecoder> makeVideoDecoder(int64_t deadline);

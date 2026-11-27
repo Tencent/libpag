@@ -24,8 +24,51 @@
 #include "rendering/utils/Directory.h"
 #include "tgfx/core/Buffer.h"
 #include "tgfx/core/DataView.h"
+#include "tgfx/core/Pixmap.h"
 
 namespace pag {
+namespace {
+constexpr size_t MAX_ASYNC_FRAME_BYTES = 64u * 1024u * 1024u;
+constexpr size_t MAX_ASYNC_FRAME_COUNT = 2;
+std::mutex asyncFrameLocker = {};
+size_t asyncFrameBytes = 0;
+size_t asyncFrameCount = 0;
+}  // namespace
+
+struct AsyncFrameSnapshot {
+  explicit AsyncFrameSnapshot(size_t reservedBytes) : reservedBytes(reservedBytes) {
+  }
+
+  ~AsyncFrameSnapshot() {
+    pixels.reset();
+    std::lock_guard<std::mutex> lock(asyncFrameLocker);
+    asyncFrameBytes -= reservedBytes;
+    asyncFrameCount--;
+  }
+
+  tgfx::Buffer pixels = {};
+  const size_t reservedBytes;
+};
+
+static std::shared_ptr<AsyncFrameSnapshot> ReserveFrameSnapshot(size_t byteSize) {
+  if (byteSize == 0 || byteSize > MAX_ASYNC_FRAME_BYTES) {
+    return nullptr;
+  }
+  auto encodedSize = LZ4Encoder::GetMaxOutputSize(byteSize) + 12;
+  if (encodedSize > MAX_ASYNC_FRAME_BYTES - byteSize) {
+    return nullptr;
+  }
+  auto reservedBytes = byteSize + encodedSize;
+  std::lock_guard<std::mutex> lock(asyncFrameLocker);
+  if (asyncFrameCount >= MAX_ASYNC_FRAME_COUNT ||
+      reservedBytes > MAX_ASYNC_FRAME_BYTES - asyncFrameBytes) {
+    return nullptr;
+  }
+  asyncFrameBytes += reservedBytes;
+  asyncFrameCount++;
+  return std::make_shared<AsyncFrameSnapshot>(reservedBytes);
+}
+
 static constexpr uint8_t FILE_VERSION = 1;
 /**
  * [version: uint8_t]
@@ -60,6 +103,7 @@ std::shared_ptr<SequenceFile> SequenceFile::Open(const std::string& filePath,
   }
   auto sequenceFile = std::shared_ptr<SequenceFile>(
       new SequenceFile(filePath, info, frameCount, frameRate, staticTimeRanges));
+  sequenceFile->weakThis = sequenceFile;
   return sequenceFile->file ? sequenceFile : nullptr;
 }
 
@@ -209,7 +253,10 @@ bool SequenceFile::writeFileHead() {
     data.setUint32(offset + 4, static_cast<uint32_t>(_staticTimeRanges[i].end));
   }
   auto writeLength = fwrite(data.bytes(), 1, data.size(), file);
-  _fileSize = writeLength;
+  {
+    std::lock_guard<std::mutex> lock(locker);
+    _fileSize = writeLength;
+  }
   if (writeLength != data.size()) {
     LOGE("SequenceFile::writeFileHead() write file head failed!");
     return false;
@@ -228,7 +275,15 @@ bool SequenceFile::isComplete() {
 }
 
 bool SequenceFile::readFrame(int index, std::shared_ptr<BitmapBuffer> bitmap) {
-  std::lock_guard<std::mutex> autoLock(locker);
+  return readFrameInternal(index, std::move(bitmap), false);
+}
+
+bool SequenceFile::tryReadFrame(int index, std::shared_ptr<BitmapBuffer> bitmap) {
+  return readFrameInternal(index, std::move(bitmap), true);
+}
+
+bool SequenceFile::readFrameInternal(int index, std::shared_ptr<BitmapBuffer> bitmap,
+                                     bool nonBlocking) {
   if (index < 0 || index >= _numFrames || bitmap == nullptr) {
     LOGE("SequenceFile::readFrame() invalid index or pixels!");
     return false;
@@ -237,11 +292,37 @@ bool SequenceFile::readFrame(int index, std::shared_ptr<BitmapBuffer> bitmap) {
     LOGE("SequenceFile::readFrame() the info of the specified bitmap is different from ours!");
     return false;
   }
-  const auto& frame = frames[index];
+  FrameLocation frame = {};
+  std::shared_ptr<AsyncFrameSnapshot> snapshot = nullptr;
+  {
+    std::lock_guard<std::mutex> lock(locker);
+    frame = frames[index];
+    if (nonBlocking && frame.size == 0 && pendingIndex >= 0 && pendingSnapshot != nullptr &&
+        GetTimeRangeContains(_staticTimeRanges, index).start == pendingIndex) {
+      snapshot = pendingSnapshot;
+    }
+  }
+  if (snapshot != nullptr) {
+    auto pixels = bitmap->lockPixels();
+    if (pixels == nullptr) {
+      return false;
+    }
+    auto success = tgfx::Pixmap(_info, snapshot->pixels.bytes()).readPixels(bitmap->info(), pixels);
+    bitmap->unlockPixels();
+    return success;
+  }
   if (frame.size == 0) {
     return false;
   }
-  if (!checkScratchBuffer()) {
+  std::unique_lock<std::mutex> ioLock(ioLocker, std::defer_lock);
+  if (nonBlocking && !isComplete()) {
+    if (!ioLock.try_lock()) {
+      return false;
+    }
+  } else {
+    ioLock.lock();
+  }
+  if (!checkScratchBuffer() || frame.size > scratchBuffer.size()) {
     return false;
   }
   if (fseek(file, static_cast<long>(frame.offset), SEEK_SET)) {
@@ -271,7 +352,12 @@ bool SequenceFile::readFrame(int index, std::shared_ptr<BitmapBuffer> bitmap) {
 }
 
 bool SequenceFile::writeFrame(int index, std::shared_ptr<BitmapBuffer> bitmap) {
-  std::lock_guard<std::mutex> autoLock(locker);
+  return writeFrameInternal(index, std::move(bitmap), nullptr);
+}
+
+bool SequenceFile::writeFrameInternal(int index, std::shared_ptr<BitmapBuffer> bitmap,
+                                      const std::shared_ptr<AsyncFrameSnapshot>& snapshot) {
+  std::unique_lock<std::mutex> ioLock(ioLocker);
   if (index < 0 || index >= _numFrames || bitmap == nullptr) {
     LOGE("SequenceFile::writeFrame() invalid index or pixels!");
     return false;
@@ -281,8 +367,12 @@ bool SequenceFile::writeFrame(int index, std::shared_ptr<BitmapBuffer> bitmap) {
     return false;
   }
   auto timeRange = GetTimeRangeContains(_staticTimeRanges, index);
-  if (frames[timeRange.start].size != 0) {
-    return false;
+  {
+    std::lock_guard<std::mutex> lock(locker);
+    if (cacheWriteFailed || frames[timeRange.start].size != 0 ||
+        (pendingIndex == timeRange.start && (snapshot == nullptr || pendingSnapshot != snapshot))) {
+      return false;
+    }
   }
   auto pixels = bitmap->lockPixels();
   if (pixels == nullptr) {
@@ -294,32 +384,90 @@ bool SequenceFile::writeFrame(int index, std::shared_ptr<BitmapBuffer> bitmap) {
   if (compressedSize == 0) {
     return false;
   }
-  if (_fileSize == 0 && !writeFileHead()) {
+  auto oldSize = fileSize();
+  if ((oldSize == 0 && !writeFileHead()) || fseek(file, 0, SEEK_END) != 0 ||
+      fwrite(scratchBuffer.bytes(), 1, compressedSize, file) != compressedSize ||
+      fflush(file) != 0) {
+    std::lock_guard<std::mutex> lock(locker);
+    cacheWriteFailed = true;
+    LOGE("SequenceFile::writeFrame() failed to commit the compressed frame");
     return false;
   }
-  if (fseek(file, 0, SEEK_END)) {
-    LOGE("SequenceFile::writeFrame() failed to seek to the end of the file");
-    return false;
+  bool complete = false;
+  size_t committedSize = 0;
+  {
+    std::lock_guard<std::mutex> lock(locker);
+    for (auto i = timeRange.start; i <= timeRange.end; i++) {
+      auto& frame = frames[i];
+      frame.offset = _fileSize + FRAME_HEAD_SIZE;
+      frame.size = compressedSize - FRAME_HEAD_SIZE;
+      cachedFrames++;
+    }
+    _fileSize += compressedSize;
+    committedSize = _fileSize;
+    complete = cachedFrames == _numFrames;
   }
-  if (fwrite(scratchBuffer.bytes(), 1, compressedSize, file) != compressedSize) {
-    LOGE("SequenceFile::writeFrame() failed to write the compressed frame to disk");
-    return false;
-  }
-  for (auto i = timeRange.start; i <= timeRange.end; i++) {
-    auto& frame = frames[i];
-    frame.offset = _fileSize + FRAME_HEAD_SIZE;
-    frame.size = compressedSize - FRAME_HEAD_SIZE;
-    cachedFrames++;
-  }
-  _fileSize += compressedSize;
-  if (cachedFrames == _numFrames) {
+  if (complete) {
     scratchBuffer.reset();
     encoder = nullptr;
   }
+  ioLock.unlock();
   if (diskCache) {
-    diskCache->notifyFileSizeChanged(fileID, _fileSize);
+    diskCache->notifyFileSizeChanged(fileID, committedSize);
   }
   return true;
+}
+
+bool SequenceFile::writeFrameAsync(int index, std::shared_ptr<BitmapBuffer> bitmap) {
+  if (bitmap == nullptr || index < 0 || index >= _numFrames || bitmap->info() != _info) {
+    return false;
+  }
+  auto self = weakThis.lock();
+  if (self == nullptr) {
+    return false;
+  }
+  auto representative = static_cast<int>(GetTimeRangeContains(_staticTimeRanges, index).start);
+  {
+    std::lock_guard<std::mutex> lock(locker);
+    if (cacheWriteFailed || frames[representative].size != 0 || pendingIndex >= 0) {
+      return false;
+    }
+    pendingIndex = representative;
+  }
+  auto snapshot = ReserveFrameSnapshot(_info.byteSize());
+  if (snapshot != nullptr) {
+    snapshot->pixels.alloc(_info.byteSize());
+    if (!snapshot->pixels.isEmpty()) {
+      auto pixels = bitmap->lockPixels();
+      if (pixels != nullptr) {
+        memcpy(snapshot->pixels.bytes(), pixels, _info.byteSize());
+        bitmap->unlockPixels();
+        {
+          std::lock_guard<std::mutex> lock(locker);
+          pendingSnapshot = snapshot;
+        }
+        DiskIOWorker::GetFrameCacheInstance()->submit(
+            std::bind(&SequenceFile::finishAsyncWrite, std::move(self), representative, snapshot));
+        return true;
+      }
+    }
+  }
+  std::lock_guard<std::mutex> lock(locker);
+  pendingIndex = -1;
+  return false;
+}
+
+void SequenceFile::finishAsyncWrite(int index,
+                                    const std::shared_ptr<AsyncFrameSnapshot>& snapshot) {
+  writeFrameInternal(index, BitmapBuffer::Wrap(_info, snapshot->pixels.bytes()), snapshot);
+  {
+    std::lock_guard<std::mutex> ioLock(ioLocker);
+    scratchBuffer.reset();
+    encoder = nullptr;
+  }
+  std::lock_guard<std::mutex> lock(locker);
+  pendingSnapshot = nullptr;
+  pendingIndex = -1;
 }
 
 size_t SequenceFile::compressFrame(int index, const void* pixels, size_t byteSize) {

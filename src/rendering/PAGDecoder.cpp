@@ -216,7 +216,11 @@ bool PAGDecoder::readFrameInternal(int index, std::shared_ptr<BitmapBuffer> bitm
   if (!checkSequenceFile(composition, bitmap->info())) {
     return false;
   }
+#ifdef __ANDROID__
+  auto success = sequenceFile->tryReadFrame(index, bitmap);
+#else
   auto success = sequenceFile->readFrame(index, bitmap);
+#endif
   if (!success) {
     // A failed render marks the whole decoder, not just the frame: the failing part is usually a
     // sequence decoder shared by every frame, and any frame rendered without it is incomplete.
@@ -233,10 +237,17 @@ bool PAGDecoder::readFrameInternal(int index, std::shared_ptr<BitmapBuffer> bitm
     if (success) {
       failedRenderRetryTime = 0;
       failedRenderCount = 0;
+#ifdef __ANDROID__
+      sequenceFile->writeFrameAsync(index, bitmap);
+#else
       success = sequenceFile->writeFrame(index, bitmap);
       if (!success) {
         LOGE("PAGDecoder::readFrame() Failed to write frame to SequenceFile!");
       }
+#endif
+    } else if (reader != nullptr && reader->hasPendingFrame()) {
+      failedRenderRetryTime = 0;
+      failedRenderCount = 0;
     } else {
       failedRenderRetryTime = tgfx::Clock::Now() + SequenceRetryDelay(failedRenderCount);
       failedRenderCount++;
@@ -297,6 +308,11 @@ bool PAGDecoder::checkSequenceFile(std::shared_ptr<PAGComposition> composition,
     return false;
   }
   auto key = generateCacheKey(composition);
+  // Version all PAGDecoder pixel caches, including DiskSequenceReader's nested decoder caches,
+  // so pixels rendered before delivery validation cannot be reused.
+  if (!key.empty()) {
+    key = "PAGDecoder.v2." + key;
+  }
   sequenceFile = DiskCache::OpenSequence(key, info, _numFrames, _frameRate, staticTimeRanges);
   if (sequenceFile == nullptr) {
     LOGE("PAGDecoder: Failed to open SequenceFile!");

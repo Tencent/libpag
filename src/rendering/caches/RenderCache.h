@@ -55,7 +55,35 @@ class RenderCache : public Performance {
 
   void detachFromContext();
 
+  /** Prefetches the next frame after delivery validation and publication of the current frame. */
   void prepareNextFrame();
+
+  /** Records the shared frame deadline interval in microseconds. A positive value selects strict
+   * bitmap publication checks, not a native wait limit; tgfx owns its single-read timeout. */
+  void setSequenceFrameWaitTime(int64_t waitTime) {
+    sequenceFrameWaitTime = waitTime;
+  }
+
+  /** Returns whether bitmap rendering requires strict sequence delivery before publication. */
+  bool waitsForSequenceFrames() const {
+    return sequenceFrameWaitTime > 0;
+  }
+
+  /** Assigns one shared deadline before executing this frame's GPU resource tasks. */
+  void prepareSequenceFrameReads();
+
+  /** Returns true if a video texture did not deliver its requested frame in the last draw. */
+  bool hasSequenceFramePending() const {
+    return lastFrameHasSequenceFramePending;
+  }
+
+  /** Returns true when an actually drawn sequence has no valid delivery for publication. */
+  bool hasSequenceFrameUnavailable() const {
+    return lastFrameHasSequenceFrameUnavailable;
+  }
+
+  /** Checks submitted sequence reads before publishing the drawn frame. */
+  void checkSequenceDecodeFailure();
 
   bool hasSequenceDecodeFailure() const {
     return lastFrameHasSequenceDecodeFailure;
@@ -196,12 +224,15 @@ class RenderCache : public Performance {
   bool _useDiskCache = false;
   std::unordered_set<ID> usedAssets = {};
   std::unordered_map<ID, Snapshot*> snapshotCaches = {};
+  std::unordered_set<ID> frameSnapshotIDs = {};
   std::list<Snapshot*> snapshotLRU = {};
   std::unordered_map<Snapshot*, std::list<Snapshot*>::iterator> snapshotPositions = {};
   std::unordered_map<ID, std::shared_ptr<tgfx::Image>> assetImages = {};
   struct SequenceUsage {
     SequenceImageQueue* queue = nullptr;
     std::shared_ptr<SequenceReadResult> result = nullptr;
+    bool drawn = false;
+    bool cached = false;
   };
 
   std::unordered_map<ID, std::shared_ptr<tgfx::Image>> decodedAssetImages = {};
@@ -217,6 +248,9 @@ class RenderCache : public Performance {
   std::unordered_map<ID, std::unordered_map<Frame, SequenceUsage>> usedSequences = {};
   std::unordered_map<ID, SequenceFailureState> sequenceFailureStates = {};
   bool lastFrameHasSequenceDecodeFailure = false;
+  bool lastFrameHasSequenceFramePending = false;
+  bool lastFrameHasSequenceFrameUnavailable = false;
+  int64_t sequenceFrameWaitTime = 0;
   bool _sequenceCacheInvalidated = false;
 
   // decoded image caches:
@@ -239,7 +273,7 @@ class RenderCache : public Performance {
   void clearStaticSequenceCache(ID uniqueID);
   void clearSequenceCache(ID uniqueID);
   void clearExpiredSequences();
-  void checkSequenceDecodeFailure();
+  bool checkSequenceFrameRead(ID assetID, const std::shared_ptr<SequenceReadResult>& result);
   bool canRetrySequence(ID uniqueID);
   void recordSequenceFailure(ID uniqueID);
   void recordSequenceSuccess(ID uniqueID);

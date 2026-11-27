@@ -27,6 +27,11 @@ DiskIOWorker* DiskIOWorker::GetInstance() {
   return &instance;
 }
 
+DiskIOWorker* DiskIOWorker::GetFrameCacheInstance() {
+  static auto& instance = *new DiskIOWorker();
+  return &instance;
+}
+
 DiskIOWorker::DiskIOWorker() {
   workerThread = std::thread(&DiskIOWorker::runLoop, this);
 }
@@ -75,6 +80,7 @@ void DiskIOWorker::runLoop() {
     if (task) {
       task();
     }
+    task = nullptr;
     {
       std::lock_guard<std::mutex> lock(locker);
       executing = false;

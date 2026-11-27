@@ -35,6 +35,9 @@ std::shared_ptr<CompositionReader> CompositionReader::Make(
 CompositionReader::CompositionReader(std::shared_ptr<BitmapDrawable> bitmapDrawable)
     : drawable(std::move(bitmapDrawable)) {
   pagPlayer = new PAGPlayer();
+  // Shared bookkeeping window for sequence reconciliation, not a tgfx decode timeout.
+  static constexpr int64_t RECONCILIATION_WINDOW_US = 30000;
+  pagPlayer->renderCache->setSequenceFrameWaitTime(RECONCILIATION_WINDOW_US);
   auto pagSurface = PAGSurface::MakeFrom(drawable);
   pagPlayer->setSurface(pagSurface);
 }
@@ -64,6 +67,11 @@ bool CompositionReader::readFrame(double progress, std::shared_ptr<BitmapBuffer>
   std::lock_guard<std::mutex> autoLock(locker);
   drawable->setBitmap(std::move(bitmap));
   return renderFrame(progress);
+}
+
+bool CompositionReader::hasPendingFrame() {
+  std::lock_guard<std::mutex> autoLock(locker);
+  return pagPlayer->renderCache->hasSequenceFramePending();
 }
 
 bool CompositionReader::renderFrame(double progress) {
