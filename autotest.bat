@@ -111,7 +111,7 @@ if errorlevel 1 (
   exit /b 1
 )
 
-set "CMAKE_COMPILER_ARGS="
+set "CMAKE_COMPILER_ARGS=-DCMAKE_C_COMPILER=cl -DCMAKE_CXX_COMPILER=cl"
 if "%USE_CLANG_CL%"=="1" (
   if defined VS_DIR if exist "%VS_DIR%\VC\Tools\Llvm\x64\bin" set "PATH=%VS_DIR%\VC\Tools\Llvm\x64\bin;%PATH%"
   where clang-cl >nul 2>nul

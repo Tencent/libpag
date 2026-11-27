@@ -88,12 +88,14 @@ class Baseline {
   std::string cacheVersionPath;
   std::string outVersionPath;
   std::string cacheMD5Path;
+  std::string cacheToolchainPath;
   std::string outMD5Path;
 
   static bool IsNonGpuPixelComparison(const std::string& testSuite, const std::string& testName,
                                       const std::string& key);
   static bool CheckPixelComparison(const std::string& key, bool allowNonGpu = false);
 
+  bool writeCacheData();
   bool compareMd5(const std::string& key, const std::string& md5);
   std::string getJSONValue(nlohmann::json& target, const std::string& key);
   void setJSONValue(nlohmann::json& target, const std::string& key, const std::string& value);

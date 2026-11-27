@@ -1355,6 +1355,13 @@ if (PAG_BUILD_TESTS)
         list(APPEND PAG_TEST_COMPILE_OPTIONS -fno-access-control)
         list(APPEND PAG_TEST_DEFINES PAG_TEST_ACCESS_PRIVATE)
     endif ()
+    set(PAG_TEST_COMPILER_NAME "${CMAKE_CXX_COMPILER_ID}")
+    if (MSVC AND CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+        set(PAG_TEST_COMPILER_NAME "clang-cl")
+    endif ()
+    set_property(SOURCE test/src/utils/Baseline.cpp test/src/BaselineRegistrationTest.cpp
+            APPEND PROPERTY COMPILE_DEFINITIONS
+            "PAG_BASELINE_TOOLCHAIN=\"${PAG_TEST_COMPILER_NAME} $<CONFIG>\"")
     list(APPEND PAG_TEST_DEFINES ${PAG_DEFINES} PAG_BACKEND_NAME="${PAG_BACKEND_NAME}")
     if (FFAVC_LIB)
         list(APPEND PAG_TEST_DEFINES PAG_HAS_EXTERNAL_FFAVC)

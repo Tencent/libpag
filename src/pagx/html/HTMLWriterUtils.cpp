@@ -315,8 +315,7 @@ std::string GetImageSrc(const Image* image, HTMLWriterContext* ctx) {
   if (!IsSafeImageUrl(image->filePath)) {
     return {};
   }
-  bool hasScheme = HasUriScheme(image->filePath);
-  if (!hasScheme) {
+  if (IsLocalFilePath(image->filePath)) {
     auto codec = tgfx::ImageCodec::MakeFrom(image->filePath);
     if (codec) {
       // Preferred path: copy the file alongside the HTML output (under staticImgDir) and
@@ -342,6 +341,7 @@ std::string GetImageSrc(const Image* image, HTMLWriterContext* ctx) {
         }
       }
     }
+    return IsRelativeFilePath(image->filePath) ? EscapeCSSUrl(image->filePath) : std::string{};
   }
   return EscapeCSSUrl(image->filePath);
 }

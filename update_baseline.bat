@@ -108,7 +108,7 @@ if errorlevel 1 (
   goto :cleanup
 )
 
-set "CMAKE_COMPILER_ARGS="
+set "CMAKE_COMPILER_ARGS=-DCMAKE_C_COMPILER=cl -DCMAKE_CXX_COMPILER=cl"
 set "COMPILER_LABEL=MSVC"
 set "TOOLCHAIN_LABEL=MSVC Release"
 if "%USE_CLANG_CL%"=="1" (
@@ -279,6 +279,11 @@ if errorlevel 1 (
   call :Fail "Building %BASELINE_TARGET% failed."
   goto :cleanup
 )
+if exist "%GENERATED_CACHE_DIR%\toolchain.txt" del /q "%GENERATED_CACHE_DIR%\toolchain.txt"
+if exist "%GENERATED_CACHE_DIR%\toolchain.txt" (
+  call :Fail "Cannot invalidate the previous baseline toolchain marker."
+  goto :cleanup
+)
 if exist "%GENERATED_CACHE_DIR%\md5.json" del /q "%GENERATED_CACHE_DIR%\md5.json"
 if not exist "%BUILD_DIR%\%BASELINE_TARGET%.exe" (
   call :Fail "%BASELINE_TARGET%.exe was not produced."
@@ -308,6 +313,14 @@ call :RequireFile "%GENERATED_CACHE_DIR%\md5.json" "md5.json"
 if errorlevel 1 goto :cleanup
 call :RequireFile "%GENERATED_CACHE_DIR%\HEAD" "HEAD"
 if errorlevel 1 goto :cleanup
+call :RequireFile "%GENERATED_CACHE_DIR%\toolchain.txt" "toolchain.txt"
+if errorlevel 1 goto :cleanup
+set "GENERATED_TOOLCHAIN="
+set /p GENERATED_TOOLCHAIN=<"%GENERATED_CACHE_DIR%\toolchain.txt"
+if /i not "%GENERATED_TOOLCHAIN%"=="%TOOLCHAIN_LABEL%" (
+  call :Fail "%BASELINE_TARGET% produced a cache for '%GENERATED_TOOLCHAIN%' instead of '%TOOLCHAIN_LABEL%'."
+  goto :cleanup
+)
 git diff --no-index --quiet --ignore-cr-at-eol -- "%WORKSPACE%\test\baseline\version.json" "%GENERATED_CACHE_DIR%\version.json" >nul 2>nul
 if errorlevel 1 (
   call :Fail "%BASELINE_TARGET% left a version ledger that does not match test\baseline\version.json."
@@ -315,10 +328,7 @@ if errorlevel 1 (
 )
 
 if /i "%GENERATED_CACHE_DIR%"=="%CACHE_DIR%" goto :cache_ready
-if not exist "%CACHE_DIR%" mkdir "%CACHE_DIR%"
-copy /y "%GENERATED_CACHE_DIR%\md5.json" "%CACHE_DIR%\" >nul
-copy /y "%GENERATED_CACHE_DIR%\version.json" "%CACHE_DIR%\" >nul
-copy /y "%GENERATED_CACHE_DIR%\HEAD" "%CACHE_DIR%\" >nul
+call :ImportLegacyCache
 if errorlevel 1 (
   call :Fail "Importing the legacy OpenGL cache failed."
   goto :cleanup
@@ -326,15 +336,6 @@ if errorlevel 1 (
 echo Imported the legacy OpenGL cache into '%BACKEND_NAME%'.
 
 :cache_ready
-rem Record the toolchain so autotest.bat and the next refresh can reject a cache produced by a
-rem different compiler or build type.
-> "%CACHE_DIR%\toolchain.txt" echo(!TOOLCHAIN_LABEL!
-set "WRITTEN_TOOLCHAIN="
-if exist "%CACHE_DIR%\toolchain.txt" set /p WRITTEN_TOOLCHAIN=<"%CACHE_DIR%\toolchain.txt"
-if /i not "!WRITTEN_TOOLCHAIN!"=="!TOOLCHAIN_LABEL!" (
-  call :Fail "Cannot write the toolchain marker for '%BACKEND_NAME%'."
-  goto :cleanup
-)
 if "%RESTORE_NEEDED%"=="1" (
   call :RestoreWorkspace
   if errorlevel 1 (
@@ -478,6 +479,19 @@ if "%RECOVERY_OWNED%"=="1" (
     exit /b 1
   )
   set "RECOVERY_OWNED=0"
+)
+exit /b 0
+
+:ImportLegacyCache
+if not exist "%CACHE_DIR%" (
+  mkdir "%CACHE_DIR%"
+  if errorlevel 1 exit /b 1
+)
+if exist "%CACHE_DIR%\toolchain.txt" del /q "%CACHE_DIR%\toolchain.txt"
+if exist "%CACHE_DIR%\toolchain.txt" exit /b 1
+for %%F in (md5.json version.json HEAD toolchain.txt) do (
+  copy /y "%GENERATED_CACHE_DIR%\%%F" "%CACHE_DIR%\" >nul
+  if errorlevel 1 exit /b 1
 )
 exit /b 0
 

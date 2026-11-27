@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "cli/ImageStorage.h"
+#include <cctype>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -125,12 +126,7 @@ void ApplyImageStorage(PAGXDocument* doc, const ImageStorageOptions& options,
     auto* image = static_cast<Image*>(nodePtr.get());
 
     if (options.mode == ImageStorageMode::Embed) {
-      // Already inline (embedded bytes or a data-URI path): nothing to do.
-      if (image->data || IsDataUri(image->filePath)) {
-        continue;
-      }
-      // Remote URLs cannot be inlined without network access; leave them alone.
-      if (image->filePath.rfind("http://", 0) == 0 || image->filePath.rfind("https://", 0) == 0) {
+      if (image->data || HasUriScheme(image->filePath)) {
         continue;
       }
       std::string resolved = {};

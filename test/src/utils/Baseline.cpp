@@ -21,8 +21,10 @@
 // baseline hashes identical across OpenGL / Metal / D3D12 and avoids a CommonCrypto dependency
 // on Windows.
 #include <chrono>
+#include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <system_error>
 #include "base/utils/USE.h"
 #include "core/utils/MD5.h"
 #pragma clang diagnostic push
@@ -271,6 +273,7 @@ Baseline::Baseline(const std::string& baselinePath, const std::string& cachePath
   baselineVersionPath = baselinePath + "/" + prefix + "version.json";
   cacheVersionPath = cachePath + "/" + prefix + "version.json";
   cacheMD5Path = cachePath + "/" + prefix + "md5.json";
+  cacheToolchainPath = cachePath + "/" + prefix + "toolchain.txt";
   outVersionPath = outputPath + "/" + prefix + "version.json";
   outMD5Path = outputPath + "/" + prefix + "md5.json";
 
@@ -298,6 +301,41 @@ Baseline::Baseline(const std::string& baselinePath, const std::string& cachePath
   }
 }
 
+bool Baseline::writeCacheData() {
+  std::error_code error;
+  auto cacheDirectory = std::filesystem::path(cacheMD5Path).parent_path();
+  std::filesystem::create_directories(cacheDirectory, error);
+  if (error) {
+    return false;
+  }
+  // Invalidate provenance before replacing any cache data. Interrupted or failed publications
+  // must not leave an old toolchain marker attached to newly written MD5 values.
+  std::filesystem::remove(cacheToolchainPath, error);
+  if (error) {
+    return false;
+  }
+  std::ofstream md5File(cacheMD5Path);
+  md5File << std::setw(4) << outputMD5 << std::endl;
+  md5File.close();
+  if (md5File.fail()) {
+    return false;
+  }
+  std::filesystem::copy_file(baselineVersionPath, cacheVersionPath,
+                             std::filesystem::copy_options::overwrite_existing, error);
+  if (error) {
+    return false;
+  }
+  auto temporaryToolchainPath = cacheToolchainPath + ".tmp";
+  std::ofstream toolchainFile(temporaryToolchainPath);
+  toolchainFile << PAG_BASELINE_TOOLCHAIN << std::endl;
+  toolchainFile.close();
+  if (toolchainFile.fail()) {
+    return false;
+  }
+  std::filesystem::rename(temporaryToolchainPath, cacheToolchainPath, error);
+  return !error;
+}
+
 void Baseline::saveData() {
 #ifdef UPDATE_BASELINE
   if (!PAGTest::HasFailure()) {
@@ -308,13 +346,9 @@ void Baseline::saveData() {
       std::filesystem::rename(OUT_ROOT, outPath);
     }
 #endif
-    CreateFolder(cacheMD5Path);
-    std::ofstream outMD5File(cacheMD5Path);
-    outMD5File << std::setw(4) << outputMD5 << std::endl;
-    outMD5File.close();
-    CreateFolder(cacheVersionPath);
-    std::filesystem::copy(baselineVersionPath, cacheVersionPath,
-                          std::filesystem::copy_options::overwrite_existing);
+    if (!writeCacheData()) {
+      ADD_FAILURE() << "Failed to publish baseline cache at " << cacheMD5Path;
+    }
   } else {
     std::filesystem::remove_all(OUT_ROOT);
   }
