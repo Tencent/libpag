@@ -60,6 +60,8 @@
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/ImagePattern.h"
 #include "pagx/nodes/Text.h"
+#include "pagx/types/Data.h"
+#include "renderer/ImageEmbedder.h"
 #include "tgfx/core/Bitmap.h"
 #include "tgfx/core/ImageCodec.h"
 #include "tgfx/core/Pixmap.h"
@@ -4004,6 +4006,63 @@ CLI_TEST(PAGXCliTest, Verify_PainterLeakClean) {
 //==============================================================================
 // Embed tests
 //==============================================================================
+
+CLI_TEST(PAGXCliTest, Embed_LocalImagePaths) {
+  auto imagePath = ProjectPath::Absolute("resources/apitest/image_as_mask.png");
+  auto imageBytes = ReadBinaryTestFile(imagePath);
+  ASSERT_FALSE(imageBytes.empty());
+  std::vector<std::string> paths = {imagePath};
+#ifdef _WIN32
+  paths.push_back("\\\\?\\" + std::filesystem::path(imagePath).make_preferred().string());
+#endif
+  for (const auto& path : paths) {
+    SCOPED_TRACE(path);
+    auto document = pagx::PAGXDocument::Make(100, 100);
+    ASSERT_NE(document, nullptr);
+    auto* image = document->makeNode<pagx::Image>();
+    image->filePath = path;
+    pagx::ImageEmbedder embedder;
+    ASSERT_TRUE(embedder.embed(document.get()));
+    EXPECT_TRUE(image->filePath.empty());
+    ASSERT_NE(image->data, nullptr);
+    ASSERT_EQ(image->data->size(), imageBytes.size());
+    EXPECT_EQ(memcmp(image->data->bytes(), imageBytes.data(), imageBytes.size()), 0);
+  }
+}
+
+CLI_TEST(PAGXCliTest, Embed_UrlPathsRemainExternal) {
+  std::vector<std::string> paths = {"http://example.invalid/image.png",
+                                    "https://example.invalid/image.png",
+                                    "file:///nonexistent/image.png", "data:image/png;base64,AA=="};
+  for (const auto& path : paths) {
+    SCOPED_TRACE(path);
+    auto document = pagx::PAGXDocument::Make(100, 100);
+    ASSERT_NE(document, nullptr);
+    auto* image = document->makeNode<pagx::Image>();
+    image->filePath = path;
+    pagx::ImageEmbedder embedder;
+    EXPECT_TRUE(embedder.embed(document.get()));
+    EXPECT_EQ(image->filePath, path);
+    EXPECT_EQ(image->data, nullptr);
+  }
+}
+
+#ifdef _WIN32
+CLI_TEST(PAGXCliTest, Embed_ExtendedMissingImageFails) {
+  auto imagePath = ProjectPath::Absolute("resources/apitest/image_embedder_missing.png");
+  imagePath = "\\\\?\\" + std::filesystem::path(imagePath).make_preferred().string();
+  ASSERT_FALSE(std::filesystem::exists(imagePath));
+  auto document = pagx::PAGXDocument::Make(100, 100);
+  ASSERT_NE(document, nullptr);
+  auto* image = document->makeNode<pagx::Image>();
+  image->filePath = imagePath;
+  pagx::ImageEmbedder embedder;
+  EXPECT_FALSE(embedder.embed(document.get()));
+  EXPECT_EQ(embedder.lastErrorPath(), imagePath);
+  EXPECT_EQ(image->filePath, imagePath);
+  EXPECT_EQ(image->data, nullptr);
+}
+#endif
 
 CLI_TEST(PAGXCliTest, Embed_BothDefault_EmbedsFontsAndImages) {
   auto tempPagx = CopyToTemp("embed_sample.pagx", "embed_sample.pagx");

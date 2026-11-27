@@ -128,19 +128,24 @@ CLI_TEST(ImageStorageTest, EmbedLeavesExistingDataAndDataUriUntouched) {
   EXPECT_EQ(dataUri->filePath, "data:image/png;base64,AAAA");
 }
 
-CLI_TEST(ImageStorageTest, EmbedLeavesRemoteUrlsUntouched) {
-  auto doc = PAGXDocument::Make(100, 100);
-  auto* http = AddImage(doc.get(), "http://example.com/a.png");
-  auto* https = AddImage(doc.get(), "https://example.com/b.png");
-
+CLI_TEST(ImageStorageTest, EmbedLeavesUrisUntouchedWithoutWarnings) {
   ImageStorageOptions options = {};
   options.mode = ImageStorageMode::Embed;
-  ApplyImageStorage(doc.get(), options, "test");
+  for (const std::string& source :
+       {"http://example.com/a.png", "https://example.com/b.png", "HTTP://example.com/c.png",
+        "HTTPS://example.com/d.png", "ftp://example.com/e.png", "file:///missing/image.png",
+        "mailto:image@example.com", "hash:missing-image", "data:image/png;base64,AAAA"}) {
+    auto doc = PAGXDocument::Make(100, 100);
+    auto* image = AddImage(doc.get(), source);
 
-  EXPECT_EQ(http->data, nullptr);
-  EXPECT_EQ(http->filePath, "http://example.com/a.png");
-  EXPECT_EQ(https->data, nullptr);
-  EXPECT_EQ(https->filePath, "https://example.com/b.png");
+    testing::internal::CaptureStderr();
+    ApplyImageStorage(doc.get(), options, "test");
+    auto warning = testing::internal::GetCapturedStderr();
+
+    EXPECT_TRUE(warning.empty()) << source << ": " << warning;
+    EXPECT_EQ(image->data, nullptr) << source;
+    EXPECT_EQ(image->filePath, source);
+  }
 }
 
 CLI_TEST(ImageStorageTest, EmbedRelativePathResolvedViaBaseDir) {
@@ -191,6 +196,32 @@ CLI_TEST(ImageStorageTest, EmbedAbsolutePathReadsFileDirectly) {
   EXPECT_TRUE(image->filePath.empty());
 }
 
+#ifdef _WIN32
+CLI_TEST(ImageStorageTest, EmbedWindowsDriveAndExtendedPathsReadFileDirectly) {
+  auto dir = ScratchDir("EmbedWindowsLocal");
+  auto absolutePath = std::filesystem::absolute(dir + "/pic.png").make_preferred().string();
+  WriteFile(absolutePath, "LOCALDATA");
+  ASSERT_GE(absolutePath.size(), 3u);
+  ASSERT_EQ(absolutePath[1], ':');
+
+  ImageStorageOptions options = {};
+  options.mode = ImageStorageMode::Embed;
+  for (const std::string& source : {absolutePath, std::string(R"(\\?\)") + absolutePath}) {
+    auto doc = PAGXDocument::Make(100, 100);
+    auto* image = AddImage(doc.get(), source);
+
+    testing::internal::CaptureStderr();
+    ApplyImageStorage(doc.get(), options, "test");
+    auto warning = testing::internal::GetCapturedStderr();
+
+    EXPECT_TRUE(warning.empty()) << source << ": " << warning;
+    ASSERT_NE(image->data, nullptr) << source;
+    EXPECT_EQ(image->data->size(), 9u);
+    EXPECT_TRUE(image->filePath.empty());
+  }
+}
+#endif
+
 CLI_TEST(ImageStorageTest, EmbedEmptyFilePathIsLeftAlone) {
   auto doc = PAGXDocument::Make(100, 100);
   // An empty source is neither a data URI, a URL, nor a relative path: it resolves to nothing.
@@ -204,21 +235,25 @@ CLI_TEST(ImageStorageTest, EmbedEmptyFilePathIsLeftAlone) {
   EXPECT_TRUE(image->filePath.empty());
 }
 
-CLI_TEST(ImageStorageTest, EmbedSchemeAndDriveLetterPathsAreNotRelative) {
-  auto doc = PAGXDocument::Make(100, 100);
-  // A colon before the first slash marks a scheme/drive reference, treated as non-relative and
-  // read verbatim (which fails to open, leaving the reference in place).
-  auto* driveLetter = AddImage(doc.get(), "C:/nope.png");
-  auto* scheme = AddImage(doc.get(), "ftp://host/x.png");
-
+CLI_TEST(ImageStorageTest, EmbedMissingWindowsLocalPathsEmitWarnings) {
   ImageStorageOptions options = {};
   options.mode = ImageStorageMode::Embed;
-  ApplyImageStorage(doc.get(), options, "test");
+  for (const std::string& source :
+       {R"(C:\pagx-missing-image.png)", R"(\\localhost\PAGXMissingShare\pagx-missing-image.png)",
+        R"(\\?\C:\pagx-missing-image.png)"}) {
+    auto doc = PAGXDocument::Make(100, 100);
+    auto* image = AddImage(doc.get(), source);
 
-  EXPECT_EQ(driveLetter->data, nullptr);
-  EXPECT_EQ(driveLetter->filePath, "C:/nope.png");
-  EXPECT_EQ(scheme->data, nullptr);
-  EXPECT_EQ(scheme->filePath, "ftp://host/x.png");
+    testing::internal::CaptureStderr();
+    ApplyImageStorage(doc.get(), options, "test");
+    auto warning = testing::internal::GetCapturedStderr();
+
+    EXPECT_NE(warning.find("warning: cannot embed image, file not found"), std::string::npos)
+        << source;
+    EXPECT_NE(warning.find(source), std::string::npos);
+    EXPECT_EQ(image->data, nullptr);
+    EXPECT_EQ(image->filePath, source);
+  }
 }
 
 CLI_TEST(ImageStorageTest, EmbedColonAfterSlashIsRelative) {
@@ -256,8 +291,12 @@ CLI_TEST(ImageStorageTest, EmbedAbsoluteMissingFileReadsAndFails) {
 
   ImageStorageOptions options = {};
   options.mode = ImageStorageMode::Embed;
+  testing::internal::CaptureStderr();
   ApplyImageStorage(doc.get(), options, "test");
+  auto warning = testing::internal::GetCapturedStderr();
 
+  EXPECT_NE(warning.find("warning: cannot embed image, file not found"), std::string::npos);
+  EXPECT_NE(warning.find(image->filePath), std::string::npos);
   EXPECT_EQ(image->data, nullptr);
   EXPECT_EQ(image->filePath, dir + "/missing.png");
 }
@@ -287,8 +326,12 @@ CLI_TEST(ImageStorageTest, EmbedMissingFileEmitsWarningAndKeepsReference) {
   ImageStorageOptions options = {};
   options.mode = ImageStorageMode::Embed;
   options.baseDir = WithSlash(dir);
+  testing::internal::CaptureStderr();
   ApplyImageStorage(doc.get(), options, "test");
+  auto warning = testing::internal::GetCapturedStderr();
 
+  EXPECT_NE(warning.find("warning: cannot embed image, file not found"), std::string::npos);
+  EXPECT_NE(warning.find("does-not-exist.png"), std::string::npos);
   EXPECT_EQ(image->data, nullptr);
   EXPECT_EQ(image->filePath, "does-not-exist.png");
 }

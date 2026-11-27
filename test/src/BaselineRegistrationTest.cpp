@@ -16,16 +16,70 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include <filesystem>
+#include <fstream>
 #include <functional>
+#include <iterator>
 #include <string>
+#include <system_error>
 #include "base/PAGTest.h"
 #include "gtest/gtest-spi.h"
 #include "tgfx/core/Bitmap.h"
 #include "tgfx/core/Task.h"
 #include "utils/Baseline.h"
+#include "utils/TestDir.h"
 
 namespace pag {
 namespace {
+#if !defined(UPDATE_BASELINE) && defined(PAG_TEST_ACCESS_PRIVATE)
+class BaselineCacheDirectory {
+ public:
+  explicit BaselineCacheDirectory(const std::string& name)
+      : rootPath(TestDir::GetRoot() + "/out/BaselineRegistrationTest/" + name),
+        baselinePath(rootPath + "/baseline"), cachePath(rootPath + "/cache"),
+        outputPath(rootPath + "/output") {
+  }
+
+  ~BaselineCacheDirectory() {
+    std::error_code error;
+    std::filesystem::remove_all(rootPath, error);
+    EXPECT_FALSE(error) << error.message();
+  }
+
+  /** Recreates an isolated cache fixture without touching the real baseline cache. */
+  bool prepare() {
+    std::error_code error;
+    std::filesystem::remove_all(rootPath, error);
+    if (error) {
+      return false;
+    }
+    std::filesystem::create_directories(baselinePath, error);
+    if (error) {
+      return false;
+    }
+    std::filesystem::create_directories(cachePath, error);
+    return !error;
+  }
+
+  const std::string rootPath;
+  const std::string baselinePath;
+  const std::string cachePath;
+  const std::string outputPath;
+};
+
+static bool WriteBaselineTestFile(const std::string& path, const std::string& contents) {
+  std::ofstream file(path);
+  file << contents;
+  file.close();
+  return !file.fail();
+}
+
+static std::string ReadBaselineTestFile(const std::string& path) {
+  std::ifstream file(path);
+  return {std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>()};
+}
+#endif
+
 #if defined(TGFX_USE_METAL)
 static void ExpectRegistrationFailure(const std::function<bool()>& compare) {
   testing::TestPartResultArray failures;
@@ -141,6 +195,57 @@ PAG_TEST(BaselineRegistrationTest, MissingCacheIsNotAnAcceptedWebVersionChange) 
   instance.cacheVersions = instance.baselineVersions;
   EXPECT_FALSE(instance.compareMd5("suite/image", "actual"));
   EXPECT_EQ(instance.comparisonStats().compared, 0u);
+}
+
+PAG_TEST(BaselineRegistrationTest, CachePublicationRecordsActualToolchain) {
+  BaselineCacheDirectory directory("CachePublicationRecordsActualToolchain");
+  ASSERT_TRUE(directory.prepare());
+  const std::string versions = "{\"suite\":{\"image\":\"v1\"}}\n";
+  ASSERT_TRUE(WriteBaselineTestFile(directory.baselinePath + "/version.json", versions));
+  Baseline instance(directory.baselinePath, directory.cachePath, directory.outputPath);
+  instance.outputMD5 = {{"suite", {{"image", "new-digest"}}}};
+  ASSERT_TRUE(WriteBaselineTestFile(instance.cacheToolchainPath, "previous-toolchain Release\n"));
+
+  ASSERT_TRUE(instance.writeCacheData());
+  EXPECT_EQ(ReadBaselineTestFile(instance.cacheMD5Path), instance.outputMD5.dump(4) + "\n");
+  EXPECT_EQ(ReadBaselineTestFile(instance.cacheVersionPath), versions);
+  EXPECT_EQ(ReadBaselineTestFile(instance.cacheToolchainPath),
+            std::string(PAG_BASELINE_TOOLCHAIN) + "\n");
+  EXPECT_FALSE(std::filesystem::exists(instance.cacheToolchainPath + ".tmp"));
+}
+
+PAG_TEST(BaselineRegistrationTest, CachePublicationFailureInvalidatesOldToolchain) {
+  BaselineCacheDirectory directory("CachePublicationFailureInvalidatesOldToolchain");
+  ASSERT_TRUE(directory.prepare());
+  const std::string versions = "{\"suite\":{\"image\":\"v1\"}}\n";
+  ASSERT_TRUE(WriteBaselineTestFile(directory.baselinePath + "/version.json", versions));
+  Baseline instance(directory.baselinePath, directory.cachePath, directory.outputPath);
+  instance.outputMD5 = {{"suite", {{"image", "new-digest"}}}};
+  ASSERT_TRUE(WriteBaselineTestFile(instance.cacheToolchainPath, "previous-toolchain Release\n"));
+  std::error_code error;
+  std::filesystem::create_directory(instance.cacheToolchainPath + ".tmp", error);
+  ASSERT_FALSE(error);
+
+  EXPECT_FALSE(instance.writeCacheData());
+  EXPECT_EQ(ReadBaselineTestFile(instance.cacheMD5Path), instance.outputMD5.dump(4) + "\n");
+  EXPECT_EQ(ReadBaselineTestFile(instance.cacheVersionPath), versions);
+  EXPECT_FALSE(std::filesystem::exists(instance.cacheToolchainPath));
+}
+
+PAG_TEST(BaselineRegistrationTest, CachePublicationStopsWhenToolchainCannotBeInvalidated) {
+  BaselineCacheDirectory directory("CachePublicationStopsWhenToolchainCannotBeInvalidated");
+  ASSERT_TRUE(directory.prepare());
+  const std::string oldMD5 = "{\"suite\":{\"image\":\"old-digest\"}}\n";
+  ASSERT_TRUE(WriteBaselineTestFile(directory.cachePath + "/md5.json", oldMD5));
+  Baseline instance(directory.baselinePath, directory.cachePath, directory.outputPath);
+  instance.outputMD5 = {{"suite", {{"image", "new-digest"}}}};
+  std::error_code error;
+  std::filesystem::create_directory(instance.cacheToolchainPath, error);
+  ASSERT_FALSE(error);
+  ASSERT_TRUE(WriteBaselineTestFile(instance.cacheToolchainPath + "/occupied", "occupied"));
+
+  EXPECT_FALSE(instance.writeCacheData());
+  EXPECT_EQ(ReadBaselineTestFile(instance.cacheMD5Path), oldMD5);
 }
 #endif
 

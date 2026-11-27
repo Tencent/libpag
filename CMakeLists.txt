@@ -1198,6 +1198,11 @@ if (PAG_BUILD_CLI)
         endif ()
     endif ()
     target_link_libraries(pagx-cli pag ${PAG_SHARED_LIBS} ${CLI_EXTRA_LIBS})
+    if (WIN32 AND MSVC)
+        # The HTML importer recurses up to MAX_HTML_RECURSION_DEPTH (128); the default 1 MB Windows
+        # stack is not enough for a Debug build of that path. Match the test binaries.
+        target_link_options(pagx-cli PRIVATE "/STACK:8388608")
+    endif ()
 
     # HTML browser-fidelity eval target. Not a gtest binary: it drives the
     # snapshot -> import -> render -> compare pipeline (tools/html-snapshot/eval)
@@ -1350,6 +1355,13 @@ if (PAG_BUILD_TESTS)
         list(APPEND PAG_TEST_COMPILE_OPTIONS -fno-access-control)
         list(APPEND PAG_TEST_DEFINES PAG_TEST_ACCESS_PRIVATE)
     endif ()
+    set(PAG_TEST_COMPILER_NAME "${CMAKE_CXX_COMPILER_ID}")
+    if (MSVC AND CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+        set(PAG_TEST_COMPILER_NAME "clang-cl")
+    endif ()
+    set_property(SOURCE test/src/utils/Baseline.cpp test/src/BaselineRegistrationTest.cpp
+            APPEND PROPERTY COMPILE_DEFINITIONS
+            "PAG_BASELINE_TOOLCHAIN=\"${PAG_TEST_COMPILER_NAME} $<CONFIG>\"")
     list(APPEND PAG_TEST_DEFINES ${PAG_DEFINES} PAG_BACKEND_NAME="${PAG_BACKEND_NAME}")
     if (FFAVC_LIB)
         list(APPEND PAG_TEST_DEFINES PAG_HAS_EXTERNAL_FFAVC)
@@ -1392,6 +1404,19 @@ if (PAG_BUILD_TESTS)
     target_compile_definitions(PAGFullTest_${TEST_TARGET_SUFFIX} PUBLIC ${PAG_TEST_DEFINES})
     target_compile_options(PAGFullTest_${TEST_TARGET_SUFFIX} PUBLIC ${PAG_TEST_COMPILE_OPTIONS})
     target_link_libraries(PAGFullTest_${TEST_TARGET_SUFFIX} ${PAG_TEST_LIBS})
+
+    # Windows gives the main thread a 1 MB stack by default, while macOS and Linux test processes
+    # get 8 MB. The HTML importer intentionally recurses up to MAX_HTML_RECURSION_DEPTH (128) and a
+    # Debug frame in that path costs about 9 KB, so the limit is reached only after the default
+    # stack is exhausted. Raise the test stack instead of lowering the importer limit, which would
+    # change the imported output on every platform. The shipped pagx-cli gets the same reserve
+    # above; host applications must provide their own stack budget.
+    if (WIN32 AND MSVC)
+        foreach (TEST_STACK_TARGET UpdateBaseline_${TEST_TARGET_SUFFIX}
+                PAGUnitTest_${TEST_TARGET_SUFFIX} PAGFullTest_${TEST_TARGET_SUFFIX})
+            target_link_options(${TEST_STACK_TARGET} PRIVATE "/STACK:8388608")
+        endforeach ()
+    endif ()
 
     # Compile the public C API headers with a real C compiler in every test build. When the C API
     # is enabled, also link the D3D12 entry points so their ABI cannot regress silently.

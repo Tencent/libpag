@@ -5,7 +5,7 @@ rem Refresh the selected backend's local baseline cache on Windows.
 rem
 rem Usage:
 rem   update_baseline.bat [USE_OPENGL^|USE_OPENGL_SWIFTSHADER^|USE_D3D12^|USE_D3D12_WARP^|USE_VULKAN]
-rem                       [--skip-images] [--no-checkout] [--no-fetch]
+rem                       [--skip-images] [--no-checkout] [--no-fetch] [--clang-cl]
 rem
 rem By default the script mirrors update_baseline.sh: it stashes local changes, checks out the
 rem origin/main commit, builds and runs UpdateBaseline_<Backend>, then restores the original branch
@@ -17,6 +17,11 @@ rem
 rem The cache is written to test\baseline\.cache\<backend>, where <backend> is opengl,
 rem opengl-swiftshader, d3d12, d3d12-warp or vulkan. Running the script regenerates the local md5
 rem cache; it never commits anything.
+rem
+rem --clang-cl builds with clang-cl instead of MSVC so private-access test cases are compiled in.
+rem Both Windows scripts build Release by default. The cache is keyed by backend only, so a
+rem toolchain.txt marker records the compiler and build type; refreshing with a different
+rem toolchain rebuilds instead of reusing the cache.
 
 cd /d "%~dp0"
 set "WORKSPACE=%CD%"
@@ -29,12 +34,14 @@ set "BACKEND="
 set "SKIP_IMAGES=0"
 set "NO_CHECKOUT=0"
 set "NO_FETCH=0"
+set "USE_CLANG_CL=0"
 
 :parse_args
 if "%~1"=="" goto :args_done
 if /i "%~1"=="--skip-images" goto :arg_skip_images
 if /i "%~1"=="--no-checkout" goto :arg_no_checkout
 if /i "%~1"=="--no-fetch" goto :arg_no_fetch
+if /i "%~1"=="--clang-cl" goto :arg_clang_cl
 if /i "%~1"=="-h" goto :usage
 if /i "%~1"=="--help" goto :usage
 if defined BACKEND goto :too_many_backends
@@ -54,6 +61,11 @@ goto :parse_args
 
 :arg_no_fetch
 set "NO_FETCH=1"
+shift
+goto :parse_args
+
+:arg_clang_cl
+set "USE_CLANG_CL=1"
 shift
 goto :parse_args
 
@@ -94,6 +106,31 @@ where node >nul 2>nul
 if errorlevel 1 (
   call :Fail "Node.js was not found."
   goto :cleanup
+)
+
+set "CMAKE_COMPILER_ARGS=-DCMAKE_C_COMPILER=cl -DCMAKE_CXX_COMPILER=cl"
+set "COMPILER_LABEL=MSVC"
+set "TOOLCHAIN_LABEL=MSVC Release"
+if "%USE_CLANG_CL%"=="1" (
+  set "COMPILER_LABEL=clang-cl"
+  set "TOOLCHAIN_LABEL=clang-cl Release"
+  if defined VS_DIR if exist "%VS_DIR%\VC\Tools\Llvm\x64\bin" set "PATH=%VS_DIR%\VC\Tools\Llvm\x64\bin;%PATH%"
+  where clang-cl >nul 2>nul
+  if errorlevel 1 (
+    call :Fail "clang-cl was not found. Install the C++ Clang tools for Windows component."
+    goto :cleanup
+  )
+  python -c "import sys; sys.exit(0 if sys.version_info[0] == 3 else 1)" >nul 2>nul
+  if not errorlevel 1 (
+    set "CMAKE_COMPILER_ARGS=-DCMAKE_C_COMPILER=clang-cl -DCMAKE_CXX_COMPILER=clang-cl -DCMAKE_C_COMPILER_LAUNCHER="python;%WORKSPACE%\win\tools\filter_clang.py" -DCMAKE_CXX_COMPILER_LAUNCHER="python;%WORKSPACE%\win\tools\filter_clang.py""
+  ) else (
+    py -3 -c "import sys; sys.exit(0 if sys.version_info[0] == 3 else 1)" >nul 2>nul
+    if errorlevel 1 (
+      call :Fail "Python 3 through python or py -3 is required by the clang-cl compiler launcher."
+      goto :cleanup
+    )
+    set "CMAKE_COMPILER_ARGS=-DCMAKE_C_COMPILER=clang-cl -DCMAKE_CXX_COMPILER=clang-cl -DCMAKE_C_COMPILER_LAUNCHER="py;-3;%WORKSPACE%\win\tools\filter_clang.py" -DCMAKE_CXX_COMPILER_LAUNCHER="py;-3;%WORKSPACE%\win\tools\filter_clang.py""
+  )
 )
 
 if "%NO_CHECKOUT%"=="1" goto :skip_checkout
@@ -139,6 +176,11 @@ if errorlevel 1 (
 )
 rem Both files must exist: a failed refresh deletes md5.json before regenerating it, so a lone
 rem version.json can belong to a broken cache. This mirrors update_baseline.sh's `-f` checks.
+rem The md5 file does not record which toolchain produced it, so require a matching marker;
+rem missing or different markers rebuild instead of reusing a cache the tests cannot trust.
+set "CACHED_TOOLCHAIN="
+if exist "%CACHE_DIR%\toolchain.txt" set /p CACHED_TOOLCHAIN=<"%CACHE_DIR%\toolchain.txt"
+if /i not "%CACHED_TOOLCHAIN%"=="%TOOLCHAIN_LABEL%" goto :skip_cache_check
 if exist "%CACHE_DIR%\version.json" if exist "%CACHE_DIR%\md5.json" (
   git diff --no-index --quiet --ignore-cr-at-eol -- "%TEMP%\pag_main_version.json" "%CACHE_DIR%\version.json" >nul 2>nul
   if not errorlevel 1 (
@@ -147,6 +189,7 @@ if exist "%CACHE_DIR%\version.json" if exist "%CACHE_DIR%\md5.json" (
     exit /b 0
   )
 )
+:skip_cache_check
 del "%TEMP%\pag_main_version.json" >nul 2>nul
 
 set "CURRENT_BRANCH="
@@ -208,8 +251,8 @@ if errorlevel 1 (
 if exist "%BUILD_DIR%" rmdir /s /q "%BUILD_DIR%"
 set "CMAKE_IMAGE_ARGS=-DPAG_SKIP_GENERATE_BASELINE_IMAGES=OFF"
 if "%SKIP_IMAGES%"=="1" set "CMAKE_IMAGE_ARGS=-DPAG_SKIP_GENERATE_BASELINE_IMAGES=ON"
-echo Building UpdateBaseline_%TARGET_SUFFIX% for '%BACKEND_NAME%'...
-cmake -G Ninja -S "%WORKSPACE%" -B "%BUILD_DIR%" %CMAKE_BACKEND_ARGS% %CMAKE_IMAGE_ARGS% -DPAG_BUILD_TESTS=ON -DPAG_SKIP_BASELINE_CHECK=ON -DCMAKE_BUILD_TYPE=Debug
+echo Building UpdateBaseline_%TARGET_SUFFIX% for '%BACKEND_NAME%' with %COMPILER_LABEL%...
+cmake -G Ninja -S "%WORKSPACE%" -B "%BUILD_DIR%" %CMAKE_BACKEND_ARGS% %CMAKE_COMPILER_ARGS% %CMAKE_IMAGE_ARGS% -DPAG_BUILD_TESTS=ON -DPAG_SKIP_BASELINE_CHECK=ON -DCMAKE_BUILD_TYPE=Release
 if errorlevel 1 (
   call :Fail "CMake configuration failed."
   goto :cleanup
@@ -236,18 +279,33 @@ if errorlevel 1 (
   call :Fail "Building %BASELINE_TARGET% failed."
   goto :cleanup
 )
+if exist "%GENERATED_CACHE_DIR%\toolchain.txt" del /q "%GENERATED_CACHE_DIR%\toolchain.txt"
+if exist "%GENERATED_CACHE_DIR%\toolchain.txt" (
+  call :Fail "Cannot invalidate the previous baseline toolchain marker."
+  goto :cleanup
+)
 if exist "%GENERATED_CACHE_DIR%\md5.json" del /q "%GENERATED_CACHE_DIR%\md5.json"
 if not exist "%BUILD_DIR%\%BASELINE_TARGET%.exe" (
   call :Fail "%BASELINE_TARGET%.exe was not produced."
   goto :cleanup
 )
+rem A stale baseline-out left by an aborted run must not be renamed in as this run's output.
+if exist "%WORKSPACE%\test\baseline-out" rmdir /s /q "%WORKSPACE%\test\baseline-out"
+if exist "%WORKSPACE%\test\baseline-out" (
+  call :Fail "Cannot clear test\baseline-out. Close any program holding its files before retrying."
+  goto :cleanup
+)
 "%BUILD_DIR%\%BASELINE_TARGET%.exe"
-if errorlevel 1 (
+set "BASELINE_EXIT=%ERRORLEVEL%"
+rem A crashed test binary returns a negative exit code, which `if errorlevel 1` misses because cmd
+rem compares it as a signed value. Compare the captured code so abnormal termination is reported
+rem as a failure instead of a missing md5.json.
+if not "%BASELINE_EXIT%"=="0" (
   if exist "%WORKSPACE%\test\out" (
     if not exist "%WORKSPACE%\result" mkdir "%WORKSPACE%\result"
     xcopy "%WORKSPACE%\test\out" "%WORKSPACE%\result\out\" /E /I /Y /Q >nul
   )
-  call :Fail "Baseline cache refresh for '%BACKEND_NAME%' failed."
+  call :Fail "Baseline cache refresh for '%BACKEND_NAME%' failed (exit code %BASELINE_EXIT%)."
   goto :cleanup
 )
 
@@ -255,6 +313,14 @@ call :RequireFile "%GENERATED_CACHE_DIR%\md5.json" "md5.json"
 if errorlevel 1 goto :cleanup
 call :RequireFile "%GENERATED_CACHE_DIR%\HEAD" "HEAD"
 if errorlevel 1 goto :cleanup
+call :RequireFile "%GENERATED_CACHE_DIR%\toolchain.txt" "toolchain.txt"
+if errorlevel 1 goto :cleanup
+set "GENERATED_TOOLCHAIN="
+set /p GENERATED_TOOLCHAIN=<"%GENERATED_CACHE_DIR%\toolchain.txt"
+if /i not "%GENERATED_TOOLCHAIN%"=="%TOOLCHAIN_LABEL%" (
+  call :Fail "%BASELINE_TARGET% produced a cache for '%GENERATED_TOOLCHAIN%' instead of '%TOOLCHAIN_LABEL%'."
+  goto :cleanup
+)
 git diff --no-index --quiet --ignore-cr-at-eol -- "%WORKSPACE%\test\baseline\version.json" "%GENERATED_CACHE_DIR%\version.json" >nul 2>nul
 if errorlevel 1 (
   call :Fail "%BASELINE_TARGET% left a version ledger that does not match test\baseline\version.json."
@@ -262,10 +328,7 @@ if errorlevel 1 (
 )
 
 if /i "%GENERATED_CACHE_DIR%"=="%CACHE_DIR%" goto :cache_ready
-if not exist "%CACHE_DIR%" mkdir "%CACHE_DIR%"
-copy /y "%GENERATED_CACHE_DIR%\md5.json" "%CACHE_DIR%\" >nul
-copy /y "%GENERATED_CACHE_DIR%\version.json" "%CACHE_DIR%\" >nul
-copy /y "%GENERATED_CACHE_DIR%\HEAD" "%CACHE_DIR%\" >nul
+call :ImportLegacyCache
 if errorlevel 1 (
   call :Fail "Importing the legacy OpenGL cache failed."
   goto :cleanup
@@ -288,7 +351,7 @@ set "STATUS=0"
 goto :cleanup
 
 :usage
-echo Usage: update_baseline.bat [USE_OPENGL^|USE_OPENGL_SWIFTSHADER^|USE_D3D12^|USE_D3D12_WARP^|USE_VULKAN] [--skip-images] [--no-checkout] [--no-fetch]
+echo Usage: update_baseline.bat [USE_OPENGL^|USE_OPENGL_SWIFTSHADER^|USE_D3D12^|USE_D3D12_WARP^|USE_VULKAN] [--skip-images] [--no-checkout] [--no-fetch] [--clang-cl]
 echo.
 echo   USE_OPENGL             OpenGL (default backend).
 echo   USE_OPENGL_SWIFTSHADER OpenGL on SwiftShader.
@@ -299,11 +362,15 @@ echo.
 echo   --skip-images          Only refresh md5.json; do not generate _base.webp images.
 echo   --no-checkout          Build the current working tree instead of origin/main.
 echo   --no-fetch             Skip git fetch and use the locally known origin/main.
+echo   --clang-cl             Build with clang-cl so private-access tests are compiled in.
 echo.
 echo By default the script stashes local changes and checks out origin/main, then restores the
 echo original branch and changes. Any stash created by this run is applied by exact OID and retained.
 echo Existing recovery details block a new run. Interruptions require manual recovery using that file.
 echo Run one backend at a time; test\out and version.json are shared.
+echo Both Windows scripts build Release by default. The md5 cache is keyed by backend and records
+echo its compiler and build type in toolchain.txt, so refresh it with the toolchain you intend to
+echo test with; a mismatch rebuilds instead of reusing the cache.
 exit /b 0
 
 :Fail
@@ -412,6 +479,19 @@ if "%RECOVERY_OWNED%"=="1" (
     exit /b 1
   )
   set "RECOVERY_OWNED=0"
+)
+exit /b 0
+
+:ImportLegacyCache
+if not exist "%CACHE_DIR%" (
+  mkdir "%CACHE_DIR%"
+  if errorlevel 1 exit /b 1
+)
+if exist "%CACHE_DIR%\toolchain.txt" del /q "%CACHE_DIR%\toolchain.txt"
+if exist "%CACHE_DIR%\toolchain.txt" exit /b 1
+for %%F in (md5.json version.json HEAD toolchain.txt) do (
+  copy /y "%GENERATED_CACHE_DIR%\%%F" "%CACHE_DIR%\" >nul
+  if errorlevel 1 exit /b 1
 )
 exit /b 0
 

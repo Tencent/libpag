@@ -24,35 +24,12 @@
 #include <system_error>
 #include <vector>
 #include "pagx/nodes/Image.h"
+#include "pagx/utils/Base64.h"
+#include "pagx/utils/ResourcePath.h"
 
 namespace pagx::cli {
 
 namespace {
-
-// A `source` is "external-relocatable" only when it is a plain relative filesystem path. Absolute
-// paths, drive letters, URI schemes (http:, https:, file:, data:, ...) are all treated as fixed
-// references we must not rewrite as relative-path copies.
-bool IsRelativeFilePath(const std::string& src) {
-  if (src.empty()) {
-    return false;
-  }
-  if (src[0] == '/' || src[0] == '\\') {
-    return false;  // POSIX absolute or UNC.
-  }
-  // scheme:// or drive letter "C:" — any ':' before the first '/' means a non-relative reference.
-  auto colon = src.find(':');
-  if (colon != std::string::npos) {
-    auto slash = src.find('/');
-    if (slash == std::string::npos || colon < slash) {
-      return false;
-    }
-  }
-  return true;
-}
-
-bool IsDataUri(const std::string& src) {
-  return src.compare(0, 5, "data:") == 0;
-}
 
 // Resolves a relative Image `source` to an existing file on disk. `<img>` sources arrive already
 // prefixed with the input directory (so they resolve as-is), while inline-SVG <image> hrefs are
@@ -149,12 +126,7 @@ void ApplyImageStorage(PAGXDocument* doc, const ImageStorageOptions& options,
     auto* image = static_cast<Image*>(nodePtr.get());
 
     if (options.mode == ImageStorageMode::Embed) {
-      // Already inline (embedded bytes or a data-URI path): nothing to do.
-      if (image->data || IsDataUri(image->filePath)) {
-        continue;
-      }
-      // Remote URLs cannot be inlined without network access; leave them alone.
-      if (image->filePath.rfind("http://", 0) == 0 || image->filePath.rfind("https://", 0) == 0) {
+      if (image->data || HasUriScheme(image->filePath)) {
         continue;
       }
       std::string resolved = {};

@@ -97,8 +97,6 @@ namespace pag {
 
 #ifdef PAG_TEST_ACCESS_PRIVATE
 namespace {
-static constexpr size_t InitialSequenceDiskSize = 568915u;
-
 static void ClearDiskCacheAndWait() {
   auto worker = DiskIOWorker::GetInstance();
   worker->waitAll();
@@ -132,6 +130,11 @@ static void ResetDiskCacheFixture(const std::string& cacheDir, size_t maxDiskSiz
   }
   DiskIOWorker::GetInstance()->waitAll();
 }
+
+// The committed fixture under resources/disk/libpag has the LZ4_APPLE compression tag.
+// SequenceFile rejects that tag on non-Apple platforms before decoding any frames, so the test
+// below reports a visible skip there instead of silently disappearing from the suite.
+static constexpr size_t InitialSequenceDiskSize = 568915u;
 
 struct SequenceFileState {
   std::shared_ptr<PAGFile> pagFile = nullptr;
@@ -311,6 +314,10 @@ static void CheckSequenceFilePixels(const std::shared_ptr<SequenceFile>& sequenc
  * 用例描述: 测试 SequenceFile 的磁盘缓存功能。
  */
 PAG_PIXEL_TEST(PAGDiskCacheTest, SequenceFile) {
+#ifndef __APPLE__
+  GTEST_SKIP() << "The committed fixture uses the LZ4_APPLE compression tag, which SequenceFile "
+                  "rejects on this platform.";
+#endif
   ScopedDiskCacheDirectory cleanup;
   ASSERT_FALSE(cleanup.directory.empty());
   auto cacheDir = cleanup.directory;

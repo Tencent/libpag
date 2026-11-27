@@ -36,6 +36,8 @@
 #include "pagx/nodes/Fill.h"
 #include "pagx/nodes/Font.h"
 #include "pagx/nodes/Group.h"
+#include "pagx/nodes/Image.h"
+#include "pagx/nodes/ImagePattern.h"
 #include "pagx/nodes/Layer.h"
 #include "pagx/nodes/PathData.h"
 #include "pagx/nodes/SolidColor.h"
@@ -831,6 +833,104 @@ CLI_TEST(PAGXHtmlTest, ColorImagePattern) {
       LoadAndConvert(ProjectPath::Absolute("resources/pagx_to_html/color_image_pattern.pagx"));
   ASSERT_FALSE(html.empty());
   EXPECT_NE(html.find("background-image"), std::string::npos);
+}
+
+static std::shared_ptr<pagx::PAGXDocument> MakeImageSourceDocument(const std::string& source,
+                                                                   pagx::TileMode tileMode) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto* layer = AddEllipseLayer(doc.get(), "imageSource");
+  auto* image = doc->makeNode<pagx::Image>();
+  image->filePath = source;
+  auto* pattern = doc->makeNode<pagx::ImagePattern>();
+  pattern->image = image;
+  pattern->tileModeX = tileMode;
+  pattern->tileModeY = tileMode;
+  pattern->scaleMode = pagx::ScaleMode::None;
+  pattern->matrix = pagx::Matrix::Identity();
+  auto* fill = static_cast<pagx::Fill*>(layer->contents.back());
+  fill->color = pattern;
+  return doc;
+}
+
+CLI_TEST(PAGXHtmlTest, ImageSourceReadableAbsoluteFileIsCopied) {
+  auto source = ProjectPath::Absolute("resources/apitest/test_timestretch.png");
+  auto resourceDir = ProjectPath::Absolute("test/out/PAGXHtmlTest/image-source-assets");
+  std::error_code ec;
+  std::filesystem::remove_all(resourceDir, ec);
+  ASSERT_FALSE(ec);
+  ASSERT_NE(tgfx::ImageCodec::MakeFrom(source), nullptr);
+#ifdef _WIN32
+  ASSERT_GE(source.size(), 3u);
+  ASSERT_EQ(source[1], ':');
+#endif
+  for (auto tileMode : {pagx::TileMode::Repeat, pagx::TileMode::Decal}) {
+    auto doc = MakeImageSourceDocument(source, tileMode);
+    pagx::HTMLExportOptions options;
+    options.extractStyleSheet = false;
+    auto html =
+        pagx::HTMLExporter::ToHTML(*doc, resourceDir, pagx::HTMLOutputMode::Fragment, options);
+
+    ASSERT_FALSE(html.empty());
+    EXPECT_NE(html.find("background-image:url(image-source-assets/test_timestretch.png)"),
+              std::string::npos);
+    EXPECT_EQ(html.find(source), std::string::npos);
+    EXPECT_EQ(html.find(pagx::EscapeCSSUrl(source)), std::string::npos);
+    ASSERT_TRUE(std::filesystem::exists(resourceDir + "/test_timestretch.png"));
+    EXPECT_EQ(std::filesystem::file_size(resourceDir + "/test_timestretch.png"),
+              std::filesystem::file_size(source));
+  }
+}
+
+CLI_TEST(PAGXHtmlTest, ImageSourceMissingAbsoluteFilesAreNotExposed) {
+  pagx::HTMLExportOptions options;
+  options.extractStyleSheet = false;
+  for (const std::string& source :
+       {"/pagx-missing-image.png", "C:/pagx-missing-image.png", R"(C:\pagx-missing-image.png)",
+        "C:pagx-missing-image.png", R"(\pagx-missing-image.png)",
+        R"(\\localhost\PAGXMissingShare\pagx-missing-image.png)",
+        "//localhost/PAGXMissingShare/pagx-missing-image.png", R"(\\?\C:\pagx-missing-image.png)",
+        R"(\\?\UNC\localhost\PAGXMissingShare\pagx-missing-image.png)"}) {
+    for (auto tileMode : {pagx::TileMode::Repeat, pagx::TileMode::Decal}) {
+      auto html = ConvertToHTML(MakeImageSourceDocument(source, tileMode), options);
+
+      ASSERT_FALSE(html.empty()) << source;
+      EXPECT_NE(html.find("background-image:url()"), std::string::npos) << source;
+      EXPECT_EQ(html.find(source), std::string::npos);
+      EXPECT_EQ(html.find(pagx::EscapeCSSUrl(source)), std::string::npos);
+    }
+  }
+}
+
+CLI_TEST(PAGXHtmlTest, ImageSourceRelativeFilesAndAllowedUrisArePreserved) {
+  pagx::HTMLExportOptions options;
+  options.extractStyleSheet = false;
+  for (const std::string& source : {"pagx-missing-assets/image.png", "../pagx-missing-image.png",
+                                    "http://example.com/image.png", "https://example.com/image.png",
+                                    "HTTP://example.com/image.png", "HTTPS://example.com/image.png",
+                                    "data:image/png;base64,AAAA"}) {
+    for (auto tileMode : {pagx::TileMode::Repeat, pagx::TileMode::Decal}) {
+      auto html = ConvertToHTML(MakeImageSourceDocument(source, tileMode), options);
+
+      ASSERT_FALSE(html.empty()) << source;
+      EXPECT_NE(html.find("background-image:url(" + source + ")"), std::string::npos) << source;
+    }
+  }
+}
+
+CLI_TEST(PAGXHtmlTest, ImageSourceDisallowedUrisAreNotExposed) {
+  pagx::HTMLExportOptions options;
+  options.extractStyleSheet = false;
+  for (const std::string& source :
+       {"ftp://example.com/image.png", "file:///missing/image.png", "mailto:image@example.com",
+        "hash:missing-image", "javascript:missingImage", "vbscript:missingImage"}) {
+    for (auto tileMode : {pagx::TileMode::Repeat, pagx::TileMode::Decal}) {
+      auto html = ConvertToHTML(MakeImageSourceDocument(source, tileMode), options);
+
+      ASSERT_FALSE(html.empty()) << source;
+      EXPECT_NE(html.find("background-image:url()"), std::string::npos) << source;
+      EXPECT_EQ(html.find(source), std::string::npos);
+    }
+  }
 }
 
 // =============================================================================

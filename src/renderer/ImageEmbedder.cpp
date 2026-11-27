@@ -23,6 +23,7 @@
 #include "base/utils/Log.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/types/Data.h"
+#include "pagx/utils/ResourcePath.h"
 
 namespace pagx {
 
@@ -60,7 +61,7 @@ bool ImageEmbedder::embed(PAGXDocument* document) {
     }
     auto* image = static_cast<Image*>(node.get());
     const auto& path = image->filePath;
-    if (image->data != nullptr || path.empty() || path.find(':') != std::string::npos) {
+    if (image->data != nullptr || !IsLocalFilePath(path)) {
       continue;
     }
     images.push_back(image);

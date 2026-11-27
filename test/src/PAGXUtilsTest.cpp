@@ -42,10 +42,12 @@
 #include "pagx/runtime/Matrix3DDecompose.h"
 #include "pagx/svg/SVGFeatureProbe.h"
 #include "pagx/svg/SVGPathParser.h"
+#include "pagx/utils/Base64.h"
 #include "pagx/utils/ExporterUtils.h"
 #include "pagx/utils/ImageFormatUtils.h"
 #include "pagx/utils/ImageMime.h"
 #include "pagx/utils/RasterUtils.h"
+#include "pagx/utils/ResourcePath.h"
 #include "pagx/utils/StrokeGeometryUtils.h"
 #include "pagx/utils/TextUtils.h"
 #include "renderer/LayerBuilder.h"
@@ -2936,6 +2938,46 @@ PAGX_TEST(PAGXUtilsTest, IsSupportedImageMimePinsTheSpecSet) {
   EXPECT_FALSE(pagx::IsSupportedImageMime("image/svg+xml"));
   EXPECT_FALSE(pagx::IsSupportedImageMime("application/octet-stream"));
   EXPECT_FALSE(pagx::IsSupportedImageMime(nullptr));
+}
+
+// Resource discovery, image embedding, import resolution and the HTML exporter all need the same
+// answer for "scheme, drive path, absolute path or relative path"; pin that classification here.
+PAGX_TEST(PAGXUtilsTest, ResourcePathClassification) {
+  EXPECT_EQ(pagx::GetUriScheme("https://example.com/x.png"), "https");
+  EXPECT_EQ(pagx::GetUriScheme("data:image/png;base64,AA=="), "data");
+  EXPECT_EQ(pagx::GetUriScheme("file:///tmp/x.png"), "file");
+  EXPECT_EQ(pagx::GetUriScheme("C:/images/x.png"), "");
+  EXPECT_EQ(pagx::GetUriScheme("C:\\images\\x.png"), "");
+  EXPECT_EQ(pagx::GetUriScheme("\\\\?\\C:\\images\\x.png"), "");
+  EXPECT_EQ(pagx::GetUriScheme("\\\\server\\share\\x.png"), "");
+  EXPECT_EQ(pagx::GetUriScheme("dir/a:b.png"), "");
+  EXPECT_EQ(pagx::GetUriScheme(""), "");
+
+  EXPECT_TRUE(pagx::HasUriScheme("mailto:user@example.com"));
+  EXPECT_FALSE(pagx::HasUriScheme("C:/images/x.png"));
+  EXPECT_FALSE(pagx::HasUriScheme("images/x.png"));
+  EXPECT_FALSE(pagx::HasUriScheme(""));
+
+  EXPECT_TRUE(pagx::IsDataUri("DATA:image/png;base64,AA=="));
+  EXPECT_TRUE(pagx::IsDataUri("data:image/png;base64,AA=="));
+  EXPECT_FALSE(pagx::IsDataUri("https://example.com/x.png"));
+
+  EXPECT_TRUE(pagx::IsRelativeFilePath("images/x.png"));
+  EXPECT_TRUE(pagx::IsRelativeFilePath("dir/a:b.png"));
+  EXPECT_FALSE(pagx::IsRelativeFilePath("C:/images/x.png"));
+  EXPECT_FALSE(pagx::IsRelativeFilePath("C:relative.png"));
+  EXPECT_FALSE(pagx::IsRelativeFilePath("\\\\?\\C:\\images\\x.png"));
+  EXPECT_FALSE(pagx::IsRelativeFilePath("/abs/x.png"));
+  EXPECT_FALSE(pagx::IsRelativeFilePath("https://example.com/x.png"));
+  EXPECT_FALSE(pagx::IsRelativeFilePath(""));
+
+  EXPECT_TRUE(pagx::IsLocalFilePath("images/x.png"));
+  EXPECT_TRUE(pagx::IsLocalFilePath("C:/images/x.png"));
+  EXPECT_TRUE(pagx::IsLocalFilePath("\\\\?\\C:\\images\\x.png"));
+  EXPECT_TRUE(pagx::IsLocalFilePath("\\\\server\\share\\x.png"));
+  EXPECT_FALSE(pagx::IsLocalFilePath("https://example.com/x.png"));
+  EXPECT_FALSE(pagx::IsLocalFilePath("data:image/png;base64,AA=="));
+  EXPECT_FALSE(pagx::IsLocalFilePath(""));
 }
 
 }  // namespace pag

@@ -137,9 +137,9 @@ if ! grep -Fxq "$BUILD_DIR/CMakeFiles/$BASELINE_TARGET.dir" "$TARGET_LIST"; then
 fi
 
 cmake --build "$BUILD_DIR" --target "$BASELINE_TARGET" -- -j 12
-# Older main revisions write their OpenGL results to the shared cache. Remove the previous MD5
-# file so a failed or incomplete refresh cannot be imported as a fresh per-backend cache.
-rm -f "$GENERATED_CACHE_DIR/md5.json"
+# Older main revisions may not publish toolchain metadata. Invalidate its previous marker before
+# replacing the MD5 file so an older binary cannot leave stale provenance behind.
+rm -f "$GENERATED_CACHE_DIR/toolchain.txt" "$GENERATED_CACHE_DIR/md5.json"
 if ! "$BUILD_DIR/$BASELINE_TARGET"; then
   mkdir -p "$WORKSPACE/result"
   if [ -d "$WORKSPACE/test/out" ]; then
@@ -156,8 +156,12 @@ if [ ! -s "$GENERATED_CACHE_DIR/md5.json" ] ||
 fi
 if [ "$GENERATED_CACHE_DIR" != "$CACHE_DIR" ]; then
   mkdir -p "$CACHE_DIR"
+  rm -f "$CACHE_DIR/toolchain.txt"
   cp "$GENERATED_CACHE_DIR/md5.json" "$GENERATED_CACHE_DIR/version.json" \
      "$GENERATED_CACHE_DIR/HEAD" "$CACHE_DIR/"
+  if [ -s "$GENERATED_CACHE_DIR/toolchain.txt" ]; then
+    cp "$GENERATED_CACHE_DIR/toolchain.txt" "$CACHE_DIR/"
+  fi
   echo "Imported the legacy OpenGL cache into '$BACKEND_NAME'."
 fi
 RestoreWorkspace

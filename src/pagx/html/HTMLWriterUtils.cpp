@@ -41,7 +41,9 @@
 #include "pagx/utils/Base64.h"
 #include "pagx/utils/ExporterUtils.h"
 #include "pagx/utils/ImageMime.h"
+#include "pagx/utils/ResourcePath.h"
 #include "pagx/utils/StringParser.h"
+#include "pagx/utils/StringUtils.h"
 #include "renderer/LineBreaker.h"
 #include "tgfx/core/Data.h"
 #include "tgfx/core/ImageCodec.h"
@@ -177,33 +179,10 @@ std::string EscapeCSSUrl(const std::string& url) {
 
 // Returns true when url has no scheme (relative path), or has a scheme on the safe allow-list
 // (http, https, data). Everything else (file://, javascript:, vbscript:, etc.) is rejected.
-// Scheme detection follows RFC 3986: a leading run of [a-zA-Z][a-zA-Z0-9+.-]* followed by ':'.
 static bool IsSafeImageUrl(const std::string& url) {
-  size_t colon = url.find(':');
-  if (colon == std::string::npos || colon == 0) {
+  auto scheme = ToLowerAscii(GetUriScheme(url));
+  if (scheme.empty()) {
     return true;
-  }
-  char first = url[0];
-  bool isAlpha = (first >= 'a' && first <= 'z') || (first >= 'A' && first <= 'Z');
-  if (!isAlpha) {
-    return true;
-  }
-  for (size_t i = 1; i < colon; i++) {
-    char c = url[i];
-    bool ok = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') ||
-              c == '+' || c == '.' || c == '-';
-    if (!ok) {
-      return true;
-    }
-  }
-  std::string scheme;
-  scheme.reserve(colon);
-  for (size_t i = 0; i < colon; i++) {
-    char c = url[i];
-    if (c >= 'A' && c <= 'Z') {
-      c = static_cast<char>(c - 'A' + 'a');
-    }
-    scheme += c;
   }
   return scheme == "http" || scheme == "https" || scheme == "data";
 }
@@ -336,9 +315,7 @@ std::string GetImageSrc(const Image* image, HTMLWriterContext* ctx) {
   if (!IsSafeImageUrl(image->filePath)) {
     return {};
   }
-  size_t colon = image->filePath.find(':');
-  bool hasScheme = (colon != std::string::npos && colon > 0);
-  if (!hasScheme) {
+  if (IsLocalFilePath(image->filePath)) {
     auto codec = tgfx::ImageCodec::MakeFrom(image->filePath);
     if (codec) {
       // Preferred path: copy the file alongside the HTML output (under staticImgDir) and
@@ -364,6 +341,7 @@ std::string GetImageSrc(const Image* image, HTMLWriterContext* ctx) {
         }
       }
     }
+    return IsRelativeFilePath(image->filePath) ? EscapeCSSUrl(image->filePath) : std::string{};
   }
   return EscapeCSSUrl(image->filePath);
 }

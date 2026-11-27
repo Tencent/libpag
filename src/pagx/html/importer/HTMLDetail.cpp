@@ -18,13 +18,13 @@
 
 #include "pagx/html/importer/HTMLDetail.h"
 #include <algorithm>
-#include <cctype>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <sstream>
 #include <utility>
 #include "pagx/html/importer/HTMLBoxAttributes.h"
+#include "pagx/utils/ResourcePath.h"
 
 namespace pagx::html {
 
@@ -665,16 +665,7 @@ std::string DirectoryOf(const std::string& filePath) {
 }
 
 bool LooksAbsolutePath(const std::string& src) {
-  if (src.empty()) return false;
-  if (src[0] == '/' || src[0] == '\\') return true;
-  if (src.find("://") != std::string::npos) return true;
-  if (src.compare(0, 5, "data:") == 0) return true;
-  // Windows drive letter ("C:/")
-  if (src.size() >= 3 && std::isalpha(static_cast<unsigned char>(src[0])) && src[1] == ':' &&
-      (src[2] == '/' || src[2] == '\\')) {
-    return true;
-  }
-  return false;
+  return !src.empty() && !IsRelativeFilePath(src);
 }
 
 Color HexToColor(uint32_t hex, bool hasAlpha) {

@@ -41,6 +41,11 @@ class FontConfig;
  * Input that uses constructs outside the subset is accepted on a best-effort basis: the
  * offending elements/properties are skipped or downgraded and a diagnostic is emitted via
  * `PAGXDocument::errors` (CLI surfaces these as warnings).
+ *
+ * Traversal is bounded to 128 nested elements; deeper subtrees are skipped with a diagnostic.
+ * Each recursion level consumes several KB of stack in Debug builds, so callers that may receive
+ * deeply nested input should provide a stack budget large enough for that bound (the shipped CLI
+ * and test binaries reserve 8 MB on Windows, where the default is 1 MB).
  */
 class HTMLImporter {
  public:
