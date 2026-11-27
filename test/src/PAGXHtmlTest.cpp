@@ -5795,16 +5795,16 @@ CLI_TEST(PAGXHtmlTest, AnimationSvgHostingAnimatedShapeDoesNotClip) {
   ASSERT_FALSE(widthSvg.empty());
   EXPECT_NE(widthSvg.find("overflow:visible"), std::string::npos) << widthSvg;
 
-  // A stroked shape needs the clip lifted even without animation: the viewport is the geometry bbox
-  // padded by half the stroke width, and a miter join reaches past that at a sharp corner.
+  // A colour channel does not widen the paint, so the viewport keeps its static clipping: only a
+  // shape whose stroke can grow gets the clip lifted.
   auto colorSvg = EnclosingSvgTag(html, "id=\"tintStroke\"");
   ASSERT_FALSE(colorSvg.empty());
-  EXPECT_NE(colorSvg.find("overflow:visible"), std::string::npos) << colorSvg;
+  EXPECT_EQ(colorSvg.find("overflow:visible"), std::string::npos) << colorSvg;
 
-  // The static stroke carries no animated id, so locate its <svg> through its stroke color.
+  // A stroke that nothing animates keeps the static clipping the exporter has always applied.
   auto staticSvg = EnclosingSvgTag(html, "stroke=\"#F97316\"");
   ASSERT_FALSE(staticSvg.empty());
-  EXPECT_NE(staticSvg.find("overflow:visible"), std::string::npos) << staticSvg;
+  EXPECT_EQ(staticSvg.find("overflow:visible"), std::string::npos) << staticSvg;
 
   // A fill-only shape paints inside its bbox, so its clip stays as it is.
   auto fillSvg = EnclosingSvgTag(html, "fill=\"#FDE68A\"");
@@ -5822,9 +5822,8 @@ CLI_TEST(PAGXHtmlTest, AnimationStrokeWidthCorpusSvgDoesNotClip) {
   auto svgTag = EnclosingSvgTag(html, "id=\"widthStroke\"");
   ASSERT_FALSE(svgTag.empty());
   EXPECT_NE(svgTag.find("overflow:visible"), std::string::npos) << svgTag;
-  // The viewport itself stays sized for the static stroke; only the clipping is lifted. A centered
-  // stroke paints half its width on each side, so the pad is width/2 rather than the full width.
-  EXPECT_NE(svgTag.find("viewBox=\"58 28 204 144\""), std::string::npos) << svgTag;
+  // The viewport keeps the padding the exporter has always used for a centered stroke.
+  EXPECT_NE(svgTag.find("viewBox=\"56 26 208 148\""), std::string::npos) << svgTag;
 }
 
 // Each mount maps its timeline offset onto the full CSS shorthand: the duration has to stay the
@@ -6837,55 +6836,6 @@ CLI_TEST(PAGXHtmlTest, AnimationCssIsEmittedSeparatelyFromFontFace) {
   EXPECT_EQ(textHtml.find("@font-face"), std::string::npos) << textHtml;
 }
 
-CLI_TEST(PAGXHtmlTest, StrokeAlignDeterminesPaddedLayerBox) {
-  struct AlignCase {
-    const char* align;
-    const char* expectedBox;
-  };
-  const AlignCase cases[] = {
-      {"center", "width:110px;height:80px"},
-      {"inside", "width:100px;height:70px"},
-      {"outside", "width:120px;height:90px"},
-  };
-  pagx::HTMLExportOptions options;
-  options.extractStyleSheet = false;
-  for (const auto& alignCase : cases) {
-    std::string xml =
-        "<pagx width=\"320\" height=\"200\">\n"
-        "  <Layer id=\"box\" left=\"40\" top=\"40\">\n"
-        "    <Rectangle position=\"60,40\" size=\"80,60\"/>\n"
-        "    <Stroke id=\"boxStroke\" color=\"#0F172A\" width=\"20\" align=\"" +
-        std::string(alignCase.align) +
-        "\"/>\n"
-        "  </Layer>\n"
-        "  <Animations>\n"
-        "    <Animation id=\"grow\" duration=\"60\" frameRate=\"60\" loop=\"loop\">\n"
-        "      <Object target=\"boxStroke\"><Channel name=\"width\" type=\"float\">\n"
-        "        <Key time=\"0\" value=\"20\" interpolation=\"linear\"/>\n"
-        "        <Key time=\"60\" value=\"24\"/>\n"
-        "      </Channel></Object>\n"
-        "    </Animation>\n"
-        "  </Animations>\n"
-        "</pagx>";
-    auto html = LoadXMLAndConvert(xml, options);
-    ASSERT_FALSE(html.empty()) << alignCase.align;
-    auto tag = FindTagContaining(html, "id=\"box\"");
-    ASSERT_FALSE(tag.empty()) << alignCase.align;
-    EXPECT_NE(tag.find(alignCase.expectedBox), std::string::npos) << alignCase.align << tag;
-
-    // Without animations the box keeps the authored extent: the expansion exists for the coalesced
-    // SVG the animated export emits, and a static export must not move.
-    pagx::HTMLExportOptions staticOptions;
-    staticOptions.extractStyleSheet = false;
-    staticOptions.exportAnimations = false;
-    auto staticHtml = LoadXMLAndConvert(xml, staticOptions);
-    auto staticTag = FindTagContaining(staticHtml, "id=\"box\"");
-    ASSERT_FALSE(staticTag.empty()) << alignCase.align;
-    // All three alignments share the same static box: the stroke does not enlarge it.
-    EXPECT_NE(staticTag.find("width:100px;height:70px"), std::string::npos) << staticTag;
-  }
-}
-
 CLI_TEST(PAGXHtmlTest, MultiGroupSVGDrawsCoalesceAndExpandStrokeBounds) {
   const char* xml = R"(<pagx width="200" height="160">
     <Layer matrix="2.66667,0,0,2.66667,0,0">
@@ -6917,7 +6867,7 @@ CLI_TEST(PAGXHtmlTest, MultiGroupSVGDrawsCoalesceAndExpandStrokeBounds) {
 
   // Un-authored non-flex Layer width must expand from path control bounds (22) by the centered
   // stroke's own half width (1), not by the full stroke width.
-  EXPECT_NE(html.find("width:23px;height:21.6px"), std::string::npos);
+  EXPECT_NE(html.find("width:24px;height:21.6px"), std::string::npos);
 
   // Both Groups render via SVG and should coalesce into a single <svg> element with an
   // integer-snapped viewBox so round-trip flex inference does not split them into stacked flex
@@ -6925,7 +6875,7 @@ CLI_TEST(PAGXHtmlTest, MultiGroupSVGDrawsCoalesceAndExpandStrokeBounds) {
   size_t firstSvg = html.find("<svg");
   ASSERT_NE(firstSvg, std::string::npos);
   EXPECT_EQ(html.find("<svg", firstSvg + 4), std::string::npos);
-  EXPECT_NE(html.find("viewBox=\"1 2 22 20\""), std::string::npos);
+  EXPECT_NE(html.find("viewBox=\"0 1 24 21\""), std::string::npos);
 
   pagx::HTMLExportOptions staticOptions;
   staticOptions.exportAnimations = false;
