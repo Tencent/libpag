@@ -7609,33 +7609,8 @@ static pagx::Layer* FindLayerWithFilters(pagx::Layer* layer) {
  * the foreground blur follows a feBlend whose "in" is omitted (implicit SourceGraphic).
  */
 PAGX_TEST(PAGXSVGTest, SVGImport_DropShadowInnerShadowForegroundBlur) {
-  std::string svg =
-      "<svg width=\"364\" height=\"364\" viewBox=\"0 0 364 364\" fill=\"none\">"
-      "<g filter=\"url(#f)\">"
-      "<rect x=\"30\" y=\"30\" width=\"300\" height=\"300\" fill=\"#E4E4E4\"/>"
-      "<rect x=\"30.5\" y=\"30.5\" width=\"299\" height=\"299\" stroke=\"black\"/>"
-      "</g>"
-      "<defs><filter id=\"f\" x=\"0\" y=\"0\" width=\"364\" height=\"364\" "
-      "filterUnits=\"userSpaceOnUse\" color-interpolation-filters=\"sRGB\">"
-      "<feFlood flood-opacity=\"0\" result=\"BackgroundImageFix\"/>"
-      "<feColorMatrix in=\"SourceAlpha\" type=\"matrix\" "
-      "values=\"0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0\" result=\"hardAlpha\"/>"
-      "<feOffset dx=\"30\" dy=\"30\"/><feGaussianBlur stdDeviation=\"2\"/>"
-      "<feComposite in2=\"hardAlpha\" operator=\"out\"/>"
-      "<feColorMatrix type=\"matrix\" "
-      "values=\"0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 1 0\"/>"
-      "<feBlend mode=\"normal\" in2=\"BackgroundImageFix\" result=\"effect1_dropShadow\"/>"
-      "<feBlend mode=\"normal\" in=\"SourceGraphic\" in2=\"effect1_dropShadow\" result=\"shape\"/>"
-      "<feColorMatrix in=\"SourceAlpha\" type=\"matrix\" "
-      "values=\"0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0\" result=\"hardAlpha\"/>"
-      "<feOffset dx=\"30\" dy=\"30\"/><feGaussianBlur stdDeviation=\"2\"/>"
-      "<feComposite in2=\"hardAlpha\" operator=\"arithmetic\" k2=\"-1\" k3=\"1\"/>"
-      "<feColorMatrix type=\"matrix\" "
-      "values=\"0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0\"/>"
-      "<feBlend mode=\"normal\" in2=\"shape\" result=\"effect2_innerShadow\"/>"
-      "<feGaussianBlur stdDeviation=\"15\" result=\"effect3_foregroundBlur\"/>"
-      "</filter></defs></svg>";
-  auto doc = pagx::SVGImporter::ParseString(svg);
+  auto doc = pagx::SVGImporter::Parse(
+      ProjectPath::Absolute("resources/svg/drop_shadow_inner_shadow_blur.svg"));
   ASSERT_NE(doc, nullptr);
 
   pagx::Layer* filtered = nullptr;
