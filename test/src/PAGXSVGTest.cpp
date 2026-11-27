@@ -7610,7 +7610,7 @@ static pagx::Layer* FindLayerWithFilters(pagx::Layer* layer) {
  */
 PAGX_TEST(PAGXSVGTest, SVGImport_DropShadowInnerShadowForegroundBlur) {
   auto doc = pagx::SVGImporter::Parse(
-      ProjectPath::Absolute("resources/svg/drop_shadow_inner_shadow_blur.svg"));
+      ProjectPath::Absolute("resources/svg/filter/drop_shadow_inner_shadow_blur.svg"));
   ASSERT_NE(doc, nullptr);
 
   pagx::Layer* filtered = nullptr;
@@ -7654,7 +7654,7 @@ PAGX_TEST(PAGXSVGTest, SVGImport_DropShadowInnerShadowForegroundBlur) {
  */
 PAGX_TEST(PAGXSVGTest, SVGImport_DuoNoise) {
   auto doc = pagx::SVGImporter::Parse(
-      ProjectPath::Absolute("resources/svg/noise_duo.svg"));
+      ProjectPath::Absolute("resources/svg/filter/duo_noise.svg"));
   ASSERT_NE(doc, nullptr);
   pagx::Layer* filtered = nullptr;
   for (auto* root : doc->layers) {
@@ -7684,7 +7684,7 @@ PAGX_TEST(PAGXSVGTest, SVGImport_DuoNoise) {
  */
 PAGX_TEST(PAGXSVGTest, SVGImport_MultiNoise) {
   auto doc = pagx::SVGImporter::Parse(
-      ProjectPath::Absolute("resources/svg/noise_multi.svg"));
+      ProjectPath::Absolute("resources/svg/filter/multi_noise.svg"));
   ASSERT_NE(doc, nullptr);
   pagx::Layer* filtered = nullptr;
   for (auto* root : doc->layers) {
