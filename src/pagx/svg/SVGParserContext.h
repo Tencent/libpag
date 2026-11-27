@@ -106,6 +106,8 @@ class SVGParserContext {
   std::shared_ptr<PAGXDocument> parseFile(const std::string& filePath);
 
  private:
+  friend class SVGFilterParser;
+
   std::shared_ptr<PAGXDocument> parseDOM(const std::shared_ptr<XMLDOM>& dom);
 
   void parseDefs(const std::shared_ptr<DOMNode>& defsNode);

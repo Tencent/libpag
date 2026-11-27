@@ -1,0 +1,17 @@
+<svg width="100" height="100" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+  <g filter="url(#f)">
+    <rect x="20" y="20" width="60" height="60" fill="#E4E4E4"/>
+  </g>
+  <defs>
+    <filter id="f" x="-20%" y="-20%" width="140%" height="140%">
+      <feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
+      <feOffset dx="5" dy="5" result="offset"/>
+      <feComposite in2="hardAlpha" operator="arithmetic" k2="-1" k3="1" result="inner"/>
+      <feColorMatrix type="matrix" values="0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0" result="color"/>
+      <feMerge>
+        <feMergeNode in="SourceGraphic"/>
+        <feMergeNode in="color"/>
+      </feMerge>
+    </filter>
+  </defs>
+</svg>

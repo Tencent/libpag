@@ -1,0 +1,26 @@
+<svg width="50" height="50" viewBox="0 0 50 50" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <g filter="url(#noise)">
+    <rect width="50" height="50" fill="#D9D9D9"/>
+  </g>
+  <defs>
+    <filter id="noise" x="0" y="0" width="50" height="50" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feTurbulence type="fractalNoise" baseFrequency="0.6666667" numOctaves="3" seed="2488" result="noise"/>
+      <feColorMatrix in="noise" type="luminanceToAlpha" result="alphaNoise"/>
+      <feComponentTransfer in="alphaNoise" result="band1">
+        <feFuncA type="discrete" tableValues="0 1 0 1"/>
+      </feComponentTransfer>
+      <feComponentTransfer in="alphaNoise" result="band2">
+        <feFuncA type="discrete" tableValues="1 0 1 0"/>
+      </feComponentTransfer>
+      <feFlood flood-color="rgba(255, 0, 0, 0.25)" result="redFlood"/>
+      <feComposite operator="in" in="redFlood" in2="band1" result="red"/>
+      <feFlood flood-color="rgba(255, 234, 0, 0.25)" result="yellowFlood"/>
+      <feComposite operator="in" in="yellowFlood" in2="band2" result="yellow"/>
+      <feMerge result="effect1_noise">
+        <feMergeNode in="SourceGraphic"/>
+        <feMergeNode in="red"/>
+        <feMergeNode in="yellow"/>
+      </feMerge>
+    </filter>
+  </defs>
+</svg>

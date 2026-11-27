@@ -1,0 +1,18 @@
+<svg width="100" height="100" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+  <g filter="url(#f)">
+    <rect x="20" y="20" width="60" height="60" fill="#3366CC"/>
+  </g>
+  <defs>
+    <filter id="f" x="-20%" y="-20%" width="140%" height="140%">
+      <feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
+      <feMorphology in="SourceAlpha" operator="dilate" radius="6" result="dilated"/>
+      <feOffset dy="8" result="offset"/>
+      <feGaussianBlur stdDeviation="6" result="blur"/>
+      <feColorMatrix type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.3 0" result="color"/>
+      <feMerge>
+        <feMergeNode in="SourceGraphic"/>
+        <feMergeNode in="color"/>
+      </feMerge>
+    </filter>
+  </defs>
+</svg>
