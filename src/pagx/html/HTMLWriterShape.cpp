@@ -56,14 +56,15 @@ float HTMLWriter::StrokeExtentPad(const Stroke* stroke) {
   if (stroke == nullptr || !(stroke->width > 0.0f)) {
     return 0.0f;
   }
+  // The static viewport keeps the paddings it always had: a non-centred stroke gets twice the
+  // width, a centred one its full width.
   switch (stroke->align) {
     case StrokeAlign::Inside:
-      return 0.0f;
     case StrokeAlign::Outside:
-      return stroke->width;
+      return stroke->width * 2.0f;
     case StrokeAlign::Center:
     default:
-      return stroke->width * 0.5f;
+      return stroke->width;
   }
 }
 
@@ -2049,12 +2050,6 @@ void HTMLWriter::renderSVG(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
   if (!_ctx->fadeVars.empty() || (alpha < 1.0f)) {
     svgStyle += PaintOpacityCss(_ctx->fadeVars, alpha);
   }
-  if (stroke != nullptr) {
-    // The viewport is the geometry bbox padded by half the stroke width, but a miter join reaches
-    // past that at sharp corners (a 5-point star tip overshoots by ~8px), so the painted extent has
-    // to be allowed to leave the box.
-    svgStyle += ";overflow:visible";
-  }
 
   out.openTag("svg");
   out.addAttr("width", CssFloatToString(sw));
@@ -2246,12 +2241,7 @@ void HTMLWriter::emitSVGContent(HTMLBuilder& out, const std::vector<GeoInfo>& ge
         break;
       }
       case NodeType::Ellipse: {
-        // `<ellipse>` always begins its implicit contour at the right-hand midpoint, while tgfx
-        // starts the oval at the top centre (SkPath::addOval startIndex=0). `stroke-dasharray`
-        // phase is measured from the contour start, so a dashed oval would land a quarter
-        // perimeter off; emit the `<path>` form, whose start GeoToPathData already matches.
-        bool needsPathForDash = stroke && !stroke->dashes.empty();
-        if (trim || needsPathForDash) {
+        if (trim) {
           PathData pathData = PathDataFromSVGString("");
           GeoToPathData(g.element, g.type, pathData);
           std::string d = PathDataToSVGString(pathData);
