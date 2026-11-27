@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: a dashed ellipse keeps the same contour start (top centre) and the same closing seam in
+     the HTML export as in the PAGX render. Two cues make a mismatch visible:
+       1. the single long gap (63 against the usual 12) is a landmark - a start-point shift moves it
+          onto a different arc instead of sliding identical dashes around;
+       2. the dash period is 359 against a perimeter of ~538.24, so the pattern repeats only 1.5
+          times and the closing seam lands mid-pattern (538.24 mod 359 = 179.24, about half a
+          period). A constant dash phase offset cannot move a seam, so a seam mismatch shows up as a
+          wrongly spliced dash at the top.
+     Ref: - -->
+<pagx width="320" height="200">
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F8FAFC"/>
+  </Layer>
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Ellipse position="160,100" size="200,140"/>
+    <Fill color="#FFFFFF"/>
+    <Stroke color="#0E7490" width="8"
+            dashes="16,12,16,12,16,12,16,12,16,12,16,12,16,12,16,12,16,12,16,12,16,63"/>
+  </Layer>
+</pagx>

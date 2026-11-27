@@ -86,6 +86,19 @@ static std::string FindTagContaining(const std::string& html, const std::string&
   return html.substr(tagStart, tagEnd - tagStart + 1);
 }
 
+static std::string FindAttribute(const std::string& tag, const std::string& name) {
+  auto pos = tag.find(name + "=\"");
+  if (pos == std::string::npos) {
+    return "";
+  }
+  pos += name.size() + 2;
+  auto end = tag.find('"', pos);
+  if (end == std::string::npos) {
+    return "";
+  }
+  return tag.substr(pos, end - pos);
+}
+
 static size_t CountOccurrences(const std::string& text, const std::string& needle) {
   size_t count = 0;
   size_t pos = 0;
@@ -710,6 +723,68 @@ CLI_TEST(PAGXHtmlTest, GeometryEllipse) {
   // Accept both class-rule and inlined forms.
   EXPECT_TRUE(html.find("border-radius: 50%") != std::string::npos ||
               html.find("border-radius:50%") != std::string::npos);
+}
+
+CLI_TEST(PAGXHtmlTest, DashedEllipseIsExportedAsTopStartedPath) {
+  auto html = LoadXMLAndConvert(R"(
+    <pagx width="200" height="200">
+      <Layer width="200" height="200">
+        <Ellipse position="100,100" size="80,80"/>
+        <Stroke color="#000000" width="4" dashes="10,6"/>
+      </Layer>
+    </pagx>)");
+  ASSERT_FALSE(html.empty());
+  auto tag = FindTagContaining(html, "stroke-dasharray");
+  ASSERT_FALSE(tag.empty());
+  // `<ellipse>` always begins its contour at 3 o'clock and can only draw the default direction,
+  // while a PAGX Ellipse begins at 12 o'clock and honours `reversed`. A dash pattern is measured
+  // from the contour start and wraps at the closing seam, so a constant offset on `<ellipse>`
+  // cannot align it around the whole contour: the seam stays at a different point and the pattern
+  // jumps there by the perimeter modulo the dash period. The 80x80 oval with a "10,6" pattern is
+  // deliberately non-integral (80*pi mod 16 = 11.33), so the seam cannot hide the mismatch.
+  EXPECT_EQ(tag.find("<ellipse"), std::string::npos);
+  ASSERT_NE(tag.find("<path"), std::string::npos);
+  auto d = FindAttribute(tag, "d");
+  ASSERT_FALSE(d.empty());
+  auto path = pagx::PathDataFromSVGString(d);
+  ASSERT_GE(path.verbs().size(), 4u);
+  ASSERT_GE(path.points().size(), 4u);
+  EXPECT_EQ(path.verbs()[0], pagx::PathVerb::Move);
+  EXPECT_EQ(path.verbs()[1], pagx::PathVerb::Cubic);
+  // Top centre, then the first segment heads right towards 3 o'clock.
+  EXPECT_NEAR(path.points()[0].x, 100.0f, 0.01f);
+  EXPECT_NEAR(path.points()[0].y, 60.0f, 0.01f);
+  EXPECT_GT(path.points()[1].x, path.points()[0].x);
+  EXPECT_NEAR(path.points()[3].x, 140.0f, 0.01f);
+  EXPECT_NEAR(path.points()[3].y, 100.0f, 0.01f);
+}
+
+CLI_TEST(PAGXHtmlTest, ReversedDashedEllipseIsExportedAsTopStartedPath) {
+  auto html = LoadXMLAndConvert(R"(
+    <pagx width="200" height="200">
+      <Layer width="200" height="200">
+        <Ellipse position="100,100" size="80,80" reversed="true"/>
+        <Stroke color="#000000" width="4" dashes="10,6"/>
+      </Layer>
+    </pagx>)");
+  ASSERT_FALSE(html.empty());
+  auto tag = FindTagContaining(html, "stroke-dasharray");
+  ASSERT_FALSE(tag.empty());
+  EXPECT_EQ(tag.find("<ellipse"), std::string::npos);
+  ASSERT_NE(tag.find("<path"), std::string::npos);
+  auto d = FindAttribute(tag, "d");
+  ASSERT_FALSE(d.empty());
+  auto path = pagx::PathDataFromSVGString(d);
+  ASSERT_GE(path.verbs().size(), 4u);
+  ASSERT_GE(path.points().size(), 4u);
+  EXPECT_EQ(path.verbs()[0], pagx::PathVerb::Move);
+  EXPECT_EQ(path.verbs()[1], pagx::PathVerb::Cubic);
+  // The same top centre start, but the first segment heads left towards 9 o'clock.
+  EXPECT_NEAR(path.points()[0].x, 100.0f, 0.01f);
+  EXPECT_NEAR(path.points()[0].y, 60.0f, 0.01f);
+  EXPECT_LT(path.points()[1].x, path.points()[0].x);
+  EXPECT_NEAR(path.points()[3].x, 60.0f, 0.01f);
+  EXPECT_NEAR(path.points()[3].y, 100.0f, 0.01f);
 }
 
 CLI_TEST(PAGXHtmlTest, GeometryPolystar) {
