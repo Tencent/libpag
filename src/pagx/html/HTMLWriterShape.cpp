@@ -2046,7 +2046,14 @@ void HTMLWriter::renderSVG(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
         break;
       }
       case NodeType::Ellipse: {
-        if (trim) {
+        // `<ellipse>` always begins its contour at 3 o'clock and can only draw the default
+        // direction, while a PAGX Ellipse begins at 12 o'clock and honours `reversed`. A dash
+        // pattern is measured from the contour start and wraps at the closing seam, so the two
+        // parameterizations cannot be reconciled with a constant offset: the seam would stay at a
+        // different point and the pattern would jump there by the perimeter modulo the dash
+        // period. The `<path>` form carries the exact contour instead, start point and direction
+        // included, so a dashed oval degrades to it — the rule the Rectangle case above follows.
+        if (trim || (stroke && !stroke->dashes.empty())) {
           PathData pathData = PathDataFromSVGString("");
           GeoToPathData(g.element, g.type, pathData);
           std::string d = PathDataToSVGString(pathData);
