@@ -26,9 +26,11 @@
 #include "rendering/caches/RenderCache.h"
 #include "rendering/sequences/SequenceImageQueue.h"
 #include "rendering/sequences/SequenceInfo.h"
+#include "rendering/sequences/SequenceRetryPolicy.h"
 #include "rendering/sequences/VideoReader.h"
 #include "rendering/video/FrameRead.h"
 #include "tgfx/core/Bitmap.h"
+#include "tgfx/core/Clock.h"
 #include "utils/TestUtils.h"
 
 namespace pag {
@@ -562,6 +564,18 @@ class ANRStaticVideoSequenceInfo : public SequenceInfo {
     return reader;
   }
 
+  std::shared_ptr<tgfx::Image> makeStaticImage(
+      std::shared_ptr<File> file, bool useDiskCache,
+      std::shared_ptr<SequenceReadResult> result) override {
+    auto generator = std::make_shared<StaticSequenceGenerator>(std::move(file), weakThis.lock(), 2,
+                                                               2, useDiskCache, std::move(result));
+    return tgfx::Image::MakeFrom(std::move(generator));
+  }
+
+  ID uniqueID() const override {
+    return 1;
+  }
+
   bool isVideo() const override {
     return true;
   }
@@ -916,6 +930,109 @@ PAG_TEST(PAGANRRegressionTest, StaticVideoGeneratorRetainsReaderUntilDeferredDel
   EXPECT_FALSE(frame->isCurrent());
   EXPECT_FALSE(frame->hasValidBuffer());
   EXPECT_FALSE(frame->matchesTarget());
+}
+
+PAG_TEST(PAGANRRegressionTest, FailedStaticDeliveryBacksOffReaderCreationAndRecovers) {
+  for (auto delivery : {tgfx::ImageBufferStatus::Timeout, tgfx::ImageBufferStatus::Failed,
+                        tgfx::ImageBufferStatus::Expired}) {
+    auto stage = PAGStage::Make(2, 2);
+    RenderCache cache(stage.get());
+    auto info = std::make_shared<ANRStaticVideoSequenceInfo>();
+    info->weakThis = info;
+    auto assetID = info->uniqueID();
+    auto snapshotImage = MakeANRTestImage();
+    ASSERT_NE(snapshotImage, nullptr);
+
+    for (uint32_t attempt = 0; attempt < 6; attempt++) {
+      cache.beginFrame();
+      ASSERT_NE(cache.getStaticSequenceImage(info), nullptr);
+      EXPECT_EQ(info->state->createCount, static_cast<int>(attempt + 1));
+      auto result = cache.staticSequenceResults[assetID];
+      auto buffer = std::static_pointer_cast<ANRDeliveryBuffer>(
+          info->weakReader.lock()->readBuffer(0, result));
+      ASSERT_NE(buffer, nullptr);
+      ASSERT_EQ(result->status.load(), SequenceReadStatus::Succeeded);
+      buffer->delivery = delivery;
+      cache.decodedAssetImages[assetID] = snapshotImage;
+      AddANRTestSnapshot(&cache, assetID, snapshotImage);
+      auto before = tgfx::Clock::Now();
+
+      cache.checkSequenceDecodeFailure();
+
+      auto after = tgfx::Clock::Now();
+      EXPECT_TRUE(cache.hasSequenceFrameUnavailable());
+      EXPECT_TRUE(cache.hasSequenceDecodeFailure());
+      EXPECT_TRUE(cache.sequenceCacheInvalidated());
+      EXPECT_FALSE(cache.hasSnapshot(assetID));
+      EXPECT_EQ(cache.assetImages.count(assetID), 0U);
+      EXPECT_EQ(cache.decodedAssetImages.count(assetID), 0U);
+      EXPECT_EQ(cache.staticSequenceResults.count(assetID), 0U);
+      EXPECT_EQ(info->state->destroyCount, static_cast<int>(attempt + 1));
+      ASSERT_EQ(cache.sequenceFailureStates.count(assetID), 1U);
+      auto& failure = cache.sequenceFailureStates[assetID];
+      EXPECT_EQ(failure.consecutiveFailures, attempt + 1);
+      EXPECT_GE(failure.retryAfterTime, before + SequenceRetryDelay(attempt));
+      EXPECT_LE(failure.retryAfterTime, after + SequenceRetryDelay(attempt));
+
+      for (int frameIndex = 0; frameIndex < 3; frameIndex++) {
+        cache.beginFrame();
+        EXPECT_EQ(cache.getStaticSequenceImage(info), nullptr);
+        cache.prepareStaticSequenceImage(info);
+        cache.checkSequenceDecodeFailure();
+        EXPECT_TRUE(cache.hasSequenceFrameUnavailable());
+        EXPECT_TRUE(cache.hasSequenceDecodeFailure());
+        EXPECT_EQ(info->state->createCount, static_cast<int>(attempt + 1));
+        EXPECT_EQ(info->state->readCount, static_cast<int>(attempt + 1));
+      }
+      failure.retryAfterTime = 0;
+    }
+
+    cache.beginFrame();
+    ASSERT_NE(cache.getStaticSequenceImage(info), nullptr);
+    EXPECT_EQ(info->state->createCount, 7);
+    auto result = cache.staticSequenceResults[assetID];
+    auto buffer =
+        std::static_pointer_cast<ANRDeliveryBuffer>(info->weakReader.lock()->readBuffer(0, result));
+    ASSERT_NE(buffer, nullptr);
+    buffer->delivery = tgfx::ImageBufferStatus::Ready;
+    cache.checkSequenceDecodeFailure();
+
+    EXPECT_TRUE(result->getFrameRead()->matchesTarget());
+    EXPECT_FALSE(cache.hasSequenceFramePending());
+    EXPECT_FALSE(cache.hasSequenceFrameUnavailable());
+    EXPECT_FALSE(cache.hasSequenceDecodeFailure());
+    EXPECT_EQ(cache.sequenceFailureStates.count(assetID), 0U);
+    EXPECT_TRUE(cache.canRetrySequence(assetID));
+  }
+}
+
+PAG_TEST(PAGANRRegressionTest, PendingStaticDeliveryKeepsImmediateRetry) {
+  for (auto status : {SequenceReadStatus::Pending, SequenceReadStatus::Succeeded}) {
+    auto stage = PAGStage::Make(2, 2);
+    RenderCache cache(stage.get());
+    auto info = std::make_shared<ANRStaticVideoSequenceInfo>();
+    info->weakThis = info;
+    auto assetID = info->uniqueID();
+
+    for (int attempt = 0; attempt < 2; attempt++) {
+      cache.beginFrame();
+      ASSERT_NE(cache.getStaticSequenceImage(info), nullptr);
+      auto result = cache.staticSequenceResults[assetID];
+      if (status == SequenceReadStatus::Succeeded) {
+        ASSERT_NE(info->weakReader.lock()->readBuffer(0, result), nullptr);
+        ASSERT_EQ(result->getFrameRead()->buffer->status(), tgfx::ImageBufferStatus::Pending);
+      }
+      ASSERT_EQ(result->status.load(), status);
+      cache.checkSequenceDecodeFailure();
+
+      EXPECT_TRUE(cache.hasSequenceFramePending());
+      EXPECT_TRUE(cache.hasSequenceFrameUnavailable());
+      EXPECT_FALSE(cache.hasSequenceDecodeFailure());
+      EXPECT_EQ(cache.sequenceFailureStates.count(assetID), 0U);
+      EXPECT_TRUE(cache.canRetrySequence(assetID));
+      EXPECT_EQ(info->state->createCount, attempt + 1);
+    }
+  }
 }
 
 PAG_TEST(PAGANRRegressionTest, FailedStaticSequenceRequestRemovesSnapshot) {

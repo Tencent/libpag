@@ -308,7 +308,8 @@ bool PAGDecoder::checkSequenceFile(std::shared_ptr<PAGComposition> composition,
     return false;
   }
   auto key = generateCacheKey(composition);
-  // Only rendered-frame caches can contain stale textures; raw sequence caches remain valid.
+  // Version all PAGDecoder pixel caches, including DiskSequenceReader's nested decoder caches,
+  // so pixels rendered before delivery validation cannot be reused.
   if (!key.empty()) {
     key = "PAGDecoder.v2." + key;
   }

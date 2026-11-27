@@ -195,6 +195,17 @@ void RenderCache::checkSequenceDecodeFailure() {
     if (status == SequenceReadStatus::Succeeded || status == SequenceReadStatus::Pending) {
       if (!checkSequenceFrameRead(item.first, result)) {
         succeededAssets.insert(item.first);
+      } else if (status == SequenceReadStatus::Succeeded) {
+        auto frame = result->getFrameRead();
+        if (frame->buffer != nullptr) {
+          auto bufferStatus = frame->buffer->status();
+          if (bufferStatus == tgfx::ImageBufferStatus::Timeout ||
+              bufferStatus == tgfx::ImageBufferStatus::Failed ||
+              bufferStatus == tgfx::ImageBufferStatus::Expired) {
+            failedAssets.insert(item.first);
+            lastFrameHasSequenceDecodeFailure = true;
+          }
+        }
       }
       continue;
     }

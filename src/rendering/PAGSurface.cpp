@@ -399,7 +399,7 @@ bool PAGSurface::draw(RenderCache* cache, std::shared_ptr<Graphic> graphic,
     return false;
   }
   if (needsPresentationCopy) {
-    // Signal only after the accepted pixels have been copied into the current window frame.
+    // Create the caller-owned semaphore only for an accepted window-copy submission.
     context->submit(Flush(context, signalSemaphore));
   }
   contentVersion = cache->getContentVersion();
