@@ -35,6 +35,7 @@
 #include "pagx/svg/SVGTransformParser.h"
 #include "pagx/types/TextBaseline.h"
 #include "pagx/utils/CSSFontStyle.h"
+#include "pagx/utils/ResourcePath.h"
 #include "pagx/utils/StringParser.h"
 #include "pagx/xml/XMLDOM.h"
 #include "renderer/ToTGFX.h"
@@ -68,9 +69,7 @@ std::shared_ptr<PAGXDocument> SVGImporter::Parse(const std::string& filePath,
       for (auto& node : doc->nodes) {
         if (node->nodeType() == NodeType::Image) {
           auto* image = static_cast<Image*>(node.get());
-          if (!image->filePath.empty() && image->filePath[0] != '/' &&
-              image->filePath.find("://") == std::string::npos &&
-              image->filePath.find("data:") != 0) {
+          if (IsRelativeFilePath(image->filePath)) {
             image->filePath = basePath + image->filePath;
           }
         }

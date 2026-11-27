@@ -17,32 +17,17 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "renderer/ImageEmbedder.h"
-#include <cctype>
 #include <fstream>
 #include <unordered_map>
 #include <vector>
 #include "base/utils/Log.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/types/Data.h"
+#include "pagx/utils/ResourcePath.h"
 
 namespace pagx {
 
 static constexpr size_t MaxFileSize = 256 * 1024 * 1024;
-
-static bool IsUrlPath(const std::string& path) {
-  auto colon = path.find(':');
-  auto separator = path.find_first_of("/\\");
-  // A URI scheme must precede path separators. Extended Windows paths have a drive colon after
-  // their prefix separator, so that colon must not make them remote resources.
-  if (colon == std::string::npos || (separator != std::string::npos && separator < colon)) {
-    return false;
-  }
-  // A Windows drive letter ("C:\..." or "C:/...") is a local path, not a URL scheme.
-  if (colon == 1 && std::isalpha(static_cast<unsigned char>(path[0])) != 0) {
-    return false;
-  }
-  return true;
-}
 
 static std::shared_ptr<pagx::Data> ReadFileToData(const std::string& path) {
   std::ifstream in(path, std::ios::binary | std::ios::ate);
@@ -76,7 +61,7 @@ bool ImageEmbedder::embed(PAGXDocument* document) {
     }
     auto* image = static_cast<Image*>(node.get());
     const auto& path = image->filePath;
-    if (image->data != nullptr || path.empty() || IsUrlPath(path)) {
+    if (image->data != nullptr || !IsLocalFilePath(path)) {
       continue;
     }
     images.push_back(image);

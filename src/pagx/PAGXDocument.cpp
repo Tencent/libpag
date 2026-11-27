@@ -44,20 +44,14 @@
 #include "pagx/nodes/TextPath.h"
 #include "pagx/utils/ImportFormat.h"
 #include "pagx/utils/ImportResources.h"
+#include "pagx/utils/ResourcePath.h"
 #include "renderer/FontEmbedder.h"
 #include "renderer/LayerBuilder.h"
 
 namespace pagx {
 
 static bool IsExternalFilePath(const std::string& filePath) {
-  return !filePath.empty() && filePath.find("data:") != 0;
-}
-
-// A local file path is an external file path that can be opened via local I/O (ifstream). URL
-// schemes (http/https/file/etc.) contain "://" and are not directly readable; the host is
-// responsible for downloading them and supplying the data via loadFileData.
-static bool IsLocalFilePath(const std::string& filePath) {
-  return IsExternalFilePath(filePath) && filePath.find("://") == std::string::npos;
+  return !filePath.empty() && !IsDataUri(filePath);
 }
 
 static bool IsExpiredScene(const std::weak_ptr<PAGScene>& scene) {

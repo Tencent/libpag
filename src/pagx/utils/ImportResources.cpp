@@ -20,6 +20,7 @@
 #include "pagx/PAGXDocument.h"
 #include "pagx/nodes/Font.h"
 #include "pagx/nodes/Image.h"
+#include "pagx/utils/ResourcePath.h"
 
 namespace pagx {
 
@@ -35,8 +36,7 @@ std::string GetImportSourceDirectory(const std::string& source) {
 }
 
 std::string ResolveImportResourcePath(const std::string& directory, const std::string& path) {
-  if (directory.empty() || path.empty() || path[0] == '/' || path[0] == '\\' ||
-      path.find(':') != std::string::npos) {
+  if (directory.empty() || !IsRelativeFilePath(path)) {
     return path;
   }
   auto last = directory.back();

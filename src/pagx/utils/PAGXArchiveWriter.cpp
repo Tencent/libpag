@@ -25,6 +25,7 @@
 #include "pagx/utils/Base64.h"
 #include "pagx/utils/ImageMime.h"
 #include "pagx/utils/MemZipWriter.h"
+#include "pagx/utils/ResourcePath.h"
 #include "pagx/utils/StringUtils.h"
 
 namespace pagx {
@@ -69,21 +70,17 @@ const char* ExternalReferenceReason(const std::string& filePath) {
   if (filePath.rfind("hash:", 0) == 0) {
     return "host-supplied hash reference";
   }
-  if (filePath.find("://") != std::string::npos) {
+  if (HasUriScheme(filePath)) {
     return "remote URL";
   }
   return "local file path";
 }
 
 bool IsAbsolutePath(const std::string& path) {
-  if (path.empty()) {
+  if (path.empty() || HasUriScheme(path)) {
     return false;
   }
-  if (path[0] == '/' || path[0] == '\\') {
-    return true;
-  }
-  return path.size() >= 2 && path[1] == ':' &&
-         ((path[0] >= 'A' && path[0] <= 'Z') || (path[0] >= 'a' && path[0] <= 'z'));
+  return !IsRelativeFilePath(path);
 }
 
 std::string JoinPathSegments(const std::string& path) {

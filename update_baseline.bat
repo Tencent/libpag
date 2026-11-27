@@ -19,10 +19,9 @@ rem opengl-swiftshader, d3d12, d3d12-warp or vulkan. Running the script regenera
 rem cache; it never commits anything.
 rem
 rem --clang-cl builds with clang-cl instead of MSVC so private-access test cases are compiled in.
-rem Both scripts build Release by default. The cache is keyed by backend only, not by compiler or
-rem build type, so refresh it with the same compiler and build type you pass to autotest.bat. A
-rem clang-cl refresh always rebuilds, because an existing cache cannot prove that the
-rem private-access cases are present.
+rem Both Windows scripts build Release by default. The cache is keyed by backend only, so a
+rem toolchain.txt marker records the compiler and build type; refreshing with a different
+rem toolchain rebuilds instead of reusing the cache.
 
 cd /d "%~dp0"
 set "WORKSPACE=%CD%"
@@ -111,8 +110,10 @@ if errorlevel 1 (
 
 set "CMAKE_COMPILER_ARGS="
 set "COMPILER_LABEL=MSVC"
+set "TOOLCHAIN_LABEL=MSVC Release"
 if "%USE_CLANG_CL%"=="1" (
   set "COMPILER_LABEL=clang-cl"
+  set "TOOLCHAIN_LABEL=clang-cl Release"
   if defined VS_DIR if exist "%VS_DIR%\VC\Tools\Llvm\x64\bin" set "PATH=%VS_DIR%\VC\Tools\Llvm\x64\bin;%PATH%"
   where clang-cl >nul 2>nul
   if errorlevel 1 (
@@ -175,9 +176,11 @@ if errorlevel 1 (
 )
 rem Both files must exist: a failed refresh deletes md5.json before regenerating it, so a lone
 rem version.json can belong to a broken cache. This mirrors update_baseline.sh's `-f` checks.
-rem A clang-cl refresh must not reuse the cache: the md5 file does not record which compiler built
-rem it, and only a clang-cl build proves the private-access cases ran.
-if "%USE_CLANG_CL%"=="1" goto :skip_cache_check
+rem The md5 file does not record which toolchain produced it, so require a matching marker;
+rem missing or different markers rebuild instead of reusing a cache the tests cannot trust.
+set "CACHED_TOOLCHAIN="
+if exist "%CACHE_DIR%\toolchain.txt" set /p CACHED_TOOLCHAIN=<"%CACHE_DIR%\toolchain.txt"
+if /i not "%CACHED_TOOLCHAIN%"=="%TOOLCHAIN_LABEL%" goto :skip_cache_check
 if exist "%CACHE_DIR%\version.json" if exist "%CACHE_DIR%\md5.json" (
   git diff --no-index --quiet --ignore-cr-at-eol -- "%TEMP%\pag_main_version.json" "%CACHE_DIR%\version.json" >nul 2>nul
   if not errorlevel 1 (
@@ -323,6 +326,15 @@ if errorlevel 1 (
 echo Imported the legacy OpenGL cache into '%BACKEND_NAME%'.
 
 :cache_ready
+rem Record the toolchain so autotest.bat and the next refresh can reject a cache produced by a
+rem different compiler or build type.
+> "%CACHE_DIR%\toolchain.txt" echo(!TOOLCHAIN_LABEL!
+set "WRITTEN_TOOLCHAIN="
+if exist "%CACHE_DIR%\toolchain.txt" set /p WRITTEN_TOOLCHAIN=<"%CACHE_DIR%\toolchain.txt"
+if /i not "!WRITTEN_TOOLCHAIN!"=="!TOOLCHAIN_LABEL!" (
+  call :Fail "Cannot write the toolchain marker for '%BACKEND_NAME%'."
+  goto :cleanup
+)
 if "%RESTORE_NEEDED%"=="1" (
   call :RestoreWorkspace
   if errorlevel 1 (
@@ -355,9 +367,9 @@ echo By default the script stashes local changes and checks out origin/main, the
 echo original branch and changes. Any stash created by this run is applied by exact OID and retained.
 echo Existing recovery details block a new run. Interruptions require manual recovery using that file.
 echo Run one backend at a time; test\out and version.json are shared.
-echo Both scripts build Release by default. The md5 cache is keyed by backend, not by compiler or
-echo build type, so refresh it with the compiler and build type you intend to test with. A clang-cl
-echo refresh always rebuilds instead of reusing an existing cache.
+echo Both Windows scripts build Release by default. The md5 cache is keyed by backend and records
+echo its compiler and build type in toolchain.txt, so refresh it with the toolchain you intend to
+echo test with; a mismatch rebuilds instead of reusing the cache.
 exit /b 0
 
 :Fail

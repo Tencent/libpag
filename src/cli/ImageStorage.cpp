@@ -17,42 +17,17 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "cli/ImageStorage.h"
-#include <cctype>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <system_error>
 #include <vector>
 #include "pagx/nodes/Image.h"
+#include "pagx/utils/ResourcePath.h"
 
 namespace pagx::cli {
 
 namespace {
-
-// A `source` is "external-relocatable" only when it is a plain relative filesystem path. Absolute
-// paths, drive letters, URI schemes (http:, https:, file:, data:, ...) are all treated as fixed
-// references we must not rewrite as relative-path copies.
-bool IsRelativeFilePath(const std::string& src) {
-  if (src.empty()) {
-    return false;
-  }
-  if (src[0] == '/' || src[0] == '\\') {
-    return false;  // POSIX absolute or UNC.
-  }
-  // scheme:// or drive letter "C:" — any ':' before the first '/' means a non-relative reference.
-  auto colon = src.find(':');
-  if (colon != std::string::npos) {
-    auto slash = src.find('/');
-    if (slash == std::string::npos || colon < slash) {
-      return false;
-    }
-  }
-  return true;
-}
-
-bool IsDataUri(const std::string& src) {
-  return src.compare(0, 5, "data:") == 0;
-}
 
 // Resolves a relative Image `source` to an existing file on disk. `<img>` sources arrive already
 // prefixed with the input directory (so they resolve as-is), while inline-SVG <image> hrefs are

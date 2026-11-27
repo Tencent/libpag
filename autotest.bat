@@ -13,8 +13,9 @@ rem be corrupted or deleted mid-run. The same restriction applies to tgfx/autote
 rem
 rem The script fails fast when the md5 cache for the selected backend is missing or does not match
 rem test\baseline\version.json, because the tests would otherwise skip every pixel comparison.
-rem Runs build Release by default. The md5 cache is keyed by backend only, so refresh it with
-rem update_baseline.bat using the same compiler and build type.
+rem Both Windows scripts build Release by default. The cache is keyed by backend only, so its
+rem toolchain.txt records the compiler and build type; refresh it with update_baseline.bat using
+rem the same compiler and build type.
 rem
 
 cd /d "%~dp0"
@@ -66,6 +67,12 @@ set "TARGET_SUFFIX=%PAG_TARGET_SUFFIX%"
 set "CACHE_DIR=%WORKSPACE%\test\baseline\.cache\%BACKEND_NAME%"
 set "BUILD_DIR=%WORKSPACE%\build-autotest"
 set "RESULT_DIR=%WORKSPACE%\result"
+set "REFRESH_COMMAND=update_baseline.bat %BACKEND%"
+set "EXPECTED_TOOLCHAIN=MSVC Release"
+if "%USE_CLANG_CL%"=="1" (
+  set "REFRESH_COMMAND=update_baseline.bat %BACKEND% --clang-cl"
+  set "EXPECTED_TOOLCHAIN=clang-cl Release"
+)
 
 where git >nul 2>nul
 if errorlevel 1 (
@@ -76,12 +83,24 @@ if errorlevel 1 (
 rem Fail before building when the cache cannot drive pixel comparisons. A missing cache makes
 rem Baseline::Compare() treat every key as a version change and skip the comparison silently.
 if not exist "%CACHE_DIR%\md5.json" (
-  echo Error: no baseline cache for '%BACKEND_NAME%'. Run "update_baseline.bat %BACKEND%" first.
+  echo Error: no baseline cache for '%BACKEND_NAME%'. Run "%REFRESH_COMMAND%" first.
   exit /b 1
 )
 git diff --no-index --quiet --ignore-cr-at-eol -- "%WORKSPACE%\test\baseline\version.json" "%CACHE_DIR%\version.json" >nul 2>nul
 if errorlevel 1 (
-  echo Error: the baseline cache for '%BACKEND_NAME%' is out of date. Run "update_baseline.bat %BACKEND%" first.
+  echo Error: the baseline cache for '%BACKEND_NAME%' is out of date. Run "%REFRESH_COMMAND%" first.
+  exit /b 1
+)
+rem The md5 file does not encode the compiler or build type, so a matching marker is required.
+rem Without it a cache from the other toolchain would silently drive this run.
+if not exist "%CACHE_DIR%\toolchain.txt" (
+  echo Error: the baseline cache for '%BACKEND_NAME%' has no toolchain marker. Run "%REFRESH_COMMAND%" first.
+  exit /b 1
+)
+set "CACHED_TOOLCHAIN="
+set /p CACHED_TOOLCHAIN=<"%CACHE_DIR%\toolchain.txt"
+if /i not "%CACHED_TOOLCHAIN%"=="%EXPECTED_TOOLCHAIN%" (
+  echo Error: the baseline cache for '%BACKEND_NAME%' was built with "%CACHED_TOOLCHAIN%" but this run uses "%EXPECTED_TOOLCHAIN%". Run "%REFRESH_COMMAND%" first.
   exit /b 1
 )
 

@@ -27,7 +27,12 @@ namespace pagx {
  * domains remain unchanged; flatten imports before embedding their images. Unlike FontEmbedder,
  * it does not require applyLayout() because image embedding has no layout dependency.
  *
- * URL-form paths (containing "://") are silently skipped; production PAGX does not use them.
+ * Paths with a URI scheme (an RFC 3986 scheme before the first path separator, including
+ * `file://` and `data:`) are skipped. Windows drive letters, extended `\\?\` paths, UNC paths and
+ * relative paths are treated as local files and read from disk.
+ *
+ * The embedder reads any local path referenced by the document and does not restrict it to a
+ * sandbox root, so only embed PAGX content from trusted sources.
  *
  * embed() is all-or-nothing with respect to document state — the document is only
  * mutated when all files are successfully read. On failure, no mutations are applied.

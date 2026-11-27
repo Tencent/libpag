@@ -131,10 +131,9 @@ static void ResetDiskCacheFixture(const std::string& cacheDir, size_t maxDiskSiz
   DiskIOWorker::GetInstance()->waitAll();
 }
 
-#ifdef __APPLE__
 // The committed fixture under resources/disk/libpag has the LZ4_APPLE compression tag.
-// SequenceFile rejects that tag on non-Apple platforms before decoding any frames, so this
-// fixed-size fixture case only runs where the tag matches the native cache format.
+// SequenceFile rejects that tag on non-Apple platforms before decoding any frames, so the test
+// below reports a visible skip there instead of silently disappearing from the suite.
 static constexpr size_t InitialSequenceDiskSize = 568915u;
 
 struct SequenceFileState {
@@ -291,7 +290,6 @@ static void CheckSequenceFileReuseAndRelease(SequenceFileState& state,
   DiskIOWorker::GetInstance()->waitAll();
   EXPECT_FALSE(std::filesystem::exists(cacheDir + "/files/4.bin"));
 }
-#endif
 
 static void CheckSequenceFilePixels(const std::shared_ptr<SequenceFile>& sequenceFile,
                                     const tgfx::ImageInfo& info, int frameCount) {
@@ -312,11 +310,14 @@ static void CheckSequenceFilePixels(const std::shared_ptr<SequenceFile>& sequenc
 }
 }  // namespace
 
-#ifdef __APPLE__
 /**
  * 用例描述: 测试 SequenceFile 的磁盘缓存功能。
  */
 PAG_PIXEL_TEST(PAGDiskCacheTest, SequenceFile) {
+#ifndef __APPLE__
+  GTEST_SKIP() << "The committed fixture uses the LZ4_APPLE compression tag, which SequenceFile "
+                  "rejects on this platform.";
+#endif
   ScopedDiskCacheDirectory cleanup;
   ASSERT_FALSE(cleanup.directory.empty());
   auto cacheDir = cleanup.directory;
@@ -329,7 +330,6 @@ PAG_PIXEL_TEST(PAGDiskCacheTest, SequenceFile) {
   ASSERT_NO_FATAL_FAILURE(CheckSequenceFileEviction(state, cacheDir));
   ASSERT_NO_FATAL_FAILURE(CheckSequenceFileReuseAndRelease(state, cacheDir));
 }
-#endif
 
 /**
  * 用例描述: 同一 key 在上一次的异步关闭任务尚未执行时被重新打开。重开的文件必须能看到已写入

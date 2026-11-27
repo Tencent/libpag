@@ -1198,6 +1198,11 @@ if (PAG_BUILD_CLI)
         endif ()
     endif ()
     target_link_libraries(pagx-cli pag ${PAG_SHARED_LIBS} ${CLI_EXTRA_LIBS})
+    if (WIN32 AND MSVC)
+        # The HTML importer recurses up to MAX_HTML_RECURSION_DEPTH (128); the default 1 MB Windows
+        # stack is not enough for a Debug build of that path. Match the test binaries.
+        target_link_options(pagx-cli PRIVATE "/STACK:8388608")
+    endif ()
 
     # HTML browser-fidelity eval target. Not a gtest binary: it drives the
     # snapshot -> import -> render -> compare pipeline (tools/html-snapshot/eval)
@@ -1397,11 +1402,12 @@ if (PAG_BUILD_TESTS)
     # get 8 MB. The HTML importer intentionally recurses up to MAX_HTML_RECURSION_DEPTH (128) and a
     # Debug frame in that path costs about 9 KB, so the limit is reached only after the default
     # stack is exhausted. Raise the test stack instead of lowering the importer limit, which would
-    # change the imported output on every platform.
+    # change the imported output on every platform. The shipped pagx-cli gets the same reserve
+    # above; host applications must provide their own stack budget.
     if (WIN32 AND MSVC)
-        foreach (TEST_TARGET UpdateBaseline_${TEST_TARGET_SUFFIX}
+        foreach (TEST_STACK_TARGET UpdateBaseline_${TEST_TARGET_SUFFIX}
                 PAGUnitTest_${TEST_TARGET_SUFFIX} PAGFullTest_${TEST_TARGET_SUFFIX})
-            target_link_options(${TEST_TARGET} PRIVATE "/STACK:8388608")
+            target_link_options(${TEST_STACK_TARGET} PRIVATE "/STACK:8388608")
         endforeach ()
     endif ()
 
