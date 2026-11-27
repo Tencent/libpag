@@ -33,6 +33,7 @@
 
 namespace pag {
 class DiskCache;
+struct AsyncFrameSnapshot;
 
 /**
  * Owns the file handle of a SequenceFile so that it may outlive the SequenceFile object. The actual
@@ -149,12 +150,24 @@ class SequenceFile {
    */
   bool writeFrame(int index, std::shared_ptr<BitmapBuffer> bitmap);
 
+  /** Reads a committed frame or immutable pending snapshot without waiting for a cache writer. */
+  bool tryReadFrame(int index, std::shared_ptr<BitmapBuffer> bitmap);
+
+  /** Copies a complete frame for best-effort caching. Returns false when capacity is full.
+   * Queued frames are not counted as committed. Rendering never waits for the returned write. */
+  bool writeFrameAsync(int index, std::shared_ptr<BitmapBuffer> bitmap);
+
  private:
   std::mutex locker = {};
+  std::mutex ioLocker = {};
+  std::weak_ptr<SequenceFile> weakThis = {};
+  std::shared_ptr<AsyncFrameSnapshot> pendingSnapshot = nullptr;
+  int pendingIndex = -1;
+  bool cacheWriteFailed = false;
   DiskCache* diskCache = nullptr;
   uint32_t fileID = 0;
   // `handle` owns the FILE*, while `file` is a non-owning alias of handle->file used by all IO
-  // under `locker`. The alias is invalidated only in the constructor right after handle->close(),
+  // under `ioLocker`. The alias is invalidated only in the constructor right after handle->close(),
   // and the handle is otherwise closed after this object is destroyed, so `file` is valid for the
   // whole lifetime of this object. Never close the handle while this object may still use `file`.
   FILE* file = nullptr;
@@ -180,6 +193,10 @@ class SequenceFile {
                float frameRate, std::vector<TimeRange> staticTimeRanges);
 
   bool readFramesFromFile();
+  bool readFrameInternal(int index, std::shared_ptr<BitmapBuffer> bitmap, bool nonBlocking);
+  bool writeFrameInternal(int index, std::shared_ptr<BitmapBuffer> bitmap,
+                          const std::shared_ptr<AsyncFrameSnapshot>& snapshot);
+  void finishAsyncWrite(int index, const std::shared_ptr<AsyncFrameSnapshot>& snapshot);
   bool writeFileHead();
   size_t compressFrame(int index, const void* pixels, size_t byteSize);
   bool checkScratchBuffer();

@@ -21,6 +21,7 @@
 #include "WebVideoSequenceDemuxer.h"
 #include "base/utils/TimeUtil.h"
 #include "rendering/sequences/VideoSequenceDemuxer.h"
+#include "rendering/video/FrameRead.h"
 
 namespace emscripten {
 class val;
@@ -53,6 +54,10 @@ HardwareDecoder::HardwareDecoder(const VideoFormat& format) {
   }
 }
 
+HardwareDecoder::~HardwareDecoder() {
+  sourceGeneration->fetch_add(1, std::memory_order_acq_rel);
+}
+
 DecodingResult HardwareDecoder::onSendBytes(void*, size_t, int64_t time) {
   pendingTimeStamp = time;
   return DecodingResult::Success;
@@ -72,6 +77,12 @@ DecodingResult HardwareDecoder::onDecodeFrame() {
 }
 
 void HardwareDecoder::onFlush() {
+  sourceGeneration->fetch_add(1, std::memory_order_acq_rel);
+  currentFrame = -1;
+  lastDecodedBuffer = nullptr;
+  frameRead = nullptr;
+  pendingTimeStamp = 0;
+  currentTimeStamp = 0;
   endOfStream = false;
 }
 
@@ -80,13 +91,25 @@ int64_t HardwareDecoder::presentationTime() {
 }
 
 std::shared_ptr<tgfx::ImageBuffer> HardwareDecoder::onRenderFrame() {
-  if (!videoReader.isUndefined()) {
+  if (imageReader != nullptr && !videoReader.isUndefined() && !videoReader.isNull()) {
     int frameId = videoReader.call<int>("getCurrentFrame");
-    if (currentFrame < 0 || currentFrame != frameId) {
+    if (currentFrame < 0 || currentFrame != frameId || lastDecodedBuffer == nullptr ||
+        lastDecodedBuffer->expired() ||
+        lastDecodedBuffer->status() == tgfx::ImageBufferStatus::Expired ||
+        lastDecodedBuffer->status() == tgfx::ImageBufferStatus::Timeout ||
+        lastDecodedBuffer->status() == tgfx::ImageBufferStatus::Failed) {
       currentFrame = frameId;
       lastDecodedBuffer = imageReader->acquireNextBuffer();
+      frameRead = std::make_shared<FrameRead>();
+      frameRead->sourceGeneration = sourceGeneration;
+      frameRead->generation = sourceGeneration->load(std::memory_order_acquire);
+      frameRead->buffer = lastDecodedBuffer;
     }
   }
   return lastDecodedBuffer;
+}
+
+std::shared_ptr<FrameRead> HardwareDecoder::getFrameRead() {
+  return frameRead;
 }
 }  // namespace pag

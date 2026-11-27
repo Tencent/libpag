@@ -1518,19 +1518,22 @@ class PAG_API PAGPlayer {
   bool wait(const BackendSemaphore& waitSemaphore);
 
   /**
-   * Apply all pending changes to the target surface immediately. Returns true if the content has
-   * changed.
+   * Applies pending changes to the target surface immediately. Returns false if the content is
+   * unchanged or a required sequence frame is unavailable. Android window-backed surfaces preserve
+   * their last presented pixels when a frame is rejected.
    */
   bool flush();
 
   /**
-   * Apply all pending changes to the target surface immediately. Returns true if the content has
-   * changed. After issuing all commands, the signalSemaphore will be signaled by the GPU.
+   * Applies pending changes to the target surface immediately. Returns false if the content is
+   * unchanged or a required sequence frame is unavailable. Android window-backed surfaces copy and
+   * signal only accepted frames. After issuing commands, signalSemaphore is signaled by the GPU.
    *
    * If the signalSemaphore is not null and uninitialized, a new semaphore is created and
    * initializes BackendSemaphore.
    *
-   * The caller must delete the semaphore returned in signalSemaphore.
+   * The caller must delete any semaphore returned in signalSemaphore, even if this function
+   * returns false.
    * BackendSemaphore can be deleted as soon as this function returns.
    *
    * If the back-end API is OpenGL only uninitialized backend semaphores are supported.

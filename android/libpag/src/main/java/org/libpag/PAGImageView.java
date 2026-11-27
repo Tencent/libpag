@@ -637,8 +637,6 @@ public class PAGImageView extends View implements PAGAnimator.Listener {
         }
     }
 
-    private AtomicBoolean useFirst = new AtomicBoolean(true);
-
     private boolean handleFrame(final int frame) {
         if (!decoderInfo.isValid() || freezeDraw.get()) {
             return false;
@@ -687,14 +685,13 @@ public class PAGImageView extends View implements PAGAnimator.Listener {
                     }
                     backBitmap = pair.first;
                 }
-                if (useFirst.get()) {
+                if (renderBitmap != frontBitmap) {
                     flushBitmap = frontBitmap;
                     flushBuffer = frontHardwareBuffer;
                 } else {
                     flushBitmap = backBitmap;
                     flushBuffer = backHardwareBuffer;
                 }
-                useFirst.set(!useFirst.get());
             } else {
                 flushBuffer = frontHardwareBuffer;
                 flushBitmap = frontBitmap;

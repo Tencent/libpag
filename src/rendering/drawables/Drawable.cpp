@@ -41,6 +41,14 @@ void Drawable::freeSurface() {
 void Drawable::updateSize() {
 }
 
+bool Drawable::needsPresentationCopy() const {
+  return false;
+}
+
+bool Drawable::preparePresent(tgfx::Context*) {
+  return true;
+}
+
 void Drawable::present(tgfx::Context*) {
 }
 

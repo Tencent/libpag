@@ -19,14 +19,18 @@
 #pragma once
 
 #include <atomic>
+#include <mutex>
 #include "pag/file.h"
 #include "pag/pag.h"
 #include "rendering/Performance.h"
+#include "rendering/video/FrameRead.h"
 #include "tgfx/core/ImageBuffer.h"
 
 namespace pag {
+
 enum class SequenceReadStatus {
   Pending,
+  // Buffer preparation completed. Final delivery must be checked through the associated FrameRead.
   Succeeded,
   Failed,
   // The reader returned a previously decoded buffer for the requested frame because decoding
@@ -39,6 +43,19 @@ struct SequenceReadResult {
   uint64_t requestID = 0;
   Frame targetFrame = -1;
   std::atomic<SequenceReadStatus> status = SequenceReadStatus::Pending;
+
+  /** Returns the read constraints and delivery state associated with the decoded buffer. */
+  std::shared_ptr<FrameRead> getFrameRead();
+
+  /** Binds an existing buffer's frame read while retaining this request's recorded deadline. */
+  void setFrameRead(std::shared_ptr<FrameRead> frame);
+
+  /** Records the shared publication deadline without changing tgfx's native read timeout. */
+  void setFrameReadDeadline(int64_t deadline);
+
+ private:
+  std::mutex frameReadLocker = {};
+  std::shared_ptr<FrameRead> frameRead = std::make_shared<FrameRead>();
 };
 
 class SequenceReader {
@@ -56,7 +73,8 @@ class SequenceReader {
   virtual int height() const = 0;
 
   /**
-   * Decodes the specified target frame immediately and returns the decoded image buffer.
+   * Prepares a buffer for the target frame immediately. Deferred buffers may still be Pending;
+   * consumers must verify the associated FrameRead after texture generation completes.
    */
   std::shared_ptr<tgfx::ImageBuffer> readBuffer(
       Frame targetFrame, const std::shared_ptr<SequenceReadResult>& result = nullptr);

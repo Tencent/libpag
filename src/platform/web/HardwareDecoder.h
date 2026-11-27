@@ -27,6 +27,8 @@
 namespace pag {
 class HardwareDecoder : public VideoDecoder {
  public:
+  ~HardwareDecoder() override;
+
   DecodingResult onSendBytes(void* bytes, size_t length, int64_t time) override;
 
   DecodingResult onEndOfStream() override;
@@ -38,6 +40,8 @@ class HardwareDecoder : public VideoDecoder {
   int64_t presentationTime() override;
 
   std::shared_ptr<tgfx::ImageBuffer> onRenderFrame() override;
+
+  std::shared_ptr<FrameRead> getFrameRead() override;
 
  private:
   int64_t pendingTimeStamp = 0;
@@ -53,6 +57,9 @@ class HardwareDecoder : public VideoDecoder {
   float frameRate = 30.0f;
   int currentFrame = -1;
   std::shared_ptr<tgfx::ImageBuffer> lastDecodedBuffer = nullptr;
+  std::shared_ptr<FrameRead> frameRead = nullptr;
+  std::shared_ptr<std::atomic<uint64_t>> sourceGeneration =
+      std::make_shared<std::atomic<uint64_t>>(0);
 
   explicit HardwareDecoder(const VideoFormat& format);
 

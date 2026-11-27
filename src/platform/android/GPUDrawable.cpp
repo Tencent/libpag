@@ -75,23 +75,16 @@ std::shared_ptr<tgfx::Device> GPUDrawable::getDevice() {
   return window ? window->getDevice() : nullptr;
 }
 
-std::shared_ptr<tgfx::Surface> GPUDrawable::onCreateSurface(tgfx::Context* context) {
-  if (window == nullptr) {
-    return nullptr;
-  }
-  return tgfx::Surface::MakeFrom(context, window);
+std::shared_ptr<tgfx::Window> GPUDrawable::getWindow() {
+  return window;
 }
 
-void GPUDrawable::onFreeSurface() {
-}
-
-void GPUDrawable::present(tgfx::Context*) {
-  if (window == nullptr) {
-    return;
+bool GPUDrawable::preparePresent(tgfx::Context* context) {
+  if (!SurfaceDrawable::preparePresent(context)) {
+    return false;
   }
   window->setPresentationTime(currentTimeStamp);
-  // In the new tgfx architecture, Window::onPresent() is called automatically by
-  // DrawingBuffer::presentWindows() after command submission.
+  return true;
 }
 
 void GPUDrawable::setTimeStamp(int64_t timeStamp) {

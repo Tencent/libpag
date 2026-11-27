@@ -128,8 +128,26 @@ void RenderCache::prepareImageLayer(PAGImageLayer* pagLayer) {
   }
 }
 
+void RenderCache::prepareSequenceFrameReads() {
+  auto deadline = sequenceFrameWaitTime > 0 ? tgfx::Clock::Now() + sequenceFrameWaitTime : 0;
+  for (auto& item : usedStaticSequences) {
+    if (item.second != nullptr) {
+      item.second->setFrameReadDeadline(deadline);
+    }
+  }
+  for (auto& item : usedSequences) {
+    for (auto& map : item.second) {
+      if (map.second.drawn && map.second.result != nullptr) {
+        map.second.result->setFrameReadDeadline(deadline);
+      }
+    }
+  }
+}
+
 void RenderCache::prepareNextFrame() {
-  checkSequenceDecodeFailure();
+  if (lastFrameHasSequenceFramePending || lastFrameHasSequenceFrameUnavailable) {
+    return;
+  }
 #ifndef PAG_BUILD_FOR_WEB
   for (auto& item : usedSequences) {
     if (!canRetrySequence(item.first)) {
@@ -142,21 +160,48 @@ void RenderCache::prepareNextFrame() {
 #endif
 }
 
+bool RenderCache::checkSequenceFrameRead(ID assetID,
+                                         const std::shared_ptr<SequenceReadResult>& result) {
+  auto status = result->status.load(std::memory_order_acquire);
+  auto frame = result->getFrameRead();
+  if ((status == SequenceReadStatus::Succeeded || status == SequenceReadStatus::Fallback) &&
+      frame->hasValidBuffer() && frame->matchesTarget()) {
+    return false;
+  }
+  lastFrameHasSequenceFramePending = true;
+  lastFrameHasSequenceFrameUnavailable = true;
+  _sequenceCacheInvalidated = true;
+  removeSnapshot(assetID);
+  assetImages.erase(assetID);
+  decodedAssetImages.erase(assetID);
+  staticSequenceResults.erase(assetID);
+  if (status != SequenceReadStatus::Pending) {
+    result->status.store(SequenceReadStatus::Failed, std::memory_order_release);
+  }
+  return true;
+}
+
 void RenderCache::checkSequenceDecodeFailure() {
   std::unordered_set<ID> failedAssets = {};
   std::unordered_set<ID> succeededAssets = {};
   for (auto& item : usedStaticSequences) {
     auto& result = item.second;
     if (result == nullptr) {
+      lastFrameHasSequenceFrameUnavailable = true;
+      _sequenceCacheInvalidated = true;
       continue;
     }
     auto status = result->status.load(std::memory_order_acquire);
-    if (status == SequenceReadStatus::Succeeded) {
-      succeededAssets.insert(item.first);
+    if (status == SequenceReadStatus::Succeeded || status == SequenceReadStatus::Pending) {
+      if (!checkSequenceFrameRead(item.first, result)) {
+        succeededAssets.insert(item.first);
+      }
       continue;
     }
-    if (status != SequenceReadStatus::Failed && status != SequenceReadStatus::Fallback) {
-      continue;
+    if (status == SequenceReadStatus::Fallback) {
+      checkSequenceFrameRead(item.first, result);
+    } else {
+      lastFrameHasSequenceFrameUnavailable = true;
     }
     failedAssets.insert(item.first);
     lastFrameHasSequenceDecodeFailure = true;
@@ -170,20 +215,40 @@ void RenderCache::checkSequenceDecodeFailure() {
     for (auto& map : item.second) {
       auto& usage = map.second;
       if (usage.result == nullptr) {
+        if (usage.drawn) {
+          lastFrameHasSequenceFrameUnavailable = true;
+          _sequenceCacheInvalidated = true;
+        }
         continue;
       }
       auto status = usage.result->status.load(std::memory_order_acquire);
-      if (status == SequenceReadStatus::Succeeded) {
-        succeededAssets.insert(item.first);
+      if (status == SequenceReadStatus::Succeeded || status == SequenceReadStatus::Pending) {
+        if (usage.drawn) {
+          if (checkSequenceFrameRead(item.first, usage.result)) {
+            if (usage.queue != nullptr) {
+              usage.queue->invalidateFailedRequest(usage.result->requestID,
+                                                   usage.result->targetFrame);
+            }
+          } else {
+            succeededAssets.insert(item.first);
+          }
+        }
         continue;
       }
-      if (status != SequenceReadStatus::Failed && status != SequenceReadStatus::Fallback) {
-        continue;
+      if (usage.drawn) {
+        if (status == SequenceReadStatus::Fallback) {
+          checkSequenceFrameRead(item.first, usage.result);
+        } else {
+          lastFrameHasSequenceFrameUnavailable = true;
+        }
       }
-      failedAssets.insert(item.first);
+      if (!usage.cached) {
+        failedAssets.insert(item.first);
+      }
       lastFrameHasSequenceDecodeFailure = true;
       _sequenceCacheInvalidated = true;
-      if (status == SequenceReadStatus::Failed) {
+      if (usage.result->status.load(std::memory_order_acquire) == SequenceReadStatus::Failed &&
+          usage.queue != nullptr) {
         usage.queue->invalidateFailedRequest(usage.result->requestID, usage.result->targetFrame);
       }
       // A fallback read keeps its stale image cached in the queue, so the frozen frame can stay
@@ -197,6 +262,13 @@ void RenderCache::checkSequenceDecodeFailure() {
   for (auto assetID : succeededAssets) {
     if (failedAssets.count(assetID) == 0) {
       recordSequenceSuccess(assetID);
+    }
+  }
+  if (lastFrameHasSequenceFramePending || lastFrameHasSequenceDecodeFailure ||
+      lastFrameHasSequenceFrameUnavailable) {
+    // A parent snapshot can contain the failed sequence under a different asset ID.
+    for (auto assetID : frameSnapshotIDs) {
+      removeSnapshot(assetID);
     }
   }
 }
@@ -229,7 +301,10 @@ void RenderCache::beginFrame() {
   usedAssets = {};
   usedStaticSequences = {};
   usedSequences = {};
+  frameSnapshotIDs = {};
   lastFrameHasSequenceDecodeFailure = false;
+  lastFrameHasSequenceFramePending = false;
+  lastFrameHasSequenceFrameUnavailable = false;
   resetPerformance();
 }
 
@@ -365,6 +440,7 @@ Snapshot* RenderCache::getSnapshot(const Picture* picture, float scaleFactor,
   snapshotLRU.push_front(snapshot);
   snapshotPositions[snapshot] = snapshotLRU.begin();
   snapshotCaches[picture->assetID] = snapshot;
+  frameSnapshotIDs.insert(picture->assetID);
   return snapshot;
 }
 
@@ -538,6 +614,7 @@ std::shared_ptr<tgfx::Image> RenderCache::getStaticSequenceImage(
   }
   auto assetID = sequence->uniqueID();
   if (!canRetrySequence(assetID)) {
+    lastFrameHasSequenceFrameUnavailable = true;
     return nullptr;
   }
   usedAssets.insert(assetID);
@@ -591,18 +668,46 @@ std::shared_ptr<tgfx::Image> RenderCache::getSequenceImage(std::shared_ptr<Seque
   }
   auto queue = getSequenceImageQueue(sequence, targetFrame);
   if (queue == nullptr) {
+    if (_videoEnabled || !sequence->isVideo()) {
+      lastFrameHasSequenceFrameUnavailable = true;
+      _sequenceCacheInvalidated = true;
+    }
     return nullptr;
   }
-  if (!canRetrySequence(sequence->uniqueID())) {
-    // The sequence is cooling down after decode failures, so no new decoding is scheduled. Keep
-    // displaying the last decoded frame (the queue still holds it from a fallback read) instead
-    // of flashing a transparent frame. canRetrySequence() has already marked this frame as
-    // failed, so the stale content is never persisted into a disk cache.
-    return queue->getCachedImage(targetFrame);
-  }
   std::shared_ptr<SequenceReadResult> result = nullptr;
-  auto image = queue->getImage(targetFrame, &result);
-  usedSequences[sequence->uniqueID()][targetFrame].result = std::move(result);
+  std::shared_ptr<tgfx::Image> image = nullptr;
+  auto cached = !canRetrySequence(sequence->uniqueID());
+  if (cached) {
+    image = queue->getCachedImage(targetFrame, &result);
+    if (image != nullptr && result != nullptr) {
+      auto fallbackResult = std::make_shared<SequenceReadResult>();
+      fallbackResult->requestID = result->requestID;
+      fallbackResult->targetFrame = targetFrame;
+      auto frame = result->getFrameRead();
+      if (frame->options->targetTimestamp >= 0 && result->targetFrame != targetFrame) {
+        // A cached known-target credential cannot validate a fallback for a different frame.
+        auto mismatchedRead = std::make_shared<FrameRead>();
+        mismatchedRead->buffer = frame->buffer;
+        mismatchedRead->sourceGeneration = frame->sourceGeneration;
+        mismatchedRead->generation = frame->generation;
+        mismatchedRead->options->targetTimestamp = frame->options->targetTimestamp;
+        frame = std::move(mismatchedRead);
+      }
+      fallbackResult->setFrameRead(std::move(frame));
+      fallbackResult->status.store(SequenceReadStatus::Fallback, std::memory_order_release);
+      result = std::move(fallbackResult);
+    }
+  } else {
+    image = queue->getImage(targetFrame, &result);
+  }
+  auto& usage = usedSequences[sequence->uniqueID()][targetFrame];
+  usage.result = std::move(result);
+  usage.drawn = true;
+  usage.cached = cached;
+  if (image == nullptr) {
+    lastFrameHasSequenceFrameUnavailable = true;
+    _sequenceCacheInvalidated = true;
+  }
   // We don't check mipmaps for sequences since there is currently no backend support yet.
   return image;
 }
@@ -699,8 +804,8 @@ bool RenderCache::canRetrySequence(ID uniqueID) {
   if (tgfx::Clock::Now() >= result->second.retryAfterTime) {
     return true;
   }
-  // The sequence is intentionally absent while cooling down. Keep the frame marked as failed so
-  // PAGDecoder never persists an incomplete render into its disk sequence cache.
+  // Cooling down may display a valid old delivery, but it is not the requested decoded frame.
+  // Keep the frame marked as failed so disk caches cannot persist it as a successful target read.
   lastFrameHasSequenceDecodeFailure = true;
   _sequenceCacheInvalidated = true;
   return false;

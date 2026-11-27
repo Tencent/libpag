@@ -18,8 +18,38 @@
 
 #include "BitmapDrawable.h"
 #include "rendering/gpu/Devices.h"
+#ifdef __ANDROID__
+#include "tgfx/core/Pixmap.h"
+#endif
 
 namespace pag {
+#ifdef __ANDROID__
+static bool ReadHardwarePixels(const std::shared_ptr<tgfx::Surface>& surface,
+                               const tgfx::ImageInfo& info, void* pixels) {
+  if (surface->origin() != tgfx::ImageOrigin::TopLeft || surface->colorSpace() != nullptr ||
+      info.colorSpace() != nullptr) {
+    return false;
+  }
+  // Retrieving the hardware buffer submits pending work and waits for GPU completion.
+  auto hardwareBuffer = surface->getHardwareBuffer();
+  if (hardwareBuffer == nullptr) {
+    return false;
+  }
+  auto source = BitmapBuffer::Wrap(hardwareBuffer);
+  if (source == nullptr || source->info().width() != info.width() ||
+      source->info().height() != info.height()) {
+    return false;
+  }
+  auto sourcePixels = source->lockPixels();
+  if (sourcePixels == nullptr) {
+    return false;
+  }
+  auto success =
+      sourcePixels != pixels && tgfx::Pixmap(source->info(), sourcePixels).readPixels(info, pixels);
+  source->unlockPixels();
+  return success;
+}
+#endif
 std::shared_ptr<BitmapDrawable> BitmapDrawable::Make(int width, int height,
                                                      std::shared_ptr<tgfx::Device> sharedDevice) {
   auto device = std::move(sharedDevice);
@@ -60,7 +90,14 @@ void BitmapDrawable::present(tgfx::Context* context) {
     if (pixels == nullptr) {
       return;
     }
+#ifdef __ANDROID__
+    pixelCopied = ReadHardwarePixels(offscreenSurface, bitmap->info(), pixels);
+    if (!pixelCopied) {
+      pixelCopied = offscreenSurface->readPixels(bitmap->info(), pixels);
+    }
+#else
     pixelCopied = offscreenSurface->readPixels(bitmap->info(), pixels);
+#endif
     bitmap->unlockPixels();
   }
 }

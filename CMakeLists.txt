@@ -1324,6 +1324,8 @@ if (PAG_BUILD_TESTS)
                 INCLUDE_DIRECTORIES "${TGFX_DIR}/src;${TGFX_DIR}/third_party/concurrentqueue")
     endif ()
 
+    set_source_files_properties(test/src/WindowSubmissionTest.cpp PROPERTIES
+            INCLUDE_DIRECTORIES "${TGFX_DIR}/src;${TGFX_DIR}/third_party/concurrentqueue")
     add_vendor_target(test-vendor STATIC_VENDORS googletest CONFIG_DIR ${TGFX_DIR})
     find_vendor_libraries(test-vendor STATIC TEST_VENDOR_STATIC_LIBRARIES)
     list(APPEND PAG_TEST_LIBS ${TEST_VENDOR_STATIC_LIBRARIES})

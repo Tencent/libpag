@@ -19,6 +19,39 @@
 #include "SequenceImageQueue.h"
 
 namespace pag {
+static bool CanReuseSequenceRead(const std::shared_ptr<SequenceReadResult>& result) {
+  if (result == nullptr) {
+    return false;
+  }
+  auto status = result->status.load(std::memory_order_acquire);
+  if (status == SequenceReadStatus::Failed || status == SequenceReadStatus::Fallback) {
+    return false;
+  }
+  auto frame = result->getFrameRead();
+  if (!frame->isCurrent() ||
+      (frame->buffer != nullptr &&
+       (frame->buffer->expired() || frame->buffer->status() == tgfx::ImageBufferStatus::Expired ||
+        frame->buffer->status() == tgfx::ImageBufferStatus::Timeout ||
+        frame->buffer->status() == tgfx::ImageBufferStatus::Failed))) {
+    return false;
+  }
+  if (status == SequenceReadStatus::Pending ||
+      (frame->buffer != nullptr && frame->buffer->status() == tgfx::ImageBufferStatus::Pending)) {
+    return frame->buffer == nullptr || !frame->buffer->expired();
+  }
+  return frame->hasValidBuffer() && frame->matchesTarget();
+}
+
+static bool HasCachedSequenceDelivery(const std::shared_ptr<SequenceReadResult>& result) {
+  if (result == nullptr) {
+    return false;
+  }
+  auto status = result->status.load(std::memory_order_acquire);
+  auto frame = result->getFrameRead();
+  return (status == SequenceReadStatus::Succeeded || status == SequenceReadStatus::Fallback) &&
+         frame->hasValidBuffer() && frame->matchesTarget();
+}
+
 std::unique_ptr<SequenceImageQueue> SequenceImageQueue::MakeFrom(
     std::shared_ptr<SequenceInfo> sequence, PAGLayer* pagLayer, bool useDiskCache) {
   if (sequence == nullptr || pagLayer == nullptr || sequence->staticContent()) {
@@ -41,6 +74,9 @@ SequenceImageQueue::SequenceImageQueue(std::shared_ptr<SequenceInfo> sequence,
 }
 
 void SequenceImageQueue::prepareNextImage() {
+  if (currentResult != nullptr && !HasCachedSequenceDelivery(currentResult)) {
+    return;
+  }
   auto nextFrame = lastRequestedFrame + 1;
   if (nextFrame >= totalFrames) {
     nextFrame = firstFrame;
@@ -51,6 +87,11 @@ void SequenceImageQueue::prepareNextImage() {
 void SequenceImageQueue::prepare(Frame targetFrame, std::shared_ptr<SequenceReadResult>* result) {
   if (targetFrame < 0 || targetFrame >= totalFrames) {
     return;
+  }
+  if (preparedImage != nullptr && !CanReuseSequenceRead(preparedResult)) {
+    preparedImage = nullptr;
+    preparedFrame = -1;
+    preparedResult = nullptr;
   }
   if (preparedImage != nullptr) {
     if (result != nullptr && targetFrame == preparedFrame) {
@@ -80,18 +121,17 @@ void SequenceImageQueue::prepare(Frame targetFrame, std::shared_ptr<SequenceRead
 std::shared_ptr<tgfx::Image> SequenceImageQueue::getImage(
     Frame targetFrame, std::shared_ptr<SequenceReadResult>* result) {
   lastRequestedFrame = targetFrame;
-  if (targetFrame == currentFrame) {
-    auto status = currentResult == nullptr ? SequenceReadStatus::Pending
-                                           : currentResult->status.load(std::memory_order_acquire);
-    if (status != SequenceReadStatus::Fallback) {
-      if (result != nullptr) {
-        *result = currentResult;
-      }
-      return currentImage;
+  if (targetFrame == currentFrame && currentImage != nullptr &&
+      CanReuseSequenceRead(currentResult)) {
+    if (result != nullptr) {
+      *result = currentResult;
     }
-    // The cached image holds stale content from an earlier frame. Bypass the same-frame cache so
-    // the request re-decodes once decoding recovers; if it still fails, the reader returns the
-    // fallback buffer again and the frozen content stays on screen.
+    return currentImage;
+  }
+  if (targetFrame == preparedFrame && !CanReuseSequenceRead(preparedResult)) {
+    preparedImage = nullptr;
+    preparedFrame = -1;
+    preparedResult = nullptr;
   }
   if (targetFrame == preparedFrame) {
     currentImage = preparedImage;
@@ -108,6 +148,9 @@ std::shared_ptr<tgfx::Image> SequenceImageQueue::getImage(
   auto readResult = std::make_shared<SequenceReadResult>();
   readResult->requestID = ++nextRequestID;
   readResult->targetFrame = targetFrame;
+  currentFrame = targetFrame;
+  currentImage = nullptr;
+  currentResult = readResult;
   auto image = sequence->makeFrameImage(reader, targetFrame, useDiskCache, readResult);
   if (image == nullptr) {
     readResult->status.store(SequenceReadStatus::Failed, std::memory_order_release);
@@ -136,9 +179,11 @@ std::shared_ptr<tgfx::Image> SequenceImageQueue::getImage(
   return currentImage;
 }
 
-std::shared_ptr<tgfx::Image> SequenceImageQueue::getCachedImage(Frame targetFrame) {
+std::shared_ptr<tgfx::Image> SequenceImageQueue::getCachedImage(
+    Frame targetFrame, std::shared_ptr<SequenceReadResult>* result) {
   lastRequestedFrame = targetFrame;
-  if (targetFrame == preparedFrame && preparedImage != nullptr) {
+  if (targetFrame == preparedFrame && preparedImage != nullptr &&
+      HasCachedSequenceDelivery(preparedResult)) {
     currentImage = preparedImage;
     currentFrame = preparedFrame;
     currentResult = preparedResult;
@@ -146,7 +191,10 @@ std::shared_ptr<tgfx::Image> SequenceImageQueue::getCachedImage(Frame targetFram
     preparedFrame = -1;
     preparedResult = nullptr;
   }
-  return currentImage;
+  if (result != nullptr) {
+    *result = currentResult;
+  }
+  return HasCachedSequenceDelivery(currentResult) ? currentImage : nullptr;
 }
 
 void SequenceImageQueue::invalidateFailedRequest(uint64_t requestID, Frame targetFrame) {

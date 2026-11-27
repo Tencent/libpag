@@ -623,7 +623,7 @@ void DiskCache::notifyFileClosed(uint32_t fileID,
 void DiskCache::notifyFileSizeChanged(uint32_t fileID, size_t fileSize) {
   std::lock_guard<std::mutex> autoLock(locker);
   auto result = cachedFileInfos.find(fileID);
-  if (result != cachedFileInfos.end()) {
+  if (result != cachedFileInfos.end() && fileSize > result->second->fileSize) {
     totalDiskSize += fileSize - result->second->fileSize;
     result->second->fileSize = fileSize;
     if (checkDiskSpace(maxDiskSize)) {
