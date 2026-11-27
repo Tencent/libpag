@@ -7586,20 +7586,84 @@ PAGX_TEST(PAGXSVGTest, SVGImport_StdDeviationKeepsPerChannelBase) {
   EXPECT_NEAR(blurY->keyframes.back().value, 5.0f, 1e-4f);
 }
 
-static pagx::Layer* FindLayerWithFilters(pagx::Layer* layer) {
+static void CollectLayersWithFilters(pagx::Layer* layer, std::vector<pagx::Layer*>& layers) {
   if (layer == nullptr) {
-    return nullptr;
+    return;
   }
   if (!layer->filters.empty()) {
-    return layer;
+    layers.push_back(layer);
   }
   for (auto* child : layer->children) {
-    auto* found = FindLayerWithFilters(child);
-    if (found != nullptr) {
-      return found;
+    CollectLayersWithFilters(child, layers);
+  }
+}
+
+static pagx::Layer* FindUniqueFilterLayer(pagx::PAGXDocument* doc) {
+  std::vector<pagx::Layer*> layers;
+  for (auto* root : doc->layers) {
+    CollectLayersWithFilters(root, layers);
+  }
+  return layers.size() == 1 ? layers[0] : nullptr;
+}
+
+static void CollectShadowStyles(pagx::Layer* layer, std::vector<pagx::DropShadowStyle*>& styles) {
+  if (layer == nullptr) {
+    return;
+  }
+  for (auto* style : layer->styles) {
+    if (style->nodeType() == pagx::NodeType::DropShadowStyle) {
+      styles.push_back(static_cast<pagx::DropShadowStyle*>(style));
     }
   }
-  return nullptr;
+  for (auto* child : layer->children) {
+    CollectShadowStyles(child, styles);
+  }
+}
+
+static pagx::DropShadowStyle* FindUniqueShadowStyle(pagx::PAGXDocument* doc) {
+  std::vector<pagx::DropShadowStyle*> styles;
+  for (auto* root : doc->layers) {
+    CollectShadowStyles(root, styles);
+  }
+  return styles.size() == 1 ? styles[0] : nullptr;
+}
+
+static std::shared_ptr<pagx::PAGXDocument> MakeMultiNoiseDocument(float opacity) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto layer = doc->makeNode<pagx::Layer>();
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {50, 50};
+  rect->size = {80, 80};
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {0.8f, 0.8f, 0.8f, 1.0f};
+  fill->color = solid;
+  auto noise = doc->makeNode<pagx::NoiseFilter>();
+  noise->mode = pagx::NoiseMode::Multi;
+  noise->size = 2.0f;
+  noise->density = 0.5f;
+  noise->seed = 7.0f;
+  noise->opacity = opacity;
+  layer->contents.push_back(rect);
+  layer->contents.push_back(fill);
+  layer->filters.push_back(noise);
+  doc->layers.push_back(layer);
+  return doc;
+}
+
+static float RoundTripMultiNoiseOpacity(float opacity) {
+  auto doc = MakeMultiNoiseDocument(opacity);
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  auto imported = pagx::SVGImporter::ParseString(svg);
+  if (imported == nullptr) {
+    return -1.0f;
+  }
+  auto* layer = FindUniqueFilterLayer(imported.get());
+  if (layer == nullptr || layer->filters.empty() ||
+      layer->filters[0]->nodeType() != pagx::NodeType::NoiseFilter) {
+    return -1.0f;
+  }
+  return static_cast<pagx::NoiseFilter*>(layer->filters[0])->opacity;
 }
 
 /**
@@ -7612,18 +7676,12 @@ PAGX_TEST(PAGXSVGTest, SVGImport_DropShadowInnerShadowForegroundBlur) {
       ProjectPath::Absolute("resources/svg/filter/drop_shadow_inner_shadow_blur.svg"));
   ASSERT_NE(doc, nullptr);
 
-  pagx::Layer* filtered = nullptr;
-  for (auto* root : doc->layers) {
-    filtered = FindLayerWithFilters(root);
-    if (filtered != nullptr) {
-      break;
-    }
-  }
+  auto* filtered = FindUniqueFilterLayer(doc.get());
   ASSERT_NE(filtered, nullptr);
   ASSERT_EQ(filtered->filters.size(), 3u);
 
+  ASSERT_EQ(filtered->filters[0]->nodeType(), pagx::NodeType::DropShadowFilter);
   auto* drop = static_cast<pagx::DropShadowFilter*>(filtered->filters[0]);
-  ASSERT_EQ(drop->nodeType(), pagx::NodeType::DropShadowFilter);
   EXPECT_FLOAT_EQ(drop->offsetX, 30.0f);
   EXPECT_FLOAT_EQ(drop->offsetY, 30.0f);
   EXPECT_FLOAT_EQ(drop->blurX, 2.0f);
@@ -7631,8 +7689,8 @@ PAGX_TEST(PAGXSVGTest, SVGImport_DropShadowInnerShadowForegroundBlur) {
   EXPECT_FLOAT_EQ(drop->color.green, 1.0f);
   EXPECT_FLOAT_EQ(drop->color.red, 0.0f);
 
+  ASSERT_EQ(filtered->filters[1]->nodeType(), pagx::NodeType::InnerShadowFilter);
   auto* inner = static_cast<pagx::InnerShadowFilter*>(filtered->filters[1]);
-  ASSERT_EQ(inner->nodeType(), pagx::NodeType::InnerShadowFilter);
   EXPECT_FLOAT_EQ(inner->offsetX, 30.0f);
   EXPECT_FLOAT_EQ(inner->offsetY, 30.0f);
   EXPECT_FLOAT_EQ(inner->blurX, 2.0f);
@@ -7640,8 +7698,8 @@ PAGX_TEST(PAGXSVGTest, SVGImport_DropShadowInnerShadowForegroundBlur) {
   EXPECT_FLOAT_EQ(inner->color.red, 1.0f);
   EXPECT_FLOAT_EQ(inner->color.green, 0.0f);
 
+  ASSERT_EQ(filtered->filters[2]->nodeType(), pagx::NodeType::BlurFilter);
   auto* blur = static_cast<pagx::BlurFilter*>(filtered->filters[2]);
-  ASSERT_EQ(blur->nodeType(), pagx::NodeType::BlurFilter);
   EXPECT_FLOAT_EQ(blur->blurX, 15.0f);
   EXPECT_FLOAT_EQ(blur->blurY, 15.0f);
 }
@@ -7653,17 +7711,11 @@ PAGX_TEST(PAGXSVGTest, SVGImport_DropShadowInnerShadowForegroundBlur) {
 PAGX_TEST(PAGXSVGTest, SVGImport_DuoNoise) {
   auto doc = pagx::SVGImporter::Parse(ProjectPath::Absolute("resources/svg/filter/duo_noise.svg"));
   ASSERT_NE(doc, nullptr);
-  pagx::Layer* filtered = nullptr;
-  for (auto* root : doc->layers) {
-    filtered = FindLayerWithFilters(root);
-    if (filtered != nullptr) {
-      break;
-    }
-  }
+  auto* filtered = FindUniqueFilterLayer(doc.get());
   ASSERT_NE(filtered, nullptr);
   ASSERT_EQ(filtered->filters.size(), 1u);
+  ASSERT_EQ(filtered->filters[0]->nodeType(), pagx::NodeType::NoiseFilter);
   auto* noise = static_cast<pagx::NoiseFilter*>(filtered->filters[0]);
-  ASSERT_EQ(noise->nodeType(), pagx::NodeType::NoiseFilter);
   EXPECT_EQ(noise->mode, pagx::NoiseMode::Duo);
   EXPECT_NEAR(noise->size, 1.5f, 1e-4f);
   EXPECT_FLOAT_EQ(noise->seed, 2488.0f);
@@ -7683,22 +7735,135 @@ PAGX_TEST(PAGXSVGTest, SVGImport_MultiNoise) {
   auto doc =
       pagx::SVGImporter::Parse(ProjectPath::Absolute("resources/svg/filter/multi_noise.svg"));
   ASSERT_NE(doc, nullptr);
-  pagx::Layer* filtered = nullptr;
-  for (auto* root : doc->layers) {
-    filtered = FindLayerWithFilters(root);
-    if (filtered != nullptr) {
-      break;
-    }
-  }
+  auto* filtered = FindUniqueFilterLayer(doc.get());
   ASSERT_NE(filtered, nullptr);
   ASSERT_EQ(filtered->filters.size(), 1u);
+  ASSERT_EQ(filtered->filters[0]->nodeType(), pagx::NodeType::NoiseFilter);
   auto* noise = static_cast<pagx::NoiseFilter*>(filtered->filters[0]);
-  ASSERT_EQ(noise->nodeType(), pagx::NodeType::NoiseFilter);
   EXPECT_EQ(noise->mode, pagx::NoiseMode::Multi);
   EXPECT_NEAR(noise->size, 1.5f, 1e-4f);
   EXPECT_FLOAT_EQ(noise->seed, 2488.0f);
   EXPECT_NEAR(noise->density, 1.0f, 1e-4f);
   EXPECT_FLOAT_EQ(noise->opacity, 0.29f);
+}
+
+PAGX_TEST(PAGXSVGTest, SVGImport_ImplicitOffsetShadowUsesSourceGraphic) {
+  auto doc = pagx::SVGImporter::Parse(
+      ProjectPath::Absolute("resources/svg/filter/offset_implicit_shadow.svg"));
+  ASSERT_NE(doc, nullptr);
+  auto* filtered = FindUniqueFilterLayer(doc.get());
+  ASSERT_NE(filtered, nullptr);
+  ASSERT_EQ(filtered->filters.size(), 1u);
+  ASSERT_EQ(filtered->filters[0]->nodeType(), pagx::NodeType::DropShadowFilter);
+  auto* shadow = static_cast<pagx::DropShadowFilter*>(filtered->filters[0]);
+  EXPECT_FLOAT_EQ(shadow->offsetX, 0.0f);
+  EXPECT_FLOAT_EQ(shadow->offsetY, 4.0f);
+  EXPECT_FLOAT_EQ(shadow->blurX, 2.0f);
+  EXPECT_FLOAT_EQ(shadow->blurY, 2.0f);
+  EXPECT_FLOAT_EQ(shadow->color.alpha, 0.3f);
+}
+
+PAGX_TEST(PAGXSVGTest, SVGImport_MorphologyChainPreservesSpread) {
+  auto doc =
+      pagx::SVGImporter::Parse(ProjectPath::Absolute("resources/svg/filter/morphology_shadow.svg"));
+  ASSERT_NE(doc, nullptr);
+  auto* style = FindUniqueShadowStyle(doc.get());
+  ASSERT_NE(style, nullptr);
+  EXPECT_FLOAT_EQ(style->offsetX, 0.0f);
+  EXPECT_FLOAT_EQ(style->offsetY, 8.0f);
+  EXPECT_FLOAT_EQ(style->blurX, 6.0f);
+  EXPECT_FLOAT_EQ(style->blurY, 6.0f);
+  EXPECT_FLOAT_EQ(style->spread, 6.0f);
+  EXPECT_FLOAT_EQ(style->color.alpha, 0.3f);
+  EXPECT_TRUE(FindUniqueFilterLayer(doc.get()) == nullptr);
+}
+
+PAGX_TEST(PAGXSVGTest, SVGImport_InnerShadowWithoutBlur) {
+  auto doc = pagx::SVGImporter::Parse(
+      ProjectPath::Absolute("resources/svg/filter/inner_shadow_no_blur.svg"));
+  ASSERT_NE(doc, nullptr);
+  auto* filtered = FindUniqueFilterLayer(doc.get());
+  ASSERT_NE(filtered, nullptr);
+  ASSERT_EQ(filtered->filters.size(), 1u);
+  ASSERT_EQ(filtered->filters[0]->nodeType(), pagx::NodeType::InnerShadowFilter);
+  auto* shadow = static_cast<pagx::InnerShadowFilter*>(filtered->filters[0]);
+  EXPECT_FLOAT_EQ(shadow->offsetX, 5.0f);
+  EXPECT_FLOAT_EQ(shadow->offsetY, 5.0f);
+  EXPECT_FLOAT_EQ(shadow->blurX, 0.0f);
+  EXPECT_FLOAT_EQ(shadow->blurY, 0.0f);
+  EXPECT_FLOAT_EQ(shadow->color.red, 1.0f);
+}
+
+PAGX_TEST(PAGXSVGTest, SVGImport_NoiseExportRoundTripPreservesFloodAlpha) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto monoLayer = doc->makeNode<pagx::Layer>();
+  auto monoRect = doc->makeNode<pagx::Rectangle>();
+  monoRect->position = {50, 50};
+  monoRect->size = {80, 80};
+  auto monoFill = doc->makeNode<pagx::Fill>();
+  auto monoSolid = doc->makeNode<pagx::SolidColor>();
+  monoSolid->color = {0.8f, 0.8f, 0.8f, 1.0f};
+  monoFill->color = monoSolid;
+  auto mono = doc->makeNode<pagx::NoiseFilter>();
+  mono->mode = pagx::NoiseMode::Mono;
+  mono->size = 2.0f;
+  mono->density = 0.5f;
+  mono->color = {1.0f, 0.0f, 0.0f, 0.25f};
+  monoLayer->contents.push_back(monoRect);
+  monoLayer->contents.push_back(monoFill);
+  monoLayer->filters.push_back(mono);
+  doc->layers.push_back(monoLayer);
+
+  auto duoLayer = doc->makeNode<pagx::Layer>();
+  auto duoRect = doc->makeNode<pagx::Rectangle>();
+  duoRect->position = {50, 50};
+  duoRect->size = {80, 80};
+  auto duoFill = doc->makeNode<pagx::Fill>();
+  auto duoSolid = doc->makeNode<pagx::SolidColor>();
+  duoSolid->color = {0.8f, 0.8f, 0.8f, 1.0f};
+  duoFill->color = duoSolid;
+  auto duo = doc->makeNode<pagx::NoiseFilter>();
+  duo->mode = pagx::NoiseMode::Duo;
+  duo->size = 2.0f;
+  duo->density = 0.5f;
+  duo->firstColor = {1.0f, 0.0f, 0.0f, 0.25f};
+  duo->secondColor = {1.0f, 234.0f / 255.0f, 0.0f, 0.25f};
+  duoLayer->contents.push_back(duoRect);
+  duoLayer->contents.push_back(duoFill);
+  duoLayer->filters.push_back(duo);
+  doc->layers.push_back(duoLayer);
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  auto imported = pagx::SVGImporter::ParseString(svg);
+  ASSERT_NE(imported, nullptr);
+
+  std::vector<pagx::Layer*> layers;
+  for (auto* root : imported->layers) {
+    CollectLayersWithFilters(root, layers);
+  }
+  ASSERT_EQ(layers.size(), 2u);
+  bool sawMono = false;
+  bool sawDuo = false;
+  for (auto* layer : layers) {
+    ASSERT_EQ(layer->filters.size(), 1u);
+    ASSERT_EQ(layer->filters[0]->nodeType(), pagx::NodeType::NoiseFilter);
+    auto* noise = static_cast<pagx::NoiseFilter*>(layer->filters[0]);
+    if (noise->mode == pagx::NoiseMode::Mono) {
+      sawMono = true;
+      EXPECT_FLOAT_EQ(noise->color.alpha, 0.25f);
+    } else if (noise->mode == pagx::NoiseMode::Duo) {
+      sawDuo = true;
+      EXPECT_FLOAT_EQ(noise->firstColor.alpha, 0.25f);
+      EXPECT_FLOAT_EQ(noise->secondColor.alpha, 0.25f);
+    }
+  }
+  EXPECT_TRUE(sawMono);
+  EXPECT_TRUE(sawDuo);
+}
+
+PAGX_TEST(PAGXSVGTest, SVGImport_MultiNoiseRoundTripKeepsBoundaryOpacity) {
+  EXPECT_FLOAT_EQ(RoundTripMultiNoiseOpacity(0.0f), 0.0f);
+  EXPECT_FLOAT_EQ(RoundTripMultiNoiseOpacity(1.0f), 1.0f);
 }
 
 }  // namespace pag

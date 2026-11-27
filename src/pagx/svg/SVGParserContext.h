@@ -106,6 +106,8 @@ class SVGParserContext {
   std::shared_ptr<PAGXDocument> parseFile(const std::string& filePath);
 
  private:
+  friend class SVGFilterParser;
+
   std::shared_ptr<PAGXDocument> parseDOM(const std::shared_ptr<XMLDOM>& dom);
 
   void parseDefs(const std::shared_ptr<DOMNode>& defsNode);
@@ -211,11 +213,6 @@ class SVGParserContext {
   std::pair<float, float> parseFilterOffset(const std::shared_ptr<DOMNode>& node);
   std::pair<float, float> parseFilterBlur(const std::shared_ptr<DOMNode>& node);
   Color parseFilterColorMatrix(const std::shared_ptr<DOMNode>& node);
-
-  // Converts an feTurbulence-based noise filter (noise bands plus optional flood colors).
-  // Returns true when the filter is fully represented by one NoiseFilter.
-  bool convertNoiseFilter(const std::vector<std::shared_ptr<DOMNode>>& primitives,
-                          std::vector<LayerFilter*>& filters);
 
   // Create a DropShadowFilter node with the given parameters.
   DropShadowFilter* createDropShadow(float offsetX, float offsetY, float blurX, float blurY,

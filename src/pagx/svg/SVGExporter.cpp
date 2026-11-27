@@ -68,6 +68,7 @@
 #include "pagx/nodes/TextPath.h"
 #include "pagx/svg/SVGBlendMode.h"
 #include "pagx/svg/SVGFeatureProbe.h"
+#include "pagx/svg/SVGNoiseUtils.h"
 #include "pagx/svg/SVGPathParser.h"
 #include "pagx/types/Rect.h"
 #include "pagx/utils/Base64.h"
@@ -1127,21 +1128,10 @@ std::string SVGWriter::writeNoiseBand(float size, float density, float seed, boo
   _defs->addAttribute("result", "luma" + label);
   _defs->closeElementSelfClosing();
 
-  auto d = std::clamp(density, 0.0f, 1.0f);
-  int lower = 0;
-  int upper = 0;
-  // Maps density to a percentile band [lower, upper] in the luminance histogram:
-  //   dark  (isDark=true ): d=0→[25,25], d=1→[ 0,49]
-  //   bright (isDark=false): d=0→[74,74], d=1→[50,99]
-  // The band narrows at d=0 and widens toward the extremes as density increases,
-  // producing a continuous noise density gradient.
-  if (isDark) {
-    lower = std::clamp(static_cast<int>(std::lround(-25.0f * d + 25.0f)), 0, 99);
-    upper = std::clamp(static_cast<int>(std::lround(24.0f * d + 25.0f)), 0, 99);
-  } else {
-    lower = std::clamp(static_cast<int>(std::lround(-24.0f * d + 74.0f)), 0, 99);
-    upper = std::clamp(static_cast<int>(std::lround(25.0f * d + 74.0f)), 0, 99);
-  }
+  // The band geometry is shared with the importer so density survives a round trip.
+  const auto band = isDark ? MakeDarkNoiseBand(density) : MakeBrightNoiseBand(density);
+  const int lower = band.lower;
+  const int upper = band.upper;
   std::string table;
   table.reserve(300);
   for (int i = 0; i < 100; i++) {
@@ -1186,9 +1176,9 @@ std::string SVGWriter::writeNoiseMultiCore(float size, float density, float seed
   _defs->closeElementSelfClosing();
   _defs->closeElement();
 
-  auto d = std::clamp(density, 0.0f, 1.0f);
-  int lower = std::clamp(static_cast<int>(std::lround(-25.0f * d + 25.0f)), 0, 99);
-  int upper = std::clamp(static_cast<int>(std::lround(24.0f * d + 25.0f)), 0, 99);
+  const auto band = MakeDarkNoiseBand(density);
+  const int lower = band.lower;
+  const int upper = band.upper;
   std::string table;
   table.reserve(300);
   for (int i = 0; i < 100; i++) {
