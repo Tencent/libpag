@@ -687,14 +687,6 @@ void SampleArcLengthLUT(const ArcLengthLUT& lut, float arcLength, Point* outPos,
 // HTMLWriter – text methods
 //==============================================================================
 
-// CSS translate() that combines a horizontal anchor percentage with an optional vertical shift.
-static std::string CssTextTranslate(const char* xPercent, float dy) {
-  if (FloatNearlyZero(dy)) {
-    return std::string("translateX(") + xPercent + ")";
-  }
-  return std::string("translate(") + xPercent + "," + CssFloatToString(dy) + "px)";
-}
-
 // CSS line box settings that put browser-rendered text on the same rows as PAGX's own layout.
 struct CssLineBoxAlignment {
   // False when the family cannot be resolved, in which case the default line box has to be kept.
@@ -1025,26 +1017,6 @@ void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
       style += ";line-height:1";
     }
     style += ";white-space:pre";
-    bool singleLine = text->text.find('\n') == std::string::npos;
-    // A CSS line box centres the font's content area inside the line height and splits the leading
-    // around it, while PAGX counts the leading as content and puts the baseline at the ascent (then
-    // rounds it). Placing the span top at PAGX's origin therefore renders the glyphs about
-    // leading/2 lower in a browser. A single line can absorb that by shrinking its line box onto
-    // PAGX's baseline row; a multi-line block keeps PAGX's line advance (its spacing must stay
-    // intact) and is shifted as a whole through `transform`.
-    float baselineShift = 0.0f;
-    if (!usesGlyphRunPosition) {
-      auto alignment =
-          ComputeLineBoxAlignment(text->fontFamily, text->fontStyle, text->renderFontSize());
-      if (alignment.hasFont) {
-        if (singleLine) {
-          style += ";line-height:" + CssFloatToString(alignment.singleLineHeight) + "px";
-        } else {
-          style += ";line-height:" + CssFloatToString(alignment.lineHeight) + "px";
-          baselineShift = -alignment.baselineDelta;
-        }
-      }
-    }
     // Multi-line text with a non-Start anchor needs per-line alignment relative to the anchor
     // point. The single-line path below uses `width:posX*2` (center) or `width:posX` (end)
     // which only positions one line correctly — posX here is glyphRuns[0]'s x, i.e. the
@@ -1053,27 +1025,25 @@ void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
     // a span whose anchor is the origin, shifted with `transform:translateX`. tgfx centres
     // each line around anchor x=0 in the layer's coordinate space; mirror that by placing
     // the span at `text->position.x` and using translateX(-50%) for Center / -100% for End.
-    bool multiLineAnchor = !singleLine && text->textAnchor != TextAnchor::Start;
+    bool multiLineAnchor =
+        text->text.find('\n') != std::string::npos && text->textAnchor != TextAnchor::Start;
     if (multiLineAnchor) {
       float anchorX = text->position.x;
       if (text->textAnchor == TextAnchor::Center) {
         style += ";left:" + CssFloatToString(anchorX) +
-                 "px;transform:" + CssTextTranslate("-50%", baselineShift) + ";text-align:center";
+                 "px;transform:translateX(-50%);text-align:center";
       } else {
         style += ";left:" + CssFloatToString(anchorX) +
-                 "px;transform:" + CssTextTranslate("-100%", baselineShift) + ";text-align:right";
+                 "px;transform:translateX(-100%);text-align:right";
       }
     } else if (text->textAnchor == TextAnchor::Center) {
-      style += ";left:" + CssFloatToString(posX) +
-               "px;transform:" + CssTextTranslate("-50%", baselineShift) + ";text-align:center";
+      style +=
+          ";left:" + CssFloatToString(posX) + "px;transform:translateX(-50%);text-align:center";
     } else if (text->textAnchor == TextAnchor::End) {
-      style += ";left:" + CssFloatToString(posX) +
-               "px;transform:" + CssTextTranslate("-100%", baselineShift) + ";text-align:right";
+      style +=
+          ";left:" + CssFloatToString(posX) + "px;transform:translateX(-100%);text-align:right";
     } else {
       style += ";left:" + CssFloatToString(posX) + "px";
-      if (!FloatNearlyZero(baselineShift)) {
-        style += ";transform:translateY(" + CssFloatToString(baselineShift) + "px)";
-      }
     }
     if (!text->id.empty()) {
       // The frame list shifts this anchor when the x/y channel is animated.
@@ -1109,11 +1079,7 @@ void HTMLWriter::writeText(HTMLBuilder& out, const Text* text, const Fill* fill,
     }
   }
   if (text->fauxBold) {
-    // PAGX bolds by stroking the outline; `font-weight: bold` swaps the face, which changes the
-    // advance and makes the line wider than the reference.
-    style +=
-        ";-webkit-text-stroke:" + CssFloatToString(FauxBoldStrokeWidth(text->renderFontSize())) +
-        "px currentColor";
+    style += ";font-weight:bold";
   }
   if (fill && fill->color) {
     auto ct = fill->color->nodeType();
@@ -1442,11 +1408,26 @@ void HTMLWriter::writeTextModifier(HTMLBuilder& out, const std::vector<GeoInfo>&
       // at the position PAGX's shaper produced (baseline coordinates), while inline-block spans let
       // the browser re-lay the run out. That costs the shaper's kerning (2-3px per kerned pair) and
       // shifts the baseline by a half-leading that depends on the font metrics.
-      bool usesSVGTextForModifier = !layoutAnimated && fill && fill->color &&
-                                    fill->color->nodeType() == NodeType::SolidColor &&
-                                    modifier != nullptr && !(modifier->fillColor.has_value()) &&
-                                    text->glyphData != nullptr &&
-                                    !text->glyphData->layoutRuns.empty();
+      // Only a modifier the animation drives needs per-glyph <text> elements; a static modifier
+      // keeps the span layout, which leaves the exported document editable.
+      bool modifierAnimated = false;
+      if (modifier != nullptr) {
+        modifierAnimated = _ctx->animation.animatedModifiers.count(modifier) > 0;
+        for (const auto* selector : modifier->selectors) {
+          if (selector == nullptr) {
+            continue;
+          }
+          if (_ctx->animation.animatedRangeSelectors.count(
+                  static_cast<const RangeSelector*>(selector)) > 0) {
+            modifierAnimated = true;
+            break;
+          }
+        }
+      }
+      bool usesSVGTextForModifier =
+          modifierAnimated && !layoutAnimated && fill && fill->color &&
+          fill->color->nodeType() == NodeType::SolidColor && !(modifier->fillColor.has_value()) &&
+          text->glyphData != nullptr && !text->glyphData->layoutRuns.empty();
 
       if (usesSVGTextForModifier) {
         usesSVGTextGradient = true;
@@ -1765,8 +1746,13 @@ void HTMLWriter::writeTextModifier(HTMLBuilder& out, const std::vector<GeoInfo>&
           if (isSpace) {
             charStr = "\u00A0";
           }
+          // A static run keeps the inline-block flow the exporter has always used, so its markup
+          // matches the previous output. Only a run the animation drives needs the shaper's exact
+          // pen positions, because a per-glyph keyframe assumes that origin.
           std::string charStyle = "";
-          if (charIdx < glyphPositions.size()) {
+          const bool exactPlacement =
+              (composed || spanSelector != nullptr) && charIdx < glyphPositions.size();
+          if (exactPlacement) {
             charStyle = "position:absolute;left:" + CssFloatToString(glyphPositions[charIdx].x) +
                         "px;top:0;";
           } else {
@@ -1799,9 +1785,15 @@ void HTMLWriter::writeTextModifier(HTMLBuilder& out, const std::vector<GeoInfo>&
             // CSS transform applies right-to-left on the point, so the equivalent sequence is
             // rotate(+axis) skewX(-skew) rotate(-axis). Skip the rotations when skewAxis is 0 to
             // keep the simpler output for the common pure-horizontal-skew case.
-            transform += "rotate(" + CssFloatToString(-modifier->skewAxis) + "deg) ";
+            // tgfx rotates by -skewAxis, applies the skew and rotates back by +skewAxis; CSS applies
+            // the list right to left, so the emitted order is +axis, skew, -axis.
+            if (!FloatNearlyZero(modifier->skewAxis)) {
+              transform += "rotate(" + CssFloatToString(modifier->skewAxis) + "deg) ";
+            }
             transform += "skewX(" + CssFloatToString(-modifier->skew * absF) + "deg) ";
-            transform += "rotate(" + CssFloatToString(modifier->skewAxis) + "deg) ";
+            if (!FloatNearlyZero(modifier->skewAxis)) {
+              transform += "rotate(" + CssFloatToString(-modifier->skewAxis) + "deg) ";
+            }
           }
           if (!FloatNearlyZero(anchorX) || !FloatNearlyZero(anchorY)) {
             transform += "translate(" + CssFloatToString(-anchorX) + "px," +
@@ -1874,9 +1866,7 @@ void HTMLWriter::writeTextModifier(HTMLBuilder& out, const std::vector<GeoInfo>&
             }
           }
           if (text->fauxBold) {
-            charStyle += ";-webkit-text-stroke:" +
-                         CssFloatToString(FauxBoldStrokeWidth(text->renderFontSize())) +
-                         "px currentColor";
+            charStyle += ";font-weight:bold";
           }
           // A TextModifier channel animates every glyph it reaches; on the span path each glyph is
           // its own element, so it needs an id and a record just like an SVG <text> would.
