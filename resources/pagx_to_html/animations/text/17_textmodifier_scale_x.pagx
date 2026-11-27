@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: A TextModifier scale.x stretches each glyph horizontally.
+     Target: TextModifier  Channel: scale.x  Type: float
+     Ceiling: the horizontal stretch magnifies an edge difference the two rasterisers already
+     have at rest - 3.3x more faint (>0-20% coverage) edge pixels and 5.8% more ink, present at
+     t=0 (scale 1.06) where the case still measures 0.9933. Measured limits: a frozen static
+     state scores 0.897 against the animated 0.903, and re-rasterising at a larger size
+(font-size K with scaleY 1/K) is pixel-identical to scaleX K - so Chromium already rasterises
+     at the final scale and no CSS hint moves it. Mid-ramp tops out around 0.94 by design;
+     geometry itself agrees to 1-2px.
+     Ref: - -->
+<pagx width="320" height="200">
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F8FAFC"/>
+  </Layer>
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Text text="WAVE" fontFamily="Arial" fontStyle="Bold" fontSize="64" letterSpacing="0"
+          position="50,130"/>
+    <TextModifier id="modifier">
+      <RangeSelector start="0" end="1" offset="0" unit="percentage" shape="rampUp"/>
+    </TextModifier>
+    <Fill color="#BE123C"/>
+  </Layer>
+  <Animations>
+    <Animation id="modifierAnim" duration="60" frameRate="60" loop="once">
+      <Object target="modifier">
+        <Channel name="scale.x" type="float">
+          <Key time="0" value="1" interpolation="linear"/>
+          <Key time="60" value="1.8"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>

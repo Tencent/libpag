@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: Splitting opacity from an eased pose preserves the authored Once window; a separate clock exposes time after that window.
+     Target: Composite  Channel: alpha,x  Type: float
+     Ref: R14 -->
+<pagx width="360" height="220">
+  <Layer width="360" height="220"><Rectangle position="180,110" size="360,220"/><Fill color="#F8FAFC"/></Layer>
+  <Layer x="30" y="50" width="300" height="130">
+    <Layer id="lateOpacityBox" width="80" height="60"><Rectangle position="40,30" size="80,60"/><Fill color="#BE123C"/></Layer>
+  </Layer>
+  <Layer y="185" width="360" height="20">
+    <Layer id="lateWindowClock" width="20" height="12"><Rectangle position="10,6" size="20,12"/><Fill color="#0F172A"/></Layer>
+  </Layer>
+  <Animations>
+    <Animation id="splitLateWindow" duration="60" frameRate="60" loop="once"><Object target="lateOpacityBox">
+      <Channel name="alpha" type="float"><Key time="30" value="0" interpolation="linear"/><Key time="90" value="1"/></Channel>
+      <Channel name="x" type="float"><Key time="0" value="0" interpolation="linear"/><Key time="30" value="50" interpolation="bezier" bezierOut="0.42,0"/><Key time="60" value="100" bezierIn="0.58,1"/></Channel>
+    </Object></Animation>
+    <Animation id="extendedClock" duration="120" frameRate="60" loop="once"><Object target="lateWindowClock">
+      <Channel name="x" type="float"><Key time="0" value="20" interpolation="linear"/><Key time="120" value="320"/></Channel>
+    </Object></Animation>
+  </Animations>
+</pagx>

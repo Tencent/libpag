@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: Parent and child layers apply their own masks; horizontal outer clipping and vertical inner coverage evolve independently.
+     Target: Composite  Channel: point1.x,point2.x,point2.y,point3.y  Type: float
+     Ref: R25 -->
+<pagx width="320" height="200">
+  <Layer width="320" height="200">
+    <Rectangle position="160,100" size="320,200"/><Fill color="#F8FAFC"/>
+    <Layer id="outerMask" width="320" height="200" visible="false" includeInLayout="false">
+      <Path id="outerMaskPath" data="M 30 10 L 290 10 L 290 190 L 30 190 Z"/><Fill color="#FFFFFF"/>
+    </Layer>
+    <Layer id="outerHost" mask="@outerMask" maskType="contour" width="320" height="200">
+      <Layer id="innerMask" width="320" height="200" visible="false" includeInLayout="false">
+        <Path id="innerMaskPath" data="M 20 20 L 300 20 L 300 180 L 20 180 Z"/>
+        <Fill><LinearGradient startPoint="0.5,0.4" endPoint="0.5,1">
+          <ColorStop offset="0" color="#FFFFFFFF"/><ColorStop offset="1" color="#FFFFFF00"/>
+        </LinearGradient></Fill>
+      </Layer>
+      <Layer mask="@innerMask" maskType="alpha" width="320" height="200">
+        <Rectangle position="120,100" size="180,180"/><Fill color="#BE123C"/>
+        <Ellipse position="220,100" size="160,160"/><Fill color="#1D4ED8"/>
+      </Layer>
+    </Layer>
+  </Layer>
+  <Animations><Animation id="nestedMaskWarp" duration="60" frameRate="60" loop="once">
+    <Object target="outerMaskPath">
+      <Channel name="point1.x" type="float"><Key time="0" value="290" interpolation="linear"/><Key time="60" value="150"/></Channel>
+      <Channel name="point2.x" type="float"><Key time="0" value="290" interpolation="linear"/><Key time="60" value="150"/></Channel>
+    </Object>
+    <Object target="innerMaskPath">
+      <Channel name="point2.y" type="float"><Key time="0" value="180" interpolation="linear"/><Key time="60" value="70"/></Channel>
+      <Channel name="point3.y" type="float"><Key time="0" value="180" interpolation="linear"/><Key time="60" value="70"/></Channel>
+    </Object>
+  </Animation></Animations>
+</pagx>

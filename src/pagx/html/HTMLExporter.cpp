@@ -23,6 +23,7 @@
 #include <fstream>
 #include <iostream>
 #include <string>
+#include "pagx/html/HTMLAnimationWriter.h"
 #include "pagx/html/HTMLBuilder.h"
 #include "pagx/html/HTMLStyleExtractor.h"
 #include "pagx/html/HTMLWriter.h"
@@ -209,6 +210,8 @@ std::string BuildHTML(PAGXDocument& doc, HTMLOutputMode mode, const HTMLExporter
     return {};
   }
 
+  HTMLAnimationSession animSession(doc, ctx, options.exportAnimations);
+
   // Pre-pass: for every compatible PlusDarker Layer, render a cropped backdrop PNG with the layer
   // temporarily hidden. The resulting base64 data URLs are consumed by writeLayer below to emit an
   // SVG filter (feImage + feComposite arithmetic) that matches tgfx PlusDarker pixel-for-pixel.
@@ -274,6 +277,36 @@ std::string BuildHTML(PAGXDocument& doc, HTMLOutputMode mode, const HTMLExporter
     }
     writer.writeLayer(body, layer);
   }
+  std::string bodyStr = body.release();
+
+  // The SVG defs go in front of the content, as they always have. They are part of the woven string
+  // because a filter primitive inside them can carry keyframes (the colour of a <feFlood>), and the
+  // weaver resolves its tags from the body it is given.
+  {
+    std::string defsStr = defs.release();
+    if (!defsStr.empty()) {
+      HTMLBuilder defsBlock(1, 4096);
+      defsBlock.openTag("svg");
+      defsBlock.addAttr("style", "position:absolute;width:0;height:0;overflow:hidden");
+      defsBlock.closeTagStart();
+      defsBlock.openTag("defs");
+      defsBlock.closeTagStart();
+      defsBlock.addRawContent(defsStr);
+      defsBlock.closeTag();  // </defs>
+      defsBlock.closeTag();  // </svg>
+      bodyStr = defsBlock.release() + bodyStr;
+    }
+  }
+
+  // Animation CSS is independent of the font rules: keep it in its own buffer and emit it in its
+  // own <style> so that changing how fonts are written can never drop the keyframes.
+  std::string animationCss;
+  if (ctx.animationError.empty() && animSession.isActive()) {
+    animationCss = animSession.emitKeyframesAndWeave(bodyStr);
+  }
+  if (!ctx.animationError.empty()) {
+    return {};
+  }
 
   // Insert @font-face rules for embedded WOFF2 fonts
   if (!fontFaceRules.empty()) {
@@ -283,20 +316,14 @@ std::string BuildHTML(PAGXDocument& doc, HTMLOutputMode mode, const HTMLExporter
     html.closeTag();  // </style>
   }
 
-  // Insert SVG defs if any
-  std::string defsStr = defs.release();
-  if (!defsStr.empty()) {
-    html.openTag("svg");
-    html.addAttr("style", "position:absolute;width:0;height:0;overflow:hidden");
+  if (!animationCss.empty()) {
+    html.openTag("style");
     html.closeTagStart();
-    html.openTag("defs");
-    html.closeTagStart();
-    html.addRawContent(defsStr);
-    html.closeTag();  // </defs>
-    html.closeTag();  // </svg>
+    html.addRawContent(animationCss);
+    html.closeTag();  // </style>
   }
 
-  html.addRawContent(body.release());
+  html.addRawContent(bodyStr);
 
   html.closeTag();  // </div>
 
@@ -358,11 +385,16 @@ std::string HTMLExporter::ToHTML(PAGXDocument& doc, const std::string& resourceD
   HTMLWriterContext ctx;
   ctx.docWidth = doc.width;
   ctx.docHeight = doc.height;
+  ctx.hasAnimations = options.exportAnimations && !doc.animations.empty();
   ctx.staticImgDir = resourceDir;
   ctx.staticImgUrlPrefix = urlPrefix;
   ctx.rasterScale = std::clamp(options.rasterScale, 0.01f, 4.0f);
 
-  return BuildHTML(doc, mode, options, ctx);
+  auto result = BuildHTML(doc, mode, options, ctx);
+  if (errorMsg != nullptr && !ctx.animationError.empty()) {
+    *errorMsg = ctx.animationError;
+  }
+  return result;
 }
 
 bool HTMLExporter::ToFile(PAGXDocument& document, const std::string& filePath,
@@ -425,11 +457,18 @@ std::shared_ptr<Data> HTMLExporter::ToData(PAGXDocument& document, const Options
   HTMLWriterContext ctx;
   ctx.docWidth = document.width;
   ctx.docHeight = document.height;
+  ctx.hasAnimations = options.exportAnimations && !document.animations.empty();
   ctx.zipWriter = &zipWriter;
   ctx.staticImgUrlPrefix = "assets/";
   ctx.rasterScale = std::clamp(options.rasterScale, 0.01f, 4.0f);
 
   auto html = BuildHTML(document, HTMLOutputMode::FullDocument, options, ctx);
+  if (!ctx.animationError.empty()) {
+    if (errorMsg != nullptr) {
+      *errorMsg = ctx.animationError;
+    }
+    return nullptr;
+  }
   if (html.empty()) {
     if (errorMsg && errorMsg->empty()) {
       *errorMsg = "document produced no HTML output.";

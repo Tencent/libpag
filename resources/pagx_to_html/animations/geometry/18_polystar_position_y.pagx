@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: A Polystar position.y lifts the polygon towards the top edge.
+     Target: Polystar  Channel: position.y  Type: float
+     Ref: - -->
+<pagx width="320" height="200">
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F8FAFC"/>
+  </Layer>
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Polystar id="starSlideY" position="160,140" type="polygon" pointCount="5" outerRadius="68"
+              rotation="-90"/>
+    <Fill color="#B45309"/>
+  </Layer>
+  <Animations>
+    <Animation id="geoAnim" duration="60" frameRate="60" loop="once">
+      <Object target="starSlideY">
+        <Channel name="position.y" type="float">
+          <Key time="0" value="140" interpolation="linear"/>
+          <Key time="60" value="60"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>

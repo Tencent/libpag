@@ -51,6 +51,7 @@ struct ExportOptions {
   int svgIndent = 2;
   bool svgNoXmlDeclaration = false;
   bool textToPath = false;
+  bool htmlExportAnimations = true;
   bool pptBakeUnsupported = true;
   bool pptIgnoreGlyphRuns = false;
   // Sampling options shared with the render command. Zero frame rate means "use the document
@@ -100,6 +101,12 @@ Options:
 constexpr const char* kSVGUsage = R"(SVG options:
   --svg-indent <n>            Indentation spaces (default: 2, valid range: 0-16)
   --svg-no-xml-declaration    Omit the <?xml ...?> declaration
+
+)";
+
+constexpr const char* kHTMLUsage = R"(HTML options:
+  --html-no-animations        Omit CSS @keyframes and animation declarations
+                              (--no-animations is accepted as a deprecated alias)
 
 )";
 
@@ -178,7 +185,7 @@ constexpr const char* kExampleUsage = R"(Examples:
 )";
 
 static void PrintUsage() {
-  std::cout << kCommonUsage << kSVGUsage << kPPTUsage << kMP4Usage << kExampleUsage;
+  std::cout << kCommonUsage << kSVGUsage << kHTMLUsage << kPPTUsage << kMP4Usage << kExampleUsage;
 }
 
 static void MarkVideoOnlyOption(ExportOptions* options, const char* option) {
@@ -309,7 +316,21 @@ static int ResolveExportOptions(ExportOptions* options) {
   return 0;
 }
 
+// Rejects a format-scoped flag used with another output format. Silently dropping such a flag would
+// produce output the caller did not ask for, so it is treated as a usage error.
+static int RejectFlagForFormat(const std::string& flag, const std::string& format,
+                               const char* expected) {
+  std::cerr << "pagx export: error: " << flag << " only applies to --format " << expected
+            << " (got " << format << ")\n";
+  return 1;
+}
+
 static int ParseOptions(int argc, char* argv[], ExportOptions* options) {
+  // Format-scoped flags remember the spelling used, so the error can name the flag instead of a
+  // group of flags the caller may not have passed.
+  std::string svgFlagUsed = {};
+  std::string htmlFlagUsed = {};
+  std::string pptFlagUsed = {};
   int i = 1;
   while (i < argc) {
     std::string arg = argv[i];
@@ -336,18 +357,26 @@ static int ParseOptions(int argc, char* argv[], ExportOptions* options) {
         return 1;
       }
       options->svgIndent = static_cast<int>(value);
+      svgFlagUsed = arg;
       MarkNonVideoOption(options, "--svg-indent");
+    } else if (arg == "--html-no-animations" || arg == "--no-animations") {
+      options->htmlExportAnimations = false;
+      htmlFlagUsed = arg;
+      MarkNonVideoOption(options, arg.c_str());
     } else if (arg == "--svg-no-xml-declaration") {
       options->svgNoXmlDeclaration = true;
+      svgFlagUsed = arg;
       MarkNonVideoOption(options, "--svg-no-xml-declaration");
     } else if (arg == "--text-to-path") {
       options->textToPath = true;
       MarkNonVideoOption(options, "--text-to-path");
     } else if (arg == "--ppt-no-bake-unsupported") {
       options->pptBakeUnsupported = false;
+      pptFlagUsed = arg;
       MarkNonVideoOption(options, "--ppt-no-bake-unsupported");
     } else if (arg == "--ppt-ignore-glyphruns") {
       options->pptIgnoreGlyphRuns = true;
+      pptFlagUsed = arg;
       MarkNonVideoOption(options, "--ppt-ignore-glyphruns");
     } else if (arg == "--font" && i + 1 < argc) {
       options->fontFiles.emplace_back(argv[++i]);
@@ -369,7 +398,20 @@ static int ParseOptions(int argc, char* argv[], ExportOptions* options) {
     i++;
   }
 
-  return ResolveExportOptions(options);
+  int resolved = ResolveExportOptions(options);
+  if (resolved != 0) {
+    return resolved;
+  }
+  if (!svgFlagUsed.empty() && options->format != "svg") {
+    return RejectFlagForFormat(svgFlagUsed, options->format, "svg");
+  }
+  if (!htmlFlagUsed.empty() && options->format != "html") {
+    return RejectFlagForFormat(htmlFlagUsed, options->format, "html");
+  }
+  if (!pptFlagUsed.empty() && options->format != "pptx") {
+    return RejectFlagForFormat(pptFlagUsed, options->format, "pptx");
+  }
+  return 0;
 }
 
 static void LimitOutputToTextureSize(const PAGXDocument& document, VideoExportOptions* options) {
@@ -587,8 +629,11 @@ static int ExportToHTML(const ExportOptions& options) {
     return 1;
   }
 
+  pagx::HTMLExportOptions htmlOptions = {};
+  htmlOptions.exportAnimations = options.htmlExportAnimations;
+
   std::string errorMsg;
-  if (!HTMLExporter::ToFile(*document, options.outputFile, {}, &errorMsg)) {
+  if (!HTMLExporter::ToFile(*document, options.outputFile, htmlOptions, &errorMsg)) {
     std::cerr << "pagx export: error: " << (errorMsg.empty() ? "export failed" : errorMsg) << "\n";
     return 1;
   }

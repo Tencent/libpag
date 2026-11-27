@@ -26,6 +26,7 @@
 #include "pagx/html/HTMLWriter.h"
 #include "pagx/nodes/BackgroundBlurStyle.h"
 #include "pagx/nodes/BlurFilter.h"
+#include "pagx/nodes/DropShadowFilter.h"
 #include "pagx/nodes/DropShadowStyle.h"
 #include "pagx/nodes/Ellipse.h"
 #include "pagx/nodes/Group.h"
@@ -52,7 +53,13 @@ namespace pagx {
 
 using pag::FloatNearlyZero;
 
-static Point LayerPositionForCSS(const Layer* layer) {
+// Returns the layer's authored position for left/top. A matrix channel owns the translation, so a
+// layer driven by one reports (0, 0): the keyframes carry the position and adding it twice would
+// offset the whole layer by its x/y.
+static Point LayerPositionForCSS(const Layer* layer, bool matrixDriven) {
+  if (matrixDriven) {
+    return {0.0f, 0.0f};
+  }
   // Mirror the finite checks LayerTransformCSS applies, so a non-finite matrix is treated as absent
   // on both sides and the authored position still reaches left / top.
   bool hasMatrix3D = !layer->matrix3D.isIdentity() && IsFiniteMatrix3D(layer->matrix3D);
@@ -76,6 +83,58 @@ static constexpr float BBOX_SENTINEL_LARGE = 1e9f;
 static void EmitLeftTopCss(std::string& style, bool& positionSet, float x, float y) {
   style += ";left:" + CssFloatToString(x) + "px;top:" + CssFloatToString(y) + "px";
   positionSet = true;
+}
+
+// A Group animated on its own that holds nothing but geometry has no painter of its own: whatever
+// paints it is declared later in the enclosing element list. The animation forces such a Group into
+// its own DOM wrapper, so the enclosing painters have to be forwarded or the wrapper stays empty
+// and the geometry loses its color.
+static bool GroupNeedsPropagatedPainters(const Group* group, int depth = 0) {
+  if (group == nullptr || group->elements.empty() ||
+      depth >= HTMLWriterContext::MAX_RECURSION_DEPTH) {
+    return false;
+  }
+  for (auto* element : group->elements) {
+    if (element == nullptr) {
+      continue;
+    }
+    auto type = element->nodeType();
+    if (type == NodeType::Rectangle || type == NodeType::Ellipse || type == NodeType::Path ||
+        type == NodeType::Polystar) {
+      continue;
+    }
+    // Geometry can sit one or more Groups deep; those Groups carry no painter either.
+    if (type == NodeType::Group &&
+        GroupNeedsPropagatedPainters(static_cast<const Group*>(element), depth + 1)) {
+      continue;
+    }
+    return false;
+  }
+  return true;
+}
+
+// Collects the first Fill and the first Stroke declared after `fromIndex`; they paint the geometry
+// accumulated above them.
+static void CollectPaintersAfter(const std::vector<Element*>& elements, size_t fromIndex,
+                                 std::vector<Element*>& out) {
+  bool foundFill = false;
+  bool foundStroke = false;
+  for (size_t i = fromIndex; i < elements.size(); ++i) {
+    auto* painter = elements[i];
+    if (painter == nullptr) {
+      continue;
+    }
+    if (painter->nodeType() == NodeType::Fill && !foundFill) {
+      out.push_back(painter);
+      foundFill = true;
+    } else if (painter->nodeType() == NodeType::Stroke && !foundStroke) {
+      out.push_back(painter);
+      foundStroke = true;
+    }
+    if (foundFill && foundStroke) {
+      break;
+    }
+  }
 }
 
 static bool ContainsOnlyLineBreaks(const std::string& text) {
@@ -363,6 +422,7 @@ void HTMLWriter::paintGeos(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
   if (hasText) {
     for (auto& g : geos) {
       if (g.type == NodeType::Text) {
+        flushPendingSVGDraws(out);
         writeText(out, static_cast<const Text*>(g.element), fill, stroke, textBox, alpha);
       } else {
         std::vector<GeoInfo> single = {g};
@@ -375,12 +435,21 @@ void HTMLWriter::paintGeos(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
 }
 
 void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& elements, float alpha,
-                               bool distribute, LayerPlacement targetPlacement,
+                               bool distribute, bool fadesChildren, LayerPlacement targetPlacement,
                                const Padding* containerPadding) {
   RecursionGuard guard(_ctx);
   if (guard.overflowed()) {
     return;
   }
+  auto savedPendingSVGDraws = std::move(_pendingSVGDraws);
+  bool savedCoalesceSVGDraws = _coalesceSVGDraws;
+  _pendingSVGDraws.clear();
+  // Group SVG draws only when exporting animations. Static documents must retain their original
+  // per-draw viewBoxes: sharing one SVG changes clipping and gradient/stroke rasterization.
+  // A layer that fades its children one by one (`groupOpacity=false`) keeps them apart as well:
+  // draws merged into one <svg> share a single opacity, so an overlap would lose the extra opacity
+  // its second paint adds.
+  _coalesceSVGDraws = !_ctx->animation.elementIds.empty() && !fadesChildren;
   ElementDispatchState state;
   const TextBox* curTextBox = nullptr;
   float roundCornerRadius = 0.0f;
@@ -396,6 +465,27 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
   }
 
   auto fillWillBePairedWithStroke = ComputeFillStrokePairing(elements, targetPlacement);
+
+  // The runtime applies a modifier wherever it sits in the list, so a TrimPath written after the
+  // painter still trims the shape that painter flushes. Collect a lone one up front; two or more
+  // keep the positional rule, where "which shape owns it" is ambiguous.
+  const TrimPath* leadingTrim = nullptr;
+  {
+    int trimCount = 0;
+    for (auto* element : elements) {
+      if (element != nullptr && element->nodeType() == NodeType::TrimPath) {
+        leadingTrim = static_cast<const TrimPath*>(element);
+        ++trimCount;
+      }
+    }
+    if (trimCount != 1) {
+      leadingTrim = nullptr;
+    }
+  }
+  if (leadingTrim != nullptr) {
+    state.hasTrim = true;
+    state.curTrim = leadingTrim;
+  }
 
   for (size_t elemIndex = 0; elemIndex < elements.size(); elemIndex++) {
     auto* element = elements[elemIndex];
@@ -416,11 +506,13 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
           bool deferToStroke = fillWillBePairedWithStroke[elemIndex];
           if (state.curTextModifier && !state.geos.empty()) {
             if (!deferToStroke) {
+              flushPendingSVGDraws(out);
               writeTextModifier(out, state.geos, state.curTextModifier, state.curFill, nullptr,
                                 curTextBox, a);
             }
           } else if (state.curTextPath && !state.geos.empty()) {
             if (!deferToStroke) {
+              flushPendingSVGDraws(out);
               writeTextPath(out, state.geos, state.curTextPath, state.curFill, nullptr, curTextBox,
                             a);
             }
@@ -454,9 +546,11 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
             // Merge with the deferred Fill so per-character spans carry both fill and
             // stroke in a single CSS declaration, avoiding Chromium's sub-pixel offset
             // between two stacked <div>s.
+            flushPendingSVGDraws(out);
             writeTextModifier(out, state.geos, state.curTextModifier, state.curFill,
                               state.curStroke, curTextBox, a);
           } else if (state.curTextPath && !state.geos.empty()) {
+            flushPendingSVGDraws(out);
             writeTextPath(out, state.geos, state.curTextPath, state.curFill, state.curStroke,
                           curTextBox, a);
           } else if (state.curFill != nullptr) {
@@ -496,8 +590,10 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
       case NodeType::TextBox: {
         curTextBox = static_cast<const TextBox*>(element);
         if (!curTextBox->elements.empty()) {
+          flushPendingSVGDraws(out);
           renderTextBoxWithSpans(out, curTextBox);
         } else if (useRichText && !richTextSpans.empty()) {
+          flushPendingSVGDraws(out);
           renderTextBoxAsRichText(out, curTextBox, richTextSpans);
         }
         break;
@@ -590,15 +686,26 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
         // is not something we can fold into the geos vector). Without writeGroup the TextBox
         // would be silently dropped — pagx_features Pipeline buttons (".pagx", ".pag",
         // "Production" labels) symptom: button background renders, label text disappears.
-        if ((hasPainter && hasText && groupHasTransform) || hasTextBox) {
-          writeGroup(out, group, alpha, distribute);
+        if ((hasPainter && hasText && groupHasTransform) || hasTextBox ||
+            _ctx->animation.elementIds.count(group) > 0) {
+          std::vector<Element*> propagatedPainters = {};
+          if (_ctx->animation.elementIds.count(group) > 0 && GroupNeedsPropagatedPainters(group)) {
+            CollectPaintersAfter(elements, elemIndex + 1, propagatedPainters);
+          }
+          flushPendingSVGDraws(out);
+          writeGroup(out, group, alpha, distribute, {}, &propagatedPainters);
         } else {
+          std::vector<Element*> flattenedPainters = {};
+          if (GroupNeedsPropagatedPainters(group)) {
+            CollectPaintersAfter(elements, elemIndex + 1, flattenedPainters);
+          }
           flattenGroup(out, group, alpha, distribute, targetPlacement, hasUpcomingRepeater,
-                       curTextBox, state);
+                       curTextBox, state, &flattenedPainters);
         }
         break;
       }
       case NodeType::Repeater: {
+        flushPendingSVGDraws(out);
         auto rep = static_cast<const Repeater*>(element);
         // tgfx's Repeater::apply multiplies `copyAlpha` onto the painters that already exist
         // when the repeater runs, i.e. only Fill/Stroke nodes emitted *before* the Repeater.
@@ -653,6 +760,9 @@ void HTMLWriter::writeElements(HTMLBuilder& out, const std::vector<Element*>& el
         break;
     }
   }
+  flushPendingSVGDraws(out);
+  _pendingSVGDraws = std::move(savedPendingSVGDraws);
+  _coalesceSVGDraws = savedCoalesceSVGDraws;
 }
 
 struct ElementDispatchStateGuard {
@@ -703,7 +813,8 @@ struct ElementDispatchStateGuard {
 
 void HTMLWriter::flattenGroup(HTMLBuilder& out, const Group* group, float alpha, bool distribute,
                               LayerPlacement targetPlacement, bool hasUpcomingRepeater,
-                              const TextBox* curTextBox, ElementDispatchState& state) {
+                              const TextBox* curTextBox, ElementDispatchState& state,
+                              const std::vector<Element*>* enclosingPainters) {
   ElementDispatchStateGuard stateGuard(state);
   std::vector<GeoInfo> groupGeos;
   Matrix gm = BuildGroupMatrix(group);
@@ -725,7 +836,8 @@ void HTMLWriter::flattenGroup(HTMLBuilder& out, const Group* group, float alpha,
       break;
     }
   }
-  for (auto* ge : group->elements) {
+  for (size_t elemIndex = 0; elemIndex < group->elements.size(); ++elemIndex) {
+    auto* ge = group->elements[elemIndex];
     auto gt = ge->nodeType();
     if (gt == NodeType::Rectangle || gt == NodeType::Ellipse || gt == NodeType::Path ||
         gt == NodeType::Polystar) {
@@ -755,10 +867,12 @@ void HTMLWriter::flattenGroup(HTMLBuilder& out, const Group* group, float alpha,
       if (fill->placement == targetPlacement && !hasUpcomingRepeater && !groupHasUpcomingRepeater) {
         float a = groupAlpha * (distribute ? alpha : 1.0f);
         if (state.curTextPath && !state.geos.empty()) {
+          flushPendingSVGDraws(out);
           writeTextPath(out, state.geos, state.curTextPath, state.curFill, nullptr, curTextBox, a);
           state.geos.clear();
           groupGeos.clear();
         } else if (state.curTextModifier && !state.geos.empty()) {
+          flushPendingSVGDraws(out);
           writeTextModifier(out, state.geos, state.curTextModifier, state.curFill, nullptr,
                             curTextBox, a);
           state.geos.clear();
@@ -775,11 +889,13 @@ void HTMLWriter::flattenGroup(HTMLBuilder& out, const Group* group, float alpha,
           !groupHasUpcomingRepeater) {
         float a = groupAlpha * (distribute ? alpha : 1.0f);
         if (state.curTextPath && !state.geos.empty()) {
+          flushPendingSVGDraws(out);
           writeTextPath(out, state.geos, state.curTextPath, state.curFill, state.curStroke,
                         curTextBox, a);
           state.geos.clear();
           groupGeos.clear();
         } else if (state.curTextModifier && !state.geos.empty()) {
+          flushPendingSVGDraws(out);
           writeTextModifier(out, state.geos, state.curTextModifier, state.curFill, state.curStroke,
                             curTextBox, a);
           state.geos.clear();
@@ -894,7 +1010,21 @@ void HTMLWriter::flattenGroup(HTMLBuilder& out, const Group* group, float alpha,
         }
       }
     } else if (gt == NodeType::Group) {
-      writeGroup(out, static_cast<const Group*>(ge), alpha, distribute, gm);
+      flushPendingSVGDraws(out);
+      auto* childGroup = static_cast<const Group*>(ge);
+      // Same propagation as the top-level path: an animated pure-geometry Group inside a flattened
+      // Group is painted by painters declared later in this element list, not by its own contents.
+      std::vector<Element*> propagatedPainters = {};
+      if (_ctx->animation.elementIds.count(childGroup) > 0 &&
+          GroupNeedsPropagatedPainters(childGroup)) {
+        CollectPaintersAfter(group->elements, elemIndex + 1, propagatedPainters);
+        if (propagatedPainters.empty() && enclosingPainters != nullptr) {
+          // The painters live outside this flattened Group; the child cannot propagate its
+          // geometry up to them, so they have to be forwarded instead.
+          propagatedPainters = *enclosingPainters;
+        }
+      }
+      writeGroup(out, childGroup, alpha, distribute, gm, &propagatedPainters);
     } else if (gt == NodeType::RoundCorner) {
       // Mirror the top-level RoundCorner handler (case above): apply the radius to
       // every shape geo that came before it in the group's element list, replacing
@@ -949,6 +1079,40 @@ void HTMLWriter::flattenGroup(HTMLBuilder& out, const Group* group, float alpha,
     stateGuard.savedStroke = state.curStroke;
   }
   stateGuard.savedGeos.insert(stateGuard.savedGeos.end(), groupGeos.begin(), groupGeos.end());
+}
+
+void HTMLWriter::appendTextBoxContainerStyle(std::string& style, const TextBox* tb,
+                                             const std::string& extraTransform) {
+  // A TextBox is a Group, so its container carries the same two things writeGroup emits for a plain
+  // Group: the group matrix (anchor, scale, skew, rotation) and the node alpha. Both TextBox paths
+  // build their own style string and used to skip this, which left every TextBox transform-only
+  // channel (rotation / scale / skew / anchor) and its alpha on the floor.
+  //
+  // The matrix translation is dropped on purpose: the caller already emits it as `left`/`top` from
+  // renderPosition(), and folding it into both would place the box twice. For a TextBox authored
+  // only with `position` that translation is (0,0): TextBox::onMeasure never seeds preferredX/Y the
+  // way Group::onMeasure does, so the authored position never reaches layoutBounds(), and the PAGX
+  // renderer drops it as well (`pagx render --time 0` equals a plain render). Matching that here is
+  // therefore correct — adding `position` would move the box away from the reference picture.
+  Matrix matrix = BuildGroupMatrix(tb);
+  // BuildGroupMatrix applies the render position last, so removing it is a plain subtraction on the
+  // translation; the anchor translation (which is composed inside the rotation/scale) survives.
+  auto renderPos = tb->renderPosition();
+  matrix.tx -= renderPos.x;
+  matrix.ty -= renderPos.y;
+  std::string transform = matrix.isIdentity() ? std::string() : MatrixTransformToCSS(matrix);
+  if (!extraTransform.empty()) {
+    transform = transform.empty() ? extraTransform : transform + " " + extraTransform;
+  }
+  if (!transform.empty()) {
+    style += ";transform:" + transform + ";transform-origin:0 0";
+  }
+  // The node's own alpha. Ancestor divs emit their own opacity (writeGroup / writeLayer) and CSS
+  // opacity multiplies down the tree, which is the same layering PAGX renders, so this is not a
+  // second application of this node's alpha.
+  if (tb->alpha < 1.0f) {
+    style += ";opacity:" + CssFloatToString(tb->alpha);
+  }
 }
 
 void HTMLWriter::renderTextBoxWithSpans(HTMLBuilder& out, const TextBox* tb) {
@@ -1022,6 +1186,7 @@ void HTMLWriter::renderTextBoxWithSpans(HTMLBuilder& out, const TextBox* tb) {
       !std::isnan(tb->width) && tb->width == 0.0f && tb->textAlign != TextAlign::Start;
   bool heightAnchor =
       !std::isnan(tb->height) && tb->height == 0.0f && tb->paragraphAlign != ParagraphAlign::Near;
+  std::string anchorTransform;
   if (widthAnchor || heightAnchor) {
     std::string tx = "0";
     std::string ty = "0";
@@ -1031,8 +1196,12 @@ void HTMLWriter::renderTextBoxWithSpans(HTMLBuilder& out, const TextBox* tb) {
     if (heightAnchor) {
       ty = (tb->paragraphAlign == ParagraphAlign::Middle) ? "-50%" : "-100%";
     }
-    style += ";transform:translate(" + tx + "," + ty + ")";
+    // Kept as a separate transform function and composed *after* the group matrix (CSS applies the
+    // list left to right, so `matrix(...) translate(...)` shifts the already-transformed box, which
+    // is the order PAGX uses: the box shift sits inside the group's rotation/scale/anchor).
+    anchorTransform = "translate(" + tx + "," + ty + ")";
   }
+  appendTextBoxContainerStyle(style, tb, anchorTransform);
   if (tb->paragraphAlign != ParagraphAlign::Near) {
     style += ";display:flex;flex-direction:column";
     if (tb->paragraphAlign == ParagraphAlign::Middle) {
@@ -1099,6 +1268,8 @@ void HTMLWriter::renderTextBoxWithSpans(HTMLBuilder& out, const TextBox* tb) {
     // back to its own line-height:normal (read from the font's OS/2 metrics).
     float lineH = tb->lineHeight > 0 ? tb->lineHeight : 0.0f;
     if (lineH > 0) {
+      // The block below carries its own line-height (PAGX's rounded advance, or this authored value),
+      // so the container must not compete with it.
       style += ";line-height:" + CssFloatToString(lineH) + "px";
     }
     // Translate PAGX Overflow::Hidden with a simple pixel clip. tgfx's TextLayout drops
@@ -1124,6 +1295,12 @@ void HTMLWriter::renderTextBoxWithSpans(HTMLBuilder& out, const TextBox* tb) {
       }
     }
     out.openTag("div");
+    {
+      auto animId = _ctx->claimAnimatedDomId({tb});
+      if (!animId.empty()) {
+        out.addAttr("id", animId);
+      }
+    }
     out.addAttr("style", style);
     out.closeTagStart();
     bool needsInnerWrap = tb->paragraphAlign != ParagraphAlign::Near;
@@ -1213,6 +1390,12 @@ void HTMLWriter::renderTextBoxWithSpans(HTMLBuilder& out, const TextBox* tb) {
         continue;
       }
       out.openTag("span");
+      {
+        auto animId = _ctx->claimAnimatedDomId({span.fill, span.stroke, span.text});
+        if (!animId.empty()) {
+          out.addAttr("id", animId);
+        }
+      }
       out.addAttr("style", spanStyle);
       // For vertical-writing-mode TextBoxes with textAlign=justify (or an explicit
       // lineHeight that exceeds the glyph's natural advance), emit per-CJK-character
@@ -1258,6 +1441,7 @@ void HTMLWriter::renderTextBoxAsRichText(HTMLBuilder& out, const TextBox* tb,
   auto tbPos = tb->renderPosition();
   std::string style = "position:absolute;left:" + CssFloatToString(tbPos.x) +
                       "px;top:" + CssFloatToString(tbPos.y) + "px";
+  appendTextBoxContainerStyle(style, tb, std::string());
   if (!std::isnan(tb->width)) {
     style += ";width:" + CssFloatToString(tb->width) + "px";
   }
@@ -1301,6 +1485,12 @@ void HTMLWriter::renderTextBoxAsRichText(HTMLBuilder& out, const TextBox* tb,
     style += ";overflow:hidden";
   }
   out.openTag("div");
+  {
+    auto animId = _ctx->claimAnimatedDomId({tb});
+    if (!animId.empty()) {
+      out.addAttr("id", animId);
+    }
+  }
   out.addAttr("style", style);
   out.closeTagStart();
   bool needsInnerWrap = tb->paragraphAlign != ParagraphAlign::Near;
@@ -1340,6 +1530,12 @@ void HTMLWriter::renderTextBoxAsRichText(HTMLBuilder& out, const TextBox* tb,
       continue;
     }
     out.openTag("span");
+    {
+      auto animId = _ctx->claimAnimatedDomId({span.fill, span.stroke, span.text});
+      if (!animId.empty()) {
+        out.addAttr("id", animId);
+      }
+    }
     out.addAttr("style", spanStyle);
     std::string rtSpanText = span.text->text;
     out.closeTagWithTextBreaks(rtSpanText);
@@ -1669,12 +1865,33 @@ static ShadowShape FindLayerShadowShape(const Layer* layer) {
   return s;
 }
 
+std::string PaintOpacityCss(const std::vector<std::string>& fadeVars, float value) {
+  if (fadeVars.empty()) {
+    return ";opacity:" + CssFloatToString(value);
+  }
+  std::string product = {};
+  for (const auto& name : fadeVars) {
+    product += "var(" + name + ", 1) * ";
+  }
+  return ";opacity:calc(" + product + CssFloatToString(value) + ")";
+}
+
 void HTMLWriter::writeLayerContents(HTMLBuilder& out, const Layer* layer, float alpha,
                                     bool distribute, LayerPlacement targetPlacement) {
   // Forward the layer's padding (when non-zero) so inner GeoInfo carries it. Skipping the
   // pointer when padding is zero keeps downstream fast paths unchanged for the common case.
   const Padding* layerPadding = layer->padding.isZero() ? nullptr : &layer->padding;
-  writeElements(out, layer->contents, alpha, distribute, targetPlacement, layerPadding);
+  // A layer that fades its children one by one keeps them apart: merging their draws into one <svg>
+  // would give the whole paint a single opacity, so an overlap would lose the extra opacity its
+  // second paint adds. `distribute` already says the children carry the alpha; an animated alpha
+  // does the same through the `> *` rule while the authored value is still 1.
+  bool fadesChildren =
+      distribute || (!layer->groupOpacity && _ctx->animation.alphaAnimatedNodes.count(layer) > 0);
+  // The paints of an alpha-animated distributing layer read that layer's animated variable (pushed
+  // by writeLayer, which also covers child layers) and fade on their own instead of through one
+  // container opacity.
+  writeElements(out, layer->contents, alpha, distribute, fadesChildren, targetPlacement,
+                layerPadding);
 }
 
 //==============================================================================
@@ -1914,6 +2131,13 @@ std::string HTMLWriter::emitInnerShadowFilterDef(const InnerShadowStyle* is) {
       blurredResult = "iOff";
     }
     _defs->openTag("feFlood");
+    {
+      // A colour channel animates flood-color on this element, which CSS can do.
+      auto floodIt = _ctx->animation.filterFloodIds.find(is);
+      if (floodIt != _ctx->animation.filterFloodIds.end()) {
+        _defs->addAttr("id", floodIt->second);
+      }
+    }
     _defs->addAttr("flood-color", ColorToSVGHex(is->color));
     if (is->color.alpha < 1.0f) {
       _defs->addAttr("flood-opacity", CssFloatToString(is->color.alpha));
@@ -1951,6 +2175,43 @@ std::string HTMLWriter::emitInnerShadowFilterDef(const InnerShadowStyle* is) {
 // HTMLWriter – layer
 //==============================================================================
 
+void HTMLWriter::ExpandStrokePaddedExtent(const std::vector<Element*>& elems,
+                                          const Matrix& parentMat, float& maxRight,
+                                          float& maxBottom) {
+  std::vector<GeoInfo> scopeGeos;
+  float maxPad = 0.0f;
+  for (auto* elem : elems) {
+    if (!elem) {
+      continue;
+    }
+    auto t = elem->nodeType();
+    if (t == NodeType::Rectangle || t == NodeType::Ellipse || t == NodeType::Path ||
+        t == NodeType::Polystar) {
+      PathData pd = PathDataFromSVGString("");
+      GeoToPathData(elem, t, pd);
+      if (!pd.isEmpty()) {
+        std::string svgPath = parentMat.isIdentity() ? PathDataToSVGString(pd)
+                                                     : TransformPathDataToSVG(pd, parentMat);
+        scopeGeos.push_back({t, elem, svgPath, nullptr});
+      }
+    } else if (t == NodeType::Stroke) {
+      maxPad = std::max(maxPad, StrokeExtentPad(static_cast<const Stroke*>(elem)));
+    } else if (t == NodeType::Group) {
+      auto* grp = static_cast<const Group*>(elem);
+      Matrix gm = BuildGroupMatrix(grp);
+      Matrix combined = parentMat.isIdentity() ? gm : (parentMat * gm);
+      ExpandStrokePaddedExtent(grp->elements, combined, maxRight, maxBottom);
+    }
+  }
+  if (!scopeGeos.empty()) {
+    float gx = 0, gy = 0, gw = 0, gh = 0;
+    if (HTMLWriter::ComputeGeosBoundingBox(scopeGeos, maxPad, true, gx, gy, gw, gh)) {
+      maxRight = std::max(maxRight, gx + gw);
+      maxBottom = std::max(maxBottom, gy + gh);
+    }
+  }
+}
+
 void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAlpha,
                             bool distributeAlpha, bool isFlexItem, LayoutMode parentLayout) {
   RecursionGuard guard(_ctx);
@@ -1962,8 +2223,35 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
   // (hasContent == false, after the ctx writes) exits without clearing them, which would leak
   // a stale offset to the next sibling layer's writeLayer invocation. The guard restores the
   // caller's offsets at destruction regardless of how writeLayer returns.
+  // A layer that hands its animated alpha to its paints publishes it under its own variable, and
+  // everything it renders - elements and child layers alike - multiplies that variable into its
+  // opacity. The scope covers the child loop too, so a nested fading layer compounds with this one
+  // instead of replacing it (R16).
+  struct FadeScope {
+    HTMLWriterContext* ctx;
+    bool active = false;
+    explicit FadeScope(HTMLWriterContext* c) : ctx(c) {
+    }
+    ~FadeScope() {
+      if (active) {
+        ctx->fadeVars.pop_back();
+      }
+    }
+  } fadeScope(_ctx);
+  if (!layer->groupOpacity && layer->filters.empty() &&
+      _ctx->animation.alphaAnimatedNodes.count(layer) > 0) {
+    auto nameIt = _ctx->fadeVarNames.find(layer);
+    if (nameIt == _ctx->fadeVarNames.end()) {
+      nameIt = _ctx->fadeVarNames
+                   .emplace(layer,
+                            std::string(kFadeVariableName) + std::to_string(++_ctx->fadeVarCounter))
+                   .first;
+    }
+    _ctx->fadeVars.push_back(nameIt->second);
+    fadeScope.active = true;
+  }
   RepeaterOffsetGuard offsetGuard(_ctx);
-  if (!layer->visible) {
+  if (!layer->visible && _ctx->animation.visibleLayers.count(layer) == 0) {
     out.openTag("div");
     out.addAttr("style", "display:none");
     if (!layer->id.empty()) {
@@ -2062,7 +2350,9 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
     }
   } else {
     style += "position:absolute";
-    auto renderPos = LayerPositionForCSS(layer);
+    auto renderPos =
+        LayerPositionForCSS(layer, _ctx->animation.matrixDrivenLayers.count(layer) > 0 ||
+                                       _ctx->animation.poseDrivenLayers.count(layer) > 0);
     // If the parent layer's div was shifted to cover Repeater union bounds, child layers need
     // the inverse shift added to their own left/top so they still paint at the correct document
     // position. Consume and clear the offset so it is not applied to grandchild layers.
@@ -2207,11 +2497,34 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
     if (!repeater && (isFlexContainer || !layer->contents.empty() ||
                       layer->composition != nullptr || !layer->children.empty())) {
       auto bounds = layer->layoutBounds();
-      if (bounds.width > 0) {
-        style += ";width:" + CssFloatToString(bounds.width) + "px";
+      float outW = bounds.width;
+      float outH = bounds.height;
+      // When a non-flex Layer has no authored width/height, `layoutBounds()` comes from
+      // content geometry without stroke expansion (e.g. Path::onMeasure). Meanwhile child
+      // `<svg>` elements emitted by `renderSVG` expand their box by `stroke->width`, which can
+      // make the child SVG wider/taller than the parent div and mislead downstream Flex
+      // inference on round-trip import. Expand un-authored axes to cover the stroke-padded
+      // extent of contents.
+      // Only the animated export needs this: it coalesces the child draws into one <svg>, whose
+      // padded box can exceed the Layer box. A static export keeps one <svg> per draw and must stay
+      // byte-identical to the behaviour before animation support was added.
+      if (!_ctx->animation.elementIds.empty() && layer->layout == LayoutMode::None &&
+          !layer->contents.empty() && (std::isnan(layer->width) || std::isnan(layer->height))) {
+        float maxRight = outW;
+        float maxBottom = outH;
+        ExpandStrokePaddedExtent(layer->contents, Matrix::Identity(), maxRight, maxBottom);
+        if (std::isnan(layer->width)) {
+          outW = maxRight;
+        }
+        if (std::isnan(layer->height)) {
+          outH = maxBottom;
+        }
       }
-      if (bounds.height > 0) {
-        style += ";height:" + CssFloatToString(bounds.height) + "px";
+      if (outW > 0) {
+        style += ";width:" + CssFloatToString(outW) + "px";
+      }
+      if (outH > 0) {
+        style += ";height:" + CssFloatToString(outH) + "px";
       }
     }
   }
@@ -2280,6 +2593,37 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
     if (!filterCSS.empty()) {
       filterValues += filterCSS;
     }
+    // The frame rewrites `filter` every stop with CSS functions, which only cover blur and
+    // drop-shadow. Whatever else the chain holds (a blend, an inner shadow, a colour matrix) gets its
+    // own def so the frame can append it as `url(#id)` instead of dropping it - composite/08 lost its
+    // multiply blend that way. Emitted unconditionally: the animation pass resolves after the body is
+    // written, so "is anything animated?" is not answerable here; a static document simply carries an
+    // unreferenced def.
+    std::vector<LayerFilter*> residual = {};
+    if (_ctx->hasAnimations) {
+      for (auto* f : layer->filters) {
+        if (f == nullptr) {
+          continue;
+        }
+        auto type = f->nodeType();
+        bool cssAnimatable = false;
+        if (type == NodeType::BlurFilter) {
+          cssAnimatable = true;
+        } else if (type == NodeType::DropShadowFilter) {
+          auto* ds = static_cast<const DropShadowFilter*>(f);
+          cssAnimatable = ds->blurX == ds->blurY && !ds->shadowOnly;
+        }
+        if (!cssAnimatable) {
+          residual.push_back(f);
+        }
+      }
+    }
+    if (!residual.empty() && residual.size() != layer->filters.size()) {
+      std::string id = writeFilterDefs(residual);
+      if (!id.empty()) {
+        _ctx->animation.residualFilterIds[layer] = id;
+      }
+    }
   }
 
   std::vector<std::pair<NodeType, const LayerStyle*>> belowStyles = {};
@@ -2316,7 +2660,9 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
   // layer's primary fill shape — critical for parity with tgfx when the layer has descendants
   // that paint their own filters (otherwise those descendants leak into the shadow's alpha
   // source and darken/widen the shadow beyond the layer silhouette).
-  std::vector<std::string> pendingSiblingShadows;
+  // (id, style): the id is non-empty only for a DropShadowStyle whose channels animate, so an
+  // untouched shadow keeps byte-identical output.
+  std::vector<std::pair<std::string, std::string>> pendingSiblingShadows;
   std::vector<const DropShadowStyle*> pendingFilterDropShadows;
   bool hasNestedDomContent = !layer->children.empty() || layer->composition != nullptr;
   auto appendBoxShadow = [&boxShadowValue](const DropShadowStyle* ds) {
@@ -2413,7 +2759,27 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
           if (blurAvg > 0) {
             style += ";filter:blur(" + CssFloatToString(blurAvg) + "px)";
           }
-          pendingSiblingShadows.push_back(style);
+          std::string shadowId = {};
+          auto idIt = _ctx->animation.shadowStyleIds.find(ds);
+          if (idIt != _ctx->animation.shadowStyleIds.end()) {
+            shadowId = idIt->second;
+            // The frame recomputes the box from these values plus the channel values.
+            HTMLWriterContext::AnimationState::ShadowBox box = {};
+            box.left = shape.left;
+            box.top = shape.top;
+            box.width = shape.width;
+            box.height = shape.height;
+            if (!shape.radius.empty()) {
+              box.hasRadius = true;
+              if (shape.radius.back() == '%') {
+                box.radiusPercent = true;
+              } else {
+                box.radius = std::strtof(shape.radius.c_str(), nullptr);
+              }
+            }
+            _ctx->animation.shadowBoxes[ds] = box;
+          }
+          pendingSiblingShadows.emplace_back(shadowId, style);
           continue;
         }
       }
@@ -2517,6 +2883,19 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
           style += ";height:" + CssFloatToString(maskBox.height) + "px";
         }
       }
+    } else if (_ctx->animation.animatedMaskHosts.count(layer) > 0) {
+      // A coverage mask with animated geometry cannot become a clip polygon without losing its
+      // paint. Emit it as an inline <mask> so its content stays a live SVG subtree the keyframes
+      // can animate, which keeps the soft edge and the file small.
+      auto maskId = writeAnimatedMaskDef(layer->mask, layer->maskType);
+      _ctx->animation.svgMaskIds[layer] = maskId;
+      std::string maskImage = "url(#" + maskId + ")";
+      style += ";-webkit-mask-image:" + maskImage + ";mask-image:" + maskImage;
+      style += ";-webkit-mask-repeat:no-repeat;mask-repeat:no-repeat";
+      // Mask coordinates are the masked element's own space, so pin the image to 1:1.
+      std::string maskSize =
+          CssFloatToString(_ctx->docWidth) + "px " + CssFloatToString(_ctx->docHeight) + "px";
+      style += ";-webkit-mask-size:" + maskSize + ";mask-size:" + maskSize;
     } else {
       style += writeMaskCSS(layer->mask, layer->maskType);
     }
@@ -2539,8 +2918,20 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
     }
   }
 
+  if (!layer->visible) {
+    // Keep the contents of an initially hidden animated Layer so a later visible key can reveal it.
+    if (!style.empty()) {
+      style += ';';
+    }
+    style += "visibility:hidden";
+  }
   out.openTag("div");
-  if (!layer->id.empty()) {
+  // A Composition may be mounted more than once: each animated child Layer needs its own DOM id
+  // and timing even though all instances share the same source Layer node.
+  auto animatedId = _ctx->animation.scope != 0 ? _ctx->claimAnimatedDomId({layer}) : std::string{};
+  if (!animatedId.empty()) {
+    out.addAttr("id", animatedId);
+  } else if (!layer->id.empty()) {
     out.addAttr("id", layer->id);
   }
   if (!layer->name.empty()) {
@@ -2572,7 +2963,10 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
   // elements and the layer's own contents/children in painter's order.
   for (const auto& shadowStyle : pendingSiblingShadows) {
     out.openTag("div");
-    out.addAttr("style", shadowStyle);
+    if (!shadowStyle.first.empty()) {
+      out.addAttr("id", shadowStyle.first);
+    }
+    out.addAttr("style", shadowStyle.second);
     out.closeTagSelfClosing();
   }
 
@@ -2877,6 +3271,9 @@ void HTMLWriter::writeLayerInner(HTMLBuilder& out, const Layer* layer, float con
   writeLayerContents(out, layer, contentAlpha, childDistribute, LayerPlacement::Background);
 
   if (layer->composition) {
+    // The guard restores the enclosing scope on every exit path, including early returns inside
+    // writeComposition, so a nested slot cannot leak its scope to later siblings.
+    HTMLWriterContext::AnimationScopeGuard scopeGuard(*_ctx, layer->composition, layer);
     writeComposition(out, layer->composition, contentAlpha, childDistribute);
   }
 
@@ -2898,6 +3295,11 @@ void HTMLWriter::writeLayerInner(HTMLBuilder& out, const Layer* layer, float con
       continue;
     }
     bool childIsFlexItem = isFlexContainer && child->includeInLayout;
+    if (childIsFlexItem) {
+      // The flex container already places this child in its slot. The animated transform has to
+      // know, or it folds the slot position into `translate` a second time (composite/33).
+      _ctx->animation.flexItems.insert(child);
+    }
     _ctx->childLayerOffsetX = childOffX;
     _ctx->childLayerOffsetY = childOffY;
     writeLayer(out, child, contentAlpha, childDistribute, childIsFlexItem, layer->layout);

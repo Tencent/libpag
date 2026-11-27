@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: DropShadowStyle offsetY lifts the shadow from under the card up to its top edge.
+     Target: DropShadowStyle  Channel: offsetY  Type: float
+     Ref: - -->
+<pagx width="320" height="200">
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F8FAFC"/>
+  </Layer>
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle position="160,100" size="170,120" roundness="16"/>
+    <Fill color="#FFFFFF"/>
+    <DropShadowStyle id="styleNode" offsetX="0" offsetY="18" blurX="12" blurY="12" color="#1E1B4B"/>
+  </Layer>
+  <Animations>
+    <Animation id="styleAnim" duration="60" frameRate="60" loop="once">
+      <Object target="styleNode">
+        <Channel name="offsetY" type="float">
+          <Key time="0" value="24" interpolation="linear"/>
+          <Key time="60" value="-24"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>

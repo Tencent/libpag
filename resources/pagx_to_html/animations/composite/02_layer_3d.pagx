@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: One Layer carrying rotation.x / rotation.y / rotation.z / z / anchor.x / anchor.y / anchor.z / alpha
+     together under a static perspective, so the 3D compose order and the pivot depth are exercised at
+     the same time as the projection.
+     Target: Composite  Channel: rotation.x,rotation.y,rotation.z,z,anchor.x,anchor.y,anchor.z,alpha,perspective  Type: mixed
+     Ref: - -->
+<pagx width="320" height="200">
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F8FAFC"/>
+  </Layer>
+  <Layer id="card3d" x="90" y="50" width="140" height="100" perspective="600">
+    <Rectangle position="70,50" size="140,100" roundness="14"/>
+    <Fill color="#0E7490"/>
+    <Group position="20,20">
+      <Rectangle position="50,25" size="100,50" roundness="10"/>
+      <Fill color="#FDE047"/>
+    </Group>
+  </Layer>
+  <Animations>
+    <Animation id="composite" duration="60" frameRate="60" loop="once">
+      <Object target="card3d">
+        <Channel name="rotation.x" type="float">
+          <Key time="0" value="-20" interpolation="linear"/>
+          <Key time="30" value="25"/>
+          <Key time="60" value="0"/>
+        </Channel>
+        <Channel name="rotation.y" type="float">
+          <Key time="0" value="0" interpolation="linear"/>
+          <Key time="20" value="45"/>
+          <Key time="60" value="-15"/>
+        </Channel>
+        <Channel name="rotation.z" type="float">
+          <Key time="0" value="0" interpolation="linear"/>
+          <Key time="60" value="15"/>
+        </Channel>
+        <Channel name="perspective" type="float">
+          <Key time="0" value="600" interpolation="linear"/>
+          <Key time="60" value="260"/>
+        </Channel>
+        <Channel name="z" type="float">
+          <Key time="0" value="0" interpolation="linear"/>
+          <Key time="40" value="60"/>
+          <Key time="60" value="20"/>
+        </Channel>
+        <Channel name="anchor.x" type="float">
+          <Key time="0" value="70" interpolation="linear"/>
+          <Key time="30" value="40"/>
+          <Key time="60" value="70"/>
+        </Channel>
+        <Channel name="anchor.y" type="float">
+          <Key time="0" value="50" interpolation="linear"/>
+          <Key time="40" value="30"/>
+          <Key time="60" value="50"/>
+        </Channel>
+        <Channel name="anchor.z" type="float">
+          <Key time="0" value="0" interpolation="linear"/>
+          <Key time="50" value="25"/>
+          <Key time="60" value="0"/>
+        </Channel>
+        <Channel name="alpha" type="float">
+          <Key time="0" value="1" interpolation="linear"/>
+          <Key time="60" value="0.8"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>

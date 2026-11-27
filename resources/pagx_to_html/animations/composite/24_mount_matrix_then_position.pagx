@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: A matrix3D timeline is followed by an independent position timeline; matrix priority is local to each Animation.
+     Target: Composite  Channel: matrix3D,x  Type: mixed
+     Ref: R45 -->
+<pagx width="360" height="200">
+  <Resources><Composition id="matrixCard" width="300" height="100">
+    <Layer id="matrixBox" width="60" height="40"><Rectangle position="30,20" size="60,40"/><Fill color="#1D4ED8"/></Layer>
+    <Animations>
+      <Animation id="matrixFirst" duration="60" frameRate="60" loop="once"><Object target="matrixBox">
+        <Channel name="matrix3D" type="matrix3D"><Key time="0" value="1,0,0,0,0,1,0,0,0,0,1,0,10,0,0,1" interpolation="linear"/><Key time="60" value="1,0,0,0,0,1,0,0,0,0,1,0,100,0,0,1"/></Channel>
+      </Object></Animation>
+      <Animation id="positionSecond" duration="60" frameRate="60" loop="once"><Object target="matrixBox">
+        <Channel name="x" type="float"><Key time="0" value="0" interpolation="linear"/><Key time="60" value="200"/></Channel>
+      </Object></Animation>
+    </Animations>
+  </Composition></Resources>
+  <Layer width="360" height="200"><Rectangle position="180,100" size="360,200"/><Fill color="#F8FAFC"/></Layer>
+  <Layer x="30" y="70" width="300" height="100" composition="@matrixCard"><Timelines>
+    <Animation ref="@matrixFirst" playing="true"/><Animation ref="@positionSecond" playing="true"/>
+  </Timelines></Layer>
+</pagx>

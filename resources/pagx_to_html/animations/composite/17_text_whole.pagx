@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: Whole-text channels on one Text, the case the single-span path owns: the browser re-lays
+     the line out as the size and tracking change, so glyph positions follow.
+     Target: Composite  Channel: fontSize,letterSpacing  Type: mixed
+     Ref: - -->
+<pagx width="320" height="200">
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F8FAFC"/>
+  </Layer>
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Text id="wholeBody" text="Ag" fontFamily="Arial" fontStyle="Regular" fontSize="36"
+          letterSpacing="0" position="60,110"/>
+    <Fill color="#BE123C"/>
+  </Layer>
+  <Animations>
+    <Animation id="wholeText" duration="60" frameRate="60" loop="once">
+      <Object target="wholeBody">
+        <Channel name="fontSize" type="float">
+          <Key time="0" value="36" interpolation="linear"/>
+          <Key time="60" value="64"/>
+        </Channel>
+        <Channel name="letterSpacing" type="float">
+          <Key time="0" value="0" interpolation="linear"/>
+          <Key time="60" value="8"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>

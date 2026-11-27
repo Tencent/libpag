@@ -1,0 +1,21 @@
+<pagx width="320" height="200">
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F8FAFC"/>
+  </Layer>
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Text id="txt" text="AB" fontFamily="Arial" fontStyle="Bold" fontSize="64" position="60,130"/>
+    <Fill color="#BE123C"/>
+    <Stroke id="sk" color="#1E1B4B" width="1"/>
+  </Layer>
+  <Animations>
+    <Animation id="a" duration="60" frameRate="60" loop="once">
+      <Object target="sk">
+        <Channel name="width" type="float">
+          <Key time="0" value="1" interpolation="linear"/>
+          <Key time="60" value="6"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>

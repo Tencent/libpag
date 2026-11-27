@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: Strong contrasting shapes exercise reversed and interleaved residual/CSS filter stages; authored order is preserved independently of score.
+     Target: Composite  Channel: blurX,blurY,offsetX  Type: float
+     Ref: R17 -->
+<pagx width="480" height="240">
+  <Layer width="480" height="240"><Rectangle position="240,120" size="480,240"/><Fill color="#F8FAFC"/></Layer>
+  <Layer x="10" y="25" width="140" height="180">
+    <Rectangle position="65,80" size="100,120" roundness="8"/><Fill color="#FBBF24"/>
+    <Rectangle position="45,80" size="30,100"/><Fill color="#1D4ED8"/>
+    <InnerShadowFilter offsetX="12" offsetY="12" blurX="12" blurY="12" color="#7F1D1DCC"/>
+    <BlurFilter id="innerThenBlur" blurX="0" blurY="0"/>
+  </Layer>
+  <Layer x="165" y="25" width="140" height="180">
+    <Rectangle position="65,80" size="100,120" roundness="8"/><Fill color="#FBBF24"/>
+    <Rectangle position="45,80" size="30,100"/><Fill color="#1D4ED8"/>
+    <BlurFilter id="blurThenInner" blurX="0" blurY="0"/>
+    <InnerShadowFilter offsetX="12" offsetY="12" blurX="12" blurY="12" color="#7F1D1DCC"/>
+  </Layer>
+  <Layer x="320" y="25" width="140" height="180">
+    <Rectangle position="65,80" size="100,120" roundness="8"/><Fill color="#FBBF24"/>
+    <Rectangle position="45,80" size="30,100"/><Fill color="#1D4ED8"/>
+    <BlurFilter id="interleavedBlur" blurX="0" blurY="0"/>
+    <InnerShadowFilter offsetX="12" offsetY="12" blurX="12" blurY="12" color="#7F1D1DCC"/>
+    <DropShadowFilter id="interleavedShadow" offsetX="0" offsetY="12" blurX="8" blurY="8" color="#0F172ACC"/>
+  </Layer>
+  <Animations><Animation id="orderedFilters" duration="60" frameRate="60" loop="once">
+    <Object target="innerThenBlur">
+      <Channel name="blurX" type="float"><Key time="0" value="0" interpolation="linear"/><Key time="60" value="12"/></Channel>
+      <Channel name="blurY" type="float"><Key time="0" value="0" interpolation="linear"/><Key time="60" value="12"/></Channel>
+    </Object>
+    <Object target="blurThenInner">
+      <Channel name="blurX" type="float"><Key time="0" value="0" interpolation="linear"/><Key time="60" value="12"/></Channel>
+      <Channel name="blurY" type="float"><Key time="0" value="0" interpolation="linear"/><Key time="60" value="12"/></Channel>
+    </Object>
+    <Object target="interleavedBlur">
+      <Channel name="blurX" type="float"><Key time="0" value="0" interpolation="linear"/><Key time="60" value="12"/></Channel>
+      <Channel name="blurY" type="float"><Key time="0" value="0" interpolation="linear"/><Key time="60" value="12"/></Channel>
+    </Object>
+    <Object target="interleavedShadow"><Channel name="offsetX" type="float"><Key time="0" value="0" interpolation="linear"/><Key time="60" value="20"/></Channel></Object>
+  </Animation></Animations>
+</pagx>

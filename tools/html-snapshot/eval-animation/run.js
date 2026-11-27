@@ -23,6 +23,12 @@
  *   report.md   — markdown table with a corpus summary on top
  *   index.html  — per-case baseline / render / diff frame strips; open in a browser
  *   <case>/baseline/*.png, <case>/render/*.png, <case>/diff/*.png, subset.html, subset.pagx, …
+ *
+ * `--source pagx` evaluates the reverse direction over a corpus of hand-authored .pagx files
+ * (resources/pagx_to_html/animations): the reference timeline is `pagx render --time` of the source
+ * PAGX (written to <case>/baseline/) and the candidate is `pagx export` HTML seeked in the browser at
+ * the same times (written to <case>/render/). Sample times are derived from the PAGX animations
+ * themselves, so PAGX-only semantics (evaluationOffset, keys not spanning the duration) are covered.
  */
 'use strict';
 
@@ -45,7 +51,12 @@ const REPO_ROOT = path.resolve(TOOL_DIR, '..', '..');
 
 const USAGE = `Usage: node run.js [options]
 
-  --corpus <dir>      Directory of original HTML files (required; or set $EVAL_CORPUS)
+  --corpus <dir>      Directory of original HTML files, or .pagx files with --source pagx
+                      (required; or set $EVAL_CORPUS)
+  --source <kind>     'html' (default): HTML -> PAGX import eval. 'pagx': PAGX -> HTML export
+                      eval, comparing pagx render --time (reference) with the exported HTML in
+                      the browser. --roundtrip / --download-images / --pagx-images /
+                      --no-infer-flex do not apply to 'pagx', and --scale must stay 1.
   --out <dir>         Output directory (default: eval-animation/out/<label>)
   --pagx-bin <path>   pagx binary (default: $PAGX_BIN or repo cmake-build-debug/pagx)
   --samples <n>       Frames sampled across the timeline (default: 5)
@@ -68,7 +79,8 @@ const USAGE = `Usage: node run.js [options]
   --label <name>      Sub-directory name under out/ (default: current)
   --recursive, -r     Recurse into sub-directories of --corpus
   --concurrency, -j N Process N cases in parallel (default: 1)
-  --browser-engine N  Headless driver forwarded to baseline-frames.js / snapshot.js`;
+  --browser-engine N  Headless driver forwarded to baseline-frames.js / snapshot.js
+  --roundtrip         Also evaluate PAGX -> HTML -> browser & roundtrip PAGX`;
 
 function parseArgs(argv) {
   const opts = {
@@ -93,16 +105,26 @@ function parseArgs(argv) {
     recursive: false,
     concurrency: 1,
     browserEngine: '',
+    roundtrip: false,
+    source: 'html',
   };
   for (let i = 2; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--corpus') opts.corpus = argv[++i];
+    else if (a === '--source') {
+      const kind = argv[++i];
+      if (kind !== 'html' && kind !== 'pagx') {
+        fail(`--source expects 'html' or 'pagx', got '${kind}'`);
+      }
+      opts.source = kind;
+    }
     else if (a === '--out') opts.outDir = argv[++i];
     else if (a === '--pagx-bin') opts.pagxBin = argv[++i];
     else if (a === '--samples') {
       const v = parseInt(argv[++i], 10);
       if (!Number.isFinite(v) || v < 1) fail(`--samples requires a positive integer, got '${argv[i]}'`);
       opts.samples = v;
+      opts.samplesSet = true;
     } else if (a === '--scale') {
       const v = parseFloat(argv[++i]);
       if (!Number.isFinite(v) || v <= 0) fail(`--scale requires a positive number, got '${argv[i]}'`);
@@ -127,6 +149,7 @@ function parseArgs(argv) {
     else if (a === '--label') opts.label = argv[++i];
     else if (a === '--recursive' || a === '-r') opts.recursive = true;
     else if (a === '--browser-engine') opts.browserEngine = argv[++i];
+    else if (a === '--roundtrip') opts.roundtrip = true;
     else if (a === '--concurrency' || a === '-j') {
       const v = parseInt(argv[++i], 10);
       if (!Number.isFinite(v) || v < 1) fail(`--concurrency requires a positive integer, got '${argv[i]}'`);
@@ -154,7 +177,7 @@ function fmt(n, digits = 4) {
   return n.toFixed(digits);
 }
 
-function findCorpusFiles(corpusDir, only, recursive) {
+function findCorpusFiles(corpusDir, only, recursive, ext = '.html') {
   const out = [];
   const visit = (dir, relPrefix) => {
     let entries;
@@ -172,15 +195,15 @@ function findCorpusFiles(corpusDir, only, recursive) {
         continue;
       }
       if (!ent.isFile()) continue;
-      if (!name.toLowerCase().endsWith('.html')) continue;
+      if (!name.toLowerCase().endsWith(ext)) continue;
       if (name.includes('.subset.')) continue;
       const rel = relPrefix ? `${relPrefix}/${name}` : name;
       if (only.length && !only.some((s) => rel.includes(s))) continue;
-      const base = name.slice(0, -'.html'.length);
+      const base = name.slice(0, -ext.length);
       const caseName = relPrefix
         ? `${relPrefix.replace(/[\\/]/g, '__')}__${base}`
         : base;
-      out.push({ path: full, name: caseName });
+      out.push({ path: full, name: caseName, rel });
     }
   };
   visit(corpusDir, '');
@@ -190,6 +213,58 @@ function findCorpusFiles(corpusDir, only, recursive) {
 
 // Parse `subset:animation-*` importer diagnostics plus the "captured N animation(s)" line the
 // snapshot tool logs, so the report shows how much animation actually flowed through each stage.
+
+// Identity of a cached case run: the source file as it currently sits on disk plus the sampling that
+// produced the frames. Reusing frames across a changed source or a different sample grid would score
+// an old run against expectations it was never rendered for.
+function statIdentity(target) {
+  try {
+    const stat = fs.statSync(target);
+    return { size: stat.size, mtimeMs: stat.mtimeMs };
+  } catch (err) {
+    return { size: -1, mtimeMs: -1 };
+  }
+}
+
+function buildCaseCacheKey(sourcePath, opts) {
+  // The frames on disk were produced by a specific exporter binary, browser engine and scale. Keying
+  // on the fixture alone let a rebuilt exporter keep scoring frames it no longer produces, which is
+  // exactly the case someone re-running after a code change is looking at.
+  return {
+    source: statIdentity(sourcePath),
+    bin: statIdentity(opts.pagxBin || ''),
+    samples: opts.samples,
+    roundtrip: !!opts.roundtrip,
+    scale: opts.scale,
+    browserEngine: opts.browserEngine || '',
+  };
+}
+
+function cacheKeyMatches(cacheKeyPath, expected) {
+  try {
+    const actual = JSON.parse(fs.readFileSync(cacheKeyPath, 'utf8'));
+    const sameStat = (a, b) => !!a && !!b && a.size === b.size && a.mtimeMs === b.mtimeMs;
+    return (
+      sameStat(actual.source, expected.source) &&
+      sameStat(actual.bin, expected.bin) &&
+      actual.samples === expected.samples &&
+      !!actual.roundtrip === expected.roundtrip &&
+      actual.scale === expected.scale &&
+      (actual.browserEngine || '') === expected.browserEngine
+    );
+  } catch (err) {
+    return false;
+  }
+}
+
+function writeCaseCacheKey(cacheKeyPath, key) {
+  try {
+    fs.writeFileSync(cacheKeyPath, JSON.stringify(key));
+  } catch (err) {
+    // The cache key only shortens re-runs; failing to persist it must not fail the case.
+  }
+}
+
 function countAnimationsCaptured(stderrPath) {
   if (!fs.existsSync(stderrPath)) return 0;
   const text = fs.readFileSync(stderrPath, 'utf8');
@@ -261,10 +336,24 @@ async function runPagxRenderAtTime(opts) {
   return spawnCapture(opts.pagxBin, args, { stderrPath: opts.stderrPath });
 }
 
+async function runPagxExportHtml(opts) {
+  const args = [
+    'export',
+    '--input', opts.pagxFile,
+    '--output', opts.htmlFile,
+    '--format', 'html',
+  ];
+  return spawnCapture(opts.pagxBin, args, { stderrPath: opts.stderrPath });
+}
+
 async function processCase(entry, outDir, opts) {
   const htmlPath = entry.path;
   const base = entry.name;
   const caseDir = path.join(outDir, base);
+  // Cached frames are only reusable for the same source and the same sample grid.
+  const cacheKeyPath = path.join(caseDir, '.cache-key.json');
+  const skipExisting = opts.skipExisting &&
+    cacheKeyMatches(cacheKeyPath, buildCaseCacheKey(entry.path, opts));
   const baselineDir = path.join(caseDir, 'baseline');
   const renderDir = path.join(caseDir, 'render');
   const diffDir = path.join(caseDir, 'diff');
@@ -284,6 +373,10 @@ async function processCase(entry, outDir, opts) {
     frames: 0,
     ssimMean: NaN,
     pixelDiffMean: NaN,
+    exportBrowserSsimMean: NaN,
+    exportBrowserVsPagxSsimMean: NaN,
+    roundtripPagxSsimMean: NaN,
+    roundtripVsPagxSsimMean: NaN,
     motion: NaN,
     animCaptured: 0,
     animWarnings: 0,
@@ -296,13 +389,14 @@ async function processCase(entry, outDir, opts) {
     // the captured frames back as an animation on the real timeline clock (dynamic playback mode).
     times: [],
     globalDurationMs: 0,
+    roundtrip: !!opts.roundtrip,
     error: '',
   };
 
   const engineArgs = opts.browserEngine ? ['--browser-engine', opts.browserEngine] : [];
 
   // 1. baseline frames (ground-truth timeline)
-  if (!opts.skipExisting || !fs.existsSync(samplesJson)) {
+  if (!skipExisting || !fs.existsSync(samplesJson)) {
     const r = await spawnCapture(
       process.execPath,
       [
@@ -337,7 +431,7 @@ async function processCase(entry, outDir, opts) {
   }
 
   // 2. snapshot (captures + normalises the animation into the subset HTML)
-  if (!opts.skipExisting || !fs.existsSync(subsetHtml)) {
+  if (!skipExisting || !fs.existsSync(subsetHtml)) {
     const r = await forkSnapshotCli({
       input: htmlPath,
       output: subsetHtml,
@@ -365,7 +459,7 @@ async function processCase(entry, outDir, opts) {
   row.camSkipReasons = cameraSkipReasons(snapshotStderr);
 
   // 3. import
-  if (!opts.skipExisting || !fs.existsSync(subsetPagx)) {
+  if (!skipExisting || !fs.existsSync(subsetPagx)) {
     const r = await runPagxImportToFile({
       pagxBin: opts.pagxBin,
       subsetHtml,
@@ -412,7 +506,7 @@ async function processCase(entry, outDir, opts) {
     const diffPng = path.join(diffDir, `frame-${idx}.png`);
     if (fs.existsSync(baselinePng)) baselineFrames.push(baselinePng);
 
-    if (!opts.skipExisting || !fs.existsSync(renderPng)) {
+    if (!skipExisting || !fs.existsSync(renderPng)) {
       const r = await runPagxRenderAtTime({
         pagxBin: opts.pagxBin,
         pagxFile: subsetPagx,
@@ -441,14 +535,700 @@ async function processCase(entry, outDir, opts) {
   row.ssimMean = mean(ssims);
   row.pixelDiffMean = mean(pdiffs);
   row.motion = baselineMotion(baselineFrames);
+
+  // 7. Optional round-trip evaluation:
+  //    subset.pagx -> exported.html -> (A) browser frames via baseline-frames.js
+  //                                 -> (B) roundtrip.pagx -> render frames
+  if (opts.roundtrip) {
+    const exportedHtml = path.join(caseDir, 'exported.html');
+    const roundtripPagx = path.join(caseDir, 'roundtrip.pagx');
+    const exportedBrowserDir = path.join(caseDir, 'exported-browser');
+    const roundtripRenderDir = path.join(caseDir, 'roundtrip-render');
+    ensureDir(exportedBrowserDir);
+    ensureDir(roundtripRenderDir);
+
+    if (!skipExisting || !fs.existsSync(exportedHtml)) {
+      const r = await runPagxExportHtml({
+        pagxBin: opts.pagxBin,
+        pagxFile: subsetPagx,
+        htmlFile: exportedHtml,
+        stderrPath: path.join(caseDir, 'export.stderr.txt'),
+      });
+      if (r.code !== 0 || !fs.existsSync(exportedHtml)) {
+        row.error = 'export-html-failed';
+        return row;
+      }
+    }
+
+    // 7A. Render exported.html in headless Chromium at the exact same sample timestamps
+    const exportedSamplesJson = path.join(exportedBrowserDir, 'samples.json');
+    if (!skipExisting || !fs.existsSync(exportedSamplesJson)) {
+      const r = await spawnCapture(
+        process.execPath,
+        [
+          path.join(SCRIPT_DIR, 'baseline-frames.js'), exportedHtml,
+          '-o', exportedBrowserDir,
+          '--samples', String(opts.samples),
+          '--times-json', samplesJson,
+          ...engineArgs,
+        ],
+        { stderrPath: path.join(caseDir, 'exported-browser.stderr.txt') },
+      );
+      if (r.code !== 0 || !fs.existsSync(exportedSamplesJson)) {
+        row.error = 'exported-browser-failed';
+        return row;
+      }
+    }
+
+    // 7B. Snapshot exported.html -> roundtrip.subset.html -> roundtrip.pagx -> resolve -> render frames
+    const roundtripSubsetHtml = path.join(caseDir, 'roundtrip.subset.html');
+    if (!skipExisting || !fs.existsSync(roundtripPagx)) {
+      const rSnap = await forkSnapshotCli({
+        input: exportedHtml,
+        output: roundtripSubsetHtml,
+        scriptDir: TOOL_DIR,
+        browserEngine: opts.browserEngine || undefined,
+        captureAnimations: true,
+        downloadImages: opts.downloadImages,
+        imageDir: opts.downloadImages ? opts.imageCacheDir : '',
+        stderrPath: path.join(caseDir, 'roundtrip-snapshot.stderr.txt'),
+      });
+      if (rSnap.code !== 0 || !fs.existsSync(roundtripSubsetHtml)) {
+        row.error = 'roundtrip-snapshot-failed';
+        return row;
+      }
+      const rImp = await runPagxImportToFile({
+        pagxBin: opts.pagxBin,
+        subsetHtml: roundtripSubsetHtml,
+        pagxFile: roundtripPagx,
+        inferFlex: opts.inferFlex,
+        stderrPath: path.join(caseDir, 'roundtrip-import.stderr.txt'),
+      });
+      if (rImp.code !== 0 || !fs.existsSync(roundtripPagx)) {
+        row.error = 'roundtrip-import-failed';
+        return row;
+      }
+      const rRes = await runPagxResolve({
+        pagxBin: opts.pagxBin,
+        pagxFile: roundtripPagx,
+        imageStorage: opts.pagxImages,
+        imageBaseDir: caseDir,
+        stderrPath: path.join(caseDir, 'roundtrip-resolve.stderr.txt'),
+      });
+      if (rRes.code !== 0) {
+        row.error = 'roundtrip-resolve-failed';
+        return row;
+      }
+    }
+
+    const expBrowserVsBaseSsims = [];
+    const expBrowserVsPagxSsims = [];
+    const rtPagxVsBaseSsims = [];
+    const rtPagxVsPagxSsims = [];
+
+    for (const s of samples) {
+      const idx = String(s.index).padStart(3, '0');
+      const baselinePng = path.join(baselineDir, `frame-${idx}.png`);
+      const renderPng = path.join(renderDir, `frame-${idx}.png`);
+      const expBrowserPng = path.join(exportedBrowserDir, `frame-${idx}.png`);
+      const rtRenderPng = path.join(roundtripRenderDir, `frame-${idx}.png`);
+
+      if (!skipExisting || !fs.existsSync(rtRenderPng)) {
+        const r = await runPagxRenderAtTime({
+          pagxBin: opts.pagxBin,
+          pagxFile: roundtripPagx,
+          output: rtRenderPng,
+          scale: opts.scale,
+          timeSec: s.timeSec,
+          stderrPath: path.join(caseDir, `roundtrip-render.${idx}.stderr.txt`),
+        });
+        if (r.code !== 0 || !fs.existsSync(rtRenderPng)) {
+          row.error = `roundtrip-render-failed@${idx}`;
+          return row;
+        }
+      }
+
+      try {
+        expBrowserVsBaseSsims.push(compare.pixelMetrics(baselinePng, expBrowserPng, null).ssim);
+        expBrowserVsPagxSsims.push(compare.pixelMetrics(renderPng, expBrowserPng, null).ssim);
+        rtPagxVsBaseSsims.push(compare.pixelMetrics(baselinePng, rtRenderPng, null).ssim);
+        rtPagxVsPagxSsims.push(compare.pixelMetrics(renderPng, rtRenderPng, null).ssim);
+      } catch (err) {
+        row.error = `roundtrip-compare-failed@${idx}: ${err.message}`;
+        return row;
+      }
+    }
+
+    row.exportBrowserSsimMean = mean(expBrowserVsBaseSsims);
+    row.exportBrowserVsPagxSsimMean = mean(expBrowserVsPagxSsims);
+    row.roundtripPagxSsimMean = mean(rtPagxVsBaseSsims);
+    row.roundtripVsPagxSsimMean = mean(rtPagxVsPagxSsims);
+  }
+
   return row;
 }
 
-function writeCsv(rows, outPath) {
+// ---------------------------------------------------------------------------------------------
+// --source pagx: PAGX -> HTML export eval
+// ---------------------------------------------------------------------------------------------
+
+const PAGX_DEFAULT_SAMPLES = 8;
+// Sample windows longer than this are clamped so a long loop does not stretch the sample grid.
+const PAGX_MAX_WINDOW_SEC = 10;
+// Mean per-channel RGB delta (0-255 levels) from the first frame below which a timeline counts as
+// still. RGB rather than SSIM because the shared SSIM is luma-only and a hue-only animation (e.g.
+// blue to orange) barely moves luma.
+const PAGX_STATIC_RGB_EPSILON = 0.01;
+
+function readXmlAttr(tag, name) {
+  const m = tag.match(new RegExp(`\\s${name}="([^"]*)"`));
+  return m ? m[1] : null;
+}
+
+// Parses the structured header comment every corpus file carries (see the corpus prompt):
+//   Tests: ...  Target: <NodeType>  Channel: <name>  Type: <type>  Expect: <supported|gap>  Ref: ...
+function parsePagxCaseHeader(xml) {
+  const comment = (xml.match(/<!--([\s\S]*?)-->/) || [])[1] || '';
+  const pick = (re) => {
+    const m = comment.match(re);
+    return m ? m[1].trim() : '';
+  };
+  return {
+    target: pick(/Target:\s*(\S+)/),
+    channel: pick(/Channel:\s*(\S+)/),
+    // The corpus convention is "present in the tree means we promise to support it": only an
+    // explicit `Expect: gap` marks a fixture the exporter is not expected to match. Defaulting to
+    // `unknown` put every ordinary case outside the aggregate and left the report with NaN means
+    // over zero cases (R38).
+    expect: pick(/Expect:\s*(\w+)/) || 'supported',
+    // Names a channel the reference renderer does not draw at all: the fixture still measures the
+    // export against that renderer, but a mismatch it causes is a renderer gap, not our defect.
+    renderer: pick(/Renderer:\s*([^\n]+)/),
+    ref: pick(/Ref:\s*(\S+)/),
+  };
+}
+
+// Derives the playback window from the PAGX animations: each definition contributes its period
+// (doubled for pingPong) shifted by the largest positive evaluationOffset any timeline mounts it
+// with. Top-level animations without a <Timelines> mount have offset 0.
+function parsePagxTiming(xml) {
+  const defs = [];
+  const offsets = new Map();
+  const tagRe = /<Animation\b[^>]*>/g;
+  let m;
+  while ((m = tagRe.exec(xml)) !== null) {
+    const tag = m[0];
+    const ref = readXmlAttr(tag, 'ref');
+    if (ref !== null) {
+      const id = ref.replace(/^@/, '');
+      const offset = parseFloat(readXmlAttr(tag, 'evaluationOffset') || '0') || 0;
+      offsets.set(id, Math.max(offsets.has(id) ? offsets.get(id) : 0, offset));
+      continue;
+    }
+    const id = readXmlAttr(tag, 'id');
+    if (id === null) continue;
+    defs.push({
+      id,
+      duration: parseFloat(readXmlAttr(tag, 'duration') || '0') || 0,
+      frameRate: parseFloat(readXmlAttr(tag, 'frameRate') || '60') || 60,
+      loop: readXmlAttr(tag, 'loop') || 'once',
+    });
+  }
+  let windowSec = 0;
+  for (const d of defs) {
+    const periodFrames = d.duration * (d.loop === 'pingPong' ? 2 : 1);
+    const offsetFrames = Math.max(0, offsets.get(d.id) || 0);
+    windowSec = Math.max(windowSec, (offsetFrames + periodFrames) / d.frameRate);
+  }
+  return {
+    frameRates: Array.from(new Set(defs.map((d) => d.frameRate))),
+    windowSec: Math.min(windowSec, PAGX_MAX_WINDOW_SEC),
+  };
+}
+
+// Evenly spaced sample times strictly inside (0, window). A time that lands within a quarter frame
+// of an integer frame is nudged by half a frame: keys sit on integer frames, and the browser and the
+// PAGX runtime may round a sample sitting exactly on a key boundary to different sides.
+function pagxSampleTimes(timing, count) {
+  const times = [];
+  if (!(timing.windowSec > 0) || count <= 0) return times;
+  const window = timing.windowSec;
+  const epsilon = Math.min(1e-6, window / (count * 8));
+  for (let i = 0; i < count; i++) {
+    // Strictly interior, strictly increasing grid: every sample belongs to the window and no two
+    // share a slot, so a short window cannot produce repeats or out-of-range times.
+    let t = (window * (i + 0.5)) / count;
+    // Sitting exactly on a frame boundary makes the two renderers round to different frames, so
+    // step half a frame forward - but only when that keeps the sample inside the window and ahead
+    // of the previous one. The old version always stepped, which is what pushed the last samples
+    // past the end and reordered short windows.
+    for (const fr of timing.frameRates) {
+      const f = t * fr;
+      if (Math.abs(f - Math.round(f)) < 0.25) {
+        const stepped = t + 0.5 / fr;
+        const previous = times.length ? times[times.length - 1] : -Infinity;
+        // Half a frame is only a small step when the grid is coarser than a frame; on a window
+        // shorter than one frame it would jump over the rest of the grid, so the sample stays put.
+        const spacing = window / count;
+        if (0.5 / fr < spacing / 2 && stepped < window - epsilon && stepped > previous) {
+          t = stepped;
+        }
+        break;
+      }
+    }
+    t = Math.min(Math.max(t, 0), window - epsilon);
+    t = Math.round(t * 1e6) / 1e6;
+    const previous = times.length ? times[times.length - 1] : -Infinity;
+    if (t > previous) times.push(t);
+  }
+  return times;
+}
+
+// Largest mean RGB delta between the first frame and any later frame, i.e. how far the timeline
+// travels away from its starting picture. 0 means every frame matches the first one.
+function pagxTimelineSpan(pngPaths) {
+  let span = 0;
+  for (let i = 1; i < pngPaths.length; i++) {
+    span = Math.max(span, compare.pixelMetrics(pngPaths[0], pngPaths[i], null).meanRgbDelta);
+  }
+  return span;
+}
+
+// Classifies a case whose timelines did not both move, so a broken reference render is not
+// mistaken for an export regression:
+//   ref-static    reference (pagx render) never changes but the exported HTML does
+//   export-static reference moves but the exported HTML never changes (animation lost on export)
+//   both-static   neither moves (the case or the channel does not animate at all)
+function classifyPagxMotion(refStatic, exportStatic) {
+  if (refStatic && exportStatic) return 'both-static';
+  if (refStatic) return 'ref-static';
+  if (exportStatic) return 'export-static';
+  return '';
+}
+
+async function processPagxCase(entry, outDir, opts) {
+  const pagxPath = entry.path;
+  const caseDir = path.join(outDir, entry.name);
+  // Cached frames are only reusable for the same source and the same sample grid.
+  const cacheKeyPath = path.join(caseDir, '.cache-key.json');
+  const skipExisting = opts.skipExisting &&
+    cacheKeyMatches(cacheKeyPath, buildCaseCacheKey(entry.path, opts));
+  // Directory layout mirrors the HTML eval so the shared report player works unchanged:
+  // baseline/ = reference (pagx render --time), render/ = candidate (exported HTML in the browser).
+  const baselineDir = path.join(caseDir, 'baseline');
+  const renderDir = path.join(caseDir, 'render');
+  const diffDir = path.join(caseDir, 'diff');
+  ensureDir(baselineDir);
+  ensureDir(renderDir);
+  ensureDir(diffDir);
+
+  const relDir = path.dirname(entry.rel);
+  const row = {
+    source: 'pagx',
+    name: entry.name,
+    group: relDir === '.' ? '(root)' : relDir.split(/[\\/]/)[0],
+    target: '',
+    channel: '',
+    expect: 'unknown',
+    ref: '',
+    frames: 0,
+    ssimMean: NaN,
+    pixelDiffMean: NaN,
+    rgbDeltaMean: NaN,
+    rgbDeltaMax: NaN,
+    motion: NaN,
+    exportMotion: NaN,
+    // Fidelity grade; `grade(mean)` and `grade(min)` are the two readings it takes the stricter of.
+    grade: '',
+    attribution: '',
+    flag: '',
+    animCaptured: 0,
+    animWarnings: 0,
+    animDropped: 0,
+    width: 0,
+    height: 0,
+    times: [],
+    globalDurationMs: 0,
+    roundtrip: false,
+    error: '',
+  };
+
+  let xml;
+  try {
+    xml = fs.readFileSync(pagxPath, 'utf8');
+  } catch (err) {
+    row.error = `read-failed: ${err.message}`;
+    return row;
+  }
+  Object.assign(row, parsePagxCaseHeader(xml));
+  const rootTag = (xml.match(/<pagx\b[^>]*>/) || [''])[0];
+  row.width = parseInt(readXmlAttr(rootTag, 'width') || '0', 10) || 0;
+  row.height = parseInt(readXmlAttr(rootTag, 'height') || '0', 10) || 0;
+
+  const timing = parsePagxTiming(xml);
+  const times = pagxSampleTimes(timing, opts.samples);
+  if (times.length === 0) {
+    row.error = 'no-animation-window';
+    return row;
+  }
+  row.times = times;
+  row.globalDurationMs = timing.windowSec * 1000;
+  const samples = times.map((timeSec, index) => ({ index, timeSec }));
+  const samplesJson = path.join(baselineDir, 'samples.json');
+  fs.writeFileSync(
+    samplesJson,
+    JSON.stringify(
+      { width: row.width, height: row.height, globalDurationMs: row.globalDurationMs, samples },
+      null,
+      2,
+    ),
+    'utf8',
+  );
+
+  // 1. reference frames: the PAGX runtime at each sample time
+  const refFrames = [];
+  for (const s of samples) {
+    const idx = String(s.index).padStart(3, '0');
+    const refPng = path.join(baselineDir, `frame-${idx}.png`);
+    if (!skipExisting || !fs.existsSync(refPng)) {
+      const r = await runPagxRenderAtTime({
+        pagxBin: opts.pagxBin,
+        pagxFile: pagxPath,
+        output: refPng,
+        scale: 1,
+        timeSec: s.timeSec,
+        stderrPath: path.join(caseDir, `reference.${idx}.stderr.txt`),
+      });
+      if (r.code !== 0 || !fs.existsSync(refPng)) {
+        row.error = `reference-render-failed@${idx}`;
+        return row;
+      }
+    }
+    refFrames.push(refPng);
+  }
+
+  // 2. export
+  const exportedHtml = path.join(caseDir, 'exported.html');
+  if (!skipExisting || !fs.existsSync(exportedHtml)) {
+    const r = await runPagxExportHtml({
+      pagxBin: opts.pagxBin,
+      pagxFile: pagxPath,
+      htmlFile: exportedHtml,
+      stderrPath: path.join(caseDir, 'export.stderr.txt'),
+    });
+    if (r.code !== 0 || !fs.existsSync(exportedHtml)) {
+      row.error = 'export-html-failed';
+      return row;
+    }
+  }
+
+  // 3. candidate frames: the exported HTML seeked to the same times in the browser
+  const engineArgs = opts.browserEngine ? ['--browser-engine', opts.browserEngine] : [];
+  const browserSamplesJson = path.join(renderDir, 'samples.json');
+  if (!skipExisting || !fs.existsSync(browserSamplesJson)) {
+    const r = await spawnCapture(
+      process.execPath,
+      [
+        path.join(SCRIPT_DIR, 'baseline-frames.js'), exportedHtml,
+        '-o', renderDir,
+        '--samples', String(samples.length),
+        '--times-json', samplesJson,
+        ...engineArgs,
+      ],
+      { stderrPath: path.join(caseDir, 'browser.stderr.txt') },
+    );
+    if (r.code !== 0 || !fs.existsSync(browserSamplesJson)) {
+      row.error = 'browser-frames-failed';
+      return row;
+    }
+  }
+
+  // 4. per-frame metrics
+  const exportFrames = [];
+  const ssims = [];
+  const pdiffs = [];
+  const rgbDeltas = [];
+  for (const s of samples) {
+    const idx = String(s.index).padStart(3, '0');
+    const refPng = path.join(baselineDir, `frame-${idx}.png`);
+    const candPng = path.join(renderDir, `frame-${idx}.png`);
+    exportFrames.push(candPng);
+    try {
+      const m = compare.pixelMetrics(refPng, candPng, path.join(diffDir, `frame-${idx}.png`));
+      ssims.push(m.ssim);
+      pdiffs.push(m.pixelDiffRatio);
+      rgbDeltas.push(m.meanRgbDelta);
+    } catch (err) {
+      row.error = `compare-failed@${idx}: ${err.message}`;
+      return row;
+    }
+  }
+
+  row.frames = samples.length;
+  row.ssimMean = mean(ssims);
+  row.pixelDiffMean = mean(pdiffs);
+  row.rgbDeltaMean = mean(rgbDeltas);
+  row.rgbDeltaMax = Math.max(...rgbDeltas);
+  row.motion = pagxTimelineSpan(refFrames);
+  row.exportMotion = pagxTimelineSpan(exportFrames);
+  row.flag = classifyPagxMotion(
+    row.motion < PAGX_STATIC_RGB_EPSILON,
+    row.exportMotion < PAGX_STATIC_RGB_EPSILON,
+  );
+
+  row.hasText = caseDrawsText(xml);
+  gradePagxRow(row);
+  return row;
+}
+
+
+function pagxScoredRows(rows) {
+  return rows.filter((r) => !r.error && r.flag !== 'ref-static' && r.flag !== 'both-static');
+}
+
+// ---------------------------------------------------------------------------------------------
+// Fidelity grade (doc: resources/pagx_to_html/animations/README.md, restore-fidelity section).
+//   >= 0.999  complete    — pixel-identical to the reference
+//   >= 0.99   basic       — anti-aliasing / quantization level
+//   else      distorted   — needs a per-case attribution
+//
+// A case that draws text is graded on a looser curve - complete at 0.99, basic at 0.96 - because the
+// two renderers shape glyphs differently: PAGX fills a hinted outline and, for fauxBold, unions a
+// stroked one, while the browser rasterises its own face and (for fauxBold) strokes with
+// `-webkit-text-stroke`. Those outlines differ by a pixel or two at the edges whatever the animation
+// does, which caps a text case around 0.95-0.99; grading it on the shape-agnostic 0.999 curve would
+// report a rendering-strategy difference as a distortion of the export.
+// A case takes the stricter of its per-frame mean and its worst frame.
+// ---------------------------------------------------------------------------------------------
+
+const GRADE_COMPLETE = '完全还原';
+const GRADE_BASIC = '略有差异';
+const GRADE_DISTORTED = '差异较大';
+
+const TEXT_COMPLETE_SSIM = 0.99;
+const TEXT_BASIC_SSIM = 0.96;
+
+function gradeTier(ssim, hasText = false) {
+  if (!isFinite(ssim)) return 0;
+  if (ssim >= (hasText ? TEXT_COMPLETE_SSIM : 0.999)) return 3;
+  if (ssim >= (hasText ? TEXT_BASIC_SSIM : 0.99)) return 2;
+  return 1;
+}
+
+// A case draws text when its document declares a Text or TextBox node, wherever it sits in the tree.
+function caseDrawsText(xml) {
+  return /<Text(Box)?[\s/>]/.test(xml);
+}
+
+function gradeTierName(tier) {
+  if (tier >= 3) return GRADE_COMPLETE;
+  if (tier === 2) return GRADE_BASIC;
+  return GRADE_DISTORTED;
+}
+
+
+function gradePagxRow(row) {
+  // One reading only: the per-frame mean.
+  const hasText = row.hasText === true;
+  row.grade = gradeTierName(gradeTier(row.ssimMean, hasText));
+  if (row.grade !== GRADE_DISTORTED) {
+    row.attribution = '';
+    return;
+  }
+  if (row.renderer) {
+    // The code the reference renderer should draw is missing from its own output, so the case cannot
+    // match no matter what the export does: name the renderer, not the exporter.
+    row.attribution = 'renderer-gap';
+    return;
+  }
+  if (row.expect === 'gap') {
+    // The corpus header already declares this channel unsupported by the exporter.
+    row.attribution = 'known-limit';
+    return;
+  }
+  row.attribution = 'exporter';
+}
+
+function summarizePagx(rows) {
+  const scored = pagxScoredRows(rows);
+  const flags = {};
+  for (const r of rows) {
+    if (r.flag) flags[r.flag] = (flags[r.flag] || 0) + 1;
+  }
+  const byExpect = {};
+  for (const e of ['supported', 'gap', 'unknown']) {
+    const sub = scored.filter((r) => r.expect === e);
+    byExpect[e] = {
+      count: sub.length,
+      ssimMean: mean(sub.map((r) => r.ssimMean)),
+      rgbDeltaMean: mean(sub.map((r) => r.rgbDeltaMean)),
+    };
+  }
+  const groups = [];
+  for (const g of Array.from(new Set(rows.map((r) => r.group)))) {
+    const all = rows.filter((r) => r.group === g);
+    const sup = pagxScoredRows(all).filter((r) => r.expect === 'supported');
+    groups.push({
+      group: g,
+      cases: all.length,
+      supportedScored: sup.length,
+      ssimMean: mean(sup.map((r) => r.ssimMean)),
+      rgbDeltaMean: mean(sup.map((r) => r.rgbDeltaMean)),
+      flagged: all.filter((r) => r.flag).length,
+      errored: all.filter((r) => r.error).length,
+    });
+  }
+  // Grade buckets over the rows that produced a picture to grade.
+  const grades = {};
+  for (const name of [GRADE_COMPLETE, GRADE_BASIC, GRADE_DISTORTED]) {
+    grades[name] = rows.filter((r) => !r.error && r.grade === name).length;
+  }
+  // The two families are graded on different curves (see gradeTier), so the summary keeps them
+  // apart: a text case at 0.98 is complete for its family and would read as "basic" in a combined
+  // bucket.
+  const summarizeFamily = (list) => ({
+    cases: list.length,
+    ssimMean: mean(list.map((r) => r.ssimMean)),
+    grades: Object.fromEntries(
+      [GRADE_COMPLETE, GRADE_BASIC, GRADE_DISTORTED].map((name) => [
+        name,
+        list.filter((r) => r.grade === name).length,
+      ])
+    ),
+  });
+  const gradedRows = rows.filter((r) => !r.error);
+  const textFamily = summarizeFamily(gradedRows.filter((r) => r.hasText === true));
+  const plainFamily = summarizeFamily(gradedRows.filter((r) => r.hasText !== true));
+
+  const distorted = rows
+    .filter((r) => !r.error && r.grade === GRADE_DISTORTED)
+    .sort((a, b) => a.ssimMean - b.ssimMean);
+  return {
+    text: textFamily,
+    nonText: plainFamily,
+    cases: rows.length,
+    errored: rows.filter((r) => r.error).length,
+    scored: scored.length,
+    flags,
+    byExpect,
+    groups,
+    grades,
+    distorted,
+  };
+}
+
+function writePagxCsv(rows, outPath) {
   const headers = [
-    'name', 'frames', 'ssimMean', 'pixelDiffMean', 'motion',
-    'animCaptured', 'animWarnings', 'animDropped', 'cameraSkips', 'camSkipReasons', 'width', 'height',
-    'error',
+    'name', 'group', 'target', 'channel', 'expect', 'ref', 'frames', 'ssimMean',
+    'pixelDiffMean', 'rgbDeltaMean', 'rgbDeltaMax', 'motion', 'exportMotion', 'flag', 'width',
+    'height', 'error',
+    // Grade. ssimMean above is the metric it reads; eval_gate.py reads it by name and
+    // ignores everything after.
+    'hasText', 'grade', 'attribution',
+  ];
+  const lines = [headers.join(',')];
+  for (const r of rows) {
+    const cells = headers.map((h) => {
+      const v = r[h];
+      if (typeof v === 'number') {
+        if (!isFinite(v)) return '';
+        return Number.isInteger(v) ? String(v) : v.toFixed(6);
+      }
+      if (v === undefined || v === null) return '';
+      const s = String(v);
+      return s.includes(',') || s.includes('"') ? `"${s.replace(/"/g, '""')}"` : s;
+    });
+    lines.push(cells.join(','));
+  }
+  fs.writeFileSync(outPath, lines.join('\n') + '\n', 'utf8');
+}
+
+function writePagxMarkdown(rows, outPath, label) {
+  const s = summarizePagx(rows);
+  const lines = [];
+  lines.push(`# PAGX -> HTML animation export eval — ${label}`);
+  lines.push('');
+  lines.push('Reference: `pagx render --time` of the source PAGX. Candidate: `pagx export` HTML seeked in the browser at the same times.');
+  lines.push('');
+  lines.push(`Cases: ${s.cases} (errored ${s.errored}, scored ${s.scored})`);
+  lines.push('');
+  lines.push(`- supported — SSIM ${fmt(s.byExpect.supported.ssimMean)}, rgbΔ ${fmt(s.byExpect.supported.rgbDeltaMean, 2)} over ${s.byExpect.supported.count} case(s)`);
+  lines.push(`- gap — SSIM ${fmt(s.byExpect.gap.ssimMean)}, rgbΔ ${fmt(s.byExpect.gap.rgbDeltaMean, 2)} over ${s.byExpect.gap.count} case(s) (not supported by the exporter; informational)`);
+  if (s.byExpect.unknown.count) {
+    lines.push(`- missing Expect header — ${s.byExpect.unknown.count} case(s)`);
+  }
+  const flagText = Object.keys(s.flags).map((k) => `${k} ${s.flags[k]}`).join(', ');
+  lines.push(`- motion flags — ${flagText || 'none'} (ref-static / both-static are excluded from SSIM)`);
+  lines.push('');
+  lines.push('## Restore fidelity');
+  lines.push('');
+  lines.push('Grades: `>= 0.999` 完全还原 / `>= 0.99` 略有差异 / below that 差异较大 for documents without text, and `>= 0.99` / `>= 0.96` for documents with text (glyph outlines differ between the renderers). Applied to the per-frame mean of animSSIM. `animSSIM` (the `ssim mean` column) diffs an animated PAGX render against the exported HTML seeked to the same time; there is no static-instance baseline any more. Attribution `exporter` means the animation path carries the error, `renderer-gap` means the reference renderer itself does not draw a code the fixture declares, `known-limit` means the corpus header already declares the channel unsupported.');
+  lines.push('');
+  lines.push('| grade | cases |');
+  lines.push('| --- | --- |');
+  for (const name of [GRADE_COMPLETE, GRADE_BASIC, GRADE_DISTORTED]) {
+    lines.push(`| ${name} | ${s.grades[name]} |`);
+  }
+  lines.push('');
+  if (s.distorted.length) {
+    lines.push('### Distorted cases (attribution required)');
+    lines.push('');
+    lines.push('| case | SSIM | attribution |');
+    lines.push('| --- | --- | --- |');
+    for (const r of s.distorted) {
+      lines.push(`| ${r.name} | ${fmt(r.ssimMean)} | ${r.attribution || '-'} |`);
+    }
+    lines.push('');
+  }
+  lines.push('## By group (supported cases only)');
+  lines.push('');
+  lines.push('| group | cases | scored | ssim mean | rgbΔ mean | flagged | errored |');
+  lines.push('| --- | --- | --- | --- | --- | --- | --- |');
+  for (const g of s.groups) {
+    lines.push(`| ${g.group} | ${g.cases} | ${g.supportedScored} | ${fmt(g.ssimMean)} | ${fmt(g.rgbDeltaMean, 2)} | ${g.flagged} | ${g.errored} |`);
+  }
+  lines.push('');
+  lines.push('## Cases');
+  lines.push('');
+  lines.push('SSIM is luma-only, so a wrong hue can still score ~1; `rgbΔ` (mean per-channel RGB delta, 0-255) catches color errors. `ref span` / `export span` are the largest RGB delta from the first frame on each timeline (0 = never changes).');
+  lines.push('');
+  lines.push('| case | expect | target.channel | frames | ssim mean | grade | attribution | rgbΔ mean | rgbΔ max | pixelDiff% | ref span | export span | flag | error |');
+  lines.push('| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |');
+  for (const r of rows) {
+    const tc = r.target || r.channel ? `${r.target}.${r.channel}` : '-';
+    lines.push('| ' + [
+      r.name,
+      r.expect,
+      tc,
+      String(r.frames),
+      fmt(r.ssimMean),
+      r.grade || '',
+      r.attribution || '',
+      fmt(r.rgbDeltaMean, 2),
+      fmt(r.rgbDeltaMax, 2),
+      isFinite(r.pixelDiffMean) ? fmt(r.pixelDiffMean * 100, 2) : '-',
+      fmt(r.motion, 2),
+      fmt(r.exportMotion, 2),
+      r.flag || '',
+      r.error || '',
+    ].join(' | ') + ' |');
+  }
+  lines.push('');
+  fs.writeFileSync(outPath, lines.join('\n') + '\n', 'utf8');
+}
+
+function writeCsv(rows, outPath) {
+  const hasRt = rows.some((r) => r && r.roundtrip);
+  const headers = [
+    'name', 'frames', 'ssimMean', 'pixelDiffMean',
+    ...(hasRt ? [
+      'exportBrowserSsimMean',
+      'exportBrowserVsPagxSsimMean',
+      'roundtripPagxSsimMean',
+      'roundtripVsPagxSsimMean',
+    ] : []),
+    'motion', 'animCaptured', 'animWarnings', 'animDropped', 'cameraSkips', 'camSkipReasons',
+    'width', 'height', 'error',
   ];
   const lines = [headers.join(',')];
   for (const r of rows) {
@@ -478,6 +1258,10 @@ function summarize(rows) {
     ssimMean: mean(ok.map((r) => r.ssimMean)),
     ssimMovingMean: mean(moving.map((r) => r.ssimMean)),
     pdMean: mean(ok.map((r) => r.pixelDiffMean)),
+    exportBrowserSsimMean: mean(ok.map((r) => r.exportBrowserSsimMean)),
+    exportBrowserVsPagxSsimMean: mean(ok.map((r) => r.exportBrowserVsPagxSsimMean)),
+    roundtripPagxSsimMean: mean(ok.map((r) => r.roundtripPagxSsimMean)),
+    roundtripVsPagxSsimMean: mean(ok.map((r) => r.roundtripVsPagxSsimMean)),
     animCaptured: ok.reduce((a, r) => a + (r.animCaptured || 0), 0),
     animDropped: ok.reduce((a, r) => a + (r.animDropped || 0), 0),
     cameraSkips: ok.reduce((a, r) => a + (r.cameraSkips || 0), 0),
@@ -486,33 +1270,57 @@ function summarize(rows) {
 
 function writeMarkdown(rows, outPath, label) {
   const s = summarize(rows);
-  const headers = ['name', 'frames', 'ssim', 'pixelDiff%', 'motion', 'animCap', 'animWarn', 'animDrop', 'camSkip', 'camSkipWhy', 'error'];
+  const hasRt = rows.some((r) => r && r.roundtrip);
+  const headers = hasRt
+    ? ['name', 'frames', 'ssim(pagx/base)', 'expHtml/base', 'expHtml/pagx', 'rtPagx/base', 'rtPagx/pagx', 'motion', 'animCap', 'camSkip', 'camSkipWhy', 'error']
+    : ['name', 'frames', 'ssim', 'pixelDiff%', 'motion', 'animCap', 'animWarn', 'animDrop', 'camSkip', 'camSkipWhy', 'error'];
   const lines = [];
   lines.push(`# Animation eval report — ${label}`);
   lines.push('');
   lines.push(`Cases: ${s.cases} (ok ${s.ok}, errored ${s.errored}, with motion ${s.moving})`);
   lines.push('');
-  lines.push(`- SSIM (per-frame mean) — all cases ${fmt(s.ssimMean)}, moving cases only ${fmt(s.ssimMovingMean)}`);
+  lines.push(`- SSIM (pagx vs baseline) — all cases ${fmt(s.ssimMean)}, moving cases only ${fmt(s.ssimMovingMean)}`);
   lines.push(`- pixel diff (per-frame mean) — ${fmt(s.pdMean)}`);
+  if (hasRt) {
+    lines.push(`- exported.html (browser) vs baseline SSIM — ${fmt(s.exportBrowserSsimMean)}`);
+    lines.push(`- exported.html (browser) vs pagx SSIM — ${fmt(s.exportBrowserVsPagxSsimMean)}`);
+    lines.push(`- roundtrip.pagx vs baseline SSIM — ${fmt(s.roundtripPagxSsimMean)}`);
+    lines.push(`- roundtrip.pagx vs pagx SSIM — ${fmt(s.roundtripVsPagxSsimMean)}`);
+  }
   lines.push(`- animations captured: ${s.animCaptured} (dropped at import: ${s.animDropped})`);
   lines.push(`- perspective elements that kept the function form: ${s.cameraSkips}`);
   lines.push('');
   lines.push('| ' + headers.join(' | ') + ' |');
   lines.push('| ' + headers.map(() => '---').join(' | ') + ' |');
   for (const r of rows) {
-    const cells = [
-      r.name,
-      String(r.frames),
-      fmt(r.ssimMean, 4),
-      isFinite(r.pixelDiffMean) ? fmt(r.pixelDiffMean * 100, 2) : '-',
-      fmt(r.motion, 3),
-      String(r.animCaptured),
-      String(r.animWarnings),
-      String(r.animDropped),
-      String(r.cameraSkips || 0),
-      r.camSkipReasons || '',
-      r.error || '',
-    ];
+    const cells = hasRt
+      ? [
+          r.name,
+          String(r.frames),
+          fmt(r.ssimMean, 4),
+          fmt(r.exportBrowserSsimMean, 4),
+          fmt(r.exportBrowserVsPagxSsimMean, 4),
+          fmt(r.roundtripPagxSsimMean, 4),
+          fmt(r.roundtripVsPagxSsimMean, 4),
+          fmt(r.motion, 3),
+          String(r.animCaptured),
+          String(r.cameraSkips || 0),
+          r.camSkipReasons || '',
+          r.error || '',
+        ]
+      : [
+          r.name,
+          String(r.frames),
+          fmt(r.ssimMean, 4),
+          isFinite(r.pixelDiffMean) ? fmt(r.pixelDiffMean * 100, 2) : '-',
+          fmt(r.motion, 3),
+          String(r.animCaptured),
+          String(r.animWarnings),
+          String(r.animDropped),
+          String(r.cameraSkips || 0),
+          r.camSkipReasons || '',
+          r.error || '',
+        ];
     lines.push('| ' + cells.join(' | ') + ' |');
   }
   fs.writeFileSync(outPath, lines.join('\n') + '\n', 'utf8');
@@ -525,8 +1333,42 @@ function ssimClass(v) {
   return 'good';
 }
 
+// Grade -> tag colour. "Static limited" is informational (the exporter is not at fault), the two
+// hard grades earn green / red.
+function gradeClass(grade) {
+  if (grade === GRADE_COMPLETE) return 'good';
+  if (grade === GRADE_BASIC) return 'mid';
+  return 'bad';
+}
+
 function writeIndexHtml(rows, outDir, label) {
   const s = summarize(rows);
+  const pagxSource = rows.some((r) => r && r.source === 'pagx');
+  // PAGX reports are shared as a single file. Keep every sampled PNG once in the page and
+  // resolve both the player and its frame strips against this map rather than sibling folders.
+  const frameSources = {};
+  if (pagxSource) {
+    for (const row of rows) {
+      if (row.error || row.frames <= 0) continue;
+      for (const sub of ['baseline', 'render', 'diff']) {
+        for (let i = 0; i < row.frames; i++) {
+          const frame = `frame-${String(i).padStart(3, '0')}.png`;
+          const key = `${encodeURIComponent(row.name)}/${sub}/${frame}`;
+          frameSources[key] = `data:image/png;base64,${fs.readFileSync(path.join(outDir, row.name, sub, frame)).toString('base64')}`;
+        }
+      }
+      // The static baseline pair (frozen reference / frozen export / their diff), when present.
+      for (const sub of ['static/0.ref.png', 'static/0.diff.png', 'static/0.browser/frame-000.png']) {
+        const full = path.join(outDir, row.name, sub);
+        if (!fs.existsSync(full)) continue;
+        frameSources[`${encodeURIComponent(row.name)}/${sub}`] =
+          `data:image/png;base64,${fs.readFileSync(full).toString('base64')}`;
+      }
+    }
+  }
+  const frameUrl = (key) => pagxSource ? frameSources[key] : key;
+  const baselineCaption = pagxSource ? 'pagx render (reference)' : 'baseline';
+  const renderCaption = pagxSource ? 'exported.html (browser)' : 'pagx';
 
   // Per-case data the in-page player needs: where the frames live and the real sample times so the
   // flip-book plays on the same clock the baseline / pagx render were sampled on.
@@ -546,12 +1388,15 @@ function writeIndexHtml(rows, outDir, label) {
     if (!r.error && r.frames > 0) {
       // Dynamic playback: one larger frame per channel that the JS swaps in time. The static strips
       // stay below it (collapsed by default) for frame-by-frame inspection.
+      const rtFigures = r.roundtrip ? `
+      <figure><figcaption>exported.html (browser)</figcaption><img class="play-img" data-sub="exported-browser" src="${frameUrl(`${dir}/exported-browser/frame-000.png`)}"/></figure>
+      <figure><figcaption>roundtrip.pagx</figcaption><img class="play-img" data-sub="roundtrip-render" src="${frameUrl(`${dir}/roundtrip-render/frame-000.png`)}"/></figure>` : '';
       const player = `
   <div class="player" data-case="${ci}">
     <div class="stage">
-      <figure><figcaption>baseline</figcaption><img class="play-img" data-sub="baseline" src="${dir}/baseline/frame-000.png"/></figure>
-      <figure><figcaption>pagx</figcaption><img class="play-img" data-sub="render" src="${dir}/render/frame-000.png"/></figure>
-      <figure><figcaption>diff</figcaption><img class="play-img" data-sub="diff" src="${dir}/diff/frame-000.png"/></figure>
+      <figure><figcaption>${baselineCaption}</figcaption><img class="play-img" data-sub="baseline" src="${frameUrl(`${dir}/baseline/frame-000.png`)}"/></figure>
+      <figure><figcaption>${renderCaption}</figcaption><img class="play-img" data-sub="render" src="${frameUrl(`${dir}/render/frame-000.png`)}"/></figure>${rtFigures}
+      <figure><figcaption>diff</figcaption><img class="play-img" data-sub="diff" src="${frameUrl(`${dir}/diff/frame-000.png`)}"/></figure>
     </div>
     <div class="controls">
       <button class="play-btn" type="button">▶ Play</button>
@@ -572,12 +1417,25 @@ function writeIndexHtml(rows, outDir, label) {
       // One column per frame: the frame number once (shared by all three channels), then the
       // baseline / pagx / diff thumbnails stacked. A single scroll container holds every column, so
       // there is exactly one scrollbar and one number row driving all three channels.
-      const subs = [['baseline', 'baseline'], ['render', 'pagx'], ['diff', 'diff']];
+      const subs = r.roundtrip
+        ? [
+            ['baseline', 'baseline'],
+            ['render', 'pagx'],
+            ['exported-browser', 'exp.html'],
+            ['roundtrip-render', 'rt.pagx'],
+            ['diff', 'diff'],
+          ]
+        : [['baseline', pagxSource ? 'reference' : 'baseline'], ['render', pagxSource ? 'exp.html' : 'pagx'], ['diff', 'diff']];
       let cells = '';
       for (let i = 0; i < r.frames; i++) {
         const idx = String(i).padStart(3, '0');
         let imgs = '';
-        for (const [sub] of subs) imgs += `<img src="${dir}/${sub}/frame-${idx}.png" loading="lazy"/>`;
+        for (const [sub] of subs) {
+          const key = `${dir}/${sub}/frame-${idx}.png`;
+          imgs += pagxSource
+            ? `<img data-frame-key="${key}" loading="lazy"/>`
+            : `<img src="${key}" loading="lazy"/>`;
+        }
         cells += `<div class="frame-cell" data-frame="${i}"><span class="frame-no">${i + 1}</span>${imgs}</div>`;
       }
       const labels = '<span class="lbl-spacer"></span>' + subs.map(([, l]) => `<span class="strip-label">${l}</span>`).join('');
@@ -588,9 +1446,23 @@ function writeIndexHtml(rows, outDir, label) {
     ${strips}
   </details>`;
     }
+    const rtTags = r.roundtrip
+      ? ` <span class="ssim-tag ${ssimClass(r.exportBrowserSsimMean)}">expHtml/base ${fmt(r.exportBrowserSsimMean, 4)}</span>` +
+        ` <span class="ssim-tag ${ssimClass(r.roundtripVsPagxSsimMean)}">rtPagx/pagx ${fmt(r.roundtripVsPagxSsimMean, 4)}</span>`
+      : '';
+    const pagxTags = r.source === 'pagx'
+      ? ` <span class="ssim-tag na">${r.expect} · ${r.target}.${r.channel}</span>` +
+        (r.flag ? ` <span class="ssim-tag bad">${r.flag}</span>` : '')
+      : '';
+    // The grade and its attribution: the SSIM tag alone cannot say whether a low score is an export
+    // defect, a renderer gap or a corpus limitation.
+    const staticTags = r.source === 'pagx' && r.grade
+      ? ` <span class="ssim-tag ${gradeClass(r.grade)}">${r.grade}${r.attribution ? ` · ${r.attribution}` : ''}</span>`
+      : '';
+    const staticFigures = '';
     return `
 <section class="case">
-  <h2>${r.name} <span class="ssim-tag ${cls}">SSIM ${fmt(r.ssimMean, 4)}</span></h2>
+  <h2>${r.name} <span class="ssim-tag ${cls}">SSIM ${fmt(r.ssimMean, 4)}</span>${staticTags}${rtTags}${pagxTags}</h2>
   <p>
     frames <b>${r.frames}</b> &middot; pixel diff <b>${isFinite(r.pixelDiffMean) ? fmt(r.pixelDiffMean * 100, 2) + '%' : '-'}</b>
     &middot; motion <b>${fmt(r.motion, 3)}</b>
@@ -598,9 +1470,40 @@ function writeIndexHtml(rows, outDir, label) {
     <span class="muted">(import warnings ${r.animWarnings}, dropped ${r.animDropped}${r.cameraSkips ? `, kept perspective() form ${r.cameraSkips}` : ''})</span>
     ${status}
   </p>
+  ${staticFigures ? `<div class="stage">${staticFigures}</div>` : ''}
   ${body}
 </section>`;
   }).join('\n');
+
+  const hasRt = rows.some((r) => r && r.roundtrip);
+  const rtSummaryItems = hasRt ? `
+    <li>exported.html (browser) vs baseline SSIM — <b>${fmt(s.exportBrowserSsimMean, 4)}</b>, vs pagx — <b>${fmt(s.exportBrowserVsPagxSsimMean, 4)}</b></li>
+    <li>roundtrip.pagx vs baseline SSIM — <b>${fmt(s.roundtripPagxSsimMean, 4)}</b>, vs pagx — <b>${fmt(s.roundtripVsPagxSsimMean, 4)}</b></li>` : '';
+  let gradeSummaryItems = '';
+  if (pagxSource) {
+    const p = summarizePagx(rows);
+    const row = (label, fam, thresholds) => `
+      <tr>
+        <th>${label}<br/><span class="muted">${fam.cases} 例 &middot; 均值 ${fmt(fam.ssimMean, 4)}</span></th>
+        <td class="good">SSIM ≥ <b>${thresholds[0]}</b><br/><b>${fam.grades[GRADE_COMPLETE]}</b> 例</td>
+        <td class="mid">SSIM ≥ <b>${thresholds[1]}</b><br/><b>${fam.grades[GRADE_BASIC]}</b> 例</td>
+        <td class="bad">SSIM &lt; <b>${thresholds[1]}</b><br/><b>${fam.grades[GRADE_DISTORTED]}</b> 例</td>
+      </tr>`;
+    gradeSummaryItems = {
+      rows: row('无 text 节点', p.nonText, ['0.999', '0.99']) +
+        row('带 text 节点', p.text, ['0.99', '0.96']),
+      total: `<tr class="total">
+        <th>合计<br/><span class="muted">${p.cases} 例 &middot; 均值 ${fmt(
+          (p.nonText.ssimMean * p.nonText.cases + p.text.ssimMean * p.text.cases) /
+            Math.max(1, p.nonText.cases + p.text.cases),
+          4
+        )}</span></th>
+        <td class="good"><b>${p.grades[GRADE_COMPLETE]}</b> 例</td>
+        <td class="mid"><b>${p.grades[GRADE_BASIC]}</b> 例</td>
+        <td class="bad"><b>${p.grades[GRADE_DISTORTED]}</b> 例</td>
+      </tr>`,
+    };
+  }
 
   const html = `<!DOCTYPE html>
 <html>
@@ -612,6 +1515,17 @@ function writeIndexHtml(rows, outDir, label) {
   h1 { margin-top: 0; }
   .summary { background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 8px; padding: 14px 18px; margin: 12px 0 24px; }
   .summary ul { margin: 0; padding-left: 18px; font-size: 13px; }
+  .summary table.criteria { margin: 10px 0 6px; border-collapse: collapse; font-size: 12.5px; }
+  .summary table.criteria th, .summary table.criteria td { border: 1px solid #e2e8f0; padding: 6px 12px; text-align: left; vertical-align: top; }
+  .summary table.criteria thead th { background: #f1f5f9; font-weight: 600; }
+  .summary table.criteria thead th.good { background: #dcfce7; color: #166534; }
+  .summary table.criteria thead th.mid  { background: #fef9c3; color: #854d0e; }
+  .summary table.criteria thead th.bad  { background: #fee2e2; color: #991b1b; }
+  .summary table.criteria td.good { background: #f0fdf4; }
+  .summary table.criteria td.mid  { background: #fefce8; }
+  .summary table.criteria td.bad  { background: #fef2f2; }
+  .summary table.criteria tr.total th, .summary table.criteria tr.total td { border-top: 2px solid #cbd5e1; font-weight: 600; }
+  .summary p.note { margin: 6px 0 0; font-size: 12px; color: #475569; line-height: 1.6; }
   .toolbar { display: flex; align-items: center; gap: 12px; margin: 12px 0 4px; }
   .toolbar button { font-size: 13px; padding: 6px 14px; border: 1px solid #cbd5e1; border-radius: 6px; background: #fff; cursor: pointer; }
   .toolbar button:hover { background: #f1f5f9; }
@@ -656,10 +1570,21 @@ function writeIndexHtml(rows, outDir, label) {
 <div class="summary">
   <ul>
     <li>SSIM (per-frame mean) — all <b>${fmt(s.ssimMean, 4)}</b>, moving cases only <b>${fmt(s.ssimMovingMean, 4)}</b></li>
-    <li>pixel diff (per-frame mean) — <b>${isFinite(s.pdMean) ? fmt(s.pdMean * 100, 2) + '%' : '-'}</b></li>
+    <li>pixel diff (per-frame mean) — <b>${isFinite(s.pdMean) ? fmt(s.pdMean * 100, 2) + '%' : '-'}</b></li>${rtSummaryItems}
     <li>animations captured — <b>${s.animCaptured}</b> (dropped at import: <b>${s.animDropped}</b>)</li>
     <li>perspective elements that kept the function form — <b>${s.cameraSkips}</b></li>
   </ul>
+  <table class="criteria">
+    <thead>
+      <tr><th></th><th class="good">完全还原</th><th class="mid">略有差异</th><th class="bad">差异较大</th></tr>
+    </thead>
+    <tbody>${gradeSummaryItems.rows || ''}${gradeSummaryItems.total || ''}
+    </tbody>
+  </table>
+  <p class="note">SSIM 取逐帧均值。带 text 节点用更宽的一条曲线：两套渲染器
+    的字形轮廓本就不同（PAGX 填充带 hint 的轮廓、fauxBold 时再并一个描边；浏览器用自己的字面栅格化、
+    fauxBold 用 <code>-webkit-text-stroke</code>），文本用例的静态天花板通常落在 0.95–0.99。
+    带 text 的用例用更宽的一条曲线，是因为两套渲染器的字形轮廓本就不同，这部分差异与动画写入无关。</p>
 </div>
 <div class="toolbar">
   <button id="play-all" type="button">▶ Play all</button>
@@ -668,6 +1593,23 @@ function writeIndexHtml(rows, outDir, label) {
 ${cards}
 <script>
 const CASES = ${JSON.stringify(playerData)};
+const FRAME_SOURCES = ${JSON.stringify(frameSources)};
+function frameUrl(key) { return FRAME_SOURCES[key] || key; }
+// Defer decoding the static frame strips until they are brought into view.
+const frameObserver = 'IntersectionObserver' in window
+  ? new IntersectionObserver((entries, observer) => {
+      for (const entry of entries) {
+        if (!entry.isIntersecting) continue;
+        const image = entry.target;
+        image.src = frameUrl(image.dataset.frameKey);
+        observer.unobserve(image);
+      }
+    }, { rootMargin: '300px' })
+  : null;
+for (const image of document.querySelectorAll('img[data-frame-key]')) {
+  if (frameObserver) frameObserver.observe(image);
+  else image.src = frameUrl(image.dataset.frameKey);
+}
 
 // One flip-book player per case. Frames are sparse samples taken at CASES[i].times (seconds) on the
 // captured timeline. Playback runs on a bounded wall-clock loop (this.playbackMs) and maps back onto
@@ -780,7 +1722,7 @@ class Player {
     const idx = String(this.frame).padStart(3, '0');
     for (const img of this.imgs) {
       const sub = img.getAttribute('data-sub');
-      img.src = this.data.dir + '/' + sub + '/frame-' + idx + '.png';
+      img.src = frameUrl(this.data.dir + '/' + sub + '/frame-' + idx + '.png');
     }
     this.scrub.value = String(this.frame);
     let suffix;
@@ -871,13 +1813,22 @@ async function main() {
   if (!fs.existsSync(opts.pagxBin)) {
     fail(`pagx binary not found: ${opts.pagxBin}`, 1);
   }
-  const cases = findCorpusFiles(opts.corpus, opts.only, opts.recursive);
+  const pagxSource = opts.source === 'pagx';
+  if (pagxSource) {
+    if (opts.roundtrip) fail('--roundtrip does not apply to --source pagx');
+    if (opts.downloadImages) fail('--download-images does not apply to --source pagx');
+    // The browser captures the exported HTML at 1x, so the reference must be rendered at 1x too.
+    if (opts.scale !== 1) fail('--scale must be 1 with --source pagx');
+    if (!opts.samplesSet) opts.samples = PAGX_DEFAULT_SAMPLES;
+  }
+  const ext = pagxSource ? '.pagx' : '.html';
+  const cases = findCorpusFiles(opts.corpus, opts.only, opts.recursive, ext);
   if (cases.length === 0) {
     const hint = opts.recursive ? '' : ' (try --recursive to descend into sub-directories)';
-    fail(`no html cases found in ${opts.corpus}${hint}`, 1);
+    fail(`no ${ext.slice(1)} cases found in ${opts.corpus}${hint}`, 1);
   }
   const concurrency = Math.max(1, Math.min(opts.concurrency, cases.length));
-  console.log(`anim-run: ${cases.length} cases → ${opts.outDir}  (samples=${opts.samples}, concurrency=${concurrency}${opts.downloadImages ? ', download-images=on' : ''}, pagx-images=${opts.pagxImages})`);
+  console.log(`anim-run: ${cases.length} cases → ${opts.outDir}  (source=${opts.source}, samples=${opts.samples}, concurrency=${concurrency}${opts.downloadImages ? ', download-images=on' : ''}, pagx-images=${opts.pagxImages})`);
 
   const rows = new Array(cases.length);
   let nextIdx = 0;
@@ -892,29 +1843,51 @@ async function main() {
       const t0 = Date.now();
       let row;
       try {
-        row = await processCase(c, opts.outDir, opts);
+        row = pagxSource ? await processPagxCase(c, opts.outDir, opts) : await processCase(c, opts.outDir, opts);
       } catch (err) {
         row = { name: c.name, frames: 0, error: `unhandled: ${err && err.message ? err.message : err}` };
+        if (pagxSource) Object.assign(row, { source: 'pagx', group: '(error)', expect: 'unknown', flag: '' });
       }
       const dur = Date.now() - t0;
       doneCount += 1;
       if (row.error) {
         console.log(`[${doneCount}/${total}] ${c.name}  ERROR ${row.error} (${dur} ms)`);
+      } else if (pagxSource) {
+        console.log(`[${doneCount}/${total}] ${c.name}  SSIM ${fmt(row.ssimMean, 4)}  ${row.grade}${row.attribution ? '/' + row.attribution : ''}  ${row.expect}${row.flag ? '  ' + row.flag : ''}  (${dur} ms)`);
+      } else if (row.roundtrip) {
+        console.log(`[${doneCount}/${total}] ${c.name}  SSIM ${fmt(row.ssimMean, 4)}  expHtml/pagx ${fmt(row.exportBrowserVsPagxSsimMean, 4)}  rtPagx/pagx ${fmt(row.roundtripVsPagxSsimMean, 4)}  anim ${row.animCaptured}  (${dur} ms)`);
       } else {
         console.log(`[${doneCount}/${total}] ${c.name}  SSIM ${fmt(row.ssimMean, 4)}  diff ${fmt(row.pixelDiffMean * 100, 2)}%  motion ${fmt(row.motion, 3)}  anim ${row.animCaptured}  (${dur} ms)`);
       }
       rows[i] = row;
+      if (!row.error) {
+        writeCaseCacheKey(path.join(opts.outDir, c.name, '.cache-key.json'),
+          buildCaseCacheKey(c.path, opts));
+      }
     }
   };
 
   await Promise.all(Array.from({ length: concurrency }, () => worker()));
 
-  writeCsv(rows, path.join(opts.outDir, 'report.csv'));
-  writeMarkdown(rows, path.join(opts.outDir, 'report.md'), opts.label);
+  if (pagxSource) {
+    writePagxCsv(rows, path.join(opts.outDir, 'report.csv'));
+    writePagxMarkdown(rows, path.join(opts.outDir, 'report.md'), opts.label);
+  } else {
+    writeCsv(rows, path.join(opts.outDir, 'report.csv'));
+    writeMarkdown(rows, path.join(opts.outDir, 'report.md'), opts.label);
+  }
   writeIndexHtml(rows, opts.outDir, opts.label);
   console.log(`anim-run: wrote ${path.join(opts.outDir, 'report.csv')}`);
   console.log(`anim-run: wrote ${path.join(opts.outDir, 'report.md')}`);
   console.log(`anim-run: wrote ${path.join(opts.outDir, 'index.html')}`);
+
+  // A run that produced reports is not a successful run: case failures used to leave the exit code
+  // at 0, so CI could not tell a broken export from a clean one.
+  const failed = rows.filter((row) => row && row.error).length;
+  if (failed > 0) {
+    console.error(`anim-run: ${failed} of ${rows.length} case(s) failed`);
+    process.exitCode = 1;
+  }
 }
 
 if (require.main === module) {
@@ -924,4 +1897,17 @@ if (require.main === module) {
   });
 }
 
-module.exports = { writeIndexHtml, writeMarkdown, writeCsv, summarize };
+module.exports = {
+  buildCaseCacheKey,
+  cacheKeyMatches,
+  writeCaseCacheKey,
+  writeIndexHtml,
+  writeMarkdown,
+  writeCsv,
+  summarize,
+  parsePagxTiming,
+  pagxSampleTimes,
+  parsePagxCaseHeader,
+  classifyPagxMotion,
+  summarizePagx,
+};

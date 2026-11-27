@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: A Star with a fractional pointCount animates only its radius; the outline must keep the
+     shortened last vertex the runtime draws.
+     Target: Polystar  Channel: outerRadius  Type: float
+     The frame used to floor pointCount for every Polystar, so a 5.5-point star was drawn as 5 points
+     long before any channel was evaluated (t=0 measured 0.7227 against 0.9995 after the fix).
+     Ref: R22 -->
+<pagx width="320" height="200">
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F8FAFC"/>
+  </Layer>
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Polystar id="star" type="star" position="160,100" pointCount="5.5" outerRadius="60"
+              innerRadius="28" rotation="-90"/>
+    <Fill color="#B45309"/>
+  </Layer>
+  <Animations>
+    <Animation id="grow" duration="60" frameRate="60" loop="once">
+      <Object target="star">
+        <Channel name="outerRadius" type="float">
+          <Key time="0" value="60" interpolation="linear"/>
+          <Key time="60" value="80"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>

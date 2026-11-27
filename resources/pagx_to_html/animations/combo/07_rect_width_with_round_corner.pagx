@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: A Rectangle whose size.width and RoundCorner.radius animate together. The radius is CSS
+     border-radius here, so it rides on the same div as left/width instead of rewriting `d`: a path
+     rewrite cannot interpolate when the command list changes, and it would drop the width channel.
+     Target: Rectangle  Channel: size.width, RoundCorner.radius  Type: float
+     Ref: PAGXHtmlTest.AnimationShapeGeometryAndRoundCornerShareOneTag -->
+<pagx width="320" height="200">
+  <Layer left="0" right="0" top="0" bottom="0"><Rectangle left="0" right="0" top="0" bottom="0"/><Fill color="#F8FAFC"/></Layer>
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle id="card" position="160,100" size="120,80" roundness="0"/>
+    <RoundCorner id="corner" radius="0"/><Fill color="#9333EA"/>
+  </Layer>
+  <Animations><Animation id="a" duration="60" frameRate="60" loop="once">
+    <Object target="card"><Channel name="size.width" type="float"><Key time="0" value="120" interpolation="linear"/><Key time="60" value="200"/></Channel></Object>
+    <Object target="corner"><Channel name="radius" type="float"><Key time="0" value="0" interpolation="linear"/><Key time="60" value="24"/></Channel></Object>
+  </Animation></Animations>
+</pagx>

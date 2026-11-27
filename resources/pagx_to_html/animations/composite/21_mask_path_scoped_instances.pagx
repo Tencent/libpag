@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: Three instances share a coverage mask source; timeline offsets and paused state must remain instance-local.
+     Target: Composite  Channel: point1.x,point2.x  Type: float
+     Ref: R25,R28 -->
+<pagx width="460" height="200">
+  <Resources><Composition id="maskedCard" width="120" height="120">
+    <Layer id="cardMask" width="120" height="120" visible="false" includeInLayout="false">
+      <Path id="cardMaskPath" data="M 0 0 L 120 0 L 120 120 L 0 120 Z"/>
+      <Fill><LinearGradient startPoint="0.5,0.5" endPoint="1,0.5">
+        <ColorStop offset="0" color="#FFFFFFFF"/><ColorStop offset="1" color="#FFFFFF00"/>
+      </LinearGradient></Fill>
+    </Layer>
+    <Layer mask="@cardMask" maskType="alpha" width="120" height="120">
+      <Rectangle position="60,60" size="120,120"/><Fill color="#BE123C"/>
+      <Ellipse position="70,60" size="70,70"/><Fill color="#1D4ED8"/>
+    </Layer>
+    <Animations><Animation id="cardMaskWarp" duration="60" frameRate="60" loop="once">
+      <Object target="cardMaskPath">
+        <Channel name="point1.x" type="float"><Key time="0" value="120" interpolation="linear"/><Key time="60" value="30"/></Channel>
+        <Channel name="point2.x" type="float"><Key time="0" value="120" interpolation="linear"/><Key time="60" value="30"/></Channel>
+      </Object>
+    </Animation></Animations>
+  </Composition></Resources>
+  <Layer width="460" height="200"><Rectangle position="230,100" size="460,200"/><Fill color="#F8FAFC"/></Layer>
+  <Layer x="20" y="40" width="120" height="120" composition="@maskedCard"><Timelines><Animation ref="@cardMaskWarp" evaluationOffset="0" playing="true"/></Timelines></Layer>
+  <Layer x="170" y="40" width="120" height="120" composition="@maskedCard"><Timelines><Animation ref="@cardMaskWarp" evaluationOffset="30" playing="true"/></Timelines></Layer>
+  <Layer x="320" y="40" width="120" height="120" composition="@maskedCard"><Timelines><Animation ref="@cardMaskWarp" evaluationOffset="0" playing="false"/></Timelines></Layer>
+</pagx>

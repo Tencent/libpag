@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: One Repeater drives every channel at once while its copy count changes from two to five, so each frame
+     has to re-expand the copies with a moving pivot, step, scale, rotation and alpha ramp.
+     Target: Composite  Channel: copies,offset,anchor.x,anchor.y,position.x,position.y,rotation,scale.x,scale.y,startAlpha,endAlpha  Type: mixed
+     Ref: - -->
+<pagx width="320" height="200">
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F8FAFC"/>
+  </Layer>
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle position="60,100" size="54,54" roundness="10"/>
+    <Fill color="#9333EA"/>
+    <Repeater id="repAll" copies="2" offset="0" anchor="0,0" position="56,0" rotation="0"
+              scale="1,1" startAlpha="1" endAlpha="1"/>
+  </Layer>
+  <Animations>
+    <Animation id="composite" duration="60" frameRate="60" loop="once">
+      <Object target="repAll">
+        <Channel name="copies" type="float">
+          <Key time="0" value="2" interpolation="linear"/>
+          <Key time="60" value="5"/>
+        </Channel>
+        <Channel name="offset" type="float">
+          <Key time="0" value="0" interpolation="linear"/>
+          <Key time="60" value="0.3"/>
+        </Channel>
+        <Channel name="anchor.x" type="float">
+          <Key time="0" value="0" interpolation="linear"/>
+          <Key time="60" value="14"/>
+        </Channel>
+        <Channel name="anchor.y" type="float">
+          <Key time="0" value="0" interpolation="linear"/>
+          <Key time="60" value="-10"/>
+        </Channel>
+        <Channel name="position.x" type="float">
+          <Key time="0" value="56" interpolation="linear"/>
+          <Key time="60" value="44"/>
+        </Channel>
+        <Channel name="position.y" type="float">
+          <Key time="0" value="0" interpolation="linear"/>
+          <Key time="60" value="-18"/>
+        </Channel>
+        <Channel name="rotation" type="float">
+          <Key time="0" value="0" interpolation="linear"/>
+          <Key time="60" value="12"/>
+        </Channel>
+        <Channel name="scale.x" type="float">
+          <Key time="0" value="1" interpolation="linear"/>
+          <Key time="60" value="0.92"/>
+        </Channel>
+        <Channel name="scale.y" type="float">
+          <Key time="0" value="1" interpolation="linear"/>
+          <Key time="60" value="1.06"/>
+        </Channel>
+        <Channel name="startAlpha" type="float">
+          <Key time="0" value="1" interpolation="linear"/>
+          <Key time="60" value="0.5"/>
+        </Channel>
+        <Channel name="endAlpha" type="float">
+          <Key time="0" value="1" interpolation="linear"/>
+          <Key time="60" value="0.35"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>

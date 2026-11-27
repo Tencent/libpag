@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: An Ellipse position.y moves the oval towards the top edge of its layer.
+     Target: Ellipse  Channel: position.y  Type: float
+     Ref: - -->
+<pagx width="320" height="200">
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F8FAFC"/>
+  </Layer>
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Ellipse id="slideEllipseY" position="160,140" size="120,100"/>
+    <Fill color="#B45309"/>
+  </Layer>
+  <Animations>
+    <Animation id="geoAnim" duration="60" frameRate="60" loop="once">
+      <Object target="slideEllipseY">
+        <Channel name="position.y" type="float">
+          <Key time="0" value="140" interpolation="linear"/>
+          <Key time="60" value="50"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>

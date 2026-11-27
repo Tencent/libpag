@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: A Rectangle position.x slides the box along its layer, so the exported keyframes have to move the
+     same padding the static rect is written with.
+     Target: Rectangle  Channel: position.x  Type: float
+     Ref: - -->
+<pagx width="320" height="200">
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F8FAFC"/>
+  </Layer>
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle id="slideRectX" position="140,100" size="90,120" roundness="10"/>
+    <Fill color="#B45309"/>
+  </Layer>
+  <Animations>
+    <Animation id="geoAnim" duration="60" frameRate="60" loop="once">
+      <Object target="slideRectX">
+        <Channel name="position.x" type="float">
+          <Key time="0" value="140" interpolation="linear"/>
+          <Key time="60" value="230"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>

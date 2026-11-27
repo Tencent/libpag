@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: A RangeSelector weight biases where the ramp's peak sits, moving the strongest displacement across
+     the word.
+     Target: RangeSelector  Channel: weight  Type: float
+     Ref: - -->
+<pagx width="320" height="200">
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F8FAFC"/>
+  </Layer>
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Text text="WAVE" fontFamily="Arial" fontStyle="Bold" fontSize="56" letterSpacing="0"
+          position="60,120"/>
+    <TextModifier id="waveMod" position="0,-26">
+      <RangeSelector id="waveSel" start="0.3" end="0.95" offset="0" unit="percentage" shape="triangle"
+                     easeIn="0" easeOut="0" weight="1"/>
+    </TextModifier>
+    <Fill color="#BE123C"/>
+  </Layer>
+  <Animations>
+    <Animation id="rangeAnim" duration="60" frameRate="60" loop="once">
+      <Object target="waveSel">
+        <Channel name="weight" type="float">
+          <Key time="0" value="1" interpolation="linear"/>
+          <Key time="60" value="0.2"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>

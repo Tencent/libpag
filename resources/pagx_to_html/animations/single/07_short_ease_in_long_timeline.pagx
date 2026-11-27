@@ -1,0 +1,29 @@
+<pagx width="320" height="200">
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F8FAFC"/>
+  </Layer>
+  <Layer id="box" left="20" top="70" width="40" height="40">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#BE123C"/>
+  </Layer>
+  <Animations>
+    <Animation id="long" duration="6000" frameRate="60" loop="once">
+      <Object target="box">
+        <Channel name="x" type="float">
+          <Key time="0" value="0" interpolation="bezier">
+            <BezierOut x="0.42" y="0"/>
+          </Key>
+          <Key time="10" value="200">
+            <BezierIn x="0.58" y="1"/>
+          </Key>
+          <Key time="6000" value="200"/>
+        </Channel>
+        <Channel name="y" type="float">
+          <Key time="0" value="0" interpolation="linear"/>
+          <Key time="6000" value="60"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>

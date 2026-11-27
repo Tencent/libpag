@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: Two texts switch face while keeping their own animation: family, style and the two
+     synthetic flags all land on the same two elements without interfering.
+     Target: Text  Channel: fontFamily,fontStyle,fauxBold,fauxItalic  Type: mixed
+     Ref: - -->
+<pagx width="320" height="200">
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F8FAFC"/>
+  </Layer>
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Text id="sans" text="Ag" fontFamily="Arial" fontStyle="Regular" fontSize="64"
+          letterSpacing="0" position="40,90"/>
+    <Text id="serif" text="Ag" fontFamily="Times New Roman" fontStyle="Regular" fontSize="40"
+          letterSpacing="0" position="200,80"/>
+    <Fill color="#BE123C"/>
+  </Layer>
+  <Animations>
+    <Animation id="faceMix" duration="60" frameRate="60" loop="once">
+      <Object target="sans">
+        <Channel name="fontFamily" type="string">
+          <Key time="0" value="Arial" interpolation="hold"/>
+          <Key time="40" value="Times New Roman" interpolation="hold"/>
+          <Key time="60" value="Times New Roman"/>
+        </Channel>
+        <Channel name="fauxItalic" type="bool">
+          <Key time="0" value="false" interpolation="hold"/>
+          <Key time="20" value="true" interpolation="hold"/>
+          <Key time="60" value="true"/>
+        </Channel>
+      </Object>
+      <Object target="serif">
+        <Channel name="fontStyle" type="string">
+          <Key time="0" value="Regular" interpolation="hold"/>
+          <Key time="30" value="Bold" interpolation="hold"/>
+          <Key time="60" value="Bold"/>
+        </Channel>
+        <Channel name="fauxBold" type="bool">
+          <Key time="0" value="false" interpolation="hold"/>
+          <Key time="30" value="true" interpolation="hold"/>
+          <Key time="60" value="true"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>

@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: An Ellipse size.height squashes the oval into a flat lens around its centre.
+     Target: Ellipse  Channel: size.height  Type: float
+     Ref: - -->
+<pagx width="320" height="200">
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F8FAFC"/>
+  </Layer>
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Ellipse id="shrinkEllipseH" position="160,100" size="180,150"/>
+    <Fill color="#B45309"/>
+  </Layer>
+  <Animations>
+    <Animation id="geoAnim" duration="60" frameRate="60" loop="once">
+      <Object target="shrinkEllipseH">
+        <Channel name="size.height" type="float">
+          <Key time="0" value="150" interpolation="linear"/>
+          <Key time="60" value="40"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>

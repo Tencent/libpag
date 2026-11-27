@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: Three geometry nodes animate every box and path channel at once: Rectangle w/h/position/roundness,
+     Ellipse w/h/position, Polystar pointCount and the four radius/roundness channels plus rotation and
+     position. Each node has to rebuild one path per frame from several independent channels.
+     Target: Composite  Channel: size.width,size.height,position.x,position.y,roundness,pointCount,outerRadius,innerRadius,outerRoundness,innerRoundness,rotation  Type: mixed
+     Ref: - -->
+<pagx width="320" height="200">
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F8FAFC"/>
+  </Layer>
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle id="geoRect" position="90,70" size="120,90" roundness="0"/>
+    <Fill color="#B45309"/>
+  </Layer>
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Ellipse id="geoEllipse" position="240,60" size="90,60"/>
+    <Fill color="#65A30D"/>
+  </Layer>
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Polystar id="geoStar" position="120,150" type="star" pointCount="5" outerRadius="40"
+              innerRadius="16" outerRoundness="0" innerRoundness="0" rotation="-90"/>
+    <Fill color="#9A3412"/>
+  </Layer>
+  <Animations>
+    <Animation id="composite" duration="60" frameRate="60" loop="once">
+      <Object target="geoRect">
+        <Channel name="size.width" type="float">
+          <Key time="0" value="120" interpolation="linear"/>
+          <Key time="60" value="80"/>
+        </Channel>
+        <Channel name="size.height" type="float">
+          <Key time="0" value="90" interpolation="linear"/>
+          <Key time="40" value="50"/>
+          <Key time="60" value="110"/>
+        </Channel>
+        <Channel name="position.x" type="float">
+          <Key time="0" value="90" interpolation="linear"/>
+          <Key time="60" value="130"/>
+        </Channel>
+        <Channel name="position.y" type="float">
+          <Key time="0" value="70" interpolation="linear"/>
+          <Key time="60" value="50"/>
+        </Channel>
+        <Channel name="roundness" type="float">
+          <Key time="0" value="0" interpolation="linear"/>
+          <Key time="60" value="26"/>
+        </Channel>
+      </Object>
+      <Object target="geoEllipse">
+        <Channel name="size.width" type="float">
+          <Key time="0" value="90" interpolation="linear"/>
+          <Key time="60" value="130"/>
+        </Channel>
+        <Channel name="size.height" type="float">
+          <Key time="0" value="60" interpolation="linear"/>
+          <Key time="50" value="90"/>
+          <Key time="60" value="70"/>
+        </Channel>
+        <Channel name="position.x" type="float">
+          <Key time="0" value="240" interpolation="linear"/>
+          <Key time="60" value="210"/>
+        </Channel>
+        <Channel name="position.y" type="float">
+          <Key time="0" value="60" interpolation="linear"/>
+          <Key time="60" value="90"/>
+        </Channel>
+      </Object>
+      <Object target="geoStar">
+        <Channel name="pointCount" type="float">
+          <Key time="0" value="5" interpolation="hold"/>
+          <Key time="30" value="5" interpolation="hold"/>
+          <Key time="31" value="6" interpolation="hold"/>
+          <Key time="60" value="6"/>
+        </Channel>
+        <Channel name="outerRadius" type="float">
+          <Key time="0" value="40" interpolation="linear"/>
+          <Key time="60" value="60"/>
+        </Channel>
+        <Channel name="innerRadius" type="float">
+          <Key time="0" value="16" interpolation="linear"/>
+          <Key time="60" value="26"/>
+        </Channel>
+        <Channel name="outerRoundness" type="float">
+          <Key time="0" value="0" interpolation="linear"/>
+          <Key time="60" value="1"/>
+        </Channel>
+        <Channel name="innerRoundness" type="float">
+          <Key time="0" value="0" interpolation="linear"/>
+          <Key time="60" value="1"/>
+        </Channel>
+        <Channel name="rotation" type="float">
+          <Key time="0" value="-90" interpolation="linear"/>
+          <Key time="60" value="-50"/>
+        </Channel>
+        <Channel name="position.x" type="float">
+          <Key time="0" value="120" interpolation="linear"/>
+          <Key time="60" value="160"/>
+        </Channel>
+        <Channel name="position.y" type="float">
+          <Key time="0" value="150" interpolation="linear"/>
+          <Key time="60" value="130"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>

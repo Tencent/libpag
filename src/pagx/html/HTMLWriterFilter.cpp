@@ -321,6 +321,14 @@ std::string HTMLWriter::writeFilterDefs(const std::vector<LayerFilter*>& filters
           blurredResult = "iOff" + i;
         }
         _defs->openTag("feFlood");
+        {
+          // A colour channel animates `flood-color` on this element, which CSS can do; the pipeline's
+          // geometry attributes cannot be animated at all.
+          auto floodIt = _ctx->animation.filterFloodIds.find(f);
+          if (floodIt != _ctx->animation.filterFloodIds.end()) {
+            _defs->addAttr("id", floodIt->second);
+          }
+        }
         _defs->addAttr("flood-color", ColorToSVGHex(s->color));
         if (s->color.alpha < 1.0f) {
           _defs->addAttr("flood-opacity", CssFloatToString(s->color.alpha));
@@ -389,6 +397,14 @@ std::string HTMLWriter::writeFilterDefs(const std::vector<LayerFilter*>& filters
         std::string i = std::to_string(si++);
         std::string alphaIn = EnsurePipelineAlpha(_defs, si, currentInput, alphaResult, alphaDirty);
         _defs->openTag("feFlood");
+        {
+          // A colour channel animates `flood-color` on this element, which CSS can do; the pipeline's
+          // geometry attributes cannot be animated at all.
+          auto floodIt = _ctx->animation.filterFloodIds.find(f);
+          if (floodIt != _ctx->animation.filterFloodIds.end()) {
+            _defs->addAttr("id", floodIt->second);
+          }
+        }
         _defs->addAttr("flood-color", ColorToSVGHex(bf->color));
         if (bf->color.alpha < 1.0f) {
           _defs->addAttr("flood-opacity", CssFloatToString(bf->color.alpha));
@@ -536,6 +552,26 @@ std::string HTMLWriter::writeMaskCSS(const Layer* mask, MaskType type) {
   css += ";mask-size:" + sizeValue;
   css += ";-webkit-mask-repeat:no-repeat;mask-repeat:no-repeat";
   return css;
+}
+
+std::string HTMLWriter::writeAnimatedMaskDef(const Layer* mask, MaskType type) {
+  std::string id = _ctx->nextId("mask");
+  _defs->openTag("mask");
+  _defs->addAttr("id", id);
+  // userSpaceOnUse on both axes keeps the mask content in the masked element's own coordinate
+  // space, which is the same space its children paint in, so no extra positioning is needed.
+  _defs->addAttr("maskUnits", "userSpaceOnUse");
+  _defs->addAttr("x", "0");
+  _defs->addAttr("y", "0");
+  _defs->addAttr("width", CssFloatToString(_ctx->docWidth));
+  _defs->addAttr("height", CssFloatToString(_ctx->docHeight));
+  _defs->addAttr("maskContentUnits", "userSpaceOnUse");
+  _defs->addAttr("style", type == MaskType::Luminance ? "mask-type:luminance" : "mask-type:alpha");
+  _defs->closeTagStart();
+  int gradientIndex = 0;
+  writeMaskGeometry(*_defs, mask, {}, type, 1.0f, gradientIndex);
+  _defs->closeTag();
+  return id;
 }
 
 void HTMLWriter::ExpandElementBounds(const Element* element, const Matrix& combined, float& minX,
@@ -785,6 +821,16 @@ void HTMLWriter::writeMaskElements(HTMLBuilder& out, const std::vector<Element*>
       std::string d = GetPathSVGString(p);
       if (!d.empty()) {
         out.openTag("path");
+        if (_ctx->animation.maskPaths.count(p) > 0) {
+          // Animated mask geometry needs a target for its CSS keyframes. One mask source can render
+          // once per Composition mount, and every copy needs its own id: a repeated id would make
+          // all instances share the first copy's keyframes and timing.
+          std::string base = !p->id.empty() ? p->id : _ctx->nextId("maskPath");
+          size_t use = _ctx->animation.maskPathUseCount[p]++;
+          std::string pathId = use == 0 ? base : base + "__" + std::to_string(use);
+          out.addAttr("id", pathId);
+          _ctx->animation.maskPathIds[{p, _ctx->animation.scope}] = pathId;
+        }
         if (!tr.empty()) {
           out.addAttr("transform", tr);
         }
@@ -884,34 +930,38 @@ void HTMLWriter::writeClipContent(HTMLBuilder& out, const Layer* layer, const Ma
       }
     } else if (e->nodeType() == NodeType::Rectangle) {
       auto r = static_cast<const Rectangle*>(e);
+      auto pos = r->renderPosition();
+      auto sz = r->renderSize();
       out.openTag("rect");
       if (!tr.empty()) {
         out.addAttr("transform", tr);
       }
-      float x = r->position.x - r->size.width / 2;
-      float y = r->position.y - r->size.height / 2;
+      float x = pos.x - sz.width / 2;
+      float y = pos.y - sz.height / 2;
       if (!FloatNearlyZero(x)) {
         out.addAttr("x", CssFloatToString(x));
       }
       if (!FloatNearlyZero(y)) {
         out.addAttr("y", CssFloatToString(y));
       }
-      out.addAttr("width", CssFloatToString(r->size.width));
-      out.addAttr("height", CssFloatToString(r->size.height));
+      out.addAttr("width", CssFloatToString(sz.width));
+      out.addAttr("height", CssFloatToString(sz.height));
       if (r->roundness > 0) {
         out.addAttr("rx", CssFloatToString(r->roundness));
       }
       out.closeTagSelfClosing();
     } else if (e->nodeType() == NodeType::Ellipse) {
       auto el = static_cast<const Ellipse*>(e);
+      auto pos = el->renderPosition();
+      auto sz = el->renderSize();
       out.openTag("ellipse");
       if (!tr.empty()) {
         out.addAttr("transform", tr);
       }
-      out.addAttr("cx", CssFloatToString(el->position.x));
-      out.addAttr("cy", CssFloatToString(el->position.y));
-      out.addAttr("rx", CssFloatToString(el->size.width / 2));
-      out.addAttr("ry", CssFloatToString(el->size.height / 2));
+      out.addAttr("cx", CssFloatToString(pos.x));
+      out.addAttr("cy", CssFloatToString(pos.y));
+      out.addAttr("rx", CssFloatToString(sz.width / 2));
+      out.addAttr("ry", CssFloatToString(sz.height / 2));
       out.closeTagSelfClosing();
     } else if (e->nodeType() == NodeType::Polystar) {
       auto ps = static_cast<const Polystar*>(e);

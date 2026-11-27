@@ -1,0 +1,23 @@
+<pagx width="320" height="200">
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle left="0" right="0" top="0" bottom="0"/>
+    <Fill color="#F8FAFC"/>
+  </Layer>
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Group>
+      <Rectangle position="120,100" size="40,40"/>
+      <Fill color="#BE123C"/>
+    </Group>
+    <Repeater id="rep" copies="0" offset="1" position="40,0"/>
+  </Layer>
+  <Animations>
+    <Animation id="grow" duration="60" frameRate="60" loop="once">
+      <Object target="rep">
+        <Channel name="copies" type="float">
+          <Key time="0" value="0" interpolation="linear"/>
+          <Key time="60" value="4"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>
