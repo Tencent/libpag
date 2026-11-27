@@ -50,9 +50,9 @@
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/ImagePattern.h"
 #include "pagx/nodes/InnerShadowFilter.h"
-#include "pagx/nodes/NoiseFilter.h"
 #include "pagx/nodes/LinearGradient.h"
 #include "pagx/nodes/MergePath.h"
+#include "pagx/nodes/NoiseFilter.h"
 #include "pagx/nodes/Path.h"
 #include "pagx/nodes/PathData.h"
 #include "pagx/nodes/Polystar.h"
@@ -7586,7 +7586,6 @@ PAGX_TEST(PAGXSVGTest, SVGImport_StdDeviationKeepsPerChannelBase) {
   EXPECT_NEAR(blurY->keyframes.back().value, 5.0f, 1e-4f);
 }
 
-
 static pagx::Layer* FindLayerWithFilters(pagx::Layer* layer) {
   if (layer == nullptr) {
     return nullptr;
@@ -7647,14 +7646,12 @@ PAGX_TEST(PAGXSVGTest, SVGImport_DropShadowInnerShadowForegroundBlur) {
   EXPECT_FLOAT_EQ(blur->blurY, 15.0f);
 }
 
-
 /**
  * Duo noise: feTurbulence -> two thresholded alpha bands filled with two flood colors and
  * merged over the shape. Maps to NoiseFilter mode=Duo.
  */
 PAGX_TEST(PAGXSVGTest, SVGImport_DuoNoise) {
-  auto doc = pagx::SVGImporter::Parse(
-      ProjectPath::Absolute("resources/svg/filter/duo_noise.svg"));
+  auto doc = pagx::SVGImporter::Parse(ProjectPath::Absolute("resources/svg/filter/duo_noise.svg"));
   ASSERT_NE(doc, nullptr);
   pagx::Layer* filtered = nullptr;
   for (auto* root : doc->layers) {
@@ -7683,8 +7680,8 @@ PAGX_TEST(PAGXSVGTest, SVGImport_DuoNoise) {
  * sets the noise opacity. Maps to NoiseFilter mode=Multi with the table's second value as opacity.
  */
 PAGX_TEST(PAGXSVGTest, SVGImport_MultiNoise) {
-  auto doc = pagx::SVGImporter::Parse(
-      ProjectPath::Absolute("resources/svg/filter/multi_noise.svg"));
+  auto doc =
+      pagx::SVGImporter::Parse(ProjectPath::Absolute("resources/svg/filter/multi_noise.svg"));
   ASSERT_NE(doc, nullptr);
   pagx::Layer* filtered = nullptr;
   for (auto* root : doc->layers) {

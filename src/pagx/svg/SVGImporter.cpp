@@ -27,8 +27,8 @@
 #include "pagx/PAGXDocument.h"
 #include "pagx/nodes/AnimationObject.h"
 #include "pagx/nodes/Channel.h"
-#include "pagx/nodes/NoiseFilter.h"
 #include "pagx/nodes/Image.h"
+#include "pagx/nodes/NoiseFilter.h"
 #include "pagx/nodes/SolidColor.h"
 #include "pagx/svg/SVGBlendMode.h"
 #include "pagx/svg/SVGCssRules.h"
@@ -2086,9 +2086,8 @@ void SVGParserContext::parseMaskChildren(const std::shared_ptr<DOMNode>& parent,
     child = child->getNextSibling();
   }
 }
-bool SVGParserContext::convertNoiseFilter(
-    const std::vector<std::shared_ptr<DOMNode>>& primitives,
-    std::vector<LayerFilter*>& filters) {
+bool SVGParserContext::convertNoiseFilter(const std::vector<std::shared_ptr<DOMNode>>& primitives,
+                                          std::vector<LayerFilter*>& filters) {
   std::shared_ptr<DOMNode> turbulence;
   bool hasShadowPrimitive = false;
   bool hasMerge = false;
@@ -2110,16 +2109,14 @@ bool SVGParserContext::convertNoiseFilter(
     } else if (primitive->name == "feMerge") {
       hasMerge = true;
     } else if (primitive->name == "feFlood") {
-      auto floodOpacity =
-          strtof(getAttribute(primitive, "flood-opacity", "1").c_str(), nullptr);
+      auto floodOpacity = strtof(getAttribute(primitive, "flood-opacity", "1").c_str(), nullptr);
       if (floodOpacity > 0.0f) {
         floodColors.push_back(parseColor(getAttribute(primitive, "flood-color", "black")));
       }
     } else if (primitive->name == "feComponentTransfer") {
       auto child = primitive->getFirstChild();
       while (child) {
-        if (child->name == "feFuncR" || child->name == "feFuncG" ||
-            child->name == "feFuncB") {
+        if (child->name == "feFuncR" || child->name == "feFuncG" || child->name == "feFuncB") {
           hasRgbTransfer = true;
         } else if (child->name == "feFuncA") {
           const auto type = getAttribute(child, "type");
@@ -2255,8 +2252,7 @@ bool SVGParserContext::convertFilterElement(const std::shared_ptr<DOMNode>& filt
         auto [offsetX, offsetY] = parseFilterOffset(primitives[i + 1]);
         auto [blurX, blurY] = parseFilterBlur(primitives[i + 2]);
         auto shadowColor = parseFilterColorMatrix(primitives[i + 4]);
-        const bool isInnerShadow =
-            getAttribute(primitives[i + 3], "operator") == "arithmetic";
+        const bool isInnerShadow = getAttribute(primitives[i + 3], "operator") == "arithmetic";
 
         if (isInnerShadow) {
           auto* innerShadow = _document->makeNode<InnerShadowFilter>();
